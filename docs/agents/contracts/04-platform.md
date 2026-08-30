@@ -278,7 +278,15 @@ all read them.
 `LOGIN_GATEWAY_JWT_PUBLIC_KEY_PATH` `LOGIN_GATEWAY_JWT_KID` `LOGIN_GATEWAY_JWT_ISSUER`
 `LOGIN_GATEWAY_JWT_AUDIENCE` `LOGIN_GATEWAY_JWKS_URL` `LOGIN_GATEWAY_ACCESS_TOKEN_TTL`
 `LOGIN_GATEWAY_REFRESH_COOKIE_NAME`
-`WAREHOUSE_DB` `WAREHOUSE_DB_USER` `WAREHOUSE_DB_PASSWORD`
+`WAREHOUSE_DB` `WAREHOUSE_HOST_PORT` `DBT_THREADS`
+`WAREHOUSE_ADMIN_USER` `WAREHOUSE_ADMIN_PASSWORD` (superuser; runs DDL and backups only)
+`WAREHOUSE_DB_USER` `WAREHOUSE_DB_PASSWORD` (schema owner; dbt connects as this)
+`WAREHOUSE_RLS_USER` `WAREHOUSE_RLS_PASSWORD` (SELECT only, NOBYPASSRLS; the semantic-api identity)
+
+> Three warehouse roles, not one, added by the Data Warehouse agent. A Postgres **superuser
+> bypasses RLS unconditionally** and no policy can stop it, so sharing one role between DDL,
+> dbt and the dashboard would make every tenant-isolation test pass while proving nothing.
+> This is the same "read-only by construction" argument as `warehouse_reader` in section 2.
 
 **How to add a secret.** Put the key in `.env.example` with the literal value `changeme` and add a
 length to `LENGTHS` in `scripts/gen-env-secrets.py` if the default 32 characters is wrong. The
