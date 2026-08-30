@@ -61,6 +61,11 @@ secretGroup = 1
     '''(?i)WAREHOUSE_MASK_SALT[A-Z0-9_]*\s*[=:]\s*["']?ENC\[''',
   ]
 
+  [[rules.allowlists]]
+  description = "The value is an interpolation of the salt variable itself. reason: `WAREHOUSE_MASK_SALT_BCT=${WAREHOUSE_MASK_SALT_BCT:-...}` carries no salt; contract 01 requires the real value to come from SOPS at render time. The `:-default` form captures the default fragment, so a line-scoped carve-out anchored on the interpolation of a *MASK_SALT variable is needed. Found by probing this rule against the correct-usage forms rather than waiting for it to block someone. expires: never."
+  regexTarget = "line"
+  regexes = ['''\$\{?[A-Z0-9_]*MASK_SALT''']
+
 [[rules]]
 id = "bct-postgres-uri-inline-password"
 description = "Postgres connection URI carrying an inline password"
@@ -76,6 +81,11 @@ secretGroup = 1
     '''(?i)postgres(?:ql)?://[a-z0-9_.-]+:changeme@''',
     '''(?i)postgres(?:ql)?://[a-z0-9_.-]+:<[a-z_-]+>@''',
   ]
+
+  [[rules.allowlists]]
+  description = "The password slot is an environment interpolation, so the URI carries no secret. reason: `postgresql://warehouse_reader:${WAREHOUSE_READER_PASSWORD:?required}@...` and the `${VAR:-default}` form resolve at render time from the untracked .env. Scoped to the *captured secret* rather than the line: the carve-out applies only when the password slot itself begins with `${`, so a URI with a literal password still fails even if an interpolation appears elsewhere on the same line. expires: never - this is the correct-usage form, not debt."
+  regexTarget = "secret"
+  regexes = ['''^\$\{''']
 
 [[rules]]
 id = "bct-age-secret-key"
@@ -115,6 +125,11 @@ secretGroup = 2
   description = "Placeholder value. reason: `changeme` is mandated by the Platform-Infra brief for .env.example. expires: never."
   regexTarget = "match"
   regexes = ['''(?i)(GF_SECURITY_ADMIN_PASSWORD|GRAFANA_ADMIN_PASSWORD)\s*[=:]\s*["']?changeme''']
+
+  [[rules.allowlists]]
+  description = "The value is an interpolation of the variable itself. reason: `GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?...}` carries no secret - the value lives in the untracked .env. The rule's own character class excludes `$` and `{`, so it captures the *inner* fragment of the interpolation - for the `:?message` form that fragment is the English error message, which is why this needs a line-scoped carve-out rather than a match-scoped one. Anchored on the interpolation of an *_ADMIN_PASSWORD variable, so an unrelated line is not exempted. Mirrors the bct-odoo-admin-passwd twin; reported by Platform-Infra 2026-08-31, who hit it on a legitimate compose line. expires: never."
+  regexTarget = "line"
+  regexes = ['''\$\{?[A-Z0-9_]*ADMIN_PASSWORD''']
 
 # --------------------------------------------------------------------------------
 # Global allowlists. Each is scoped by targetRules where it is not universally safe.
