@@ -95,6 +95,15 @@ EXPOSE 8069 8072
 # ?db_server_status=1 it opens a live libpq cursor and returns HTTP 500 when the
 # database server is unreachable. `curl -f` turns that 500 into a failure.
 # So this exercises: WSGI worker alive -> Odoo routing -> psycopg2 -> Postgres.
+#
+# DL3025 (shell form) is suppressed for THIS LINE ONLY, and deliberately not in
+# .hadolint.yaml. Shell form is required here: JSON exec form does not expand
+# ${ODOO_HTTP_PORT}, so the check would request a literal '${ODOO_HTTP_PORT}'
+# and fail forever. The rule stays on globally because shell form on a real
+# ENTRYPOINT/CMD means PID 1 is /bin/sh and never receives SIGTERM, so the
+# container takes the full kill timeout and Odoo shuts down uncleanly. The
+# ENTRYPOINT and CMD below are exec form for exactly that reason.
+# hadolint ignore=DL3025
 HEALTHCHECK --interval=15s --timeout=10s --start-period=90s --retries=6 \
     CMD curl -fsS -o /dev/null "http://127.0.0.1:${ODOO_HTTP_PORT}/web/health?db_server_status=1" || exit 1
 
