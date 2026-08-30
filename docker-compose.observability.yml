@@ -168,14 +168,11 @@ services:
     user: "472:472"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      # `:?` with no message on purpose. The Security agent's gitleaks rule
-      # bct-grafana-admin-password reads the text after the colon as the secret
-      # and fires on any message here; the equivalent rule for ODOO_ADMIN_PASSWD
-      # has a line-scoped carve-out for `${...ADMIN_PASSWD`, this one does not
-      # yet. The guard is unchanged either way: compose still refuses to render
-      # when GRAFANA_ADMIN_PASSWORD is unset, and names the variable when it
-      # does. If it is missing, run `make dev-bootstrap`.
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?}
+      # `:?` makes compose refuse to render when the variable is unset, rather
+      # than starting Grafana with whatever default the image picks. The message
+      # is the point of the form - it tells the reader how to fix it at the
+      # moment it breaks.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required - run make dev-bootstrap}
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://127.0.0.1:33001/}
       # No anonymous access and no sign-up: this dashboard will eventually show
       # tenant-scoped business data.
