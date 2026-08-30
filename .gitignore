@@ -1,10 +1,57 @@
+# ---------------------------------------------------------------------------
+# Secrets. `.env` holds generated dev credentials; `.env.example` (tracked)
+# holds only the literal string `changeme`.
+# ---------------------------------------------------------------------------
 .env
-.env.bak-*
+.env.*
+!.env.example
+*.bak-*
+.age-key.txt
+*.agekey
+*.pem
+*.key
+!**/*.pub.pem
+secrets/
+
+# ---------------------------------------------------------------------------
+# Runtime state — bind-mounted or generated. Never tracked.
+# ---------------------------------------------------------------------------
 data/
+backups/
 *.log
-node_modules/
+logs/
+
+# ---------------------------------------------------------------------------
+# Language / tooling artefacts
+# ---------------------------------------------------------------------------
 __pycache__/
-*.pyc
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.next/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+coverage/
+.coverage
+
+# dbt (Data Warehouse agent)
 analytics/dbt/target/
 analytics/dbt/logs/
-.age-key.txt
+analytics/dbt/dbt_packages/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
