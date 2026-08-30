@@ -65,6 +65,20 @@ images:
     status: pending
     notes: dbt runner. Also gates the dbt-ci job, which stays disabled until this exists.
 
+  - name: analytics/cdc
+    dockerfile: analytics/cdc/Dockerfile
+    context: analytics/cdc
+    owner: Backend
+    wave: 3
+    status: present
+    notes: >-
+      CDC loader. Registered by Security on 2026-08-31 when the coverage guard failed on
+      it as an unregistered image - the control working as designed rather than a request
+      arriving first. Base pinned to the PLAN.md python:3.12-slim digest; runs as numeric
+      UID 10001. This is the process that applies contract 01 masking, so its findings are
+      release-blocking regardless of severity score: a compromise here reads unmasked
+      personal data before it is ever hashed.
+
   - name: semantic-api
     dockerfile: analytics/semantic-api/Dockerfile
     context: analytics/semantic-api
@@ -112,7 +126,7 @@ python_projects:
     path: analytics/cdc
     owner: Backend
     wave: 3
-    status: pending
+    status: present
 
   - name: analytics-dbt
     path: analytics/dbt
