@@ -67,26 +67,44 @@ secretGroup = 1
   regexes = ['''\$\{?[A-Z0-9_]*MASK_SALT''']
 
 [[rules]]
-id = "bct-postgres-uri-inline-password"
-description = "Postgres connection URI carrying an inline password"
-regex = '''(?i)postgres(?:ql)?://[a-z0-9_.-]+:([^@\s"'/]{4,})@'''
-keywords = ["postgres://", "postgresql://"]
+id = "bct-datasource-uri-inline-password"
+description = "Data-source URI carrying an inline password (postgres, redis, amqp, mongodb, mysql, clickhouse, mssql)"
+# Two things this regex has to get right, both learned from a miss rather than from design:
+#
+#   1. The USERNAME slot must tolerate an interpolation. The original class was
+#      [a-z0-9_.-]+, which cannot match ${...}. When the username was interpolated the
+#      regex never engaged at all, so the capture never happened and the allowlists were
+#      never consulted - a URI with a real literal PASSWORD sailed through. That is a
+#      false negative, which is far worse than the false positive that led us here.
+#      Reported by Platform-Infra 2026-08-31 and confirmed by the Lead; their own
+#      postgres_exporter DSN was that shape and had been passing for the wrong reason.
+#
+#   2. The username may be ABSENT entirely: `redis://:password@host` is the ordinary
+#      Redis form. Hence the trailing `?` on the username group.
+#
+# Scheme list is explicit rather than a wildcard so this cannot start matching https://
+# or git+ssh:// URLs that legitimately carry a token in the userinfo position.
+regex = '''(?i)\b(?:postgres(?:ql)?|rediss?|amqps?|mongodb(?:\+srv)?|mysql|mariadb|clickhouse|mssql)://(?:[a-z0-9_.%+-]+|\$\{[^}@]{1,64}\})?:([^@\s"'/]{4,})@'''
+# keywords are a prefilter: a scheme missing here means the rule never runs on that line.
+keywords = [
+  "postgres://", "postgresql://",
+  "redis://", "rediss://",
+  "amqp://", "amqps://",
+  "mongodb://", "mongodb+srv://",
+  "mysql://", "mariadb://",
+  "clickhouse://", "mssql://",
+]
 tags = ["database", "connection-string", "bct"]
 secretGroup = 1
 
   [[rules.allowlists]]
-  description = "Documented placeholder URIs. reason: contract 04 and the onboarding docs must show the URI *shape*; the password slot is `changeme`, an env reference or an <angle-bracket> token. expires: never."
-  regexTarget = "match"
-  regexes = [
-    '''(?i)postgres(?:ql)?://[a-z0-9_.-]+:changeme@''',
-    '''(?i)postgres(?:ql)?://[a-z0-9_.-]+:<[a-z_-]+>@''',
-  ]
-
-  [[rules.allowlists]]
-  description = "The password slot is an environment interpolation, so the URI carries no secret. reason: `postgresql://warehouse_reader:${WAREHOUSE_READER_PASSWORD:?required}@...` and the `${VAR:-default}` form resolve at render time from the untracked .env. Scoped to the *captured secret* rather than the line: the carve-out applies only when the password slot itself begins with `${`, so a URI with a literal password still fails even if an interpolation appears elsewhere on the same line. expires: never - this is the correct-usage form, not debt."
+  description = "The password slot is a placeholder or an environment interpolation, so the URI carries no secret. reason: contract 04 and the onboarding docs must show the URI *shape*; `changeme` is the mandated placeholder, `<password>` the documentation token, and `${VAR}` / `${VAR:?msg}` / `${VAR:-default}` resolve at render time from the untracked .env. Scoped to the CAPTURED SECRET, deliberately: the earlier match-target version embedded a copy of the username character class, so widening the rule without widening the allowlist in lockstep would have made the documented placeholder form fire. A secret-scoped allowlist has no username class to keep in sync and is scheme-independent, so it cannot drift out of step with the rule again. It also stays precise - a URI with a literal password still fails even when an interpolation appears elsewhere on the same line. expires: never - this is the correct-usage form, not debt."
   regexTarget = "secret"
-  regexes = ['''^\$\{''']
-
+  regexes = [
+    '''^\$\{''',
+    '''^changeme$''',
+    '''^<[a-z_-]+>$''',
+  ]
 [[rules]]
 id = "bct-age-secret-key"
 description = "age private key (SOPS identity) - must never be committed under any circumstance"
