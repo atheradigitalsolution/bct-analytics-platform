@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <record id="res_groups_privilege_operating_unit" model="res.groups.privilege">
+            <field name="name">Operating Unit</field>
+            <field name="category_id" ref="base.module_category_hidden"/>
+            <field name="sequence">20</field>
+            <field name="description">Who may manage the Operating Unit dimension, and who is
+                exempt from the per-unit record rules.</field>
+        </record>
+
+        <!--
+          Manager: creates and edits units. Does NOT by itself lift the record rules - a manager
+          of the dimension is not automatically entitled to every unit's documents.
+        -->
+        <record id="group_operating_unit_manager" model="res.groups">
+            <field name="name">Operating Unit Manager</field>
+            <field name="sequence">10</field>
+            <field name="privilege_id" ref="res_groups_privilege_operating_unit"/>
+            <field name="comment">May create and edit Operating Units.</field>
+        </record>
+
+        <!--
+          All Operating Units: the record-rule bypass. Granted to root and to the admin user so a
+          fresh database is administrable; a real deployment revokes it from day-to-day accounts.
+        -->
+        <record id="group_operating_unit_all" model="res.groups">
+            <field name="name">All Operating Units</field>
+            <field name="sequence">20</field>
+            <field name="privilege_id" ref="res_groups_privilege_operating_unit"/>
+            <field name="implied_ids" eval="[(4, ref('group_operating_unit_manager'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+            <field name="comment">Sees documents from every Operating Unit. Bypasses the per-unit
+                record rules.</field>
+        </record>
+
+    </data>
+</odoo>
