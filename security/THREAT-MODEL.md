@@ -233,6 +233,13 @@ veto and the Lead does not override it):
 - [ ] Does a new column reach the warehouse without a classification? (T-3)
 - [ ] Does a new read path bypass the mask? `read()` is not the only funnel — `export_data`
       already does. Check exports, reports, QWeb templates and any new controller. (T-3)
+- [ ] Is every column whose transform is `hmac_sha256` actually of a **text** type? A
+      column can be correctly classified and still be unhashable - contract 01's
+      "hard-fail on unclassified" does not catch it, so it surfaces as a silent wrong
+      answer rather than a refusal to start. (T-3)
+- [ ] Did a contract amendment reach its **producer**? A ruling written into
+      `docs/agents/contracts/` is not in force until the module that declares the data
+      agrees with it. Check the seed data, not the prose. (T-3)
 - [ ] Does a security grant sit in a `noupdate="0"` block, so revoking it does not survive
       the next module upgrade? (T-1, T-3)
 - [ ] Does any new verifier pin RS256 and check `iss`/`aud`? (T-4)
