@@ -33,7 +33,7 @@ Runner: `ubuntu-24.04`, pinned. Workflow permissions: `contents: read`.
 | `discover scan targets` | a Dockerfile or `package.json` exists that no scan job covers; a target registered `present` whose path is missing; the registry cannot be parsed | a registered target that has not landed yet (reports SKIP) |
 | `lint (pre-commit)` | any pre-commit hook fails: CRLF, trailing whitespace, missing EOF newline, unparseable YAML/JSON/TOML/XML, a private key, an oversized file, a ruff-check finding, a hadolint finding, a gitleaks staged finding, an expired scanner suppression, an unregistered scan target | formatting drift (`ruff-format` is `stages: [manual]` in wave 1 — see §6) |
 | `sast (semgrep)` | a finding from `.semgrep/**`, the repository's own rules, including the contract rules | a Semgrep **registry** finding — those run advisory and are uploaded, never blocking |
-| `sca-python (pip-audit + SBOM)` | a known vulnerability in `security/requirements-ci.txt` or any tracked `requirements*.txt` | the absence of project requirements (reports SKIP in the job summary) |
+| `sca-python (pip-audit + SBOM)` | a known vulnerability in `security/requirements-ci.txt`, in the **installed environment** (which catches transitive versions a manifest cannot express), or in any tracked `requirements*.txt` | the absence of project requirements (reports SKIP in the job summary) |
 | `sca-node (<name>)` | `npm audit` at `--audit-level=high` finds a high/critical, or OSV-Scanner finds a vulnerability | a registered project whose directory does not exist yet (reports SKIP) |
 | `secrets (gitleaks, full history)` | a secret in the working tree **or anywhere in git history** (`--log-opts="--all --full-history"`) | values allowlisted by name in `.gitleaks.toml`, each with a documented reason |
 | `hadolint (every Dockerfile)` | any Dockerfile produces a warning or worse | info-level findings; line-scoped `# hadolint ignore=` with a reason |
@@ -199,6 +199,29 @@ gitleaks git . --config .gitleaks.toml --redact --log-opts="--all --full-history
 
 If a local run and CI ever disagree, the configuration is wrong and it is Security's bug —
 report it rather than working around it. With one known exception:
+
+### Why OSV-Scanner gates Node but not Python
+
+Both are dependency scanners; they are pointed at different kinds of artefact on purpose.
+
+`package-lock.json` records the **exact resolved version** of every transitive dependency,
+so OSV-Scanner's static answer is the truth about what will be installed. A
+`requirements.txt` records **ranges**, so a static resolver has to guess — and it guesses
+the floor.
+
+Measured on 2026-08-31: OSV-Scanner over `security/requirements-ci.txt` reported seven
+advisories, up to CVSS 8.6, against `python-multipart 0.0.9` — the floor of a transitive
+`>=0.0.9` constraint from semgrep. pip actually installs `0.0.32`, which is above every
+fixed version in those advisories. `pip-audit` over the resolved environment reports no
+vulnerabilities, and it is right.
+
+So `sca-python` runs `pip-audit` twice — once over the manifest, once over the installed
+environment — and does not run OSV-Scanner. `sca-node` runs `npm audit` **and**
+OSV-Scanner, because there the lockfile makes both meaningful.
+
+This is worth stating because the obvious "improvement" is to add OSV-Scanner to
+`sca-python` for symmetry. That would fail the build over a version that is never
+installed, and a gate that cries wolf is a gate people learn to re-run until it passes.
 
 ### `gitleaks dir .` locally will flag your `.env`, and it is right to
 

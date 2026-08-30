@@ -235,8 +235,25 @@ jobs:
           echo "Project requirement files found: $(wc -l < project-reqs.txt)"
           cat project-reqs.txt || true
 
-      - name: pip-audit - CI toolchain
+      - name: pip-audit - CI toolchain manifest
         run: pip-audit --strict --requirement security/requirements-ci.txt --desc
+
+      - name: pip-audit - the installed environment
+        # Audits what pip actually RESOLVED AND INSTALLED, not what the manifest declares.
+        # These differ in a way that matters: a manifest expresses ranges, and a transitive
+        # dependency's vulnerability only exists at a concrete version. Measured on
+        # 2026-08-31 - OSV-Scanner's static resolution of this same requirements file
+        # reported 7 advisories (up to CVSS 8.6) against python-multipart 0.0.9, the FLOOR
+        # of a transitive `>=0.0.9` constraint from semgrep. pip installs 0.0.32, which is
+        # above every one of those fixes. The finding was an artefact of resolving a
+        # manifest instead of an environment.
+        #
+        # That is also why OSV-Scanner gates sca-node but not sca-python: package-lock.json
+        # pins exact resolved versions, so OSV's answer is the truth there, while a
+        # requirements file does not, so it is not the truth here. A scanner pointed at the
+        # wrong artefact fails the build for a version that is never installed, and a gate
+        # that cries wolf is a gate people learn to re-run until it passes.
+        run: pip-audit --strict --desc
 
       - name: pip-audit - project requirements
         run: |
