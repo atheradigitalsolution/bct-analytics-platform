@@ -1,0 +1,202 @@
+# CI contract — job names, pass/fail semantics, and how to get your artefact scanned
+
+Owner: Security agent, sole owner of `.github/workflows/**` (master prompt §2.1).
+Consumers: **Phase 5 CD** (gates on these names), **QA & Docs** (adds test jobs through
+Security), **DWH / Backend / Frontend** (register images and Node projects).
+
+---
+
+## 1. The ownership rule, restated
+
+`ci.yml` — and `cd.yml` when Phase 5 creates it — have exactly one writer: the Security
+agent. **QA does not edit them.** QA sends Security a diff request for its test jobs and
+Security merges it. Same for DWH's `dbt-ci` body, Backend's service jobs, and anyone
+else's.
+
+This is not process for its own sake. CI is the only thing in the repository whose job is
+to say no. A file that every agent can edit is a file where the job that would have failed
+can be removed by whoever is blocked by it — usually with a good reason, at the worst
+moment, in a commit nobody reads.
+
+**There is no `cd.yml` and there must not be one before Phase 5.** Not even a stub: a stub
+is a deployment path that nobody reviewed, sitting in the repository one `on:` edit away
+from running.
+
+---
+
+## 2. Jobs and their pass/fail semantics
+
+Runner: `ubuntu-24.04`, pinned. Workflow permissions: `contents: read`.
+
+| Job | Fails when | Never fails on |
+|---|---|---|
+| `discover scan targets` | a Dockerfile or `package.json` exists that no scan job covers; a target registered `present` whose path is missing; the registry cannot be parsed | a registered target that has not landed yet (reports SKIP) |
+| `lint (pre-commit)` | any pre-commit hook fails: CRLF, trailing whitespace, missing EOF newline, unparseable YAML/JSON/TOML/XML, a private key, an oversized file, a ruff-check finding, a hadolint finding, a gitleaks staged finding, an expired scanner suppression, an unregistered scan target | formatting drift (`ruff-format` is `stages: [manual]` in wave 1 — see §6) |
+| `sast (semgrep)` | a finding from `.semgrep/**`, the repository's own rules, including the contract rules | a Semgrep **registry** finding — those run advisory and are uploaded, never blocking |
+| `sca-python (pip-audit + SBOM)` | a known vulnerability in `security/requirements-ci.txt` or any tracked `requirements*.txt` | the absence of project requirements (reports SKIP in the job summary) |
+| `sca-node (<name>)` | `npm audit` at `--audit-level=high` finds a high/critical, or OSV-Scanner finds a vulnerability | a registered project whose directory does not exist yet (reports SKIP) |
+| `secrets (gitleaks, full history)` | a secret in the working tree **or anywhere in git history** (`--log-opts="--all --full-history"`) | values allowlisted by name in `.gitleaks.toml`, each with a documented reason |
+| `hadolint (every Dockerfile)` | any Dockerfile produces a warning or worse | info-level findings; line-scoped `# hadolint ignore=` with a reason |
+| `container-scan (<image>)` | a **fixable** CRITICAL/HIGH vulnerability, an embedded secret, or a misconfiguration in a built image | unfixed base-image CVEs (collected in the advisory report and uploaded); an image that does not exist yet (reports SKIP) |
+| `fs-scan (trivy filesystem + config)` | a fixable CRITICAL/HIGH in a dependency manifest, a secret, or an IaC misconfiguration in compose/Dockerfiles | LOW/MEDIUM config findings (advisory report) |
+| `dbt-ci` | — **DISABLED**, `if: false`. See §5 | — |
+| **`ci-gate`** | **any** job above reported `failure` or `cancelled`, or any job other than `dbt-ci` reported `skipped` | `dbt-ci` being skipped — the one permitted skip, and it is named in code |
+
+### What Phase 5 CD gates on
+
+**One required status check: `ci-gate`.**
+
+It `needs:` every other job and runs with `if: always()`, so it observes their results
+rather than inheriting them. Consequences that matter for CD:
+
+- Adding a job to `ci.yml` tightens the gate automatically. Nobody has to remember to
+  update a branch-protection list.
+- A job that is deleted, renamed or fails to start surfaces as a missing dependency, not
+  as a silent pass.
+- A **skipped** job fails the gate. A job that did not run is not a job that passed — that
+  distinction is where "green build" lies most often. `dbt-ci` is the single exception and
+  it is exempted by name in the gate's own code, with the reason next to it.
+
+CD should require `ci-gate` and nothing else. Requiring individual job names would break
+every time the matrix changes shape, which it does whenever an image is registered.
+
+---
+
+## 3. Registering a new image or Node project — the extension point
+
+**You do not edit `ci.yml`.** The `container-scan`, `sca-node` and coverage matrices are
+generated at run time from a registry file:
+
+> ### `security/scan-targets.yml`
+
+Send the Lead one entry. For an image:
+
+```yaml
+  - name: my-service                  # unique; becomes the scan job's name
+    dockerfile: my-service/Dockerfile # path from the repo root
+    context: my-service               # docker build context
+    owner: Backend                    # who is accountable for its findings
+    wave: 3                           # PLAN.md wave
+    status: pending                   # pending until it exists, then present
+```
+
+For a Node project (npm audit + OSV-Scanner + CycloneDX SBOM):
+
+```yaml
+  - name: my-service
+    path: my-service                  # directory containing package.json
+    owner: Backend
+    wave: 3
+    status: pending
+```
+
+Verify before you hand it over — this is the same check CI runs:
+
+```bash
+python3 security/scan_targets.py --check     # exits 1 on anything unscanned
+python3 security/scan_targets.py --list      # what will be scanned, what will be skipped
+```
+
+### Why a registry instead of a literal matrix
+
+Five agents need their artefacts scanned; one agent may edit the workflow. A registry
+turns "please add my image to CI" from a workflow edit into a five-line data change that
+the Lead can review in seconds — and, more importantly, makes *not* registering an image a
+build failure rather than an oversight.
+
+### The guarantee it provides
+
+| Situation | What happens |
+|---|---|
+| Image registered, Dockerfile exists | scanned |
+| Image registered, not built yet | job runs, prints an explicit **SKIPPED** row with owner and wave to the job summary. Never absent — absent and clean look identical in a job list |
+| Image lands but the registry still says `pending` | **scanned anyway**, plus a loud drift warning to flip the status. Landing an image never buys a scan-free window |
+| Registry says `present` but the path is gone | hard fail |
+| **A Dockerfile or `package.json` appears that is in no entry** | **hard fail** — master prompt §5.2, no new image ships unscanned |
+
+The last row is the one that matters. Without it a registry is documentation; with it, the
+repository cannot grow an unscanned artefact.
+
+---
+
+## 4. Suppressing a finding
+
+Every scanner suppression must carry a reason and an expiry, and this is enforced by
+`security/check_ignore_policy.py`, which runs as a pre-commit hook and as a CI step:
+
+| File | Required per entry |
+|---|---|
+| `.trivyignore` | `reason:`, `expires: YYYY-MM-DD` (future, ≤ ~1 year), `owner:` |
+| `.hadolint.yaml` (`ignored:`) | `reason:`, `expires: YYYY-MM-DD` |
+| `.gitleaks.toml` (allowlist descriptions) | `reason:`, `expires:` — `never` allowed only because a gitleaks allowlist describes correct usage (SOPS ciphertext *is* high-entropy) rather than a deferred fix |
+
+An expiry in the past **fails the build**. That is the design: the entry does not vanish
+quietly and does not live forever; a human re-reads it and decides again.
+
+Preferences, strongest first:
+
+1. **Fix it.**
+2. **Line-scoped suppression with the reason next to the code** — `# hadolint ignore=DL3025`,
+   `# nosemgrep: <rule-id> - <reason>`, `# noqa: <code>`.
+3. **Rule-scoped carve-out** in the rule itself (`paths.exclude`, gitleaks `targetRules`).
+4. **Global ignore with reason + expiry.** Last resort. It switches a rule off for every
+   artefact this project will ever build, including ones that do not exist yet.
+
+Dry-run what a future date breaks:
+
+```bash
+python3 security/check_ignore_policy.py --today 2027-03-01
+```
+
+---
+
+## 5. `dbt-ci` is disabled, and why that is the honest choice
+
+`analytics/dbt/` does not exist. There is no `profiles.yml`, no warehouse to connect to and
+no models to compile, so `dbt deps`, `dbt build` and `dbt test` would each fail on a
+missing directory.
+
+Both dishonest options were available and rejected:
+
+- `|| true` on every step — a green dbt gate for a project that does not exist. Phase 5
+  would then require a status check that has never verified anything.
+- Omitting the job — loses the record that dbt CI is owed, and by whom.
+
+`if: false` renders it as **Skipped** on every run: visible, impossible to mistake for a
+pass, impossible to forget. Its placeholder step exits 1, so enabling it without writing a
+real body fails loudly.
+
+**To enable (Data Warehouse agent, Phase 3):** send Security a diff that deletes `if: false`
+and replaces the placeholder with a real `dbt deps && dbt build --target ci && dbt test`,
+and flip `analytics/dbt` to `status: present` in `security/scan-targets.yml`.
+
+---
+
+## 6. Known deviations in wave 1, stated rather than hidden
+
+| Deviation | Reason | When it closes |
+|---|---|---|
+| `ruff-format` is `stages: [manual]`, not blocking | It would rewrite 21 files owned by agents writing them right now — a write outside Security's owned paths and a merge-conflict generator | GATE 1: one dedicated `style(repo): format with ruff` commit, then delete the line |
+| Semgrep registry rules are advisory | A floating upstream ruleset can turn the merge path red with no commit behind it | Stays advisory; project rules are the gate |
+| `ignore-unfixed: true` on the blocking Trivy scans | A base-image CVE with no upstream patch cannot be actioned here; blocking on it makes `.trivyignore` the only route to green, which teaches suppression | Reviewed at GATE 5 with the base-image bump |
+| SARIF is uploaded as an artifact, not to code scanning | GitHub code scanning needs Advanced Security, which this repository does not have | If/when the repository gains a remote with GHAS |
+| No cosign / SLSA provenance | Phase 5 | Phase 5 |
+| `--require-hashes` not used for pip | Needs a full transitive lockfile this project does not generate yet | Phase 5, with the other build-integrity work |
+
+---
+
+## 7. Reproducing CI locally
+
+```bash
+pip install -r security/requirements-ci.txt
+pre-commit install
+pre-commit run --all-files                     # == the `lint` job
+semgrep scan --config .semgrep/ --error        # == the `sast` job (blocking half)
+python3 security/scan_targets.py --check       # == the `discover` coverage gate
+python3 security/check_ignore_policy.py        # == the ignore-policy audit
+gitleaks dir . --config .gitleaks.toml --redact   # == the `secrets` job (tree half)
+gitleaks git . --config .gitleaks.toml --redact --log-opts="--all --full-history"
+```
+
+If a local run and CI ever disagree, the configuration is wrong and it is Security's bug —
+report it rather than working around it.
