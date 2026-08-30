@@ -62,7 +62,7 @@ images:
     context: analytics/dbt
     owner: Data-Warehouse
     wave: 3
-    status: pending
+    status: present
     notes: dbt runner. Also gates the dbt-ci job, which stays disabled until this exists.
 
   - name: analytics/cdc
