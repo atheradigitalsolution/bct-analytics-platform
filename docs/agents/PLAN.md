@@ -78,3 +78,39 @@ the Lead does not override it** (§2.4).
 No agent claim is accepted on assertion. For every "done", the Lead re-runs that brief's Evidence
 commands and pastes the output. A reported-but-unrun test is the specific failure the Lead exists
 to catch.
+
+## MANDATORY — path-limited commits (added at GATE 3 after a near-miss)
+
+**All agents share one git index.** A plain `git commit` commits *everything* currently staged,
+including files another agent staged seconds earlier. This is not hypothetical:
+
+- Security ran `git add security/scan-targets.yml && git commit` while Backend had **25 files**
+  staged under `analytics/cdc/**`. Only Security's own ruff hook failing aborted the commit. That is
+  luck, not a control.
+- Commit `28fe2c2c` ("feat(cdc): pgoutput CDC loader…") **did** capture three Platform-Addons files —
+  `custom_pdp_masking/models/pdp_export.py`, `custom_operating_unit/hooks.py`,
+  `custom_demo_seed/MODULE_KNOWLEDGE.md` — under Backend's message and outside Backend's owned paths.
+
+**The rule, binding on every agent including the Lead:**
+
+```
+git commit -m "..." -- path/i/own          # path-limited; ignores the rest of the index
+```
+
+Verified behaviour: only the named paths are committed, and another agent's staged files remain
+staged and untouched.
+
+### Why this matters beyond attribution
+
+The captured files happened to be syntactically complete and correctly wired. They need not have
+been. An agent mid-edit can have a half-written file committed under someone else's message, where
+its owner will not look for it and the committing agent does not know it exists — and a security fix
+(`pdp_export.py` closes the `export_data` masking bypass) is exactly the kind of file whose apparent
+completion matters.
+
+### Lead audit, run at GATE 3
+
+All 45 commits checked for file sets spanning more than one owner. Four hits: three benign
+(the Lead's own `.gitignore`; two Platform-Infra commits publishing `04-platform.md`, which that
+brief explicitly authorises) and one real — `28fe2c2c`, above. No work was lost. Re-run this audit
+before the final merge.
