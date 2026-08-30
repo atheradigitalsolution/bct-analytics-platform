@@ -67,3 +67,34 @@ Two consequences that bind every future change:
 2. **Odoo Settings access is effectively root.** The in-Odoo mask is a surface control, not a
    containment boundary. Tenant isolation and personal-data containment for analytics rest on the
    warehouse side — load-time masking plus RLS — not on the Odoo UI mask.
+
+## Ruling — company-dependent (jsonb) columns are never HMAC'd as a blob (GATE 3)
+
+Raised by the DWH agent: `res.partner.barcode` was classified `personal` → `hmac_sha256`, but its
+physical type is `jsonb`, and the HMAC spec takes `str` and raises `TypeError` otherwise.
+
+Verified by the Lead against the live database rather than taken on report:
+
+- `res_partner.barcode` is `udt_name = jsonb` and **`company_dependent = t`**. Odoo stores a
+  company-dependent field as a jsonb map keyed by company id — `{"1": "BC123", "2": "BC456"}`.
+- It is the **only** non-text column classified `personal`. `res.partner.properties` is also jsonb but
+  is `sensitive` + `drop_to_null`, so it goes to NULL and was never affected.
+- It is referenced by **no** metric in contract 03 and by no mart requirement in Phase 3.
+- 0 of 48 seeded partners populate it, which is why nothing is broken today.
+
+**Ruling: `res.partner.barcode` is reclassified `sensitive` + `drop_to_null`. It does not land.**
+
+Hashing the blob was rejected on the merits, not for convenience. A digest of a company-keyed map is
+not a stable identifier for a person: it changes when *any* single company's value changes, it is
+useless as a join key, and its very presence leaks how many companies hold a value for that partner.
+That is false precision — a number that looks like a pseudonymous identifier while behaving like
+none. Dropping a personal identifier that no metric asks for is the honest default.
+
+**General rule, binding on every agent:** a `company_dependent` (jsonb) column is **never** HMAC'd as
+a whole value. If analytics ever genuinely needs one, it must be hashed **per value, preserving the
+company key**, designed deliberately as a contract change — not by rendering the blob to text and
+hoping the rendering is stable.
+
+**Loader consequence:** the "hard-fail on unclassified" rule is not sufficient on its own. The loader
+must **also** hard-fail when a column's `transform` is `hmac_sha256` but its physical type is not a
+text type. That turns this whole class of defect from a silent wrong answer into a startup error.
