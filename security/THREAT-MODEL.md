@@ -123,6 +123,35 @@ can rebuild the mapping by enumeration. The salt is therefore key material and i
 compromise is a personal-data breach, not a configuration problem. Salt rotation
 invalidates historical joins and is a migration.
 
+**The in-Odoo mask is a UI-and-RPC-surface control, and only that.** `custom_pdp_masking`
+overrides `read()`, which is the funnel `web_read()` and `web_search_read()` use, so list,
+form and kanban views are covered for web and RPC clients alike. It does not stop, and is
+not intended to stop, a Settings administrator, a server action calling `sudo()`, or anyone
+with database access. Odoo's Settings access is effectively root; no record rule or field
+mask is a control against it. Saying so is what makes the control trustworthy.
+
+**Open finding, raised to Platform-Addons 2026-08-31 — `export_data` bypasses the mask.**
+Verified against the pinned Odoo 19 image: `odoo/orm/models.py:880` `export_data()` calls
+`_export_rows()`, which reads values with `value = record[name]` (line 129) — ORM
+`__getitem__`, straight to the cache, never through the overridden `read()`. A user without
+`group_pdp_data_viewer` who holds `base.group_allow_export` can select records in a list
+view and export unmasked names, emails and `customer_ref` to CSV. Export rights and
+PDP-viewer rights are independent groups. This is the bulk path and it is the event UU
+27/2022 cares most about — an export is a copy of personal data leaving the system.
+**Security wants this closed before the CDC loader starts extracting**, with a test
+asserting a non-viewer's export of `res.partner` contains no cleartext email.
+
+**Accepted, documented: `group_operating_unit_all` is granted to `base.user_admin` at
+install.** Removing it was considered and rejected — a fresh database would be
+unadministrable, and the operator's first act would be to add themselves to the bypass group
+via Settings, which teaches self-granting as a normal setup step and reaches the same end
+state with less visibility. OU segmentation is intra-tenant; tenant separation is per
+database plus warehouse RLS (contract 02), so this does not touch T-1. The related **defect**
+raised to Platform-Addons: the grant lives in a `noupdate="0"` data block, so an operator who
+revokes it gets it silently re-granted by the next `odoo -u custom_operating_unit`. A control
+that un-revokes itself during routine maintenance is worse than one that was never applied.
+Fix is to move the `user_ids` seed into `noupdate="1"`.
+
 **Open at GATE 3:** warehouse backups contain the same pseudonymised data and are
 frequently the least-protected copy. Who encrypts them, with what key, and what is the
 retention period?
@@ -202,6 +231,10 @@ veto and the Lead does not override it):
 - [ ] Does anything new read `tenant_id` from somewhere other than the verified token? (T-1)
 - [ ] Does a new consumer create a replication slot? Is its retention bounded and alerted? (T-2)
 - [ ] Does a new column reach the warehouse without a classification? (T-3)
+- [ ] Does a new read path bypass the mask? `read()` is not the only funnel — `export_data`
+      already does. Check exports, reports, QWeb templates and any new controller. (T-3)
+- [ ] Does a security grant sit in a `noupdate="0"` block, so revoking it does not survive
+      the next module upgrade? (T-1, T-3)
 - [ ] Does any new verifier pin RS256 and check `iss`/`aud`? (T-4)
 - [ ] Is every new image in `security/scan-targets.yml`, and every action SHA-pinned? (T-5)
 - [ ] Did a new `.env` variable land in `.env.example` as anything other than `changeme`? (T-6)
