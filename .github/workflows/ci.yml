@@ -362,9 +362,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p reports
+          # Machine-readable report first, non-gating. `set -e` plus a scanner that exits
+          # non-zero on findings would abort before the artefact is written, so a failing
+          # scan would upload nothing - exactly when the report matters most.
           osv-scanner scan source --recursive \
             --format json --output "reports/osv-${{ matrix.slug }}.json" \
-            "${{ matrix.path }}"
+            "${{ matrix.path }}" || true
+          # This run is the gate.
           osv-scanner scan source --recursive "${{ matrix.path }}"
 
       - name: CycloneDX SBOM
@@ -372,9 +376,12 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: |
           set -euo pipefail
+          # Absolute path: `../` is the repository root only while every registered Node
+          # project sits at the top level. A nested path would write the SBOM somewhere
+          # the upload step does not look, and the artefact would silently be empty.
           npx --yes "@cyclonedx/cyclonedx-npm@${CYCLONEDX_NPM_VERSION}" \
             --output-format JSON \
-            --output-file "../sbom-node-${{ matrix.slug }}.cdx.json" \
+            --output-file "${GITHUB_WORKSPACE}/sbom-node-${{ matrix.slug }}.cdx.json" \
             --omit dev
 
       - name: Upload SBOM and reports

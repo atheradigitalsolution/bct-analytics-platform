@@ -194,9 +194,35 @@ pre-commit run --all-files                     # == the `lint` job
 semgrep scan --config .semgrep/ --error        # == the `sast` job (blocking half)
 python3 security/scan_targets.py --check       # == the `discover` coverage gate
 python3 security/check_ignore_policy.py        # == the ignore-policy audit
-gitleaks dir . --config .gitleaks.toml --redact   # == the `secrets` job (tree half)
 gitleaks git . --config .gitleaks.toml --redact --log-opts="--all --full-history"
 ```
 
 If a local run and CI ever disagree, the configuration is wrong and it is Security's bug —
-report it rather than working around it.
+report it rather than working around it. With one known exception:
+
+### `gitleaks dir .` locally will flag your `.env`, and it is right to
+
+`gitleaks dir .` (equivalently `gitleaks detect --source . --no-git`) walks the
+**filesystem**, and gitleaks has no flag to make it honour `.gitignore`. After
+`make dev-bootstrap` your working directory contains a real `.env` full of real generated
+dev credentials, so a local run reports findings in it. That is a true positive about your
+disk and a true negative about the repository: `.env` is gitignored and untracked, and
+nothing in it is in git.
+
+A CI runner never sees this — `.env` is not checked out, so `gitleaks dir .` in the
+`secrets` job scans a tree where the file does not exist.
+
+**Do not** silence it by adding `.env` to a gitleaks allowlist. `.env` is the single most
+important thing to catch if it is ever force-added, and a path exclusion would remove
+exactly that protection. To reproduce the CI result locally, scan only what git can see:
+
+```bash
+# everything that could reach the repository: tracked + untracked-but-not-ignored
+CLEAN="$(mktemp -d)"
+git ls-files -co --exclude-standard -z \
+  | while IFS= read -r -d '' f; do mkdir -p "$CLEAN/$(dirname "$f")"; cp "$f" "$CLEAN/$f"; done
+gitleaks dir "$CLEAN" --config .gitleaks.toml --redact --no-banner
+```
+
+If *that* reports a finding, you have a real problem. Verified 2026-08-31: 136 files, no
+leaks; full history across 21 commits, no leaks.
