@@ -70,7 +70,7 @@ else
     dc run --rm --no-deps -T odoo \
         odoo "${ODOO_ARGS[@]}" \
              --stop-after-init \
-             --without-demo=all \
+             --without-demo=True \
              --load-language=en_US
 
     db_initialised "$DB" || die "odoo exited 0 but '$DB' has no ir_module_module — check 'make logs'."

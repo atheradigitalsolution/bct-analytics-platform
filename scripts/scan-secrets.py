@@ -48,8 +48,18 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
     ("Stripe secret key", re.compile(r"\b[sr]k_live_[0-9A-Za-z]{16,}\b")),
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
+    # The negative character class matters as much as the positive one. A
+    # documented DSN legitimately reads `postgresql://odoo:<password>@host/db`
+    # or `postgresql://odoo:${POSTGRES_PASSWORD}@host/db`. Flagging those trains
+    # people to add blanket ignores, which is how a scanner stops finding
+    # anything real. So the captured secret may neither be a known placeholder
+    # word nor contain a placeholder delimiter.
     ("password in connection URI",
-     re.compile(r"\b(postgres(?:ql)?|redis|amqp|mongodb|mysql)://[^\s:/@]+:(?!changeme\b)[^\s:/@]{6,}@")),
+     re.compile(
+         r"\b(postgres(?:ql)?|redis|amqp|mongodb|mysql)://[^\s:/@]+:"
+         r"(?!changeme\b)(?!password\b)(?!REDACTED\b)(?!secret\b)"
+         r"[^\s:/@<>{}$%*]{6,}@"
+     )),
     ("hardcoded password assignment",
      re.compile(r"""(?i)\b(password|passwd|secret|api_key|token)\s*[:=]\s*["'](?!changeme|CHANGEME|\$|\{\{|<)[^"'\s]{12,}["']""")),
 ]

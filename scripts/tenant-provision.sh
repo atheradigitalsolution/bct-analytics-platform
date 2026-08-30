@@ -78,7 +78,7 @@ log "[1/3] creating database and installing modules (this takes a minute)"
 dc run --rm --no-deps -T odoo \
     odoo -d "$DB" -i "$MODULES" \
          --stop-after-init \
-         --without-demo=all \
+         --without-demo=True \
          --load-language=en_US
 
 db_initialised "$DB" || die "odoo exited 0 but '$DB' has no ir_module_module."

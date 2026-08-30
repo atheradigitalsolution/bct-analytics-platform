@@ -81,9 +81,16 @@ check "scan-secrets" python3 "$REPO_ROOT/scripts/scan-secrets.py"
 
 # 10 ------------------------------------------------------------------------
 step "10. make help documents every target"
-undocumented="$(grep -Eo '^\.PHONY: [a-zA-Z0-9_-]+' "$REPO_ROOT/Makefile" | awk '{print $2}' | sort -u > /tmp/bct_phony.$$ ; \
-                make -s -C "$REPO_ROOT" help | grep -Eo '^ {4}\S+' | tr -d ' ' | sort -u > /tmp/bct_help.$$ ; \
-                comm -23 /tmp/bct_phony.$$ /tmp/bct_help.$$ ; rm -f /tmp/bct_phony.$$ /tmp/bct_help.$$)"
+# `make help` colourises target names, so the raw output starts each line with
+# an ANSI escape, not the target. Strip escapes before comparing, or every
+# single target reads as undocumented.
+help_targets="$(make -s -C "$REPO_ROOT" help 2>/dev/null \
+                | sed 's/\x1b\[[0-9;]*m//g' \
+                | grep -E '^ {4}[a-zA-Z0-9_-]+ ' \
+                | awk '{print $1}' | sort -u)"
+phony_targets="$(grep -Eo '^\.PHONY: [a-zA-Z0-9_-]+' "$REPO_ROOT/Makefile" \
+                | awk '{print $2}' | sort -u)"
+undocumented="$(comm -23 <(printf '%s\n' "$phony_targets") <(printf '%s\n' "$help_targets"))"
 if [ -n "$undocumented" ]; then echo "undocumented targets:"; printf '  %s\n' $undocumented; else echo "every .PHONY target appears in 'make help'"; fi
 check "no undocumented targets" bash -c "[ -z \"$undocumented\" ]"
 

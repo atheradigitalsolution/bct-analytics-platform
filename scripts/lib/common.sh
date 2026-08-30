@@ -101,6 +101,12 @@ load_env() {
 dc() {
     (
         cd "$REPO_ROOT"
+        # These scripts intentionally load only the base + dev files, so compose
+        # sees the running observability containers (same project, different
+        # overlay) as orphans and prints a scary warning on every `up`. It never
+        # removes them - that needs --remove-orphans, which nothing here passes -
+        # but the warning trains people to ignore compose output.
+        export COMPOSE_IGNORE_ORPHANS=true
         if [ "$IS_MSYS" = "1" ]; then
             MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
                 docker compose -p "$COMPOSE_PROJECT_NAME" \

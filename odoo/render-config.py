@@ -59,7 +59,7 @@ DEFAULTS: dict[str, str] = {
     # logging
     "ODOO_LOG_LEVEL": "info",
     # behaviour
-    "ODOO_WITHOUT_DEMO": "all",
+    "ODOO_WITHOUT_DEMO": "True",
     # email
     "ODOO_EMAIL_FROM": "noreply@localhost",
     "ODOO_SMTP_SERVER": "localhost",
