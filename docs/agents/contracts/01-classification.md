@@ -43,3 +43,27 @@ carries **no** classification. Unclassified is a hard failure, never a silent de
 - A test asserts `res.partner.name` is unreadable in `raw_res_partner` and in every mart.
 - A test asserts a `secret`-class column does not exist as a warehouse column at all.
 - A test asserts the loader exits non-zero when a classification row is missing.
+
+## Two different controls — do not confuse them (added at GATE 1)
+
+This contract governs **warehouse masking at load**. `custom_pdp_masking` also implements an
+**in-Odoo UI mask**. They are different controls with different reach, and overstating the second is
+what makes it dangerous.
+
+| Control | Where | What it stops | What it does NOT stop |
+|---|---|---|---|
+| Warehouse masking (this contract) | CDC loader, before the row lands in `raw` | Any reader of the warehouse, including the dashboard, exports and a stolen warehouse backup | Nothing downstream — there is no unmasking path, by construction |
+| In-Odoo UI mask | `read()` override on the mixin | The list/form/kanban UI and RPC reads for users lacking `group_pdp_data_viewer` | A Settings admin, a `sudo()` server action, direct database access — and **any read funnel that does not route through `read()`** |
+
+**`read()` is not the only funnel.** Confirmed in the pinned image at GATE 1:
+`odoo/orm/models.py:806` inside `_export_rows` reads via `value = record[name]`, which is
+`__getitem__` → ORM cache → `_read`, so it never calls the public `read()`. The CSV/XLSX export path
+therefore bypassed the UI mask entirely until it was closed.
+
+Two consequences that bind every future change:
+
+1. **Adding a new read path is a security change.** Before shipping one, ask whether it routes
+   through the overridden funnel. `export_data` did not.
+2. **Odoo Settings access is effectively root.** The in-Odoo mask is a surface control, not a
+   containment boundary. Tenant isolation and personal-data containment for analytics rest on the
+   warehouse side — load-time masking plus RLS — not on the Odoo UI mask.
