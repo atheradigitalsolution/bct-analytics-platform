@@ -61,20 +61,53 @@ else
         ODOO_ARGS=(-d "$DB" -i "$MODULES")
     fi
 
+    # ------------------------------------------------------------------
+    # Stop the running server first, if there is one.
+    #
+    # A module install/update runs DDL — `ALTER TABLE res_users ...` and
+    # friends. The live server holds a connection pool and a loaded registry
+    # against the same tables, and the two deadlock:
+    #
+    #   ERROR: deadlock detected
+    #   bad query: ALTER TABLE "res_users" ALTER COLUMN "notification_type" DROP NOT NULL
+    #   CRITICAL: Failed to initialize database `bct`.
+    #
+    # `make up-dev` never hits this, because it runs init BEFORE starting odoo.
+    # `make install-modules` on a running stack hits it every time. Found by
+    # running it against real modules, not by reasoning about it.
+    # ------------------------------------------------------------------
+    odoo_was_running=0
+    if [ "$(health_of odoo)" != "absent" ] && \
+       [ "$(docker inspect -f '{{.State.Running}}' "$(container_of odoo)" 2>/dev/null)" = "true" ]; then
+        odoo_was_running=1
+        log "stopping odoo: DDL against a database its workers hold will deadlock"
+        dc stop odoo >/dev/null
+    fi
+
     # --no-deps: postgres and redis are already up and healthy (checked above);
     # without it, `run` would start a second dependency chain.
     # --rm: the init container is disposable.
     # A separate one-off container rather than `exec` into the running server,
     # so this also works before the odoo service has ever started — which is
     # exactly the ordering `make up-dev` relies on.
+    set +e
     dc run --rm --no-deps -T odoo \
         odoo "${ODOO_ARGS[@]}" \
              --stop-after-init \
              --without-demo=True \
              --load-language=en_US
+    odoo_rc=$?
+    set -e
 
+    if [ "$odoo_was_running" -eq 1 ]; then
+        log "restarting odoo"
+        dc up -d odoo >/dev/null
+        wait_healthy odoo || warn "odoo did not come back healthy — check 'make logs'."
+    fi
+
+    [ "$odoo_rc" -eq 0 ] || die "odoo exited $odoo_rc during '${ODOO_ARGS[*]}'. See the traceback above."
     db_initialised "$DB" || die "odoo exited 0 but '$DB' has no ir_module_module — check 'make logs'."
-    log "database '$DB' initialised."
+    log "database '$DB' modules applied: $MODULES"
 fi
 
 # ---------------------------------------------------------------------------
