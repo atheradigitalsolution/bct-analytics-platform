@@ -249,3 +249,81 @@ gitleaks dir "$CLEAN" --config .gitleaks.toml --redact --no-banner
 
 If *that* reports a finding, you have a real problem. Verified 2026-08-31: 136 files, no
 leaks; full history across 21 commits, no leaks.
+
+
+---
+
+## 8. Working in a shared tree — two hazards the tooling cannot fix for you
+
+Wave 1 runs several agents against **one working directory and one git index**. That is an
+operator decision, not something this repo configures, and it creates two failure modes
+that have each already happened once. Both are cheap to avoid and expensive to notice
+late, so they are written down rather than rediscovered.
+
+### 8.1 `git commit` commits the whole index, including someone else's staged files
+
+`git add <my file>` followed by a plain `git commit` commits **everything currently
+staged** — which, in a shared tree, includes whatever another agent staged while you were
+working. Their files land in your commit, under your message, outside your owned paths.
+
+This nearly happened during Phase 1: 25 files under `analytics/cdc/**` and
+`scripts/analytics/**` were staged by another agent at the moment Security ran `git
+commit`. It was caught only because a lint hook failed on *their* code and aborted the
+commit — luck, not a control.
+
+**Always commit path-limited:**
+
+```bash
+git commit -m "..." -- path/you/own          # ignores the rest of the index
+```
+
+Verify afterwards, which takes a second and is worth it:
+
+```bash
+git show --pretty="" --name-only HEAD        # only your paths should appear
+```
+
+### 8.2 The pre-commit hook stashes the whole tree while it runs
+
+When `git commit` triggers pre-commit, it stashes **all** unstaged changes tree-wide,
+runs the hooks against the staged content, and then restores the stash. If another agent
+writes to a file inside that window, the restore can put the older content back and their
+edit is silently gone. Platform-Infra hit this twice: a file that read clean, then read
+stale thirty seconds later.
+
+Measured behaviour, so you know which operations are safe:
+
+| Operation | Stashes the tree? |
+|---|---|
+| `git commit` (hook path) | **yes** — `[INFO] Stashing unstaged files…` |
+| `pre-commit run --files …` | no |
+| `pre-commit run --all-files` | no |
+
+So checking your work by hand is always safe; only committing has a window.
+
+**Practical guidance:** commit before running anything long, keep uncommitted work short-
+lived, and prefer `pre-commit run --files <your paths>` over a commit when you only want
+to know whether the hooks pass.
+
+**Recovery, if an edit does vanish.** pre-commit keeps every stash as a patch file and
+does not delete it afterwards, so the change is recoverable:
+
+```bash
+ls -t ~/.cache/pre-commit/patch*        # newest first; they are ordinary git diffs
+git apply ~/.cache/pre-commit/patch<timestamp>-<pid>
+```
+
+Read the patch before applying it — it contains the whole tree's unstaged state at that
+moment, not just your file, so apply selectively if others were mid-edit too.
+
+### 8.3 What this means for gate evidence
+
+Evidence gathered while sibling agents are writing is not stable. `pre-commit run
+--all-files` can report *"files were modified by this hook"* on read-only hooks such as
+`check-yaml`, which is the tree changing mid-run rather than a finding, and a scan can
+catch a file in a half-written state. During Phase 1 a Dockerfile appeared to reference a
+missing `requirements.txt`; the file arrived between two consecutive commands, and
+re-checking before reporting is the only reason a false finding was not raised.
+
+**Re-run before you assert, and prefer a quiet moment.** A red result during active wave
+work is a question, not a conclusion.

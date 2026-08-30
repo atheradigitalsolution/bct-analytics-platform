@@ -82,6 +82,20 @@ executed under a correct policy, so the evidence must include
 `select current_user, rolsuper, rolbypassrls from pg_roles where rolname = current_user;`
 alongside the 403. Without that line the test result carries no information.
 
+Keep it in that **column** form. `rolsuper` and `rolbypassrls` are booleans, and Postgres
+renders them as `true`/`false` when concatenated with `||` — not the `t`/`f` that psql's
+table output displays. A check written as `... = 'f'` against a concatenated string never
+matches, so it passes forever without ever testing anything: a verification step that
+cannot fail is worse than no verification step, because it is mistaken for one. Platform-
+Infra hit exactly this while adopting the rule into `warehouse-reader-check.sh` and lost a
+cycle to it. Returning columns rather than a built string sidesteps it entirely.
+
+The same asymmetry is worth stating in general terms, because it decides where identity
+assertions are needed at all: **connecting as a superuser by mistake makes every write
+succeed, so that error catches itself. Pointing an isolation test at one makes the test
+still pass, so that error never does.** The loud failure needs no control; the silent one
+needs the identity line.
+
 **Residual risk.** RLS is only as good as the session variable being set on *every* code
 path, including background jobs and cache warmers that have no request context. Phase 3
 must state how a connection-pooled query proves its session variable was set for the right
