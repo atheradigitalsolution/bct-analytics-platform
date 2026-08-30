@@ -281,9 +281,10 @@ all read them.
 `WAREHOUSE_DB` `WAREHOUSE_HOST_PORT` `DBT_THREADS`
 `WAREHOUSE_ADMIN_USER` `WAREHOUSE_ADMIN_PASSWORD` (superuser; runs DDL and backups only)
 `WAREHOUSE_DB_USER` `WAREHOUSE_DB_PASSWORD` (schema owner; dbt connects as this)
+`WAREHOUSE_LOADER_USER` `WAREHOUSE_LOADER_PASSWORD` (CDC loader; INSERT into `raw.*` only, no marts)
 `WAREHOUSE_RLS_USER` `WAREHOUSE_RLS_PASSWORD` (SELECT only, NOBYPASSRLS; the semantic-api identity)
 
-> Three warehouse roles, not one, added by the Data Warehouse agent. A Postgres **superuser
+> Four warehouse roles, not one, added by the Data Warehouse and Backend agents. A Postgres **superuser
 > bypasses RLS unconditionally** and no policy can stop it, so sharing one role between DDL,
 > dbt and the dashboard would make every tenant-isolation test pass while proving nothing.
 > This is the same "read-only by construction" argument as `warehouse_reader` in section 2.
