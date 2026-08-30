@@ -102,6 +102,10 @@ check "odoo19-platform-odoo still up" bash -c \
 check "odoo19-analytics-odoo still up" bash -c \
     "docker ps --format '{{.Names}}\t{{.Status}}' | grep -q 'odoo19-analytics-odoo.*Up'"
 
+# 12 ------------------------------------------------------------------------
+step "12. .gitignore does not silently drop a file that must ship"
+check "gitignore guard" python3 "$REPO_ROOT/scripts/check-gitignore.py"
+
 # base-stack footprint ------------------------------------------------------
 step "base stack memory (constraint: idle under 4 GiB)"
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' \

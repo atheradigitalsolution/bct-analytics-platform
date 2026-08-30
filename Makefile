@@ -162,6 +162,10 @@ tenant-restore: ## Restore a tenant: make tenant-restore TENANT=bct FROM=backups
 warehouse-reader-check: ## Prove warehouse_reader can SELECT and replicate but cannot write
 	@bash scripts/warehouse-reader-check.sh $(if $(TENANT),--db $(TENANT),)
 
+.PHONY: check-gitignore
+check-gitignore: ## Fail if .gitignore would drop an addon data file or a dbt seed
+	@python3 scripts/check-gitignore.py
+
 .PHONY: scan-secret
 scan-secret: ## Fail if a real secret is committed, or .env.example drifts off `changeme`
 	@python3 scripts/scan-secrets.py
