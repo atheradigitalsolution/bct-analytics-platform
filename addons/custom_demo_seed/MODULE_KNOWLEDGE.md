@@ -57,6 +57,12 @@ it cannot collide with genuine data that happens to share a name, and it makes
 
 **Measured**, on a fresh database with the defaults:
 
+All counters are derived from `ir.model.data` membership of the dataset, never from matching a
+reference prefix. A name pattern is a heuristic: it mixed datasets together and it silently omitted
+the inventory-adjustment moves, which is where the earlier "238 stock moves" understatement came
+from. `stock_moves` is now reported split, and `stock_moves_delivery + stock_moves_inventory`
+equals the raw `select count(*) from stock_move`.
+
 | counter | run 1 | run 2 |
 |---|---|---|
 | operating_units | 2 | 2 |
@@ -150,8 +156,8 @@ Stated so nobody builds a conclusion on top of one of them.
 * **No purchases, no manufacturing, no payments.** Invoices are posted but not paid, so
   `payment_state` is uniformly `not_paid` and any DSO/ageing metric will look wrong.
 * **Stock is topped up once**, via a single inventory adjustment of 100 000 units per storable
-  product, before any month is seeded. So `stock.move` contains one large adjustment per product
-  plus the deliveries; it is not a realistic replenishment pattern.
+  product, before any month is seeded. So `stock.move` contains one adjustment per storable product
+  (9 with the default parameters) plus the deliveries; it is not a realistic replenishment pattern.
 * **Everything is in one company** (`env.company`). Multi-company behaviour is exercised by the
   unit tests, not by the fixture.
 * **`date_order` is re-pinned after `action_confirm()`**, because confirmation moves it to "now" in
