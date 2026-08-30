@@ -267,3 +267,100 @@ class TestPdpUiMasking(TransactionCase):
             [("email", "=", "budi.santoso@contoh.invalid")]
         )
         self.assertIn(self.partner, found)
+
+
+@tagged("post_install", "-at_install", "pdp")
+class TestPdpExportMasking(TransactionCase):
+    """The export funnel.
+
+    `export_data()` does not go through `read()` - `_export_rows()` reads each value with
+    `record[name]` (`__getitem__` -> ORM cache). Before the fix, a user without
+    `group_pdp_data_viewer` who held the standard `base.group_allow_export` right could export
+    cleartext names, e-mails and subscriber numbers straight to CSV. An export is a bulk copy of
+    personal data leaving the system, which is the event UU 27/2022 is most concerned with.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.partner = cls.env["res.partner"].create({
+            "name": "Budi Santoso",
+            "email": "budi.santoso@contoh.invalid",
+            "phone": "+62-800-555-0001",
+            "comment": "<p>Catatan bebas.</p>",
+            "ref": "EXPORT-TEST-0001",
+        })
+        common_groups = [
+            cls.env.ref("base.group_user").id,
+            cls.env.ref("base.group_allow_export").id,
+        ]
+        cls.exporter = cls.env["res.users"].create({
+            "name": "PDP Exporter (no viewer right)",
+            "login": "pdp_exporter",
+            "group_ids": [(6, 0, common_groups)],
+        })
+        cls.viewer_exporter = cls.env["res.users"].create({
+            "name": "PDP Exporter (viewer)",
+            "login": "pdp_viewer_exporter",
+            "group_ids": [(6, 0, common_groups + [
+                cls.env.ref("custom_pdp_core.group_pdp_data_viewer").id,
+            ])],
+        })
+
+    def test_non_viewer_export_contains_no_cleartext(self):
+        """The assertion Security asked for at the gate."""
+        rows = self.partner.with_user(self.exporter).export_data(
+            ["name", "email", "phone"]
+        )["datas"]
+        flat = " ".join(str(cell) for row in rows for cell in row)
+        self.assertNotIn("budi.santoso@contoh.invalid", flat)
+        self.assertNotIn("Budi Santoso", flat)
+        self.assertNotIn("+62-800-555-0001", flat)
+        for row in rows:
+            for cell in row:
+                self.assertTrue(str(cell).startswith(UI_MASK_PREFIX), cell)
+
+    def test_free_text_is_blanked_in_an_export(self):
+        rows = self.partner.with_user(self.exporter).export_data(["comment"])["datas"]
+        self.assertEqual(rows[0][0], UI_MASK_BLANK)
+        self.assertNotIn("Catatan bebas", str(rows[0][0]))
+
+    def test_excluded_column_is_still_exported(self):
+        """`ref` is on res.partner's exclusion list, so the search box stays usable."""
+        rows = self.partner.with_user(self.exporter).export_data(["ref"])["datas"]
+        self.assertEqual(rows[0][0], "EXPORT-TEST-0001")
+
+    def test_data_viewer_export_is_cleartext(self):
+        """The legitimate case must keep working."""
+        rows = self.viewer_exporter.env["res.partner"].browse(self.partner.id).with_user(
+            self.viewer_exporter
+        ).export_data(["name", "email"])["datas"]
+        self.assertEqual(rows[0][0], "Budi Santoso")
+        self.assertEqual(rows[0][1], "budi.santoso@contoh.invalid")
+
+    def test_export_agrees_with_read(self):
+        """A record must look the same in the UI and in a spreadsheet."""
+        exported = self.partner.with_user(self.exporter).export_data(["email"])["datas"][0][0]
+        displayed = self.partner.with_user(self.exporter).read(["email"])[0]["email"]
+        self.assertEqual(exported, displayed)
+
+    def test_export_through_a_relational_path_is_masked(self):
+        """Exporting `sale.order` with `partner_id/email` reaches personal data on another model.
+
+        This is why the override extends `base` rather than only the models carrying the mixin:
+        `sale.order.export_data()` is what runs, and `res.partner` is never asked.
+        """
+        if "sale.order" not in self.env:
+            self.skipTest("sale not installed")
+        order = self.env["sale.order"].create({"partner_id": self.partner.id})
+        self.exporter.group_ids = [(4, self.env.ref("sales_team.group_sale_salesman").id)]
+        rows = order.with_user(self.exporter).export_data(
+            ["name", "partner_id/email"]
+        )["datas"]
+        flat = " ".join(str(cell) for row in rows for cell in row)
+        self.assertNotIn("budi.santoso@contoh.invalid", flat)
+        self.assertTrue(rows[0][0], "the order reference itself must survive")
+
+    def test_id_columns_are_never_masked(self):
+        rows = self.partner.with_user(self.exporter).export_data(["id", "ref"])["datas"]
+        self.assertFalse(str(rows[0][0]).startswith(UI_MASK_PREFIX))

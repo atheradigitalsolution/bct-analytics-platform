@@ -146,6 +146,32 @@ a database (two reads of the same value give the same token, so lists stay navig
 partners stay distinguishable) and worthless outside it. `test_ui_token_is_not_the_warehouse_digest`
 asserts the two are different.
 
+### The export funnel
+
+`read()` is not the only way values leave Odoo, and the second path was a real hole, found by
+Security and confirmed independently by the Lead and by me before fixing:
+
+    read()        -> {'name': '***8a2b1f58', 'email': '***49f22484'}
+    export_data() -> [['Budi Santoso (Demo 001)', 'budi.santoso.001@contoh.invalid', ...]]
+
+`export_data()` calls `_export_rows()`, which reads each value with `record[name]` -
+`__getitem__` straight out of the ORM cache (`odoo/orm/models.py:806`). The public `read()` is never
+called, so a user without **PDP / Data Viewer** holding the ordinary `base.group_allow_export`
+right could export cleartext to CSV/XLSX. An export is a bulk copy of personal data leaving the
+system, which is the event UU 27/2022 is most concerned with.
+
+`models/pdp_export.py` closes it, and it extends **`base`**, not the mixin. That is deliberate: an
+export path may *reach* personal data on another model - exporting `sale.order` with the column
+`partner_id/email` returns a partner's e-mail while never calling anything on `res.partner`. Each
+column is resolved through its `a/b/c` path to the model and field it terminates on, then looked up
+in that model's mask plan. `id` / `.id` columns are never masked.
+
+**The export surface is therefore masked more broadly than the UI read surface.**
+`sale.order.note` is `sensitive`, so it is blanked in an export while the form view still shows it.
+Asymmetric on purpose: a value on screen is read by one person; a value in a spreadsheet is a copy
+that outlives the session. If column resolution ever raises, every column is blanked rather than
+exported - a masking bug must not become a data leak.
+
 ### Models covered
 
 | model | covered | note |
@@ -153,6 +179,8 @@ asserts the two are different.
 | `res.partner` | yes | `ref` excluded — it is the code operators type into the search box |
 | `ppob.transaction` | yes (declared in `custom_ppob`) | `name` excluded — a system sequence, not a person |
 | `res.users` | **no** | see below |
+
+(The `read()` masking scope below applies to the UI; the export masking above applies everywhere.)
 
 **`res.users` is deliberately exempt from UI masking.** `login` is classified `personal` and *is*
 masked in the warehouse, but the Odoo administration screens, the login form and the session widgets
@@ -195,3 +223,20 @@ class MyModel(models.Model):
 * `TestPdpUiMasking` — a non-viewer sees masked values; tokens are stable and distinct;
   `display_name` is masked too; the UI token differs from the warehouse digest; a Data Viewer sees
   cleartext; ORM attribute access and `search()` are unaffected.
+* `TestPdpExportMasking` — a non-viewer's export of `res.partner` contains **no cleartext e-mail**;
+  free text is blanked; an excluded column (`ref`) still exports; a Data Viewer's export is
+  cleartext; export and `read()` agree on the same record; a relational path
+  (`sale.order` → `partner_id/email`) is masked; `id` columns are not.
+
+### What this control is not
+
+It is a **UI-and-RPC-surface** control. It does not, and cannot, stop:
+
+* a Settings administrator, who can grant themselves `group_pdp_data_viewer`;
+* server-side code calling `sudo()` or running as `env.su`;
+* anyone with direct database or filestore access;
+* `ir_attachment` contents, which are not classified at all (see `custom_pdp_core`
+  MODULE_KNOWLEDGE.md §7).
+
+Stating the boundary is what makes the control trustworthy. The control that actually keeps personal
+data out of the warehouse is the CDC loader never selecting it — contract 01, applied at load.

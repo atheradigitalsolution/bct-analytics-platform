@@ -148,9 +148,25 @@ fail-closed and it is a choice: the tempting alternative ("unassigned means unre
 every newly created user into an accidental super-reader. Granting access is an explicit act.
 `test_rules_fail_closed_for_a_user_with_no_units` pins it.
 
-`base.user_root` and `base.user_admin` are granted `group_operating_unit_all` at install so a fresh
-database is administrable. **A real deployment revokes it from day-to-day accounts** — otherwise the
-rules protect nothing for anyone with Settings access.
+`base.user_root` and `base.user_admin` are granted `group_operating_unit_all` **once, at install**,
+so a fresh database is administrable. **A real deployment revokes it from day-to-day accounts** —
+otherwise the rules protect nothing for anyone with Settings access.
+
+The grant is applied by `post_init_hook` in `hooks.py`, **not** by a `user_ids` field on the group
+record, and that detail matters. `odoo/modules/loading.py` invokes `post_init_hook` only when the
+update operation is `install`; on `upgrade` the branch is not taken. With the grant expressed as
+`<field name="user_ids">` inside the `noupdate="0"` block, every `odoo -u custom_operating_unit`
+re-applied it — silently re-granting the bypass to an operator who had deliberately revoked it,
+during routine maintenance, with no message. A control that un-revokes itself is worse than one
+never applied, because the operator believes the revocation holds and stops checking.
+
+Moving the whole group record into `noupdate="1"` would also stop the re-grant, but `noupdate` is a
+single flag on one `ir.model.data` row per XML ID — there is no per-field granularity — so it would
+freeze `name`, `comment` and `implied_ids` against future updates too. The hook keeps the record
+fully updatable and makes the membership one-shot.
+
+Verified end to end: revoke admin from the group, run `odoo -d bct -u custom_operating_unit`
+(exit 0), and admin is **still** out of the group afterwards.
 
 Note that `group_operating_unit_manager` (may create and edit units) does **not** lift the record
 rules. Administering the dimension is not the same entitlement as reading every unit's documents.

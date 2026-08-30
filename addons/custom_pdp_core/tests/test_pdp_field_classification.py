@@ -34,6 +34,7 @@ SPOT_CHECKS = [
     ("res.partner", "street", "personal"),
     ("res.partner", "city", "personal"),
     ("res.partner", "vat", "sensitive"),
+    ("res.partner", "barcode", "sensitive"),
     ("res.partner", "comment", "sensitive"),
     ("res.users", "password", "secret"),
     ("res.users", "totp_secret", "secret"),
@@ -164,6 +165,36 @@ class TestPdpFieldClassification(TransactionCase):
             gaps,
             "unclassified columns found - the CDC loader would refuse to start:\n%s"
             % "\n".join("  %s: %s" % (m, ", ".join(c)) for m, c in sorted(gaps.items())),
+        )
+
+    def test_company_dependent_columns_are_never_hashed(self):
+        """A company_dependent field is a per-company jsonb map, not a scalar.
+
+        Hashing ``{"1": "BC123", "2": "BC456"}`` yields a digest of a composite: it identifies
+        nobody, joins to nothing, and still discloses how many companies hold a value for that
+        person. Any such column that is personal-or-sensitive must therefore carry
+        ``drop_to_null``. Asserted against the live database so that a future Odoo release which
+        makes another column company_dependent fails the build instead of silently shipping a
+        meaningless digest.
+        """
+        self.env.cr.execute(
+            """
+            SELECT f.model, f.name, c.pdp_class, c.drop_to_null
+              FROM ir_model_fields f
+              JOIN pdp_field_classification c
+                ON c.model_name = f.model AND c.field_name = f.name
+             WHERE f.company_dependent IS TRUE
+               AND f.store IS TRUE
+               AND c.pdp_class IN ('personal', 'sensitive')
+               AND c.drop_to_null IS NOT TRUE
+             ORDER BY f.model, f.name
+            """
+        )
+        offenders = self.env.cr.fetchall()
+        self.assertFalse(
+            offenders,
+            "company_dependent columns classified for hashing rather than NULL-drop: %s"
+            % ", ".join("%s.%s (%s)" % (m, f, c) for m, f, c, _d in offenders),
         )
 
     # -- access ---------------------------------------------------------

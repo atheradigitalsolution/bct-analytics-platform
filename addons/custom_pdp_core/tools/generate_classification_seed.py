@@ -98,7 +98,14 @@ OVERRIDES = {
     "res.partner.zip": PERSONAL,
     "res.partner.function": PERSONAL,
     "res.partner.ref": PERSONAL,
-    "res.partner.barcode": PERSONAL,
+    # company_dependent + jsonb: see COMPANY_DEPENDENT_NOTE. Hashing the whole map would
+    # conflate several companies' values for one person into a single digest that identifies
+    # nobody and joins to nothing, while its presence still leaks how many companies hold a
+    # value for that partner. No metric in contract 03 references it.
+    "res.partner.barcode": ("sensitive", True, ART_43,
+        "Per-company barcode map (company_dependent, stored as jsonb). Dropped to NULL at load: "
+        "a digest of the map is a pseudonym of nothing, and its presence leaks how many companies "
+        "hold a value for this person."),
     "res.partner.website": PERSONAL,
     "res.partner.company_registry": PERSONAL,
     "res.partner.global_location_number": PERSONAL,
@@ -217,6 +224,29 @@ SUFFIX_RULES = [
     (re.compile(r"(^|_)(access_token|secret|token|api_key|private_key|passwd|password)$"), SECRET),
 ]
 
+#: A company_dependent field is stored as a jsonb map keyed by company id
+#: (``{"1": "BC123", "2": "BC456"}``), not as a scalar. Hashing that map produces a digest of a
+#: composite value: it identifies no one, joins to nothing, and still discloses how many companies
+#: hold a value. So any company_dependent column that would otherwise be `personal` or `sensitive`
+#: is forced to `sensitive` + drop_to_null. custom_pdp_core's test suite asserts this invariant
+#: against the live database, so a future Odoo release that makes another column company_dependent
+#: fails the build rather than silently shipping a meaningless digest.
+COMPANY_DEPENDENT_NOTE = (
+    "Stored as a per-company jsonb map, not a scalar. Dropped to NULL at load: a digest of the "
+    "map identifies nobody and joins to nothing."
+)
+
+
+def enforce_company_dependent(model, column, decision, is_company_dependent):
+    """Force a company_dependent personal/sensitive column to the NULL-drop transform."""
+    pdp_class, drop, basis, notes = decision
+    if not is_company_dependent or pdp_class not in ("personal", "sensitive"):
+        return decision
+    if pdp_class == "sensitive" and drop:
+        return decision
+    return ("sensitive", True, ART_43, COMPANY_DEPENDENT_NOTE)
+
+
 def xmlid(model, field):
     return "pdp_%s__%s" % (model.replace(".", "_"), field)
 
@@ -245,16 +275,22 @@ def main():
     with psycopg2.connect(args.dsn) as conn, conn.cursor() as cur:
         for model, table in MODELS:
             cur.execute(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_schema = 'public' AND table_name = %s ORDER BY column_name",
-                (table,),
+                "SELECT c.column_name, COALESCE(f.company_dependent, false) "
+                "FROM information_schema.columns c "
+                "LEFT JOIN ir_model_fields f "
+                "       ON f.model = %s AND f.name = c.column_name "
+                "WHERE c.table_schema = 'public' AND c.table_name = %s "
+                "ORDER BY c.column_name",
+                (model, table),
             )
-            columns = [r[0] for r in cur.fetchall()]
+            columns = list(cur.fetchall())
             if not columns:
                 print("ERROR: table %s not found - model %s" % (table, model), file=sys.stderr)
                 continue
-            for column in columns:
-                pdp_class, drop, basis, notes = classify(model, column)
+            for column, is_company_dependent in columns:
+                pdp_class, drop, basis, notes = enforce_company_dependent(
+                    model, column, classify(model, column), is_company_dependent
+                )
                 rows.append((xmlid(model, column), model, column, pdp_class, basis, notes,
                              "True" if drop else "False"))
                 seen.add((model, column))

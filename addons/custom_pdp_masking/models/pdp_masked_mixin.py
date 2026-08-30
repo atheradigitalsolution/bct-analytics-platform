@@ -95,9 +95,14 @@ class PdpMaskedMixin(models.AbstractModel):
         ).hexdigest()
         return UI_MASK_PREFIX + digest[:UI_MASK_TOKEN_LENGTH]
 
+    @api.model
+    def _pdp_ui_blank(self):
+        """Replacement for a masked free-text column. Shared with the export path."""
+        return UI_MASK_BLANK
+
     def _pdp_ui_mask_value(self, field_name, value, mode):
         if mode == "null":
-            return UI_MASK_BLANK
+            return self._pdp_ui_blank()
         return self._pdp_ui_token(value)
 
     def read(self, fields=None, load="_classic_read"):

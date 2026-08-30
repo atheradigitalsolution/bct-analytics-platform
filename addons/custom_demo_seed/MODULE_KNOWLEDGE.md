@@ -44,6 +44,55 @@ that wraps the same call.
 
 ---
 
+## 1a. Datasets and shape authority — the parameter-authority rule
+
+Idempotency by external ID has a failure mode worse than the problem it solves, and the first
+release shipped it: once records exist, `_ensure` returns them **whatever parameters the caller
+asked for**. `generate(partners=4)` on a database seeded with 40 returned 40, silently, with no
+error. For Phase 3 that is poison — DWH and QA seed at chosen volumes, and a reconciliation test
+that silently ran against the wrong row count is worse than one that fails.
+
+Two mechanisms, both required:
+
+1. **Datasets.** `dataset` namespaces the external IDs and every human-visible reference
+   (`DEMO-C-0001` → `DEMO-UNITTEST-C-0001`, `OU-DEMO-JKT` → `OU-DEMO-UNITTEST-JKT`, …). Two
+   datasets never share a record. The default dataset keeps the historical reference shapes.
+2. **Shape authority.** The full parameter set — including `anchor` (today's month, because the
+   12-month window is anchored to today) and `company_id` — is recorded in
+   `ir.config_parameter` `custom_demo_seed.shape.<dataset>` when the dataset is first generated.
+   A later call for the same dataset with a different shape raises, naming every conflict:
+
+   ```
+   Demo dataset 'default' already exists with a different shape, so this call would have
+   silently returned data you did not ask for.
+
+     - partners: already seeded as 40, you asked for 4
+
+   Choose one:
+     * call generate() again with dataset='<a new name>' ...
+   ```
+
+Dataset names are validated **strictly and case-sensitively**: `Default` is not `default`, and `""`
+is not a synonym for the default. Silently folding either would be the same class of substitution
+this mechanism exists to prevent.
+
+### Why there is no `reset=True`
+
+Considered and rejected. A dataset's documents include posted journal entries and done stock moves,
+and Odoo forbids deleting both by design — `account.move._unlink_account_audit_trail_except_once_post`
+and `stock.move._unlink_if_draft_or_cancel`. Deleting them means passing `force_delete` to bypass
+the audit trail. A fixture that ships an audit-trail bypass is a worse thing to have in the codebase
+than the inconvenience it saves, and a reset that silently half-worked would be worse still.
+The supported ways to get a different shape are a new `dataset` name, or a fresh database.
+
+### Legacy migration
+
+The pre-dataset release wrote unprefixed external IDs (`partner_0001`). `_migrate_legacy_xmlids`
+moves them into `default__…` on first run. It must **flush** and then **clear the registry cache**:
+`ir.model.data._xmlid_lookup` is `@ormcache('xmlid')` *and* runs a raw `cr.execute` that does not
+trigger an ORM flush, so missing either step makes `env.ref()` blind to the renamed rows and
+`_ensure` creates a duplicate of every record. Measured on `bct`: 648 legacy IDs → 0.
+
 ## 2. Idempotency — how, and why it is done this way
 
 Every record is created through `_ensure(env, xmlid, model, values)` (or tagged afterwards with
@@ -72,7 +121,7 @@ equals the raw `select count(*) from stock_move`.
 | sale_orders | 120 | 120 |
 | sale_order_lines | 311 | 311 |
 | invoices | 120 | 120 |
-| stock_moves | 238 | 238 |
+| stock_moves | 248 | 248 |
 | pos_orders | 96 | 96 |
 | ppob_transactions | 360 | 360 |
 | elapsed_seconds | 127.9 | **0.4** |
@@ -99,7 +148,7 @@ With the defaults, on a database seeded 2026-08-30:
 | `sale.order.line` | 311 | 1–4 lines per order |
 | `account.move` (customer invoices) | 120 | all posted, **0 without an Operating Unit** |
 | `stock.picking` | 109 | all done, **0 without an Operating Unit** |
-| `stock.move` | 238 | dated to the order's month |
+| `stock.move` | 248 | 239 deliveries + 9 inventory adjustments |
 | `pos.order` | 96 | 12 months, 2 OUs |
 | `ppob.transaction` | 360 | 328 success / 27 failed / 5 reversed |
 

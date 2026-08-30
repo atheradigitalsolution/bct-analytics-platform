@@ -4,24 +4,54 @@
 Why this module exists: the Phase 4 performance budget is "p95 under 2 s with 12 months of data",
 and that cannot be measured against an empty database. This generates the data.
 
-Three properties it must have, and how each is obtained:
+Four properties it must have, and how each is obtained:
 
 * **Idempotent.** Every record is created through :meth:`_ensure`, which registers an
   ``ir.model.data`` external ID. A second run finds the external ID and returns the existing
-  record instead of creating a new one. Running the generator twice therefore changes no row
-  count. This is stronger than a "does a record with this name exist?" check: it survives
-  renames and it makes ``uninstall`` remove exactly the demo rows and nothing else.
-* **Reproducible.** All randomness comes from a single ``random.Random(seed)``. The same seed
-  produces the same partners, the same amounts and the same date spread.
-* **Never in production.** ``custom_demo_seed`` is not ``auto_install``, not a dependency of any
-  other module, and generates nothing at install time. Data appears only when the method is
-  called explicitly.
+  record instead of creating a new one, so running the generator twice changes no row count.
+* **Reproducible.** All randomness comes from a single ``random.Random(seed)``.
+* **Honest about its shape.** See "The parameter-authority rule" below. This is the property the
+  first version of this module did NOT have, and it was a real defect.
+* **Never in production.** Not ``auto_install``, no module depends on it, and it generates nothing
+  at install time.
 
-Everything it writes is obviously synthetic - see :meth:`_ensure_partners`.
+The parameter-authority rule
+----------------------------
+Idempotency by external ID has a failure mode that is worse than the problem it solves: once the
+records exist, ``_ensure`` returns them **whatever parameters the caller asked for**. So
+``generate(partners=4)`` on a database already seeded with 40 returned 40 partners, silently, with
+no error - the caller had no way to notice it had been ignored. For Phase 3 that is poison: the
+DWH and QA agents seed at chosen volumes to build fixtures and to test reconciliation, and a
+reconciliation test that silently ran against the wrong row count is worse than one that fails.
+
+Two mechanisms fix it, and both are needed:
+
+1. **Datasets.** ``dataset`` namespaces the external IDs and every human-visible reference, so two
+   different shapes are two different, independently idempotent datasets that never share a
+   record. Tests use their own dataset and are therefore hermetic - their result cannot depend on
+   what a previous run left in the database.
+2. **Shape authority.** The full parameter set of a dataset is recorded when it is first
+   generated. A later call for the *same* dataset with a *different* shape raises
+   :class:`~odoo.exceptions.UserError` naming every parameter that conflicts. A caller asking for
+   a shape it does not get always finds out.
+
+Why there is no ``reset=True``
+------------------------------
+It was considered and rejected. A dataset's documents include posted journal entries and done
+stock moves, and Odoo forbids deleting both **by design** - ``account.move`` guards them with
+``_unlink_account_audit_trail_except_once_post`` and ``stock.move`` with
+``_unlink_if_draft_or_cancel``. Deleting them means passing ``force_delete`` to bypass the audit
+trail. A fixture module that ships an audit-trail bypass is a worse thing to have in the codebase
+than the inconvenience it saves, and a reset that silently half-worked would be worse still.
+
+The supported way to get a different shape is a new ``dataset`` name; the supported way to get a
+clean slate is a fresh database (``make init-db``). Both are exact.
 """
 
+import json
 import logging
 import random
+import re
 from datetime import date, datetime, time, timedelta
 
 from dateutil.relativedelta import relativedelta
@@ -33,24 +63,48 @@ _logger = logging.getLogger(__name__)
 
 MODULE = "custom_demo_seed"
 
-#: Marker carried by every generated record, so a human can tell demo data from real data at a
-#: glance and so `_reset` can find it without guessing.
-DEMO_TAG = "Demo"
+#: Dataset used when the caller does not name one.
+DEFAULT_DATASET = "default"
+
+#: A dataset name must be lowercase alphanumeric. No underscore: the external-ID prefix is
+#: ``<dataset>__``, and allowing underscores in the name would make prefixes ambiguous.
+DATASET_RE = re.compile(r"^[a-z][a-z0-9]{0,19}$")
+
+#: ``ir.config_parameter`` key holding a dataset's recorded shape, as JSON.
+SHAPE_PARAM = "custom_demo_seed.shape.%s"
+
+#: The parameters that define a dataset. Any difference in any of these is a different dataset
+#: shape. ``anchor`` is included because the month buckets are anchored to today: the same numeric
+#: parameters run in a different calendar month describe a different 12-month window, and
+#: pretending otherwise would silently widen the dataset.
+SHAPE_KEYS = (
+    "seed",
+    "partners",
+    "products",
+    "operating_units",
+    "months",
+    "sale_orders_per_month",
+    "pos_orders_per_month",
+    "ppob_per_month",
+    "with_pos",
+    "anchor",
+    "company_id",
+)
 
 OPERATING_UNITS = [
-    ("OU-DEMO-JKT", "Cabang Jakarta (Demo)"),
-    ("OU-DEMO-BDG", "Cabang Bandung (Demo)"),
-    ("OU-DEMO-SBY", "Cabang Surabaya (Demo)"),
-    ("OU-DEMO-MDN", "Cabang Medan (Demo)"),
+    ("JKT", "Cabang Jakarta"),
+    ("BDG", "Cabang Bandung"),
+    ("SBY", "Cabang Surabaya"),
+    ("MDN", "Cabang Medan"),
 ]
 
 BILLERS = [
-    ("DEMO-PLN-PRE", "PLN Prabayar (Demo)", "electricity", 20),
-    ("DEMO-PLN-POST", "PLN Pascabayar (Demo)", "electricity", 30),
-    ("DEMO-PDAM", "PDAM Kota (Demo)", "water", 45),
-    ("DEMO-TELCO", "Pulsa Seluler (Demo)", "telco", 15),
-    ("DEMO-INET", "Internet Rumah (Demo)", "internet", 60),
-    ("DEMO-BPJS", "BPJS Kesehatan (Demo)", "insurance", 90),
+    ("PLN-PRE", "PLN Prabayar (Demo)", "electricity", 20),
+    ("PLN-POST", "PLN Pascabayar (Demo)", "electricity", 30),
+    ("PDAM", "PDAM Kota (Demo)", "water", 45),
+    ("TELCO", "Pulsa Seluler (Demo)", "telco", 15),
+    ("INET", "Internet Rumah (Demo)", "internet", 60),
+    ("BPJS", "BPJS Kesehatan (Demo)", "insurance", 90),
 ]
 
 #: Obviously-synthetic person names. Common Indonesian given names, but every record also carries
@@ -67,18 +121,18 @@ FAMILY_NAMES = [
 CITIES = ["Jakarta", "Bandung", "Surabaya", "Medan", "Semarang", "Makassar"]
 
 PRODUCTS = [
-    ("DEMO-P-VCR-010", "Voucher Data Demo 10GB", 55000.0, 42000.0, False),
-    ("DEMO-P-VCR-025", "Voucher Data Demo 25GB", 110000.0, 88000.0, False),
-    ("DEMO-P-TKN-050", "Token Listrik Demo 50rb", 52500.0, 50000.0, False),
-    ("DEMO-P-TKN-100", "Token Listrik Demo 100rb", 102500.0, 100000.0, False),
-    ("DEMO-P-SIM-001", "Kartu Perdana Demo", 25000.0, 15000.0, False),
-    ("DEMO-P-RTR-001", "Router WiFi Demo", 450000.0, 310000.0, False),
-    ("DEMO-P-RTR-002", "Router WiFi Demo Pro", 890000.0, 640000.0, False),
-    ("DEMO-P-CBL-001", "Kabel LAN Demo 5m", 35000.0, 18000.0, False),
-    ("DEMO-P-ADP-001", "Adaptor Demo 12V", 75000.0, 41000.0, False),
-    ("DEMO-P-INS-001", "Jasa Instalasi Demo", 150000.0, 90000.0, True),
-    ("DEMO-P-SVC-001", "Jasa Perawatan Demo", 200000.0, 120000.0, True),
-    ("DEMO-P-CNS-001", "Konsultasi Jaringan Demo", 500000.0, 300000.0, True),
+    ("P-VCR-010", "Voucher Data Demo 10GB", 55000.0, 42000.0, False),
+    ("P-VCR-025", "Voucher Data Demo 25GB", 110000.0, 88000.0, False),
+    ("P-TKN-050", "Token Listrik Demo 50rb", 52500.0, 50000.0, False),
+    ("P-TKN-100", "Token Listrik Demo 100rb", 102500.0, 100000.0, False),
+    ("P-SIM-001", "Kartu Perdana Demo", 25000.0, 15000.0, False),
+    ("P-RTR-001", "Router WiFi Demo", 450000.0, 310000.0, False),
+    ("P-RTR-002", "Router WiFi Demo Pro", 890000.0, 640000.0, False),
+    ("P-CBL-001", "Kabel LAN Demo 5m", 35000.0, 18000.0, False),
+    ("P-ADP-001", "Adaptor Demo 12V", 75000.0, 41000.0, False),
+    ("P-INS-001", "Jasa Instalasi Demo", 150000.0, 90000.0, True),
+    ("P-SVC-001", "Jasa Perawatan Demo", 200000.0, 120000.0, True),
+    ("P-CNS-001", "Konsultasi Jaringan Demo", 500000.0, 300000.0, True),
 ]
 
 FAILURE_REASONS = [
@@ -87,6 +141,18 @@ FAILURE_REASONS = [
     "Timeout dari host biller (demo)",
     "Tagihan sudah dibayar melalui kanal lain (demo)",
 ]
+
+#: Models the dataset tracks by external ID, in the order `summary` reports them.
+TRACKED_MODELS = (
+    "operating.unit",
+    "res.partner",
+    "product.template",
+    "ppob.biller",
+    "sale.order",
+    "pos.order",
+    "ppob.transaction",
+    "stock.move",
+)
 
 
 class DemoSeedGenerator(models.TransientModel):
@@ -104,6 +170,12 @@ class DemoSeedGenerator(models.TransientModel):
     pos_orders_per_month = fields.Integer(default=8, required=True)
     ppob_per_month = fields.Integer(default=30, required=True)
     with_pos = fields.Boolean(string="Generate POS orders", default=True)
+    dataset = fields.Char(
+        default=DEFAULT_DATASET,
+        required=True,
+        help="Independent, separately idempotent dataset. Two datasets never share a record. "
+        "Use a new name to seed a different shape alongside an existing one.",
+    )
 
     def action_generate(self):
         self.ensure_one()
@@ -117,6 +189,7 @@ class DemoSeedGenerator(models.TransientModel):
             pos_orders_per_month=self.pos_orders_per_month,
             ppob_per_month=self.ppob_per_month,
             with_pos=self.with_pos,
+            dataset=self.dataset,
         )
         message = "\n".join("%s: %s" % (key, value) for key, value in sorted(summary.items()))
         return {
@@ -129,6 +202,73 @@ class DemoSeedGenerator(models.TransientModel):
                 "type": "success",
             },
         }
+
+    # ==================================================================
+    # Dataset naming
+    # ==================================================================
+
+    @api.model
+    def _dataset_context(self, dataset):
+        """Return the naming context for ``dataset``.
+
+        ``prefix``    - external-ID prefix, e.g. ``default__`` or ``unittest__``.
+        ``tag``       - upper-case infix for machine references; empty for the default dataset so
+                        that its references keep the historical ``DEMO-C-0001`` shape.
+        ``tag_lower`` - the same, lower-case, for logins and e-mail local parts.
+        """
+        # Validated strictly, on the raw value:
+        #   * only None means "unspecified"; "" is a caller mistake, not a synonym for default;
+        #   * no case folding. Accepting "Default" as "default" would silently drop a caller into
+        #     the shared dataset when they plainly meant a distinct one - the same class of
+        #     silent substitution this whole mechanism exists to prevent.
+        name = DEFAULT_DATASET if dataset is None else dataset
+        if not isinstance(name, str) or not DATASET_RE.match(name):
+            raise UserError(
+                _(
+                    "Invalid dataset name %(name)r. Use 1-20 lowercase letters and digits, "
+                    "starting with a letter, with no underscore and no capitals. The name is "
+                    "matched exactly: 'Default' is not 'default'.",
+                    name=dataset,
+                )
+            )
+        is_default = name == DEFAULT_DATASET
+        return {
+            "name": name,
+            "prefix": "%s__" % name,
+            "tag": "" if is_default else "%s-" % name.upper(),
+            "tag_lower": "" if is_default else "%s." % name,
+        }
+
+    @api.model
+    def _migrate_legacy_xmlids(self, env, ds):
+        """Move pre-dataset external IDs into the default namespace.
+
+        The first release of this module wrote unprefixed external IDs (``partner_0001``). Without
+        this, adding the prefix would orphan every record an existing database had already seeded
+        and the next run would create a second copy of all of them. Runs once; a no-op afterwards.
+        """
+        if ds["name"] != DEFAULT_DATASET:
+            return
+        legacy = env["ir.model.data"].search([("module", "=", MODULE)]).filtered(
+            lambda row: "__" not in row.name
+        )
+        if legacy:
+            for row in legacy:
+                row.name = ds["prefix"] + row.name
+            # Two steps, both required, and in this order:
+            #  1. flush - _xmlid_lookup runs a raw `cr.execute`, which does NOT trigger an ORM
+            #     flush, so without this it would read the OLD names straight from Postgres;
+            #  2. clear the cache - _xmlid_lookup is @ormcache('xmlid'), so even after the flush
+            #     env.ref() would keep answering from the pre-rename cache.
+            # Miss either one and _ensure fails to find every migrated record and tries to create
+            # a second copy: "duplicate key value violates unique constraint
+            # operating_unit_code_company_uniq".
+            env.flush_all()
+            env.registry.clear_cache()
+            _logger.info(
+                "custom_demo_seed: migrated %d legacy external ID(s) into the '%s' dataset",
+                len(legacy), DEFAULT_DATASET,
+            )
 
     # ==================================================================
     # Entry point
@@ -147,15 +287,19 @@ class DemoSeedGenerator(models.TransientModel):
         ppob_per_month=30,
         with_pos=True,
         company=None,
+        dataset=DEFAULT_DATASET,
     ):
         """Generate demo volume and return a dict of counts.
 
-        Safe to call repeatedly: a second call with the same arguments creates nothing.
+        Calling it twice with the same arguments creates nothing the second time. Calling it with
+        *different* arguments for a dataset that already exists raises, naming the conflict -
+        it never silently returns a shape you did not ask for.
 
         :param seed: RNG seed. Same seed, same data.
         :param months: how many whole months back from today to spread the data over.
-        :return: ``{"partners": n, "sale_orders": n, ...}`` - the number of records that now exist,
-            not the number created by this call.
+        :param dataset: independent namespace; see the module docstring.
+        :return: ``{"partners": n, "sale_orders": n, ...}`` - the number of records that now exist
+            in this dataset, not the number created by this call.
         """
         if not self.env.user._is_admin():
             raise UserError(_("Only an administrator may generate demo data."))
@@ -167,121 +311,199 @@ class DemoSeedGenerator(models.TransientModel):
             raise UserError(
                 _("At most %s Operating Units are defined.", len(OPERATING_UNITS))
             )
+        if products > len(PRODUCTS):
+            raise UserError(_("At most %s products are defined.", len(PRODUCTS)))
+        if months < 1:
+            raise UserError(_("months must be at least 1."))
 
         env = self.env(su=True)
         company = company or env.company
+        ds = self._dataset_context(dataset)
+        self._migrate_legacy_xmlids(env, ds)
+
+        shape = {
+            "seed": seed,
+            "partners": partners,
+            "products": products,
+            "operating_units": operating_units,
+            "months": months,
+            "sale_orders_per_month": sale_orders_per_month,
+            "pos_orders_per_month": pos_orders_per_month,
+            "ppob_per_month": ppob_per_month,
+            "with_pos": bool(with_pos),
+            "anchor": date.today().strftime("%Y-%m"),
+            "company_id": company.id,
+        }
+        self._assert_shape(env, ds, shape)
+
         rng = random.Random(seed)
         started = datetime.now()
         _logger.info(
-            "custom_demo_seed: generating (seed=%s, months=%s, company=%s)",
-            seed, months, company.display_name,
+            "custom_demo_seed: generating dataset=%s shape=%s", ds["name"], shape
         )
 
         self._ensure_chart_of_accounts(env, company)
-        units = self._ensure_operating_units(env, company, operating_units)
-        partner_records = self._ensure_partners(env, company, partners, rng)
-        product_records = self._ensure_products(env, company, products)
-        biller_records = self._ensure_billers(env, company)
-        self._ensure_demo_users(env, units)
-        self._ensure_stock(env, company, product_records)
+        units = self._ensure_operating_units(env, ds, company, operating_units)
+        partner_records = self._ensure_partners(env, ds, company, partners, rng)
+        product_records = self._ensure_products(env, ds, company, products)
+        biller_records = self._ensure_billers(env, ds, company)
+        self._ensure_demo_users(env, ds, units)
+        self._ensure_stock(env, ds, company, product_records)
 
-        pos_configs = self._ensure_pos_configs(env, company, units) if with_pos else None
+        pos_configs = self._ensure_pos_configs(env, ds, company, units) if with_pos else None
 
         for offset in range(months - 1, -1, -1):
             month_start = (date.today().replace(day=1) - relativedelta(months=offset))
             self._seed_sale_orders(
-                env, company, month_start, offset, units, partner_records, product_records,
+                env, ds, company, month_start, offset, units, partner_records, product_records,
                 sale_orders_per_month, rng,
             )
             self._seed_ppob(
-                env, company, month_start, offset, units, partner_records, product_records,
+                env, ds, company, month_start, offset, units, partner_records, product_records,
                 biller_records, ppob_per_month, rng,
             )
             if pos_configs:
                 self._seed_pos(
-                    env, company, month_start, offset, units, partner_records, product_records,
-                    pos_configs, pos_orders_per_month, rng,
+                    env, ds, company, month_start, offset, units, partner_records,
+                    product_records, pos_configs, pos_orders_per_month, rng,
                 )
 
-        summary = self.summary(company=company)
+        env["ir.config_parameter"].sudo().set_param(
+            SHAPE_PARAM % ds["name"], json.dumps(shape, sort_keys=True)
+        )
+        summary = self.summary(dataset=ds["name"])
         summary["elapsed_seconds"] = round((datetime.now() - started).total_seconds(), 1)
-        _logger.info("custom_demo_seed: done %s", summary)
+        _logger.info("custom_demo_seed: done dataset=%s %s", ds["name"], summary)
         return summary
 
+    # ==================================================================
+    # Shape authority
+    # ==================================================================
+
     @api.model
-    def summary(self, company=None):
-        """Return the current row counts of everything this module generates."""
-        env = self.env(su=True)
-        company = company or env.company
-        demo_orders = env["sale.order"].search([("name", "like", "%")]).filtered(
-            lambda order: self._is_demo(order)
+    def get_shape(self, dataset=DEFAULT_DATASET):
+        """Return the recorded shape of ``dataset``, or ``False`` if it has never been seeded."""
+        ds = self._dataset_context(dataset)
+        raw = self.env["ir.config_parameter"].sudo().get_param(SHAPE_PARAM % ds["name"])
+        return json.loads(raw) if raw else False
+
+    @api.model
+    def _assert_shape(self, env, ds, requested):
+        """Raise unless ``requested`` matches what this dataset was seeded with.
+
+        This is the guard for the defect described in the module docstring: without it, a caller
+        asking for 4 partners on a database seeded with 40 got 40, silently.
+        """
+        recorded = self.get_shape(ds["name"])
+        if not recorded:
+            return
+        conflicts = [
+            (key, recorded.get(key), requested[key])
+            for key in SHAPE_KEYS
+            if recorded.get(key) != requested[key]
+        ]
+        if not conflicts:
+            return
+        lines = "\n".join(
+            "  - %s: already seeded as %r, you asked for %r" % (key, was, now)
+            for key, was, now in conflicts
         )
+        raise UserError(
+            _(
+                "Demo dataset '%(dataset)s' already exists with a different shape, so this call "
+                "would have silently returned data you did not ask for.\n\n"
+                "%(conflicts)s\n\n"
+                "Choose one:\n"
+                "  * call generate() again with dataset='<a new name>' to seed this shape "
+                "alongside the existing one - datasets never share records; or\n"
+                "  * re-run with the shape above if you meant to reuse the existing dataset; or\n"
+                "  * start from a fresh database (make init-db) if you want a clean slate.\n\n"
+                "There is deliberately no reset: this dataset's posted journal entries and done "
+                "stock moves cannot be deleted without bypassing Odoo's audit trail.",
+                dataset=ds["name"],
+                conflicts=lines,
+            )
+        )
+
+    # ==================================================================
+    # Counting - exact, by external ID, never by name pattern
+    # ==================================================================
+
+    @api.model
+    def _tracked(self, env, ds, model_name):
+        """Return the records of ``model_name`` belonging to this dataset."""
+        rows = env["ir.model.data"].search([
+            ("module", "=", MODULE),
+            ("model", "=", model_name),
+            ("name", "=like", ds["prefix"] + "%"),
+        ])
+        return env[model_name].browse(rows.mapped("res_id")).exists()
+
+    @api.model
+    def summary(self, dataset=DEFAULT_DATASET, company=None):
+        """Return this dataset's current row counts.
+
+        Counted through ``ir.model.data`` membership, not by matching reference prefixes: a name
+        pattern is a heuristic, and it silently mixed datasets and miscounted derived documents.
+        """
+        env = self.env(su=True)
+        ds = self._dataset_context(dataset)
+        orders = self._tracked(env, ds, "sale.order")
+        invoices = orders.invoice_ids.filtered(lambda move: move.move_type == "out_invoice")
+        pickings = orders.picking_ids
+        delivery_moves = env["stock.move"].search_count([("picking_id", "in", pickings.ids)]) \
+            if pickings else 0
+        inventory_moves = len(self._tracked(env, ds, "stock.move"))
         return {
-            "operating_units": env["operating.unit"].search_count(
-                [("code", "like", "OU-DEMO-%")]
-            ),
-            "partners": env["res.partner"].search_count([("ref", "like", "DEMO-C-%")]),
-            "products": env["product.template"].search_count(
-                [("default_code", "like", "DEMO-P-%")]
-            ),
-            "billers": env["ppob.biller"].search_count([("code", "like", "DEMO-%")]),
-            "sale_orders": len(demo_orders),
+            "dataset": ds["name"],
+            "operating_units": len(self._tracked(env, ds, "operating.unit")),
+            "partners": len(self._tracked(env, ds, "res.partner")),
+            "products": len(self._tracked(env, ds, "product.template")),
+            "billers": len(self._tracked(env, ds, "ppob.biller")),
+            "sale_orders": len(orders),
             "sale_order_lines": env["sale.order.line"].search_count(
-                [("order_id", "in", demo_orders.ids)]
-            ),
-            "invoices": env["account.move"].search_count(
-                [("move_type", "=", "out_invoice"),
-                 ("operating_unit_id.code", "like", "OU-DEMO-%")]
-            ),
-            "stock_moves": env["stock.move"].search_count(
-                [("picking_id.operating_unit_id.code", "like", "OU-DEMO-%")]
-            ),
-            "pos_orders": env["pos.order"].search_count(
-                [("operating_unit_id.code", "like", "OU-DEMO-%")]
-            ),
-            "ppob_transactions": env["ppob.transaction"].search_count(
-                [("biller_id.code", "like", "DEMO-%")]
-            ),
+                [("order_id", "in", orders.ids)]
+            ) if orders else 0,
+            "invoices": len(invoices),
+            "pickings": len(pickings),
+            # Split on purpose: the deliveries are what a revenue mart joins, the inventory
+            # adjustments are the one-off stock top-up. Reporting only the first understated the
+            # table by exactly the number of storable products.
+            "stock_moves_delivery": delivery_moves,
+            "stock_moves_inventory": inventory_moves,
+            "stock_moves": delivery_moves + inventory_moves,
+            "pos_orders": len(self._tracked(env, ds, "pos.order")),
+            "ppob_transactions": len(self._tracked(env, ds, "ppob.transaction")),
         }
 
     # ==================================================================
     # Idempotency
     # ==================================================================
 
-    def _is_demo(self, record):
-        return bool(
-            self.env["ir.model.data"].sudo().search_count([
-                ("module", "=", MODULE),
-                ("model", "=", record._name),
-                ("res_id", "=", record.id),
-            ])
-        )
-
-    def _ensure(self, env, xmlid, model, values):
-        """Return the record registered under ``custom_demo_seed.<xmlid>``, creating it if absent.
+    def _ensure(self, env, ds, xmlid, model, values):
+        """Return the record registered under ``custom_demo_seed.<dataset>__<xmlid>``.
 
         This is the whole idempotency mechanism. Do not create a demo record any other way.
         """
-        existing = env.ref("%s.%s" % (MODULE, xmlid), raise_if_not_found=False)
+        full = ds["prefix"] + xmlid
+        existing = env.ref("%s.%s" % (MODULE, full), raise_if_not_found=False)
         if existing:
             return existing
         record = env[model].create(values)
+        return self._tag(env, ds, xmlid, record)
+
+    def _exists(self, env, ds, xmlid):
+        return env.ref("%s.%s" % (MODULE, ds["prefix"] + xmlid), raise_if_not_found=False)
+
+    def _tag(self, env, ds, xmlid, record):
+        """Register an external ID for a record built by a business method.
+
+        Named ``_tag`` and not ``_register`` because ``_register`` is a reserved ``BaseModel``
+        class attribute (a bool); shadowing it fails with "'bool' object is not callable".
+        """
         env["ir.model.data"].create({
             "module": MODULE,
-            "name": xmlid,
-            "model": model,
-            "res_id": record.id,
-            "noupdate": True,
-        })
-        return record
-
-    def _exists(self, env, xmlid):
-        return env.ref("%s.%s" % (MODULE, xmlid), raise_if_not_found=False)
-
-    def _tag(self, env, xmlid, record):
-        env["ir.model.data"].create({
-            "module": MODULE,
-            "name": xmlid,
+            "name": ds["prefix"] + xmlid,
             "model": record._name,
             "res_id": record.id,
             "noupdate": True,
@@ -298,17 +520,22 @@ class DemoSeedGenerator(models.TransientModel):
         _logger.info("custom_demo_seed: loading generic_coa into %s", company.display_name)
         env["account.chart.template"].try_loading("generic_coa", company=company)
 
-    def _ensure_operating_units(self, env, company, count):
+    def _ensure_operating_units(self, env, ds, company, count):
         units = env["operating.unit"].browse()
-        for code, name in OPERATING_UNITS[:count]:
-            units |= self._ensure(env, "ou_%s" % code.lower().replace("-", "_"), "operating.unit", {
-                "name": name,
+        for suffix, name in OPERATING_UNITS[:count]:
+            code = "OU-DEMO-%s%s" % (ds["tag"], suffix)
+            # The external ID is derived from the FINAL code, which is what the pre-dataset
+            # release did. Deriving it from `suffix` instead would not match the migrated legacy
+            # IDs, and _ensure would try to create a second unit with the same code.
+            units |= self._ensure(env, ds, "ou_%s" % code.lower().replace("-", "_"),
+                                  "operating.unit", {
+                "name": "%s (Demo)" % name,
                 "code": code,
                 "company_id": company.id,
             })
         return units
 
-    def _ensure_partners(self, env, company, count, rng):
+    def _ensure_partners(self, env, ds, company, count, rng):
         """Create obviously-synthetic customers.
 
         Every value is unmistakably fake:
@@ -323,8 +550,7 @@ class DemoSeedGenerator(models.TransientModel):
         ``vat`` is deliberately left EMPTY. Odoo's ``base_vat`` validates the Indonesian NPWP
         checksum, so a value that survived validation would by definition be checksum-valid - i.e.
         it would look exactly like a real NPWP. That is the "invents data resembling a real
-        person's identifiers" failure the brief forbids, so the field stays blank and the masking
-        of ``res.partner.vat`` is demonstrated by the unit tests instead.
+        person's identifiers" failure the brief forbids.
         """
         country = env.ref("base.id", raise_if_not_found=False)  # Indonesia
         partners = env["res.partner"].browse()
@@ -333,8 +559,10 @@ class DemoSeedGenerator(models.TransientModel):
             family = FAMILY_NAMES[(index - 1) // len(GIVEN_NAMES) % len(FAMILY_NAMES)]
             values = {
                 "name": "%s %s (Demo %03d)" % (given, family, index),
-                "ref": "DEMO-C-%04d" % index,
-                "email": "%s.%s.%03d@contoh.invalid" % (given.lower(), family.lower(), index),
+                "ref": "DEMO-%sC-%04d" % (ds["tag"], index),
+                "email": "%s.%s.%s%03d@contoh.invalid" % (
+                    given.lower(), family.lower(), ds["tag_lower"], index,
+                ),
                 "phone": "+62-800-555-%04d" % index,
                 "street": "Jl. Contoh Demo No. %d" % (index % 200 + 1),
                 "city": CITIES[index % len(CITIES)],
@@ -345,15 +573,15 @@ class DemoSeedGenerator(models.TransientModel):
             }
             if country:
                 values["country_id"] = country.id
-            partners |= self._ensure(env, "partner_%04d" % index, "res.partner", values)
+            partners |= self._ensure(env, ds, "partner_%04d" % index, "res.partner", values)
         return partners
 
-    def _ensure_products(self, env, company, count):
+    def _ensure_products(self, env, ds, company, count):
         products = env["product.product"].browse()
         for index, (code, name, price, cost, is_service) in enumerate(PRODUCTS[:count], start=1):
-            template = self._ensure(env, "product_%02d" % index, "product.template", {
+            template = self._ensure(env, ds, "product_%02d" % index, "product.template", {
                 "name": name,
-                "default_code": code,
+                "default_code": "DEMO-%s%s" % (ds["tag"], code),
                 "list_price": price,
                 "standard_price": cost,
                 "type": "service" if is_service else "consu",
@@ -367,11 +595,12 @@ class DemoSeedGenerator(models.TransientModel):
             products |= template.product_variant_id
         return products
 
-    def _ensure_billers(self, env, company):
+    def _ensure_billers(self, env, ds, company):
         billers = env["ppob.biller"].browse()
-        for code, name, category, sla in BILLERS:
+        for suffix, name, category, sla in BILLERS:
+            code = "DEMO-%s%s" % (ds["tag"], suffix)
             billers |= self._ensure(
-                env, "biller_%s" % code.lower().replace("-", "_"), "ppob.biller", {
+                env, ds, "biller_%s" % code.lower().replace("-", "_"), "ppob.biller", {
                     "name": name,
                     "code": code,
                     "category": category,
@@ -381,7 +610,7 @@ class DemoSeedGenerator(models.TransientModel):
             )
         return billers
 
-    def _ensure_demo_users(self, env, units):
+    def _ensure_demo_users(self, env, ds, units):
         """Two internal users, each entitled to exactly one Operating Unit.
 
         They exist so the cross-unit isolation of ``custom_operating_unit`` can be demonstrated by
@@ -394,45 +623,65 @@ class DemoSeedGenerator(models.TransientModel):
             env.ref("custom_ppob.group_ppob_user").id,
         ]
         for index, unit in enumerate(units[:2], start=1):
-            self._ensure(env, "user_ou_%d" % index, "res.users", {
+            self._ensure(env, ds, "user_ou_%d" % index, "res.users", {
                 "name": "Petugas %s (Demo)" % unit.name,
-                "login": "demo.ou%d@contoh.invalid" % index,
+                "login": "demo.%sou%d@contoh.invalid" % (ds["tag_lower"], index),
                 "group_ids": [(6, 0, group_ids)],
                 "allowed_operating_unit_ids": [(6, 0, unit.ids)],
                 "default_operating_unit_id": unit.id,
             })
 
-    def _ensure_stock(self, env, company, products):
+    def _ensure_stock(self, env, ds, company, products):
         """Put stock on hand, so deliveries validate without going negative.
 
         Uses the inventory-adjustment flow rather than writing quants directly, so the resulting
-        `stock.move` rows are the same shape a real adjustment produces.
+        `stock.move` rows are the same shape a real adjustment produces. The moves it creates are
+        tagged, so `summary` can report them instead of quietly omitting them.
         """
-        if self._exists(env, "stock_seeded"):
+        if self._exists(env, ds, "stock_seeded"):
+            # Back-fill: a dataset seeded by the pre-dataset release has the marker but no tagged
+            # moves, so `summary` would report stock_moves_inventory as 0 - a misleading number
+            # rather than a missing one. Tag them once, from the products this dataset owns.
+            if not self._tracked(env, ds, "stock.move"):
+                existing = env["stock.move"].search([
+                    ("is_inventory", "=", True),
+                    ("product_id", "in", products.ids),
+                    ("company_id", "=", company.id),
+                ], order="id")
+                for position, move in enumerate(existing, start=1):
+                    self._tag(env, ds, "stockmove_%03d" % position, move)
+                if existing:
+                    _logger.info(
+                        "custom_demo_seed: back-tagged %d pre-existing inventory move(s) "
+                        "for dataset '%s'", len(existing), ds["name"],
+                    )
             return
         warehouse = env["stock.warehouse"].search([("company_id", "=", company.id)], limit=1)
         if not warehouse:
             return
-        location = warehouse.lot_stock_id
         storable = products.filtered(lambda p: p.is_storable)
         if not storable:
             return
+        env.cr.execute("SELECT COALESCE(MAX(id), 0) FROM stock_move")
+        highest_before = env.cr.fetchone()[0]
         quants = env["stock.quant"].with_context(inventory_mode=True).create([
             {
                 "product_id": product.id,
-                "location_id": location.id,
+                "location_id": warehouse.lot_stock_id.id,
                 "inventory_quantity": 100000.0,
             }
             for product in storable
         ])
         quants.action_apply_inventory()
-        marker = self._ensure(env, "stock_seeded", "ir.config_parameter", {
-            "key": "custom_demo_seed.stock_seeded",
+        env.cr.execute("SELECT id FROM stock_move WHERE id > %s ORDER BY id", (highest_before,))
+        for position, (move_id,) in enumerate(env.cr.fetchall(), start=1):
+            self._tag(env, ds, "stockmove_%03d" % position, env["stock.move"].browse(move_id))
+        self._ensure(env, ds, "stock_seeded", "ir.config_parameter", {
+            "key": "custom_demo_seed.%s.stock_seeded" % ds["name"],
             "value": fields.Datetime.to_string(fields.Datetime.now()),
         })
-        return marker
 
-    def _ensure_pos_configs(self, env, company, units):
+    def _ensure_pos_configs(self, env, ds, company, units):
         """One point of sale per Operating Unit, each with one long-lived open session.
 
         Odoo allows only one open ``pos.session`` per ``pos.config`` at a time, and closing a
@@ -442,13 +691,11 @@ class DemoSeedGenerator(models.TransientModel):
         which is faithful; what it does not reproduce is realistic session boundaries. Recorded in
         MODULE_KNOWLEDGE.md.
         """
-        payment_method = env["pos.payment.method"].search(
-            [("company_id", "=", company.id), ("is_cash_count", "=", True)], limit=1
-        )
-        if not payment_method:
-            payment_method = env["pos.payment.method"].search(
-                [("company_id", "=", company.id)], limit=1
-            )
+        # Do NOT force payment_method_ids. A cash pos.payment.method may belong to exactly one
+        # pos.config ("This cash payment method is already used in another Point of Sale"), so
+        # assigning the company's single cash method to every unit's till raises on the second
+        # one. Odoo's own pos.config.create already picks the available methods and skips a cash
+        # method that is taken, which is precisely the behaviour wanted here.
         configs = {}
         for unit in units:
             key = unit.code.lower().replace("-", "_")
@@ -456,10 +703,8 @@ class DemoSeedGenerator(models.TransientModel):
                 "name": "Kasir %s" % unit.name,
                 "company_id": company.id,
             }
-            if payment_method:
-                values["payment_method_ids"] = [(6, 0, payment_method.ids)]
-            config = self._ensure(env, "pos_config_%s" % key, "pos.config", values)
-            session = self._exists(env, "pos_session_%s" % key)
+            config = self._ensure(env, ds, "pos_config_%s" % key, "pos.config", values)
+            session = self._exists(env, ds, "pos_session_%s" % key)
             if not session:
                 session = env["pos.session"].search(
                     [("config_id", "=", config.id), ("state", "!=", "closed")], limit=1
@@ -469,7 +714,7 @@ class DemoSeedGenerator(models.TransientModel):
                         "config_id": config.id,
                         "user_id": env.uid,
                     })
-                self._tag(env, "pos_session_%s" % key, session)
+                self._tag(env, ds, "pos_session_%s" % key, session)
             if session.state == "opening_control":
                 session.set_opening_control(0, None)
             configs[unit.id] = (config, session)
@@ -489,14 +734,14 @@ class DemoSeedGenerator(models.TransientModel):
         moment = time(hour=rng.randint(8, 19), minute=rng.randint(0, 59), second=rng.randint(0, 59))
         return datetime.combine(day, moment)
 
-    def _seed_sale_orders(self, env, company, month_start, offset, units, partners, products,
+    def _seed_sale_orders(self, env, ds, company, month_start, offset, units, partners, products,
                           count, rng):
         sellable = products.filtered(lambda p: p.sale_ok)
         if not sellable or not partners:
             return
         for index in range(1, count + 1):
             xmlid = "so_%s_%02d" % (month_start.strftime("%Y%m"), index)
-            if self._exists(env, xmlid):
+            if self._exists(env, ds, xmlid):
                 continue
             when = self._month_datetime(month_start, rng, index)
             unit = units[rng.randrange(len(units))]
@@ -515,7 +760,7 @@ class DemoSeedGenerator(models.TransientModel):
                 "date_order": when,
                 "order_line": lines,
             })
-            self._tag(env, xmlid, order)
+            self._tag(env, ds, xmlid, order)
             order.action_confirm()
             # action_confirm resets date_order to now for a draft->sale transition in some flows;
             # pin it back so the 12-month spread survives.
@@ -545,14 +790,14 @@ class DemoSeedGenerator(models.TransientModel):
         moves.write({"invoice_date": invoice_date, "date": invoice_date})
         moves.action_post()
 
-    def _seed_ppob(self, env, company, month_start, offset, units, partners, products, billers,
-                   count, rng):
+    def _seed_ppob(self, env, ds, company, month_start, offset, units, partners, products,
+                   billers, count, rng):
         if not billers:
             return
         Transaction = env["ppob.transaction"]
         for index in range(1, count + 1):
             xmlid = "ppob_%s_%03d" % (month_start.strftime("%Y%m"), index)
-            if self._exists(env, xmlid):
+            if self._exists(env, ds, xmlid):
                 continue
             when = self._month_datetime(month_start, rng, index)
             unit = units[rng.randrange(len(units))]
@@ -574,7 +819,7 @@ class DemoSeedGenerator(models.TransientModel):
                 "commission": min(commission, admin_fee),
                 "requested_at": when,
             })
-            self._tag(env, xmlid, txn)
+            self._tag(env, ds, xmlid, txn)
             txn.action_submit()
             roll = rng.random()
             latency = rng.randint(3, int(biller.sla_target_seconds * 2.5) or 60)
@@ -592,14 +837,14 @@ class DemoSeedGenerator(models.TransientModel):
                     settled_at=settled,
                 )
 
-    def _seed_pos(self, env, company, month_start, offset, units, partners, products,
+    def _seed_pos(self, env, ds, company, month_start, offset, units, partners, products,
                   pos_configs, count, rng):
         sellable = products.filtered(lambda p: p.available_in_pos)
         if not sellable or not pos_configs:
             return
         for index in range(1, count + 1):
             xmlid = "pos_%s_%03d" % (month_start.strftime("%Y%m"), index)
-            if self._exists(env, xmlid):
+            if self._exists(env, ds, xmlid):
                 continue
             unit = units[rng.randrange(len(units))]
             entry = pos_configs.get(unit.id)
@@ -638,7 +883,7 @@ class DemoSeedGenerator(models.TransientModel):
                 "amount_return": 0.0,
                 "lines": lines,
             })
-            self._tag(env, xmlid, order)
+            self._tag(env, ds, xmlid, order)
             if payment_method:
                 order.add_payment({
                     "pos_order_id": order.id,

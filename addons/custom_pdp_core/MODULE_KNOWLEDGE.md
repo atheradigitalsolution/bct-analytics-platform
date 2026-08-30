@@ -162,8 +162,8 @@ Settings → Users → <user> → Personal Data (PDP) → Data Viewer
 |---|---|
 | `public` | 19 |
 | `internal` | 648 |
-| `personal` | 29 |
-| `sensitive` | 20 |
+| `personal` | 28 |
+| `sensitive` | 21 |
 | `secret` | 7 |
 
 `internal` dominates because it is the honest answer for the great majority of columns on a sales
@@ -186,11 +186,12 @@ by hand.
 | `pos.order.ticket_code` | portal receipt code |
 | `account.move.inalterable_hash` | audit-trail chain value; publishing it would let the chain be replayed |
 
-**`sensitive` — UU 27/2022 Art. 4(3) (20).** `[NULL]` marks `drop_to_null`.
+**`sensitive` — UU 27/2022 Art. 4(3) (21).** `[NULL]` marks `drop_to_null`.
 
 | column | why |
 |---|---|
 | `res.partner.vat` | Indonesian NPWP, and NIK for a *perorangan* under Coretax |
+| `res.partner.barcode` `[NULL]` | `company_dependent`, so stored as a per-company **jsonb map** — see below |
 | `ppob.transaction.customer_ref` | subscriber/meter number: identifies a household and its consumption |
 | `res.partner.comment` `[NULL]` | free text |
 | `res.partner.picking_warn_msg` `[NULL]` | free text |
@@ -211,11 +212,11 @@ by hand.
 | `pos.order.line.notice` `[NULL]` | free text |
 | `ppob.transaction.failure_reason` `[NULL]` | biller free text, may echo subscriber details |
 
-**`personal` — UU 27/2022 Art. 4(2), hashed so joins survive (29)**
+**`personal` — UU 27/2022 Art. 4(2), hashed so joins survive (28)**
 
 `res.partner`: `name`, `complete_name`, `commercial_company_name`, `company_name`, `email`,
 `email_normalized`, `phone`, `phone_sanitized`, `street`, `street2`, `city`, `zip`, `function`,
-`ref`, `barcode`, `website`, `company_registry`, `global_location_number`, `peppol_endpoint`,
+`ref`, `website`, `company_registry`, `global_location_number`, `peppol_endpoint`,
 `signup_type`
 · `res.users`: `login`
 · `sale.order`: `client_order_ref`, `signed_by`
@@ -231,6 +232,24 @@ by hand.
 `public_description`, `list_price`
 · `product.product`: `default_code`, `barcode`
 · `ppob.biller`: `name`, `code`, `category`
+
+### `company_dependent` columns are never hashed — an enforced invariant
+
+A `company_dependent` field is not a scalar. Odoo stores it as a **jsonb map keyed by company id**:
+
+    res_partner.barcode = {"1": "BC123", "2": "BC456"}
+
+Hashing that map yields a digest of a composite. It identifies nobody, it joins to nothing, and its
+mere presence still discloses how many companies hold a value for that person — strictly worse than
+either keeping or dropping the value. So any `company_dependent` column that would otherwise be
+`personal` or `sensitive` is forced to `sensitive` + `drop_to_null`.
+
+`res.partner.barcode` is the only column in the current schema this affects; every other
+`company_dependent` stored column is `internal`, where the transform is a no-op and the jsonb shape
+is harmless. `generate_classification_seed.py::enforce_company_dependent` applies the rule, and
+`test_company_dependent_columns_are_never_hashed` asserts it **against the live database**, so a
+future Odoo release that makes another column `company_dependent` fails the build instead of
+silently shipping a meaningless digest.
 
 ### Judgement calls worth challenging at a gate
 

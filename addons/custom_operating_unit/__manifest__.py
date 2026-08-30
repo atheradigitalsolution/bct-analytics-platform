@@ -37,6 +37,7 @@ fail-closed behaviour of the rules.
         "views/res_users_views.xml",
         "views/inherited_views.xml",
     ],
+    "post_init_hook": "post_init_hook",
     "installable": True,
     "application": False,
     "auto_install": False,
