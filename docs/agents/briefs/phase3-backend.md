@@ -87,6 +87,32 @@ Master prompt §3.0.
 - Rate-limit authentication attempts. Do not log credentials, tokens, or the values of any
   `personal`/`sensitive` field.
 
+## Security findings you MUST answer — raised at GATE 1, not optional
+
+The Security agent reviewed this design and held these open against you. They are conditions of
+passing GATE 3, not suggestions.
+
+### T-1 — RLS is defeated by a pooled connection (blocking)
+Postgres RLS reads a **session** variable. A connection pool that hands a connection carrying
+`app.tenant_id = 'tenant_a'` to a request for tenant B silently serves A's rows to B — RLS will not
+save you, because from the database's point of view nothing is wrong. Contract 02 does not say how
+this is prevented. **You must.** Acceptable answers include `SET LOCAL` inside an explicit
+transaction for every query (so the value cannot outlive the transaction), a pool keyed per tenant,
+or resetting the variable on connection checkout and checkin with a guard that fails closed if it is
+unset. State which you chose and prove it with a test that reuses a pooled connection across two
+tenants and asserts no leakage.
+
+### T-4 — no key-rotation story for the RS256 signing key (blocking)
+Platform-Infra already ships `LOGIN_GATEWAY_JWT_KID` in `.env.example`, which makes rotation
+possible. **Publish two keys in JWKS from day one** and have verifiers select by `kid`, so a rotation
+is a config change rather than a flag-day outage. A single-key JWKS is a design you cannot rotate
+without downtime.
+
+### T-2 — informational, owned by DWH
+The 2 GB slot cap trades analytics correctness for ERP uptime: past the cap the slot is invalidated
+and the warehouse needs a re-snapshot. Your consumer must therefore **detect an invalidated slot and
+report it loudly** rather than silently reconnecting and producing a mart with a hole in it.
+
 ## Scope — out
 - `analytics/dbt/**`, `analytics/warehouse/**`, `docker-compose.analytics.yml`,
   `observability/*analytics-*` — **Data Warehouse agent.**
