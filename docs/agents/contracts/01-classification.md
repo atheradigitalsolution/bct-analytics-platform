@@ -90,11 +90,45 @@ useless as a join key, and its very presence leaks how many companies hold a val
 That is false precision — a number that looks like a pseudonymous identifier while behaving like
 none. Dropping a personal identifier that no metric asks for is the honest default.
 
-**General rule, binding on every agent:** a `company_dependent` (jsonb) column is **never** HMAC'd as
-a whole value. If analytics ever genuinely needs one, it must be hashed **per value, preserving the
-company key**, designed deliberately as a contract change — not by rendering the blob to text and
-hoping the rendering is stable.
+**General rule, binding on every agent** (generalised by Security from "jsonb" to the property that
+actually matters, so nobody reads this as a *type* rule and is then caught by a `company_dependent`
+column that happens to be text):
 
-**Loader consequence:** the "hard-fail on unclassified" rule is not sufficient on its own. The loader
-must **also** hard-fail when a column's `transform` is `hmac_sha256` but its physical type is not a
-text type. That turns this whole class of defect from a silent wrong answer into a startup error.
+> A value that is a **map keyed by anything other than the data subject** is never HMAC'd as a whole.
+> If analytics ever needs one, it is hashed **per value, with the key preserved**, as a deliberate
+> contract change.
+
+The decisive property is not `jsonb`. It is that hashing such a map conflates several companies'
+values for one person into a single digest, so the result is a pseudonym of nothing: it neither
+identifies the person nor survives as a join key. That is why "pick a canonical JSON rendering and
+hash it" would have been the wrong fix even though it is technically available — it produces a
+stable digest of a thing that is not an identifier. The cardinality leak is a second, independent
+reason: the mere presence of a value discloses how many companies hold one for that partner.
+
+**Loader consequence — a startup validation, not a per-row check.** The "hard-fail on unclassified"
+rule is not sufficient on its own. At startup, over the **whole** classification map, for every
+column to be extracted:
+
+| Condition | Action |
+|---|---|
+| no classification row | refuse to start *(existing)* |
+| `transform = hmac_sha256` and column type is not `text` / `varchar` / `bpchar` / `name` | refuse to start *(new)* |
+
+It must be a startup pass rather than a per-row guard: per-row would fail partway through a load and
+leave a half-populated `raw_` table that looks like a transient error rather than a contract
+violation. Startup means the operator learns before anything lands.
+
+**Text types only — not "anything castable to text".** A bigint identifier *is* hashable if you cast
+it, but the choice of canonical rendering is precisely the ambiguity that produced this defect. Any
+non-text type requires an explicit contract decision, not an implicit cast.
+
+## Process rule — an amendment is not in force until it reaches its producer
+
+This ruling was written into this document while
+`addons/custom_pdp_core/data/pdp.field.classification.csv:453` and the live
+`pdp_field_classification` table still said `personal` / `drop_to_null=f`. The CDC loader reads the
+**table**, not this prose, so for a period the amendment had no effect while appearing settled.
+
+Binding on the Lead: a contract amendment is not complete until the producer is changed and the
+change is observable in the running system. **Gate evidence for a classification change is a query
+against the database, never a diff of this file.**
