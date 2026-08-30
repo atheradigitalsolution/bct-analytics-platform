@@ -84,7 +84,7 @@ description = "Data-source URI carrying an inline password (postgres, redis, amq
 #
 # Scheme list is explicit rather than a wildcard so this cannot start matching https://
 # or git+ssh:// URLs that legitimately carry a token in the userinfo position.
-regex = '''(?i)\b(?:postgres(?:ql)?|rediss?|amqps?|mongodb(?:\+srv)?|mysql|mariadb|clickhouse|mssql)://(?:[a-z0-9_.%+-]+|\$\{[^}@]{1,64}\})?:([^@\s"'/]{4,})@'''
+regex = '''(?i)\b(?:postgres(?:ql)?|rediss?|amqps?|mongodb(?:\+srv)?|mysql|mariadb|clickhouse|mssql)://(?:[a-z0-9_.%+-]+|\$\{[^}@]{1,64}\})?:([^@\s"'?]{4,})@'''
 # keywords are a prefilter: a scheme missing here means the rule never runs on that line.
 keywords = [
   "postgres://", "postgresql://",
@@ -96,6 +96,11 @@ keywords = [
 ]
 tags = ["database", "connection-string", "bct"]
 secretGroup = 1
+
+  [[rules.allowlists]]
+  description = "The captured value is a port followed by a path, so the URI had no userinfo at all. reason: allowing `/` in the password (base64 secrets contain it constantly - `openssl rand -base64 32`) means `postgres://host:5432/db/page@rev` can match with `host` read as the username and `5432/db/page` as the password. A capture that begins with a port-shaped number and a slash is that shape, never a credential. Narrow on purpose: it does not exempt a password that merely CONTAINS a slash, only one that starts with digits-then-slash. expires: never - this is a URI-parsing artefact, not debt."
+  regexTarget = "secret"
+  regexes = ['''^[0-9]{1,5}/''']
 
   [[rules.allowlists]]
   description = "The password slot is a placeholder or an environment interpolation, so the URI carries no secret. reason: contract 04 and the onboarding docs must show the URI *shape*; `changeme` is the mandated placeholder, `<password>` the documentation token, and `${VAR}` / `${VAR:?msg}` / `${VAR:-default}` resolve at render time from the untracked .env. Scoped to the CAPTURED SECRET, deliberately: the earlier match-target version embedded a copy of the username character class, so widening the rule without widening the allowlist in lockstep would have made the documented placeholder form fire. A secret-scoped allowlist has no username class to keep in sync and is scheme-independent, so it cannot drift out of step with the rule again. It also stays precise - a URI with a literal password still fails even when an interpolation appears elsewhere on the same line. expires: never - this is the correct-usage form, not debt."
