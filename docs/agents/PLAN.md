@@ -114,3 +114,34 @@ All 45 commits checked for file sets spanning more than one owner. Four hits: th
 (the Lead's own `.gitignore`; two Platform-Infra commits publishing `04-platform.md`, which that
 brief explicitly authorises) and one real — `28fe2c2c`, above. No work was lost. Re-run this audit
 before the final merge.
+
+## MANDATORY gate step — verify from a clone, never from the working tree
+
+Added at GATE 3 after `.gitignore`'s unanchored `data/` silently excluded three install-critical
+files, including the entire 724-row contract 01 classification seed. Every module's
+`__manifest__.py` declared them, so **a fresh clone could not install those modules at all** — while
+every test passed, because they ran against a working tree where the files exist on disk.
+
+This bug class is invisible to everything else we run: `git status` shows nothing, the working tree
+keeps working, CI on a warm checkout is fine. It surfaces only on a clean clone — which is exactly
+what the definition of done promises ("`make up-dev` and `make up-analytics` bring up a clean stack
+from a fresh clone, verified on a machine with no prior state").
+
+**Standing rule: gate evidence for anything installable is produced from `git clone` of the branch
+into a temporary directory, not from the working tree.** Verified working: clone, install all five
+modules into a brand-new database, assert declared data files present, then remove clone, container
+and database.
+
+It is the same failure shape as a contract amendment not reaching its producer, and as an isolation
+test pointed at a superuser: **the thing that was verified was not the thing that ships.** Three
+separate instances of that shape in one session is a pattern, not a coincidence — prefer evidence
+gathered from the artefact a user would actually get.
+
+### Related hazards in a shared tree — all three now documented in `security/CI-CONTRACT.md` §8
+1. **Shared git index** — a plain `git commit` captures another agent's staged files. Use
+   `git commit -- path/i/own`.
+2. **Stash window** — only `git commit` (the hook path) stashes the working tree; `pre-commit run`
+   by hand does not. Recovery: pre-commit writes each stash to `~/.cache/pre-commit/patch<ts>-<pid>`
+   as an ordinary git diff and never deletes it, so a lost edit is recoverable with `git apply`.
+3. **Unstable evidence during active waves** — a red result may be a genuine finding in a sibling's
+   in-flight work rather than a regression. Re-check before asserting it.
