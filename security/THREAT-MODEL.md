@@ -62,7 +62,25 @@ evidence is usually a customer noticing.
 | 3 | Operating Unit record rules in Odoo | `custom_operating_unit` | module test: OU-A user cannot read an OU-B `sale.order` |
 | 4 | `.sudo()` on tenant-scoped models flagged | semgrep `bct-odoo-sudo-on-tenant-scoped-model` | CI |
 | 5 | `warehouse_reader` holds `SELECT` + `REPLICATION` only | `postgres/init/sql/20-roles.sql` | Platform-Infra evidence: `INSERT` denied |
+| 5b | Warehouse roles split three ways, all `NOSUPERUSER NOBYPASSRLS` | `analytics/warehouse/init/sql/20-schemas-roles.sql` | Adopted 2026-08-31; DWH evidence at GATE 3 |
 | 6 | 403 leaks nothing about whether tenant B exists | contract 02 | Phase 4 test |
+
+**A superuser ignores RLS. This is the fact that makes control 5b necessary.** In
+Postgres, a role with `SUPERUSER` — or with `BYPASSRLS` — is exempt from row security
+unconditionally, with no error and no log line. Point semantic-api at such a role and every
+cross-tenant test still passes, because the policy is never evaluated: the test proves the
+query is well-formed, not that isolation works. The Data Warehouse agent separated three
+roles to make that structurally impossible — `warehouse_admin` (superuser; DDL and backups
+only), `warehouse` (schema owner, dbt), and `warehouse_rls` (SELECT only, `NOSUPERUSER
+NOBYPASSRLS`) — and `warehouse_rls` is the only identity semantic-api may use. Security
+adopted this on 2026-08-31; the passwords are in `.secrets.enc.yaml`, `changeme` in
+`.env.example`.
+
+**Therefore, at GATE 3 the tenant-isolation test must prove which role it ran as.** A
+passing isolation test executed as a superuser is indistinguishable from a passing one
+executed under a correct policy, so the evidence must include
+`select current_user, rolsuper, rolbypassrls from pg_roles where rolname = current_user;`
+alongside the 403. Without that line the test result carries no information.
 
 **Residual risk.** RLS is only as good as the session variable being set on *every* code
 path, including background jobs and cache warmers that have no request context. Phase 3
