@@ -1,0 +1,240 @@
+# ===========================================================================
+# odoo19-bct — analytics overlay (Data Warehouse agent).
+#
+#   make up-analytics      (adds these on top of the base + dev stack)
+#   make down-analytics    (removes only these; the base stack keeps running)
+#
+# This file is an OVERLAY on the same compose project, exactly as
+# docker-compose.observability.yml is (contract 04 §1, option A). It is never
+# a separate project: `-p odoo19-bct` plus `networks: [bct]` means the
+# warehouse resolves `postgres:5432` by service name with no external network
+# declaration and no orphan-container warning.
+#
+# SCOPING. This host also runs odoo19-platform-*, odoo19-analytics-* and
+# smart-warga-postgres-1. Every invocation is scoped `-p odoo19-bct`. There is
+# no target in the Makefile that can reach another project, and nothing here
+# is ever brought down with a bare `docker compose down`.
+#
+# PORTS. 127.0.0.1:35433 only — reserved for the warehouse in contract 04 §4.
+# Nothing else in this file publishes a host port.
+#
+# MEMORY. The ADR budgets the warehouse at <= 1 GiB under load against a VPS
+# that already carries ~1.29 GiB. mem_limit is set rather than assumed, so a
+# runaway query is bounded by the container rather than by the host's OOM
+# killer picking a victim (which on this host has already once been Odoo's
+# asset compiler).
+#
+# IMAGE PINNING. Digests inline, matching the base stack, never from .env.
+# A digest is a security control, not a tunable.
+# ===========================================================================
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+
+  # =========================================================================
+  # warehouse-db — Postgres 16, the analytical store.
+  #
+  # Same image and digest as the OLTP primary. One engine to operate, patch
+  # and back up: that is the whole point of ADR 0001 option A.
+  #
+  # ROLES, and why there are three rather than one:
+  #
+  #   warehouse_admin  superuser, POSTGRES_USER, created by initdb. Runs the
+  #                    init DDL and the backups. Nothing else uses it.
+  #   warehouse        NOSUPERUSER NOBYPASSRLS. Owns raw/staging/marts/
+  #                    warehouse and is what dbt connects as. Because it is
+  #                    NOT a superuser it is subject to the RLS policies on
+  #                    its own tables (which are FORCE ROW LEVEL SECURITY),
+  #                    so `SET app.tenant_id` genuinely constrains it.
+  #   warehouse_loader NOSUPERUSER. Backend's CDC loader: INSERT into raw.*,
+  #                    read/write warehouse.pipeline_state, read
+  #                    warehouse.column_policy. No CREATE, no marts.
+  #   warehouse_rls    NOSUPERUSER NOBYPASSRLS, SELECT only. The identity the
+  #                    semantic-api uses. It has NO unscoped policy at all, so
+  #                    with app.tenant_id unset it sees zero rows — fail
+  #                    closed, per master prompt §3.3.
+  #
+  # A single superuser role would have made every RLS test vacuous, because a
+  # superuser bypasses row security unconditionally and no policy can stop it.
+  # =========================================================================
+  warehouse-db:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-warehouse-db
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    # Identical to the OLTP primary's set: the entrypoint starts as root to
+    # chown $PGDATA and then drops to uid 70 via su-exec.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    stop_grace_period: 1m
+    mem_limit: 1g
+    memswap_limit: 1g
+    shm_size: 256m
+    environment:
+      POSTGRES_DB: ${WAREHOUSE_DB:-warehouse}
+      POSTGRES_USER: ${WAREHOUSE_ADMIN_USER:-warehouse_admin}
+      POSTGRES_PASSWORD: ${WAREHOUSE_ADMIN_PASSWORD:?WAREHOUSE_ADMIN_PASSWORD is required - run `make dev-bootstrap`}
+      PGDATA: /var/lib/postgresql/data
+      PGDATABASE: ${WAREHOUSE_DB:-warehouse}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      # Consumed by analytics/warehouse/init/00-bootstrap.sh, which injects
+      # them into psql with -v so no credential reaches a SQL file on disk.
+      WAREHOUSE_DB_USER: ${WAREHOUSE_DB_USER:-warehouse}
+      WAREHOUSE_DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD:?WAREHOUSE_DB_PASSWORD is required - run `make dev-bootstrap`}
+      WAREHOUSE_LOADER_USER: ${WAREHOUSE_LOADER_USER:-warehouse_loader}
+      WAREHOUSE_LOADER_PASSWORD: ${WAREHOUSE_LOADER_PASSWORD:?WAREHOUSE_LOADER_PASSWORD is required - run `make dev-bootstrap`}
+      WAREHOUSE_RLS_USER: ${WAREHOUSE_RLS_USER:-warehouse_rls}
+      WAREHOUSE_RLS_PASSWORD: ${WAREHOUSE_RLS_PASSWORD:?WAREHOUSE_RLS_PASSWORD is required - run `make dev-bootstrap`}
+      TZ: ${TZ:-UTC}
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+    volumes:
+      - warehousedata:/var/lib/postgresql/data
+      - ./analytics/warehouse/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      # Only files directly in this directory are executed by the entrypoint;
+      # init/sql/ is a subdirectory and is skipped, which is what lets
+      # 00-bootstrap.sh apply it with psql -v.
+      - ./analytics/warehouse/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${WAREHOUSE_HOST_PORT:-35433}:5432"
+    healthcheck:
+      # -h 127.0.0.1 forces a real TCP handshake; the unix socket answers
+      # during initdb and would report healthy before the listener is open.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - bct
+
+  # =========================================================================
+  # warehouse-exporter — postgres_exporter over the WAREHOUSE database.
+  #
+  # Distinct from the observability overlay's postgres-exporter, which watches
+  # the OLTP primary and is where replication-slot lag comes from (contract 04
+  # §3). This one carries the warehouse-side series the analytics dashboard
+  # and alerts need: reconciliation state, mart age, pipeline progress. All of
+  # them are defined in analytics/warehouse/exporter/queries.yml and all of
+  # them are namespaced bct_warehouse_* so they cannot collide with Backend's
+  # bct_cdc_* set.
+  #
+  # It connects as warehouse_rls — NOT as an admin — because the series it
+  # needs come from warehouse.* metadata tables, and an exporter reachable by
+  # every Grafana Editor should hold the narrowest identity that answers the
+  # question (the same reasoning contract 04 §7 applies to postgres-oltp).
+  # =========================================================================
+  warehouse-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0@sha256:6999a7657e2f2fb0ca6ebf417213eebf6dc7d21b30708c622f6fcb11183a2bb0
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-warehouse-exporter
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    user: "65534:65534"
+    mem_limit: 128m
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${WAREHOUSE_RLS_USER:-warehouse_rls}:${WAREHOUSE_RLS_PASSWORD:?WAREHOUSE_RLS_PASSWORD is required}@warehouse-db:5432/${WAREHOUSE_DB:-warehouse}?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres_exporter/queries.yml
+      PG_EXPORTER_EXCLUDE_DATABASES: "template0,template1"
+    volumes:
+      - ./analytics/warehouse/exporter/queries.yml:/etc/postgres_exporter/queries.yml:ro
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9187/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - bct
+
+  # =========================================================================
+  # dbt — the transformation runner.
+  #
+  # `profiles: [tools]` keeps it OUT of `up`. dbt is a batch job, not a
+  # service: leaving a restart-policy container idling would burn ~150 MiB of
+  # a VPS budget for something that runs for 20 seconds every few minutes.
+  # `make dbt-run` / `make dbt-test` invoke it with `run --rm`.
+  #
+  # No scheduler. ADR 0001 settled that: the CDC consumer is long-running and
+  # the only scheduled work is `dbt build` on an interval, which does not
+  # justify Airflow or Dagster on this host.
+  # =========================================================================
+  dbt:
+    build:
+      context: ./analytics/dbt
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-dbt:local
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-dbt
+    profiles: [tools]
+    <<: *hardening
+    logging: *default-logging
+    restart: "no"
+    mem_limit: 512m
+    environment:
+      WAREHOUSE_HOST: warehouse-db
+      WAREHOUSE_PORT: "5432"
+      WAREHOUSE_DB: ${WAREHOUSE_DB:-warehouse}
+      WAREHOUSE_DB_USER: ${WAREHOUSE_DB_USER:-warehouse}
+      WAREHOUSE_DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD:?WAREHOUSE_DB_PASSWORD is required}
+      WAREHOUSE_ADMIN_USER: ${WAREHOUSE_ADMIN_USER:-warehouse_admin}
+      WAREHOUSE_ADMIN_PASSWORD: ${WAREHOUSE_ADMIN_PASSWORD:?WAREHOUSE_ADMIN_PASSWORD is required}
+      # Read-only identity on the OLTP side. warehouse_ctl.py never opens any
+      # other connection to Odoo, so "never write to the Odoo database" holds
+      # because the role cannot, not because the code is careful.
+      ODOO_PG_HOST: ${POSTGRES_HOST:-postgres}
+      ODOO_PG_PORT: "5432"
+      ODOO_DB_NAME: ${ODOO_DB_NAME:-bct}
+      WAREHOUSE_READER_USER: ${WAREHOUSE_READER_USER:-warehouse_reader}
+      WAREHOUSE_READER_PASSWORD: ${WAREHOUSE_READER_PASSWORD:?WAREHOUSE_READER_PASSWORD is required}
+      # Per-tenant HMAC salts. SOPS-managed, `changeme` in .env.example, never
+      # in a tracked file. warehouse.tenant_registry stores only the NAME.
+      WAREHOUSE_MASK_SALT_DEFAULT: ${WAREHOUSE_MASK_SALT_DEFAULT:?WAREHOUSE_MASK_SALT_DEFAULT is required}
+      WAREHOUSE_MASK_SALT_BCT: ${WAREHOUSE_MASK_SALT_BCT:?WAREHOUSE_MASK_SALT_BCT is required}
+      DBT_PROFILES_DIR: /dbt
+      DBT_THREADS: ${DBT_THREADS:-4}
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Read-write: dbt writes target/ and logs/ into the project directory,
+      # and `dbt docs` needs the catalog to persist for the operator to read.
+      - ./analytics/dbt:/dbt
+      # Read-only: warehouse_ctl.py runs here rather than on the host because
+      # this image already carries psycopg2 and can reach BOTH databases, so
+      # the tooling has no host Python dependency at all.
+      - ./analytics/warehouse:/warehouse:ro
+    working_dir: /dbt
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
+    networks:
+      - bct
+
+networks:
+  bct:
+    name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}_bct
+    driver: bridge
+
+volumes:
+  warehousedata:
+    name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}_warehousedata
