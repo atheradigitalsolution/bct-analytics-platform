@@ -1,6 +1,6 @@
 # ADR 0001 — Analytics warehouse: engine, extraction and freshness
 
-- **Status**: Proposed — awaiting GATE 2 approval
+- **Status**: **Accepted at GATE 2 on 2026-08-31 by the operator**
 - **Date**: 2026-08-31
 - **Deciders**: Operator (engine choice), Lead (design), Security (veto)
 - **Supersedes**: none
@@ -182,9 +182,16 @@ lag alerting is load-bearing, not decorative.
 upgrade can break replication of a changed table; dbt source freshness plus reconciliation tests must
 catch it loudly (§3.4) rather than letting the mart drift quietly.
 
-## Open questions for GATE 2
+## GATE 2 resolution (2026-08-31)
 
-1. Engine confirmed as Option A?
-2. Freshness table above accepted, or should PPOB tighten below 60 s?
-3. `max_slot_wal_keep_size = 2GB` — confirm that sacrificing the warehouse to protect Odoo is the
-   correct trade for this operator.
+The operator approved all three decision points as proposed:
+
+1. **Engine: Option A** — Postgres-native marts, native logical replication, dbt-postgres.
+2. **Freshness: the table above is accepted as written**, including the deliberate non-uniformity
+   (PPOB 60 s, finance 60 min). Uniform-strict was explicitly rejected as wasting VPS headroom.
+3. **`max_slot_wal_keep_size = 2GB` confirmed**, with the trade understood and accepted: under
+   sustained lag Postgres drops the warehouse slot, killing the pipeline in order to keep Odoo
+   alive. The pipeline is re-seedable from snapshot; the ERP is not expendable. Alerting at
+   512 MiB (warn) and 1 GiB (critical) is therefore load-bearing, not decorative.
+
+This ADR is now binding on the Data Warehouse and Backend agents.
