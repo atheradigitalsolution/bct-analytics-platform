@@ -3,7 +3,7 @@
 
 import psycopg2
 
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tests import TransactionCase, tagged
 from odoo.tools import mute_logger
 
@@ -176,7 +176,9 @@ class TestPdpFieldClassification(TransactionCase):
         })
         registry = self.Classification.with_user(user)
         self.assertTrue(registry.search_count([]) > 0)
-        with self.assertRaises(Exception):
+        # AccessError specifically, not a bare Exception: a blind assertRaises would also pass on a
+        # TypeError from a malformed vals dict, i.e. it would prove nothing about the ACL.
+        with self.assertRaises(AccessError):
             registry.create({
                 "model_name": "x.denied",
                 "field_name": "col",
