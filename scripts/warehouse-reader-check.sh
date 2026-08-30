@@ -91,6 +91,40 @@ expect_denied() {
 
 log "warehouse_reader read-only proof — role='$READER' database='$DB'"
 
+
+# ---------------------------------------------------------------------------
+# 0. WHO IS ACTUALLY RUNNING THESE CHECKS.
+#
+# This comes first, and it is answered by the session under test rather than by
+# a superuser querying pg_roles about it. Every denial below is evidence only
+# if the role we claim to be testing is the one that produced it:
+#
+#   * connecting as the superuser by mistake makes every write SUCCEED - loud,
+#     so that mistake catches itself;
+#   * the mirror image is silent. Point an isolation test at a superuser and it
+#     still passes, because a SUPERUSER bypasses RLS unconditionally and the
+#     policy is never evaluated. The test then proves the query is well-formed,
+#     not that isolation works.
+#
+# Same argument the Security agent wrote into GATE 3 for the semantic-api, and
+# it holds here for the same reason: a passing check with no identity line next
+# to it carries no information.
+#
+# rolsuper and friends are booleans, and Postgres renders them 'true'/'false'
+# when concatenated with || - not the 't'/'f' that psql's table output shows.
+# ---------------------------------------------------------------------------
+hr
+printf '  0. identity of the session running every check below\n' >&2
+IDENTITY="$(as_reader "SELECT current_user || ' superuser=' || rolsuper || ' bypassrls=' || rolbypassrls || ' replication=' || rolreplication FROM pg_roles WHERE rolname = current_user;")"
+printf '  %s\n' "$IDENTITY" >&2
+if [ "$IDENTITY" = "$READER superuser=false bypassrls=false replication=true" ]; then
+    printf '  %sPASS%s not a superuser, cannot bypass RLS, holds REPLICATION\n' "$_C_GRN" "$_C_OFF" >&2
+    PASS=$((PASS + 1))
+else
+    printf '  %sFAIL%s unexpected identity - every result below is meaningless\n' "$_C_RED" "$_C_OFF" >&2
+    FAIL=$((FAIL + 1))
+fi
+
 # --- the half it must have --------------------------------------------------
 expect_success "1. SELECT on an Odoo table" \
     "SELECT count(*) FROM res_partner;"
@@ -153,7 +187,7 @@ fi
 
 # --- attributes -------------------------------------------------------------
 hr
-printf '  10. pg_roles attributes\n' >&2
+printf '  10. pg_roles attributes, as the superuser sees them (cross-check of 0)\n' >&2
 psql_super "$POSTGRES_DB" -c \
     "SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
        FROM pg_roles WHERE rolname = '$READER';" >&2
