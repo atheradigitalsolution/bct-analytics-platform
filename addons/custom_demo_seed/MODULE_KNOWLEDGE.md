@@ -1,0 +1,185 @@
+# custom_demo_seed — module knowledge
+
+## THIS IS A FIXTURE MODULE. NEVER PUT IT IN A PRODUCTION INSTALL SET.
+
+It exists for one reason: the Phase 4 performance budget — *"p95 under 2 s with 12 months of
+data"* — cannot be measured against an empty database, and neither can a dbt reconciliation test.
+
+### What stops it running in production
+
+| Safeguard | Strength |
+|---|---|
+| Generates **nothing** at install time. Data appears only when `generate()` is called. | strong — installing it is harmless on its own |
+| `auto_install: False`, and **no other module depends on it** | strong — it can never be dragged in |
+| `generate()` raises `UserError` for a non-administrator | moderate |
+| Every value is obviously synthetic (§4) | moderate — a mistake is visible, not silent |
+| Every record carries an `ir.model.data` external ID, so `uninstall` removes exactly the demo rows | moderate — recoverable |
+
+None of that makes it *safe* in production. The rule is simply: **do not install it there.**
+`make install-modules` and any production install list must name the four domain modules only.
+
+---
+
+## 1. API
+
+```python
+env['demo.seed.generator'].generate(
+    seed=20260101,               # RNG seed. Same seed -> same data.
+    partners=40,
+    products=12,                 # capped at len(PRODUCTS) = 12
+    operating_units=2,           # >= 2 enforced; max 4
+    months=12,                   # whole months back from today
+    sale_orders_per_month=10,
+    pos_orders_per_month=8,
+    ppob_per_month=30,
+    with_pos=True,
+    company=None,                # defaults to env.company
+) -> dict           # counts of what NOW EXISTS, not of what this call created
+```
+
+`env['demo.seed.generator'].summary()` returns the same counts without generating anything.
+
+There is also a wizard (**Settings → Technical → Generate Demo Data**, `base.group_system` only)
+that wraps the same call.
+
+---
+
+## 2. Idempotency — how, and why it is done this way
+
+Every record is created through `_ensure(env, xmlid, model, values)` (or tagged afterwards with
+`_tag()` when the record must be built by a business method such as `sale.order.create`). Both
+register an `ir.model.data` row under module `custom_demo_seed`. A second run looks the external ID
+up first and skips.
+
+This is stronger than a "does a record with this name already exist?" check: it survives a rename,
+it cannot collide with genuine data that happens to share a name, and it makes
+`uninstall custom_demo_seed` delete exactly the demo rows and nothing else.
+
+**Measured**, on a fresh database with the defaults:
+
+| counter | run 1 | run 2 |
+|---|---|---|
+| operating_units | 2 | 2 |
+| partners | 40 | 40 |
+| products | 12 | 12 |
+| billers | 6 | 6 |
+| sale_orders | 120 | 120 |
+| sale_order_lines | 311 | 311 |
+| invoices | 120 | 120 |
+| stock_moves | 238 | 238 |
+| pos_orders | 96 | 96 |
+| ppob_transactions | 360 | 360 |
+| elapsed_seconds | 127.9 | **0.4** |
+
+Run 2 does no work at all — that 0.4 s is the summary query.
+
+> Note on `_tag` vs `_register`: the helper is called `_tag` because `_register` is a reserved
+> `BaseModel` class attribute (a bool), and shadowing it with a method fails at runtime with
+> `TypeError: 'bool' object is not callable`. Do not rename it back.
+
+---
+
+## 3. What it generates, and the shape of the result
+
+With the defaults, on a database seeded 2026-08-30:
+
+| table | rows | span |
+|---|---|---|
+| `operating.unit` | 2 | `OU-DEMO-JKT`, `OU-DEMO-BDG` |
+| `res.partner` | 40 | `DEMO-C-0001` … `DEMO-C-0040` |
+| `product.template` | 12 | 9 storable + 3 service |
+| `ppob.biller` | 6 | electricity ×2, water, telco, internet, insurance |
+| `sale.order` | 120 | `2025-09-02` → `2026-08-27`, **12 distinct months, 2 OUs** |
+| `sale.order.line` | 311 | 1–4 lines per order |
+| `account.move` (customer invoices) | 120 | all posted, **0 without an Operating Unit** |
+| `stock.picking` | 109 | all done, **0 without an Operating Unit** |
+| `stock.move` | 238 | dated to the order's month |
+| `pos.order` | 96 | 12 months, 2 OUs |
+| `ppob.transaction` | 360 | 328 success / 27 failed / 5 reversed |
+
+The PPOB state mix is deliberate: ~92 % success, ~8 % failure, ~2 % of successes later reversed.
+A fact table where every row succeeded is useless for testing an `accepted_values` assertion or an
+SLA-breach metric.
+
+Also created: **two internal users**, each entitled to exactly one Operating Unit, so the
+cross-unit isolation of `custom_operating_unit` can be demonstrated by logging in rather than only
+by a unit test. **No password is set on either** — the accounts cannot be logged into until an
+administrator sets one, so a seeded database never ships a known credential.
+
+---
+
+## 4. Why the synthetic data is shaped the way it is
+
+The brief forbids inventing data that resembles a real person's real identifiers. Every generated
+value is therefore unmistakable:
+
+| field | pattern | why it cannot be real |
+|---|---|---|
+| `res.partner.name` | `Budi Santoso (Demo 001)` | the `(Demo NNN)` suffix |
+| `res.partner.email` | `budi.santoso.001@contoh.invalid` | `.invalid` is reserved by RFC 2606 and can never resolve |
+| `res.partner.phone` | `+62-800-555-0001` | `800` is not an assignable Indonesian mobile prefix; `555` is the fiction convention |
+| `res.partner.ref` | `DEMO-C-0001` | prefix |
+| `ppob.transaction.customer_ref` | `DEMO-00000012345` | prefix; a real PLN meter number is 11–12 bare digits |
+| `product.template.default_code` | `DEMO-P-…` | prefix |
+| `operating.unit.code` | `OU-DEMO-…` | prefix |
+| `ppob.biller.code` | `DEMO-…` | prefix |
+| user logins | `demo.ou1@contoh.invalid` | `.invalid` |
+
+**`res.partner.vat` is left EMPTY on purpose.** Odoo's `base_vat` validates the Indonesian NPWP
+checksum, so any value that survived validation would *by construction* be checksum-valid — which
+is to say, indistinguishable from a real NPWP. That is precisely the failure the brief forbids.
+The masking of `res.partner.vat` is demonstrated by `custom_pdp_masking`'s unit tests instead, which
+need no persisted value. If the warehouse team needs a populated `vat` column to exercise the
+hashing path, say so and it can be filled with a deliberately checksum-*invalid* literal — but that
+is a decision to take consciously, not a default.
+
+---
+
+## 5. Fidelity gaps — what the fixture does *not* reproduce
+
+Stated so nobody builds a conclusion on top of one of them.
+
+* **POS sessions do not have realistic boundaries.** Odoo allows only one open `pos.session` per
+  `pos.config`, and closing a session posts accounting entries. Twelve monthly close cycles per
+  unit would make the fixture slow and fragile for no analytic gain, so the fixture opens **one
+  long-lived session per Operating Unit** and spreads `pos.order.date_order` across the months
+  instead. The warehouse reads `date_order`, which is faithful; anything keyed on `session_id` or
+  on session open/close timestamps is not.
+* **POS orders carry no tax.** `tax_ids` is emptied and `price_subtotal == price_subtotal_incl`.
+  A tax-aware POS mart cannot be validated against this data.
+* **No purchases, no manufacturing, no payments.** Invoices are posted but not paid, so
+  `payment_state` is uniformly `not_paid` and any DSO/ageing metric will look wrong.
+* **Stock is topped up once**, via a single inventory adjustment of 100 000 units per storable
+  product, before any month is seeded. So `stock.move` contains one large adjustment per product
+  plus the deliveries; it is not a realistic replenishment pattern.
+* **Everything is in one company** (`env.company`). Multi-company behaviour is exercised by the
+  unit tests, not by the fixture.
+* **`date_order` is re-pinned after `action_confirm()`**, because confirmation moves it to "now" in
+  some flows. The pickings and moves are re-dated to match. Journal entries created by POS session
+  closing (if a human ever closes one) would carry today's date, not the order's.
+
+---
+
+## 6. Operating Unit propagation — found by this fixture
+
+The first full run produced 4 sale orders carrying an Operating Unit, and 4 posted invoices and 4
+pickings carrying **none** — because Odoo's `_prepare_invoice()` and its procurement machinery know
+nothing about the field. A `mart_revenue_daily` built on `account_move` would have lost every row.
+
+The fix lives in `custom_operating_unit/models/propagation.py`, not here:
+`sale.order._prepare_invoice()`, `sale.order._action_confirm()` (→ pickings),
+`stock.picking.create()` (→ backorders), `pos.order._prepare_invoice_vals()`. Credit notes inherit
+it for free because `_reverse_moves()` uses `copy()`.
+
+`test_operating_unit_propagates_to_invoices_and_pickings` in this module's suite is the regression
+guard, and it is here rather than in `custom_operating_unit` because only the fixture builds a
+document chain long enough to catch it.
+
+---
+
+## 7. Runtime
+
+~128 s for the defaults (576 documents) on the reference dev box. Almost all of it is
+`action_confirm` → deliver → `_create_invoices` → `action_post`, which is real Odoo business logic
+and cannot be short-cut without making the data unrepresentative. Scale with the per-month
+parameters; a second run costs nothing.

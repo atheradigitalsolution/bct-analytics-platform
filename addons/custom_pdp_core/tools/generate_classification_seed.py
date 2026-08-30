@@ -13,6 +13,9 @@ list of columns is machine-generated from ``information_schema.columns`` (the re
 columns, not ``ir.model.fields`` - one2many and many2many "fields" have no column and never reach
 the warehouse), and only the *decisions* are hand-written, in ``OVERRIDES`` below.
 
+The target database MUST have all five custom modules installed, otherwise the generator refuses
+to write rather than emit a seed that is silently missing a model.
+
 Usage
 -----
     python3 generate_classification_seed.py \
@@ -49,6 +52,14 @@ MODELS = [
     ("stock.picking", "stock_picking"),
     ("pos.order", "pos_order"),
     ("pos.order.line", "pos_order_line"),
+    # Custom models. They are read from information_schema like every other model, which is why
+    # this generator MUST be pointed at a database with all five custom modules installed - see
+    # the module docstring. There is deliberately no hand-maintained fallback list: an earlier
+    # revision had one, it drifted the moment a column was added to ppob.transaction, and the
+    # coverage test caught it. One source of truth only.
+    ("operating.unit", "operating_unit"),
+    ("ppob.biller", "ppob_biller"),
+    ("ppob.transaction", "ppob_transaction"),
 ]
 
 ART_42 = "UU 27/2022 Art. 4(2) - data pribadi umum"
@@ -173,6 +184,17 @@ OVERRIDES = {
     "stock.picking.note": FREETEXT,
     "stock.move.description_picking_manual": FREETEXT,
 
+    # ---------------- PPOB ----------------
+    "ppob.transaction.customer_ref": ("sensitive", False, ART_43,
+        "Subscriber / meter number. Identifies a household and, joined to amount over time, its "
+        "consumption pattern. Hashed at load - the digest still supports repeat-customer counts."),
+    "ppob.transaction.customer_name": PERSONAL,
+    "ppob.transaction.failure_reason": ("sensitive", True, ART_43,
+        "Free text from the biller; may echo subscriber details. Dropped to NULL at load."),
+    "ppob.biller.name": PUBLIC,
+    "ppob.biller.code": PUBLIC,
+    "ppob.biller.category": PUBLIC,
+
     # ---------------- point of sale ----------------
     "pos.order.access_token": SECRET,
     "pos.order.ticket_code": SECRET,
@@ -194,73 +216,6 @@ OVERRIDES = {
 SUFFIX_RULES = [
     (re.compile(r"(^|_)(access_token|secret|token|api_key|private_key|passwd|password)$"), SECRET),
 ]
-
-# --------------------------------------------------------------------------------------
-# Models the registry classifies but which live in custom modules. Their columns are listed
-# explicitly because they may not exist in the database this generator is pointed at.
-# --------------------------------------------------------------------------------------
-CUSTOM_ROWS = [
-    # (model, field, class, drop_to_null, legal_basis, notes)
-    ("ppob.transaction", "id", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "create_date", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "create_uid", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "write_date", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "write_uid", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "name", "internal", False, INTERNAL_BASIS, "System-generated transaction reference."),
-    ("ppob.transaction", "partner_id", "internal", False, INTERNAL_BASIS, "FK to res.partner; the partner's own columns carry the personal classes."),
-    ("ppob.transaction", "biller_id", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "product_id", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "operating_unit_id", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "company_id", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "currency_id", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "amount", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "admin_fee", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "commission", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "total_amount", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "customer_ref", "sensitive", False, ART_43,
-     "Subscriber / meter number. Identifies a household and its consumption; treated as Art. 4(3) "
-     "specific personal data. Hashed at load - the digest still supports repeat-customer counts."),
-    ("ppob.transaction", "customer_name", "personal", False, ART_42,
-     "Name returned by the biller inquiry for the subscriber."),
-    ("ppob.transaction", "state", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "requested_at", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "settled_at", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "sla_seconds", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.transaction", "failure_reason", "sensitive", True, ART_43,
-     "Free text from the biller; may echo subscriber details. Dropped to NULL at load."),
-    ("ppob.transaction", "biller_reference", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.biller", "id", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.biller", "create_date", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.biller", "create_uid", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.biller", "write_date", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.biller", "write_uid", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.biller", "name", "public", False, PUBLIC_BASIS, ""),
-    ("ppob.biller", "code", "public", False, PUBLIC_BASIS, ""),
-    ("ppob.biller", "active", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.biller", "sla_target_seconds", "internal", False, INTERNAL_BASIS, ""),
-    ("ppob.biller", "category", "public", False, PUBLIC_BASIS, ""),
-    ("ppob.biller", "company_id", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "id", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "create_date", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "create_uid", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "write_date", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "write_uid", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "name", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "code", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "complete_name", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "company_id", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "parent_id", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "parent_path", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "active", "internal", False, INTERNAL_BASIS, ""),
-    ("operating.unit", "manager_id", "internal", False, INTERNAL_BASIS, ""),
-    # operating_unit_id is injected by custom_operating_unit into stock models.
-    ("sale.order", "operating_unit_id", "internal", False, INTERNAL_BASIS, ""),
-    ("account.move", "operating_unit_id", "internal", False, INTERNAL_BASIS, ""),
-    ("stock.picking", "operating_unit_id", "internal", False, INTERNAL_BASIS, ""),
-    ("pos.order", "operating_unit_id", "internal", False, INTERNAL_BASIS, ""),
-    ("res.users", "default_operating_unit_id", "internal", False, INTERNAL_BASIS, ""),
-]
-
 
 def xmlid(model, field):
     return "pdp_%s__%s" % (model.replace(".", "_"), field)
@@ -286,6 +241,7 @@ def main():
 
     rows = []
     seen = set()
+    missing_models = {model for model, _table in MODELS}
     with psycopg2.connect(args.dsn) as conn, conn.cursor() as cur:
         for model, table in MODELS:
             cur.execute(
@@ -295,22 +251,21 @@ def main():
             )
             columns = [r[0] for r in cur.fetchall()]
             if not columns:
-                print("WARNING: table %s not found - model %s skipped" % (table, model),
-                      file=sys.stderr)
+                print("ERROR: table %s not found - model %s" % (table, model), file=sys.stderr)
                 continue
             for column in columns:
                 pdp_class, drop, basis, notes = classify(model, column)
                 rows.append((xmlid(model, column), model, column, pdp_class, basis, notes,
                              "True" if drop else "False"))
                 seen.add((model, column))
+            missing_models.discard(model)
 
-    for model, field, pdp_class, drop, basis, notes in CUSTOM_ROWS:
-        if (model, field) in seen:
-            continue
-        seen.add((model, field))
-        rows.append((xmlid(model, field), model, field, pdp_class, basis, notes,
-                     "True" if drop else "False"))
-
+    if missing_models:
+        raise SystemExit(
+            "refusing to write a partial seed: these models have no table in the target "
+            "database, so their columns would silently vanish from the registry: %s. Point --dsn "
+            "at a database with every custom module installed." % ", ".join(sorted(missing_models))
+        )
     rows.sort(key=lambda r: (r[1], r[2]))
     with open(args.out, "w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh, lineterminator="\n")
