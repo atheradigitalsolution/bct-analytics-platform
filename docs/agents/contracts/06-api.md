@@ -134,7 +134,9 @@ whether the bug was its own.
 `SEMANTIC_API_POOL_MAX` defaults to **16**, derived from the warehouse's budget rather than chosen
 to make a symptom disappear: `max_connections` 40 − 3 `superuser_reserved_connections` = 37 usable,
 less 5 for a dbt build (`DBT_THREADS + 1`, **measured** by DWH through a full build; total peak
-concurrency was 10), ~3 for `postgres_exporter`, 3 for the CDC loader, ~4 for operator/ad-hoc psql
+concurrency was 10), ~3 for `postgres_exporter` (**unverified** -- nothing pins it, and it connects
+as `warehouse_rls`, the same role this pool uses, so `pg_stat_activity` cannot separate the two by
+`usename`), 3 for the CDC loader (structural), ~4 for operator/ad-hoc psql
 and margin. Raising it moves the cliff; it does not remove one. **The fix is that exceeding the
 ceiling now degrades correctly at any concurrency**, and slack being larger than first estimated is
 not a reason to grow the pool. `analytics/warehouse/bin/warehouse_ctl.py verify` checks the total

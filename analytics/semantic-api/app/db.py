@@ -137,9 +137,21 @@ class Warehouse:
             max_connections               40
             superuser_reserved_connections 3   ->  37 usable
 
-        Allocated: dbt build 5, postgres_exporter ~3, the CDC loader 3 (warehouse_loader held 3
-        when measured; three fixed connections at runner.py 229/413/444, not env-driven),
+        Allocated: dbt build 5 (measured), postgres_exporter ~3 (**UNVERIFIED** -- see below), the
+        CDC loader 3 (structural: three fixed connections at runner.py 229/413/444, not env-driven),
         operator/QA psql and ad-hoc ~4, and margin. **16 for this service.**
+
+        The exporter's ~3 is an allowance nobody has checked, and it is recorded as unverified
+        rather than left looking like the other figures. Nothing pins it: the exporter's compose
+        `command:` flags change WHAT it queries, not how many connections it opens. It also cannot
+        be measured from here, because it connects as ``warehouse_rls`` -- the SAME role this pool
+        uses -- so ``pg_stat_activity`` cannot separate the two by ``usename``. Isolating it needs
+        a distinct ``application_name`` or its own role. Found by DWH in its own copy of this
+        budget, one line below the asymmetry I had found in it.
+
+        Consequence for a measurement I reported earlier and should restate: when I observed
+        ``warehouse_rls = 2`` and read it as this pool, that count could not have excluded the
+        exporter. The number was right; my attribution of it was not separable.
 
         The dbt figure is DWH's measurement, not an estimate: sampled through a full build,
         ``warehouse`` peaked at 5 and total concurrency at 10. It is ``DBT_THREADS + 1``, and
