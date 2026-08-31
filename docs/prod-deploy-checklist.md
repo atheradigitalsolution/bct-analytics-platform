@@ -85,6 +85,14 @@ bash scripts/analytics/cdc-run.sh --detach   # backfill, then stream
 make dbt-run                     # build staging and marts
 ```
 
+- [ ] **`make seed-demo` runs BEFORE `make up-analytics`, and the order is load-bearing.**
+      `up-analytics` copies whatever Odoo holds *at that moment* into the `bct_t2` fixture tenant
+      over FDW. Seeding afterwards leaves `bct_t2` with a registry row and almost no data — and
+      nothing errors. Measured on a cold start that got this wrong: 10 rows landed instead of 2,109,
+      every cross-tenant isolation assertion then passed by having nothing to leak, and `dbt test`
+      returned **714** reconciliation failures, all of them `bct_t2`, with `bct` clean at 0/818.
+      Re-running `make up-analytics` after the seed repairs it: 2,109 rows, and `dbt test` goes
+      PASS=292 / ERROR=0.
 - [ ] **Observability comes up before CDC.** Creating the replication slot starts WAL retention. If
       the consumer then fails and nobody is watching, the first thing anyone learns about it is a
       full disk. Bringing alerting up first costs nothing and removes that window.
