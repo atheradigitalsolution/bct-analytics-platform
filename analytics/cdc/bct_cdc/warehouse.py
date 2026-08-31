@@ -66,10 +66,20 @@ def connect(dsn: str, autocommit: bool = False):
 
     Applied to every connection this helper opens, warehouse and Odoo-source alike: naming the
     source connections costs nothing and makes the loader visible in Odoo's ``pg_stat_activity``
-    too. The ONE connection it does not cover is the logical-replication connection in
-    ``runner.py``, which psycopg2 opens directly with a ``connection_factory``; that is a
-    source-side connection and contract 05 SA.6 governs warehouse consumers, so it is left alone
-    rather than changed speculatively while QA holds the stack.
+    too.
+
+    The ONE connection it does not cover is the logical-replication connection in ``runner.py``,
+    which psycopg2 opens directly with a ``connection_factory``. That is **out of scope by
+    construction, not pending**: it is a source-side connection to the Odoo Postgres, and contract
+    05 SA.6 governs *warehouse* consumers. Naming it would help attribute WAL-sender sessions for
+    slot monitoring, but that is contract 04's concern -- if it is ever wanted it arrives as a
+    Platform-Infra request, not as a tidy-up here.
+
+    This paragraph previously said the connection was "left alone rather than changed
+    speculatively while QA holds the stack", which was true and read as a deferral -- an invitation
+    to do it once the stack was free, which is precisely what DWH then asked nobody to do. A
+    comment that describes a timing constraint where the real reason is scope becomes a TODO the
+    moment the timing passes.
     """
     conn = psycopg2.connect(dsn, application_name=APPLICATION_NAME)
     conn.autocommit = autocommit
