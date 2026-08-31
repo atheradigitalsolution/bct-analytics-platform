@@ -1500,3 +1500,56 @@ The asymmetry ran both ways in this exchange: DWH would not have found its `appl
 without Backend's message, and Backend would not have found its stale sentence without DWH's fix.
 **Neither was looking for it, and neither could have been.** That is an argument for agents reporting
 what they changed to the people it touches — not for either of them being more careful.
+
+### A Lead relay error, the second — a dropped hedge becomes a false instruction
+
+DWH wrote that three consumers needed `application_name`, hedging the third: *"(if it connects at
+all)"*. **The Lead's relay dropped the hedge** and instructed Backend to set it on "semantic-api,
+login-gateway and the CDC loader".
+
+Backend checked rather than complied. Verified by the Lead: `login-gateway/requirements.txt` carries
+no `psycopg2`, `sqlalchemy` or `asyncpg`; its source has no database import, no DSN, no `connect(`;
+it speaks only `ODOO_URL` over JSON-RPC. **It connects to no database at all.** The row is `N/A`, not
+pending.
+
+**Backend's reason for checking is the important part:**
+
+> "Set `application_name` on a service with no connection" is precisely the kind of task one can
+> appear to complete — I would have produced a commit, a green test, and nothing real.
+
+That is a new member of this catalogue and it is not a check: **an instruction that can be satisfied
+without being real.** Every artefact of compliance would have existed. The catalogue has been about
+checks that cannot fail; this is a *task* that cannot fail, and the same discipline applies —
+establish that the subject exists before acting on it.
+
+**This is the Lead's second relay error**, and the two share a shape:
+
+| | What was relayed | What was dropped |
+|---|---|---|
+| 1 | Frontend's "the fixtures are the seven-metric set" | **The verification** — they were ten, and had been for some time |
+| 2 | DWH's "three consumers need this" | **The hedge** — "(if it connects at all)" |
+
+Both times the Lead transmitted an agent's claim and, in transmitting, stripped the thing that made
+it honest. §2.5 says re-run an agent's evidence; the corollary the Lead keeps missing is that
+**forwarding is asserting**. A hedge is load-bearing precisely when it is inconvenient to carry.
+
+### How Backend implemented it, and three decisions worth keeping
+
+- **Set in code, not in the run scripts.** The semantic-api DSN reaches the service by *two* routes —
+  Backend's `semantic-run.sh` and DWH's `docker-compose.analytics.yml` — so a value set in one is
+  **silently absent from the other**. It now lives at the single point every route passes through.
+  Instance 12's shape, avoided at design time.
+- **One connection deliberately not covered, and stated rather than skipped:** the CDC
+  logical-replication connection, opened directly with a `connection_factory`. It is source-side,
+  A.6 governs warehouse consumers, and Backend would not alter a replication connection
+  speculatively while QA holds the stack.
+- **NOT VERIFIED on the wire**, because both services run from images built *before* the commit. The
+  query that closes it is stated.
+
+**On the missing test, Backend split it correctly.** The integration assertion
+(`access_audit.application_name IS NOT NULL` over a real serving period) needs a live warehouse and
+real traffic — QA's, still unwritten, still declared. What Backend could own without a database is
+the regression guard, written on both sides, and it asserts **the exact contract string rather than
+non-emptiness** — because `cdc_loader` would satisfy a truthiness check and still break the join a
+reader makes against A.6's table. The `MUST` now has unit coverage on one side and a declared gap on
+the other, rather than implying either.
