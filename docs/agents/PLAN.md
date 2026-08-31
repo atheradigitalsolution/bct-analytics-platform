@@ -1408,3 +1408,49 @@ gets fixed by being checkable."* Four rounds of careful people is the evidence.
 **stricter** authority produces **false findings**; reconstructing a **looser** one produces **false
 confidence**. *Both feel like diligence.* The second is the dangerous direction and the one nobody
 notices, because its output is silence.
+
+### Instance 24 — a true sentence made false by someone else's improvement
+
+Both of Backend's copies of the connection budget said the exporter's share **"cannot be measured
+from here"**, because it connected as `warehouse_rls` and `pg_stat_activity` could not separate it
+from Backend's pool by `usename`. **True when written. False forty minutes later**, once DWH's
+`c5094db` gave the exporter an `application_name`.
+
+Backend verified the compose change before editing, then corrected both copies (`ebe35eb`).
+
+**This is a distinct class from instance 20, and the remedies differ:**
+
+| | Instance 20 | Instance 24 |
+|---|---|---|
+| Cause | You formed an observation, the world moved, you restated it as present tense | **A peer improved something, and a true sentence in your repository silently became false** |
+| Signal | None, but re-measuring before asserting catches it | **None at all** — nothing in your tree changed, no test failed, no reviewer would look |
+| Remedy | Re-measure at the moment of the claim | **Only catchable by someone telling you** |
+
+The damage is specific and quiet: *a reader would have taken a documented impossibility on trust and
+never attempted the measurement.* A claim that something **cannot** be done is uniquely dangerous,
+because it forecloses the attempt rather than merely misdescribing it — and it is the kind of
+sentence that ages badly precisely when a colleague fixes the underlying limitation.
+
+Both copies now read **MEASURABLE BUT NOT MEASURED**, keeping DWH's distinction: the label stays
+`UNVERIFIED` because the means existing is not the reading being taken.
+
+**DWH's closing formulation of the authority rule**, which supersedes the Lead's: *"The hook is
+neither stricter nor looser — it is the standard."* Reconstructing a stricter one yields false
+findings; a looser one yields false confidence, and the second is worse because it produces no output
+to argue with — the same asymmetry as an empty result.
+
+### The Makefile targets are being exercised by the cold start
+
+Observed by Backend from container start times, without probing them — *"that reading is QA's to
+take"*:
+
+```
+odoo19-bct-login-gateway   11:57:12
+odoo19-bct-semantic-api    11:57:16
+odoo19-bct-cdc             11:57:20
+```
+
+That is `up-gateway` -> `up-semantic` -> `cdc-start`, in the documented order — **the cold start is
+using the Makefile targets, not the hand commands Backend wrongly supplied.** So Platform-Infra's
+NOT VERIFIED on the container-starting halves, `/healthz`'s new warehouse probe, and the CDC
+publication-coverage refusal are all live inside QA's run rather than only in their authors' own.
