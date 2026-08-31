@@ -59,23 +59,37 @@ const PIPELINE_STATE_SQL =
   "select last_refreshed_at from warehouse.mart_freshness " +
   "where tenant_id = 'bct' and mart_name = 'mart_revenue_daily'";
 
-describe("freshness: the rendered timestamp equals warehouse.pipeline_state exactly", async () => {
+describe("freshness: the rendered timestamp is one warehouse.pipeline_state actually held", async () => {
   const before = warehouse(PIPELINE_STATE_SQL);
   assert.notEqual(before, "", "no pipeline_state row for mart_revenue_daily; nothing to compare to");
 
-  const cookie = await portalSession();
-  const html = await (await fetch(PORTAL + "/t/bct/overview", { headers: { cookie } })).text();
-  const after = warehouse(PIPELINE_STATE_SQL);
+  // The portal caches aggregates for up to INSIGHT_PORTAL_CACHE_TTL_SECONDS, so a page can
+  // legitimately show a pipeline value older than the one standing at the moment of the request.
+  // Comparing against only the value read alongside the fetch therefore fails on a correct portal
+  // whenever a refresh lands mid-cache-window - which is what it did. The window is opened wide
+  // enough to contain every value the cache could still be holding, and the rendered value must be
+  // one of them. A clock-derived value would be none of them, which is the property under test.
+  const ttl = Number.parseInt(process.env.INSIGHT_PORTAL_CACHE_TTL_SECONDS ?? "30", 10);
+  const seen = new Set<string>([toRendered(before)]);
+  for (let elapsed = 0; elapsed < ttl + 6; elapsed += 3) {
+    seen.add(toRendered(warehouse(PIPELINE_STATE_SQL)));
+    await sleep(3000);
+  }
 
-  // The warehouse is refreshed on an interval. If a dbt run landed between the two reads, the page
-  // is legitimately allowed to show either value, and asserting on one of them would be a coin
-  // toss. Accept both, and say so, rather than pretending the window was quiet.
-  const candidates = [toRendered(before), toRendered(after)];
+  const cookie = await portalSession();
+  seen.add(toRendered(warehouse(PIPELINE_STATE_SQL)));
+  const html = await (await fetch(PORTAL + "/t/bct/overview", { headers: { cookie } })).text();
+  seen.add(toRendered(warehouse(PIPELINE_STATE_SQL)));
+
+  const match = /Diperbarui (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC)/.exec(html);
+  assert.notEqual(match, null, "the page rendered no timestamp at all");
+  const shown = match?.[1] ?? "";
   assert.ok(
-    candidates.some((stamp) => html.includes(stamp)),
-    "the page shows neither pipeline timestamp the warehouse held during the request (" +
-      candidates.join(" or ") +
-      ")",
+    seen.has(shown),
+    "the page showed " +
+      shown +
+      ", which warehouse.pipeline_state never held during the window. Observed: " +
+      [...seen].join(", "),
   );
 });
 
