@@ -316,6 +316,38 @@ git apply ~/.cache/pre-commit/patch<timestamp>-<pid>
 Read the patch before applying it — it contains the whole tree's unstaged state at that
 moment, not just your file, so apply selectively if others were mid-edit too.
 
+### 8.4 `git check-ignore` cannot tell you whether a file is committable
+
+`git check-ignore` exits **0 on a negation match too**, so it answers "yes, a rule matched"
+rather than "yes, this file is ignored". Demonstrated on a throwaway repo with
+`*.pem` plus `!*-public.pem`:
+
+```
+$ git check-ignore -v --no-index keys/jwt-private.pem
+exit=0   .gitignore:1:*.pem          keys/jwt-private.pem      <- ignored
+$ git check-ignore -v --no-index keys/jwt-public.pem
+exit=0   .gitignore:2:!*-public.pem  keys/jwt-public.pem       <- COMMITTABLE, same exit code
+```
+
+Only the `!` in the printed rule distinguishes them, and a script testing `$?` — or using
+`-q` — never sees it. Use `git add --dry-run`, which is unambiguous:
+
+```
+$ git add --dry-run keys/jwt-private.pem   ->  exit=1  "The following paths are ignored…"
+$ git add --dry-run keys/jwt-public.pem    ->  exit=0  "add 'keys/jwt-public.pem'"
+```
+
+The security-relevant direction is the one that is easy to miss. A guard written to assert
+*"our `.env` really is ignored"* using `check-ignore`'s exit code **passes even if a
+negation elsewhere has made it committable** — the check reports success while the
+property it was written to protect is false.
+
+That is the same failure shape as the `rolsuper` `t`/`f` rendering trap in
+`security/THREAT-MODEL.md` T-1, and it is the more dangerous class of bug in any
+verification step: not one that breaks, but one that answers confidently and wrongly. When
+a check is load-bearing, test that it can fail — restore the broken condition and confirm
+it goes red — before trusting that it is green for the right reason.
+
 ### 8.3 What this means for gate evidence
 
 Evidence gathered while sibling agents are writing is not stable. `pre-commit run
