@@ -37,14 +37,26 @@
 -- Not doing it silently: if historical valuation is ever needed, that is a
 -- change worth designing rather than a column to add.
 --
--- NOT VERIFIED, stated here so it is not mistaken for tested: the
--- NULL-valuation branch in mart_stock_position (has_unit_cost = false) is
--- written and reviewed but has never executed against real data. Both
--- products without a standard_price in this seed - Tips and Down Payment
--- (POS) - are non-storable, so they have no stock moves and never reach a
--- position row. That correlation is structural rather than accidental: a
--- product with no cost is usually a service. Exercising it needs a seeded
--- STORABLE product with stock moves and no standard_price.
+-- THE NULL-VALUATION BRANCH IS NOW EXERCISED. It was not for most of this
+-- build: both products without a standard_price were non-storable, so they had
+-- no stock moves and never reached a position row, and the correlation was
+-- structural rather than accidental - a product with no cost is usually a
+-- service. Platform-Addons seeded a STORABLE product with stock moves and no
+-- cost specifically to close that, and it does:
+--
+--     mart_stock_position, tenant bct:  28 rows, 27 valued, 1 unvalued
+--     product 15: net_qty 250, unit_cost NULL, stock_valuation NULL (not 0)
+--
+-- And it demonstrates exactly why has_unit_cost is carried:
+--
+--     sum(stock_valuation)        130 190 629 000   <- looks complete
+--     rows in the total                        28
+--     rows sum() actually used                 27   <- one skipped, silently
+--     units unaccounted for                   250
+--
+-- sum() skips NULL without comment, so the total reads as a finished number
+-- while 250 units of real stock are missing from it. has_unit_cost is what lets
+-- a consumer say so instead of presenting a partial figure as a whole one.
 
 with unpacked as (
 

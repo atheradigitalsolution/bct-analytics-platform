@@ -29,6 +29,18 @@ select
     l.company_id,
     coalesce(m.operating_unit_id, -1) as operating_unit_id,
     l.account_id,
+    -- THE COLUMN THAT SPLITS P&L FROM BALANCE SHEET BY FILTER. Without it the
+    -- only way to offer both is two metrics differing solely in name and
+    -- returning identical numbers under two headings - a "Balance Sheet"
+    -- panel that is actually invoice revenue lines.
+    a.account_type,
+    -- NULL, not false, when the line has no account: a section or note line
+    -- is neither P&L nor balance sheet, and false would put it in the balance
+    -- sheet bucket by omission.
+    case
+        when a.account_type is null then null
+        else a.account_type like 'income%' or a.account_type like 'expense%'
+    end as is_profit_and_loss,
     l.journal_id,
     l.parent_state,
     l.display_type,
@@ -54,7 +66,15 @@ select
     end as revenue_signed_subtotal,
     (m.move_type in ('out_invoice', 'out_refund') and l.display_type = 'product') as is_revenue_line
 from {{ ref('stg_account_move_line') }} as l
-join {{ ref('stg_account_move') }} as m
+inner join {{ ref('stg_account_move') }} as m
     on
         l.tenant_id = m.tenant_id
         and l.account_move_id = m.account_move_id
+-- LEFT, not inner. account_id is nullable on a journal item - section and note
+-- lines carry none - and an inner join here would drop them from the fact
+-- entirely, silently changing the set that debit == credit is asserted over.
+-- That invariant is the one thing this table exists to guarantee.
+left join {{ ref('stg_account_account') }} as a
+    on
+        l.tenant_id = a.tenant_id
+        and l.account_id = a.account_id

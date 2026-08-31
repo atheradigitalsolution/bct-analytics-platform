@@ -38,6 +38,8 @@ sources:
         freshness: {warn_after: {count: 5, period: minute}, error_after: {count: 10, period: minute}}
       - name: sale_order_line
         freshness: {warn_after: {count: 5, period: minute}, error_after: {count: 10, period: minute}}
+      - name: account_account
+        freshness: {warn_after: {count: 60, period: minute}, error_after: {count: 120, period: minute}}
       - name: account_move
         freshness: {warn_after: {count: 60, period: minute}, error_after: {count: 120, period: minute}}
       - name: account_move_line

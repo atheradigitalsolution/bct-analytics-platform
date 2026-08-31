@@ -141,6 +141,22 @@ models:
       - unique_combination:
           arguments: {combination_of_columns: [tenant_id, sale_order_line_id]}
 
+  - name: stg_account_account
+    description: >-
+      Chart of accounts. Exists so fct_account_move_line can carry account_type.
+      No company_id: Odoo 19 shares the chart across companies and holds the
+      per-company code in the company_dependent code_store map instead.
+    columns:
+      - name: tenant_id
+        data_tests: [not_null]
+      - name: account_id
+        data_tests: [not_null]
+      - name: account_type
+        data_tests: [not_null]
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, account_id]}
+
   - name: stg_account_move
     columns:
       - name: tenant_id

@@ -248,6 +248,18 @@ models:
           - not_null
           - accepted_values:
               arguments: {values: [draft, posted, cancel]}
+      - name: account_type
+        description: >-
+          account.account.account_type. NULL on section and note lines, which
+          carry no account - preserved by a LEFT join, because an inner join
+          would drop them and silently change the set debit == credit is
+          asserted over.
+      - name: is_profit_and_loss
+        description: >-
+          True for income/expense accounts, false for balance sheet, NULL where
+          the line has no account. NULL rather than false on purpose: a section
+          line is neither, and false would file it under balance sheet by
+          omission.
       - name: move_type
         data_tests:
           - not_null
