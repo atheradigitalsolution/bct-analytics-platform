@@ -111,6 +111,58 @@ def assert_publication_excludes_secrets(source_conn, publication: str, policy: P
         )
 
 
+def assert_publication_covers_plans(source_conn, publication: str, plans) -> None:
+    """Every table the loader plans to replicate must actually be IN the publication.
+
+    This exists because :func:`assert_publication_excludes_secrets` cannot catch a missing table.
+    That check starts with ``if not secrets: continue`` -- a table with no ``secret``-class column
+    is skipped outright, so its total absence from the publication produces no failure at all. It
+    is the empty-result tell in its purest form: the check asks "did any secret leak?", gets
+    "none", and has no way to distinguish "none leaked" from "this table is not published".
+
+    Observed for real: ``warehouse.column_policy`` gained ``account_account`` (16 columns, zero
+    of them ``secret``) after the publication was created. The loader planned the table, the
+    backfill landed 104 rows over a plain ``SELECT`` -- and Postgres never put a single change on
+    the wire, because the publication still carried the other 15 tables. ``raw.account_account``
+    looked populated and was frozen at the moment of the backfill; every row sat at ``_lsn 0/0``.
+
+    The backfill is exactly what makes this invisible: it does not go through the publication, so
+    a table can be fully populated and permanently stale at the same time. Nothing downstream can
+    tell those apart -- a stale row and a fresh row are the same row.
+
+    Refusing to start is the right response and the loader cannot repair it itself: ``CREATE`` /
+    ``ALTER PUBLICATION`` requires table ownership, which ``warehouse_reader`` deliberately does
+    not have (contract 04). The remedy is named in the error.
+    """
+    declared = src.publication_tables(source_conn, publication)
+    # Empty-result rule: assert the population searched was non-empty. A publication that carries
+    # no tables at all would otherwise make the set-difference below trivially satisfiable for
+    # zero plans, and would make this check pass on a publication that replicates nothing.
+    if not declared:
+        raise RuntimeError(
+            "Publication %s declares no tables at all. Nothing would ever stream. Run "
+            "scripts/analytics/cdc-provision.sh." % publication
+        )
+    missing = sorted(set(plans) - set(declared))
+    if missing:
+        raise RuntimeError(
+            "Publication %s does not carry %d of the %d tables this loader plans to replicate: "
+            "%s.\n"
+            "Those tables would be backfilled once by a plain SELECT and then never receive "
+            "another change -- populated and permanently stale, which is indistinguishable "
+            "downstream from up to date.\n"
+            "warehouse.column_policy has grown since the publication "
+            "was created. Re-run scripts/analytics/cdc-provision.sh, which rebuilds the "
+            "publication from the policy as the `odoo` role (this loader holds no ownership and "
+            "cannot ALTER PUBLICATION itself)."
+            % (publication, len(missing), len(plans), ", ".join(missing))
+        )
+    _logger.info(
+        "publication %s carries all %d planned tables (%d declared in total)",
+        publication, len(plans), len(declared),
+    )
+
+
 def _slot_monitor(settings, stop_event) -> None:
     """Poll the server's view of the slot.
 
@@ -228,6 +280,9 @@ def run(argv=None) -> int:
                 )
                 return EXIT_UNCLASSIFIED
             assert_publication_excludes_secrets(source_conn, settings.publication, policy, plans)
+            # ...and must actually carry every planned table. The check above cannot see a table
+            # that is simply absent when that table has no secret columns; this one can.
+            assert_publication_covers_plans(source_conn, settings.publication, plans)
 
             # 5. Landing tables must already exist. The loader holds no CREATE on schema raw --
             #    a loader that could create its own landing table could land an unclassified
