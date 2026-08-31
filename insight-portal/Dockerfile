@@ -40,22 +40,42 @@ COPY --from=build --chown=root:root /app/.next/standalone ./
 COPY --from=build --chown=root:root /app/.next/static ./.next/static
 COPY --from=build --chown=root:root /app/public ./public
 
-# Drop sharp and its libvips binaries from the shipped image.
+# Remove the package managers from the runtime stage.
 #
-# `npm audit` reports three HIGH findings against this project and none is a defect in Next: `next`
-# is flagged only because it depends on `postcss` (build-time only, absent from this stage) and on
-# `sharp`, whose libvips CVEs - CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591 -
-# are reachable only through the image optimizer. The advertised fix is `next@16.3.3`, a breaking
-# major this brief pins away from at 15.5.21.
+# This is the change that matters most, and it is not a version chase. npm and yarn are not
+# application dependencies and are not in package-lock.json; they arrive inside the base image, and
+# they bring their own vendored trees with them - tar, pacote, sigstore, ip-address,
+# brace-expansion, picomatch. container-scan found 13 findings in node-pkg from that source alone,
+# 12 HIGH and 1 CRITICAL, none of which any amount of work on this project's dependencies could
+# reach. `npm audit` cannot see them either: it reads the declared tree, and these are not declared.
 #
-# This dashboard renders no images: `public/` is empty and nothing imports `next/image`. The
-# optimizer is off in next.config.ts, and these packages are the only thing that would have used it,
-# so removing them takes the CVE out of the artefact rather than merely out of the code path. That
-# distinction matters because Trivy scans the image, not the reasoning.
+# A Next standalone runtime needs `node`. A package manager sitting beside the application in
+# production is also an arbitrary-code-download tool sitting beside the application in production,
+# so removing it is attack-surface reduction that stays true across future base images rather than
+# a fix that expires with the next advisory.
 #
-# Verified rather than assumed: with both directories removed, the standalone server starts and all
-# five views return 200. The HEALTHCHECK below would fail the container if that ever stopped being
-# true.
+# corepack goes too, for the same reason: it is a package-manager shim and nothing here invokes one.
+# `docker-entrypoint.sh` is kept - it is the base image's ENTRYPOINT and simply execs the CMD.
+#
+# Verified rather than assumed: with all of this gone the standalone server starts and all five
+# views return 200. The HEALTHCHECK below fails the container if that ever stops being true.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /opt/yarn-v1.22.22 \
+    && rm -f /usr/local/bin/npm \
+             /usr/local/bin/npx \
+             /usr/local/bin/yarn \
+             /usr/local/bin/yarnpkg \
+             /usr/local/bin/corepack
+
+# Drop sharp and its libvips binaries too.
+#
+# No longer a CVE mitigation - the `overrides` block in package.json now resolves sharp to 0.35.4
+# and postcss to 8.5.26, so `npm audit --audit-level=high` is clean at source and the nested
+# postcss 8.4.31 that used to ship under next/ is gone. This deletion is plain surface reduction:
+# the image optimizer is off in next.config.ts, this dashboard renders no images (public/ is empty,
+# nothing imports next/image), and native libvips binaries that nothing can invoke are still native
+# binaries in the image.
 RUN rm -rf ./node_modules/sharp ./node_modules/@img
 
 # Owned by root and readable by the runtime user, never writable by it: the process has no reason to
