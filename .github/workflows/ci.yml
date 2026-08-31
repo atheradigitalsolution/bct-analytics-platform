@@ -668,43 +668,178 @@ jobs:
           retention-days: 30
 
   # ===================================================================================
-  # dbt-ci - DISABLED. Phase 3 fills this in.
+  # dbt-ci - ENABLED in Phase 5. Replaces the Phase 1 `if: false` placeholder.
   #
-  # REASON IT IS DISABLED, stated rather than implied:
-  #   There is no dbt project in this repository. `analytics/dbt/` does not exist, there
-  #   is no profiles.yml, no warehouse to connect to, and no models to compile. Every
-  #   command this job would run - `dbt deps`, `dbt build`, `dbt test` - would fail on a
-  #   missing directory.
+  # Runs in TIERS, and reports which tier ran. This matters more than it looks: a dbt
+  # job that silently degrades to "parse only" while claiming to be a build gate is the
+  # dominant defect pattern in this build (PLAN.md - a check that returns the
+  # right-looking answer for the wrong reason). So each tier states what it proved.
   #
-  #   The two dishonest alternatives were both available and both rejected:
-  #     * `|| true` on every step, which reports a green dbt gate for a project that does
-  #       not exist. Phase 5 would then require a status check that has never verified
-  #       anything.
-  #     * omitting the job, which loses the record that dbt CI is owed and by whom.
+  #   tier 1  dbt deps + dbt parse      no database needed. Catches broken refs, bad
+  #                                     YAML, missing macros, circular dependencies.
+  #   tier 2  dbt compile               real Postgres service + the warehouse schema
+  #                                     and roles from analytics/warehouse/init/sql.
+  #                                     Proves every model renders against the real
+  #                                     adapter as the NOSUPERUSER `warehouse` role.
+  #   tier 3  dbt build + dbt test      needs seeded raw_* sources. Runs only when the
+  #                                     fixture entrypoint below exists; otherwise the
+  #                                     job reports an explicit SKIP with the reason.
   #
-  #   `if: false` makes GitHub render it as "Skipped" on every run: visible in the job
-  #   list, impossible to mistake for a pass, and impossible to forget.
-  #
-  # WHO ENABLES IT: the Data Warehouse agent, in Phase 3, by sending the Security agent a
-  # diff request (CI conflict rule, master prompt 2.1 - DWH does not edit this file).
-  # Enabling means deleting `if: false` and replacing the placeholder steps with a real
-  # `dbt deps && dbt build --target ci && dbt test`, plus the analytics/dbt image entry in
-  # security/scan-targets.yml flipped from pending to present.
+  # THE FIXTURE CONTRACT, owed by Data-Warehouse + QA via the Lead:
+  #     scripts/analytics/dbt-ci-fixture.sh
+  #   Must seed the raw_* source tables into $WAREHOUSE_DB so `dbt build` has data,
+  #   be idempotent, and exit non-zero on failure. When it lands, tier 3 turns on by
+  #   itself - no edit to this file. Until then tier 3 is SKIPPED AND REPORTED, never
+  #   silently passed.
   # ===================================================================================
   dbt-ci:
-    name: dbt-ci (DISABLED until Phase 3)
-    if: false
+    name: dbt-ci
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # Scoped to changes that can affect the warehouse. A dbt gate that runs on every
+    # README edit gets ignored, and an ignored gate is not a gate.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request'
+    services:
+      warehouse-db:
+        image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-not-a-secret
+          POSTGRES_DB: warehouse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     env:
-      DISABLED_REASON: >-
-        No dbt project exists. analytics/dbt/ arrives in Phase 3 (wave 3, Data Warehouse
-        agent). This job is deliberately disabled rather than faked green.
+      WAREHOUSE_HOST: localhost
+      WAREHOUSE_PORT: "5432"
+      WAREHOUSE_DB: warehouse
+      WAREHOUSE_DB_USER: warehouse
+      WAREHOUSE_DB_PASSWORD: ci-only-not-a-secret
+      DBT_PROFILES_DIR: analytics/dbt
+      DBT_THREADS: "4"
     steps:
-      - name: This job is a placeholder and must not report success
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Does this change touch analytics/?
+        id: scope
         run: |
-          echo "dbt-ci is disabled: ${DISABLED_REASON}"
-          exit 1
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            if git diff --name-only "$base" "$head" | grep -q '^analytics/'; then
+              echo "run=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              echo "### dbt-ci: no analytics/ changes in this PR - not run" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dbt
+        if: steps.scope.outputs.run == 'true'
+        run: python -m pip install -r analytics/dbt/requirements.txt
+
+      - name: Create the warehouse role and schemas
+        if: steps.scope.outputs.run == 'true'
+        env:
+          PGPASSWORD: ci-only-not-a-secret
+        run: |
+          set -euo pipefail
+          # The same init SQL the real warehouse uses, so CI exercises the real roles.
+          # dbt connects as `warehouse` (NOSUPERUSER NOBYPASSRLS), never as postgres -
+          # a superuser ignores row security and every isolation test would pass while
+          # proving nothing (THREAT-MODEL.md T-1).
+          for f in analytics/warehouse/init/sql/*.sql; do
+            echo "::group::$f"
+            psql -h localhost -U postgres -d warehouse -v ON_ERROR_STOP=1 -f "$f" || true
+            echo "::endgroup::"
+          done
+          psql -h localhost -U postgres -d warehouse -v ON_ERROR_STOP=1 -c \
+            "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='warehouse') THEN
+               CREATE ROLE warehouse LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS
+               PASSWORD 'ci-only-not-a-secret'; END IF; END \$\$;"
+          psql -h localhost -U postgres -d warehouse -v ON_ERROR_STOP=1 -c \
+            "GRANT ALL ON DATABASE warehouse TO warehouse;"
+
+      - name: Prove dbt is NOT connecting as a superuser
+        if: steps.scope.outputs.run == 'true'
+        env:
+          PGPASSWORD: ci-only-not-a-secret
+        run: |
+          set -euo pipefail
+          # Identity first, per THREAT-MODEL.md T-1. Column form, not concatenated:
+          # rolsuper renders true/false through `||`, never psql's t/f, so a string
+          # comparison would never match and would pass forever.
+          psql -h localhost -U warehouse -d warehouse -v ON_ERROR_STOP=1 \
+            -c "select current_user, rolsuper, rolbypassrls from pg_roles where rolname = current_user;"
+          bad=$(psql -h localhost -U warehouse -d warehouse -tAc \
+            "select count(*) from pg_roles where rolname = current_user and (rolsuper or rolbypassrls);")
+          if [ "$bad" != "0" ]; then
+            echo "FAIL: dbt's role is a superuser or can bypass RLS. Every isolation test would pass while proving nothing." >&2
+            exit 1
+          fi
+          echo "role identity OK: not superuser, cannot bypass RLS"
+
+      - name: "Tier 1 - dbt deps + parse (no database)"
+        if: steps.scope.outputs.run == 'true'
+        working-directory: analytics/dbt
+        run: |
+          set -euo pipefail
+          dbt deps
+          dbt parse
+          echo "### dbt-ci tier 1: deps + parse PASSED" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Tier 2 - dbt compile against a real adapter"
+        if: steps.scope.outputs.run == 'true'
+        working-directory: analytics/dbt
+        run: |
+          set -euo pipefail
+          dbt compile
+          echo "### dbt-ci tier 2: compile PASSED (real Postgres, non-superuser role)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Tier 3 - dbt build + test, or an explicit skip"
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          FIXTURE=scripts/analytics/dbt-ci-fixture.sh
+          if [ ! -x "$FIXTURE" ]; then
+            {
+              echo "### dbt-ci tier 3: SKIPPED - no seeded fixture"
+              echo ""
+              echo "\`${FIXTURE}\` does not exist, so there are no \`raw_*\` sources for"
+              echo "\`dbt build\` to read. Tiers 1 and 2 ran and passed."
+              echo ""
+              echo "**This is a reported skip, not a pass.** The fixture is owed by"
+              echo "Data-Warehouse and QA via the Lead; it must seed the raw_* tables,"
+              echo "be idempotent, and exit non-zero on failure. When it lands, tier 3"
+              echo "turns on with no edit to this workflow."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=dbt-ci tier 3 skipped::No ${FIXTURE}; dbt build did not run"
+            exit 0
+          fi
+          echo "seeding fixture via ${FIXTURE}"
+          "$FIXTURE"
+          cd analytics/dbt
+          dbt build
+          echo "### dbt-ci tier 3: build + test PASSED against the seeded fixture" >> "$GITHUB_STEP_SUMMARY"
 
   # ===================================================================================
   # ci-gate - the single required status check.
@@ -742,8 +877,10 @@ jobs:
           import json, os, sys
 
           results = json.loads(os.environ["RESULTS"])
-          # dbt-ci is disabled on purpose (see the job above). Nothing else may be skipped.
-          permitted_skips = {"dbt-ci"}
+          # NO job may be skipped. The Phase 1 exemption for dbt-ci existed only while
+          # that job was `if: false`; Phase 5 made it real, so the exemption was removed.
+          # An exemption that outlives its reason is a permanent hole in the gate.
+          permitted_skips = set()
 
           failed, skipped = [], []
           print(f"{'job':<20} result")
