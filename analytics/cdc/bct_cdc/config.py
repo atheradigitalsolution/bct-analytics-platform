@@ -10,26 +10,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-#: Source tables replicated into the landing zone. Every one carries an integer ``id`` primary key,
-#: which is the ordering key of contract 05 and the tombstone identity of a ``DELETE``.
-DEFAULT_SOURCE_TABLES = (
-    "res_partner",
-    "res_users",
-    "res_company",
-    "operating_unit",
-    "product_template",
-    "product_product",
-    "sale_order",
-    "sale_order_line",
-    "account_move",
-    "account_move_line",
-    "stock_picking",
-    "stock_move",
-    "pos_order",
-    "pos_order_line",
-    "ppob_biller",
-    "ppob_transaction",
-)
+#: Deliberately EMPTY. The set of replicated tables is read at runtime from
+#: ``warehouse.column_policy`` -- DWH decides what is replicated by classifying it, and the loader
+#: follows. A constant here would drift the first time DWH added or removed a table, as it already
+#: has: ``res_users`` is classified in Odoo but deliberately absent from the warehouse policy.
+#: ``CDC_SOURCE_TABLES`` narrows the list for tests; it can never widen it past the policy.
+DEFAULT_SOURCE_TABLES = ()
 
 
 def _tenant_key(tenant: str) -> str:
@@ -123,8 +109,10 @@ def settings_from_env(environ: dict[str, str] | None = None) -> Settings:
     wh_host = env.get("CDC_WAREHOUSE_HOST", "warehouse-db")
     wh_port = env.get("CDC_WAREHOUSE_PORT", "5432")
     wh_db = env.get("WAREHOUSE_DB", "warehouse")
-    wh_user = env.get("WAREHOUSE_DB_USER", "warehouse")
-    wh_password = _require("WAREHOUSE_DB_PASSWORD", env)
+    # warehouse_loader, never `warehouse` (that is dbt's) and never `warehouse_admin` (superuser,
+    # which bypasses RLS unconditionally). Contract 05 section A.
+    wh_user = env.get("WAREHOUSE_LOADER_USER", "warehouse_loader")
+    wh_password = _require("WAREHOUSE_LOADER_PASSWORD", env)
 
     tables = env.get("CDC_SOURCE_TABLES")
     source_tables = (

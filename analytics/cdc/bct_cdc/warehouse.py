@@ -1,7 +1,19 @@
-"""Everything the loader does to the warehouse database: landing DDL, writes, and pipeline state.
+"""Everything the loader does to the warehouse database: assertions, writes, and pipeline state.
 
-Contract 05 governs every name here. The landing zone is **append-only**: this module never emits an
-``UPDATE`` or a ``DELETE`` against a ``raw.*`` table. A change is a new row; a delete is a tombstone.
+Contract 05 governs every name here, and section A of it governs what this code may *do*. The
+loader connects as ``warehouse_loader``, which holds:
+
+* ``SELECT`` + ``INSERT`` on ``raw.*`` — **no ``UPDATE``, no ``DELETE``**, so the append-only rule
+  is enforced by the grant rather than trusted to this module's discipline;
+* full DML on ``warehouse.pipeline_state``;
+* ``SELECT`` on ``warehouse.column_policy`` and ``warehouse.tenant_registry``;
+* **no ``CREATE`` anywhere.**
+
+That last one is the important one. DWH generates the ``raw.*`` DDL from ``warehouse.column_policy``
+(``make warehouse-raw-ddl``), and a loader that could create its own landing table could land a
+column with no policy row — which would turn "unclassified is a hard failure" from a structural fact
+back into a convention this code has to remember. So a missing table is a schema-drift signal to
+report, never something to fix in flight.
 """
 
 from __future__ import annotations
@@ -18,36 +30,13 @@ from .policy import ColumnPolicy
 
 _logger = logging.getLogger(__name__)
 
-#: The four bookkeeping columns of contract 05, in the order they are appended to every raw table.
+#: The four bookkeeping columns of contract 05.
 META_COLUMNS = (
     ("_ingested_at", "timestamptz"),
     ("_op", "char(1)"),
     ("_tenant_id", "text"),
     ("_lsn", "pg_lsn"),
 )
-
-#: Source types that survive into the landing zone unchanged. Anything else is landed as ``text``:
-#: the landing zone's job is fidelity of *content*, and dbt's ``stg_`` models cast. Landing an exotic
-#: Odoo enum as its source type would couple the warehouse to an ERP module upgrade.
-_PASSTHROUGH_TYPES = {
-    "bigint",
-    "boolean",
-    "bytea",
-    "character varying",
-    "date",
-    "double precision",
-    "integer",
-    "json",
-    "jsonb",
-    "numeric",
-    "real",
-    "smallint",
-    "text",
-    "time without time zone",
-    "timestamp without time zone",
-    "timestamp with time zone",
-    "uuid",
-}
 
 
 # Hand back json/jsonb as the raw text Postgres sent, rather than letting psycopg2 parse it into a
@@ -56,7 +45,7 @@ _PASSTHROUGH_TYPES = {
 #     re-serialise with Python's key order -- so the bytes in the warehouse would differ from the
 #     bytes in Odoo for no reason;
 #   * the pgoutput stream delivers every value as text, so keeping the backfill on text too means
-#     both code paths land byte-identical values. A row that differs between snapshot and stream
+#     both code paths land byte-identical values. A row that differed between snapshot and stream
 #     would show up as a spurious "change" in the mart forever.
 # Odoo 19 uses jsonb heavily (49 of the 724 columns in scope) for translated and company-dependent
 # fields, so this is not an edge case.
@@ -70,67 +59,129 @@ def connect(dsn: str, autocommit: bool = False):
     return conn
 
 
-# ----------------------------------------------------------------------------------------------
-# Policy and pipeline state -- contract 05
-# ----------------------------------------------------------------------------------------------
+class SchemaDrift(RuntimeError):
+    """A table the loader must write does not exist, or lacks a column the plan would land.
 
-PIPELINE_STATE_DDL = """
-CREATE SCHEMA IF NOT EXISTS warehouse;
-CREATE TABLE IF NOT EXISTS warehouse.pipeline_state (
-  tenant_id        text NOT NULL,
-  source_table     text NOT NULL,
-  last_lsn         pg_lsn,
-  last_success_at  timestamptz,
-  rows_loaded      bigint NOT NULL DEFAULT 0,
-  last_error       text,
-  failure_count    integer NOT NULL DEFAULT 0,
-  slot_name        text,
-  PRIMARY KEY (tenant_id, source_table)
-);
-"""
-
-#: Backfill bookkeeping. Contract 05 fixes the columns of ``pipeline_state``, so resumability state
-#: lives in its own Backend-owned table rather than by bolting columns onto a frozen contract table.
-BACKFILL_STATE_DDL = """
-CREATE TABLE IF NOT EXISTS warehouse.cdc_backfill_state (
-  tenant_id        text NOT NULL,
-  source_table     text NOT NULL,
-  snapshot_lsn     pg_lsn,
-  last_pk          bigint NOT NULL DEFAULT 0,
-  max_pk           bigint NOT NULL DEFAULT 0,
-  rows_done        bigint NOT NULL DEFAULT 0,
-  started_at       timestamptz NOT NULL DEFAULT now(),
-  completed_at     timestamptz,
-  PRIMARY KEY (tenant_id, source_table)
-);
-"""
-
-
-class ColumnPolicyMissing(RuntimeError):
-    """``warehouse.column_policy`` does not exist.
-
-    DWH owns that DDL (contract 05). The loader will not create it and will not proceed without it:
-    a loader that invents its own policy table is a loader that masks according to its own opinion.
+    Fatal, and deliberately not self-healing — see this module's docstring.
     """
 
 
-def ensure_pipeline_tables(conn) -> None:
-    """Create the Backend-owned metadata tables. Idempotent, and never alters DWH's tables."""
-    with conn, conn.cursor() as cur:
-        cur.execute(PIPELINE_STATE_DDL)
-        cur.execute(BACKFILL_STATE_DDL)
+class ColumnPolicyMissing(RuntimeError):
+    """The contract-05 warehouse tables are not usable by this role.
+
+    The message disambiguates a failure mode contract 05 section A.5 calls out explicitly: a role
+    with no privilege on a schema sees its tables as **absent**, not as inaccessible. An empty
+    ``information_schema`` is therefore ambiguous between "the DDL never ran" and "this role cannot
+    see it", and the two have completely different fixes.
+    """
+
+
+# ----------------------------------------------------------------------------------------------
+# Assertions -- the loader creates nothing
+# ----------------------------------------------------------------------------------------------
+
+
+def assert_pipeline_tables(conn) -> None:
+    """Check the contract-05 tables exist and carry the privilege the loader needs."""
+    required = (("warehouse.column_policy", "SELECT"), ("warehouse.pipeline_state", "INSERT"))
+    missing = []
+    with conn.cursor() as cur:
+        for table, privilege in required:
+            cur.execute("SELECT to_regclass(%s) IS NOT NULL", (table,))
+            if not cur.fetchone()[0]:
+                missing.append("%s (absent, or invisible to this role)" % table)
+                continue
+            cur.execute("SELECT has_table_privilege(%s, %s)", (table, privilege))
+            if not cur.fetchone()[0]:
+                missing.append("%s (visible but no %s)" % (table, privilege))
+    if missing:
+        raise ColumnPolicyMissing(
+            "Cannot use the contract-05 warehouse tables: %s. They are produced by the Data "
+            "Warehouse agent; the CDC loader reads them and never creates them. A role with no "
+            "privilege on a schema sees its tables as ABSENT rather than inaccessible, so check "
+            "the role's grants before concluding the DDL never ran." % ", ".join(missing)
+        )
+
+
+def policy_tables(conn) -> list:
+    """The source tables DWH has classified. This is the loader's table list.
+
+    Derived rather than hardcoded, so the seam stays where contract 05 puts it: DWH decides what is
+    replicated by classifying it, and the loader follows. A hardcoded list here would drift the
+    first time DWH added or removed a table — as it already has, since ``res_users`` is classified
+    in Odoo but deliberately absent from the warehouse policy.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT DISTINCT source_table FROM warehouse.column_policy ORDER BY 1")
+        return [r[0] for r in cur.fetchall()]
+
+
+def landing_columns(conn, table: str) -> dict:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT column_name, data_type FROM information_schema.columns "
+            "WHERE table_schema = 'raw' AND table_name = %s",
+            (table,),
+        )
+        rows = cur.fetchall()
+    if not rows:
+        raise SchemaDrift(
+            "raw.%s does not exist, or warehouse_loader cannot see it. DWH generates the landing "
+            "DDL from warehouse.column_policy with `make warehouse-raw-ddl`; the loader holds no "
+            "CREATE on schema raw by design. Report this as schema drift rather than creating the "
+            "table." % table
+        )
+    return {r[0]: r[1] for r in rows}
+
+
+def assert_landing_table(conn, table: str, plan_columns) -> None:
+    """Every column the plan would write must already exist in ``raw.<table>``."""
+    actual = landing_columns(conn, table)
+    for meta, _type in META_COLUMNS:
+        if meta not in actual:
+            raise SchemaDrift(
+                "raw.%s is missing the contract-05 bookkeeping column %s." % (table, meta)
+            )
+    missing = sorted(c for c in plan_columns if c not in actual)
+    if missing:
+        raise SchemaDrift(
+            "raw.%s is missing %d column(s) the masking plan would write: %s. The landing DDL and "
+            "warehouse.column_policy have drifted apart; DWH regenerates it with "
+            "`make warehouse-raw-ddl`." % (table, len(missing), ", ".join(missing))
+        )
+
+
+def landed_high_water(conn, tenant: str, table: str) -> tuple:
+    """Return ``(max_landed_pk, epoch_lsn)`` for the snapshot already in the landing zone.
+
+    **The resume point is derived from the data, not from a side table.** Two reasons, and the
+    second only became visible once DWH published the real grants:
+
+    * A separate progress table can disagree with the rows it describes — a crash between two
+      commits leaves state ahead of the data (rows silently lost) or behind it (rows duplicated).
+      Reading ``max(id)`` back out of the landing zone cannot disagree with itself, because it *is*
+      the data.
+    * ``warehouse_loader`` holds no ``CREATE``, so there is nowhere to put a side table anyway, and
+      asking DWH for one would have added a moving part to save a single ``SELECT``.
+
+    ``epoch_lsn`` is the lowest LSN this tenant has landed for the table, which is the snapshot's
+    own LSN: the backfill runs before streaming, so its rows are always the oldest.
+    """
+    ident = sql.Identifier("raw", table)
+    with conn.cursor() as cur:
+        cur.execute(
+            sql.SQL(
+                "SELECT COALESCE(MAX(id), 0), MIN(_lsn)::text FROM {} "
+                "WHERE _tenant_id = %s AND _op = 'I'"
+            ).format(ident),
+            (tenant,),
+        )
+        row = cur.fetchone()
+    return int(row[0] or 0), row[1]
 
 
 def load_column_policy(conn) -> list:
     with conn.cursor() as cur:
-        cur.execute("SELECT to_regclass('warehouse.column_policy') IS NOT NULL")
-        if not cur.fetchone()[0]:
-            raise ColumnPolicyMissing(
-                "warehouse.column_policy does not exist. It is produced by the Data Warehouse "
-                "agent (frozen contract 05); the CDC loader reads it and never creates it. "
-                "Refusing to start: with no policy there is no classification, and an unclassified "
-                "column must never default to 'public'."
-            )
         cur.execute(
             "SELECT source_table, source_column, pdp_class, transform, mask_null "
             "FROM warehouse.column_policy"
@@ -147,7 +198,12 @@ def load_column_policy(conn) -> list:
         ]
 
 
-def record_success(conn, tenant: str, table: str, lsn: int | None, rows: int, slot: str) -> None:
+# ----------------------------------------------------------------------------------------------
+# Pipeline state -- contract 05, and the only source of meta.last_refreshed_at
+# ----------------------------------------------------------------------------------------------
+
+
+def record_success(conn, tenant: str, table: str, lsn, rows: int, slot: str) -> None:
     """Advance ``warehouse.pipeline_state``. This is what ``meta.last_refreshed_at`` reads."""
     with conn, conn.cursor() as cur:
         cur.execute(
@@ -169,7 +225,7 @@ def record_success(conn, tenant: str, table: str, lsn: int | None, rows: int, sl
 
 
 def record_failure(conn, tenant: str, table: str, error: str, slot: str) -> None:
-    """Record a failure without clearing the last success -- a stale mart must still say *when*."""
+    """Record a failure without clearing the last success — a stale mart must still say *when*."""
     with conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -185,78 +241,37 @@ def record_failure(conn, tenant: str, table: str, error: str, slot: str) -> None
         )
 
 
-# ----------------------------------------------------------------------------------------------
-# Landing zone DDL
-# ----------------------------------------------------------------------------------------------
+def heartbeat(conn, tenant: str, tables) -> None:
+    """Advance ``last_success_at`` on a cycle that moved no rows.
 
-
-def landing_column_type(source_type: str, action: str) -> str:
-    """Decide the landing column type for one column.
-
-    A hashed column is always ``text``: the digest is 64 hex characters regardless of what the
-    source column was, and keeping ``varchar(64)`` here would break the day someone widens a source
-    column. A nulled column keeps its source type so dbt's ``stg_`` models still see the shape they
-    expect -- it is simply always NULL.
+    A heartbeat, not an event. An idle pipeline and a dead one are indistinguishable if this only
+    moves when rows flow — and it backs ``meta.is_stale``, so that confusion makes the dashboard
+    claim fresh data is stale, or worse, the reverse.
     """
-    if action == "hash":
-        return "text"
-    if source_type in _PASSTHROUGH_TYPES:
-        return source_type
-    return "text"
-
-
-def ensure_landing_table(conn, table: str, columns: list) -> None:
-    """Create or converge ``raw.<table>``.
-
-    Deliberately additive only: ``CREATE TABLE IF NOT EXISTS`` and ``ADD COLUMN IF NOT EXISTS``,
-    never a type change and never a drop. The Data Warehouse agent may ship its own landing DDL in
-    ``analytics/warehouse/``; two additive converging writers cannot corrupt each other, whereas a
-    loader that "fixes" a column type would silently rewrite DWH's schema.
-
-    ``columns`` is a list of ``(name, type)`` after masking; ``secret`` columns are already absent.
-    """
-    ident = sql.Identifier("raw", table)
-    coldefs = [sql.SQL("{} {}").format(sql.Identifier(n), sql.SQL(t)) for n, t in columns]
-    coldefs += [sql.SQL("{} {}").format(sql.Identifier(n), sql.SQL(t)) for n, t in META_COLUMNS]
     with conn, conn.cursor() as cur:
-        cur.execute("CREATE SCHEMA IF NOT EXISTS raw")
         cur.execute(
-            sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(ident, sql.SQL(", ").join(coldefs))
-        )
-        for name, type_ in list(columns) + list(META_COLUMNS):
-            cur.execute(
-                sql.SQL("ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {}").format(
-                    ident, sql.Identifier(name), sql.SQL(type_)
-                )
-            )
-        # Idempotency key. A change's LSN is unique per change, and backfill rows all share the
-        # snapshot LSN, so (_tenant_id, id, _lsn) identifies a landing row exactly. With
-        # ON CONFLICT DO NOTHING this makes a replayed range a no-op rather than a duplicate --
-        # append-only is preserved because a skipped insert modifies nothing.
-        cur.execute(
-            sql.SQL("CREATE UNIQUE INDEX IF NOT EXISTS {} ON {} (_tenant_id, id, _lsn)").format(
-                sql.Identifier("%s_ingest_key" % table), ident
-            )
-        )
-        # Ordering key of contract 05, used by every stg_ model to find the latest version.
-        cur.execute(
-            sql.SQL("CREATE INDEX IF NOT EXISTS {} ON {} (_tenant_id, id, _lsn DESC)").format(
-                sql.Identifier("%s_latest" % table), ident
-            )
+            "UPDATE warehouse.pipeline_state SET last_success_at = now() "
+            "WHERE tenant_id = %s AND source_table = ANY(%s)",
+            (tenant, list(tables)),
         )
 
 
 def insert_rows(conn, table: str, columns: list, rows: list) -> int:
-    """Append masked rows to ``raw.<table>``. Returns the number actually landed.
+    """Append masked rows to ``raw.<table>``.
 
-    ``ON CONFLICT DO NOTHING`` on the ingest key is what makes re-running the loader over the same
-    source range produce an identical mart instead of duplicated facts.
+    Plain ``INSERT``, with no ``ON CONFLICT``: DWH's landing tables carry ``(_tenant_id, id, _lsn)``
+    as a **non-unique** index, so there is no constraint for a conflict clause to key on.
+    Idempotency comes instead from never re-reading a range — the backfill resumes from the highest
+    id already landed, so a replay finds nothing to insert. A unique index would let the database
+    enforce that as well as the loader; it has been requested from DWH. Until it exists the property
+    rests on the resume logic rather than on the storage layer, which is worth stating plainly
+    rather than implying.
     """
     if not rows:
         return 0
     ident = sql.Identifier("raw", table)
-    all_columns = list(columns) + [name for name, _ in META_COLUMNS]
-    statement = sql.SQL("INSERT INTO {} ({}) VALUES %s ON CONFLICT DO NOTHING").format(
+    all_columns = list(columns) + [name for name, _type in META_COLUMNS]
+    statement = sql.SQL("INSERT INTO {} ({}) VALUES %s").format(
         ident, sql.SQL(", ").join(sql.Identifier(c) for c in all_columns)
     )
     with conn.cursor() as cur:

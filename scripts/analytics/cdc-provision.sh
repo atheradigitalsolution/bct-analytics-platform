@@ -45,10 +45,10 @@ PUBLICATION="bct_cdc_${SLUG}"
 
 echo "==> generating the publication column list from warehouse.column_policy"
 SQL="$(docker run --rm --network odoo19-bct_bct \
-  -e WAREHOUSE_READER_PASSWORD -e WAREHOUSE_DB_PASSWORD -e WAREHOUSE_DB -e WAREHOUSE_DB_USER \
+  -e WAREHOUSE_READER_PASSWORD -e WAREHOUSE_LOADER_PASSWORD -e WAREHOUSE_DB -e WAREHOUSE_LOADER_USER \
   -e WAREHOUSE_MASK_SALT_DEFAULT -e WAREHOUSE_MASK_SALT_BCT \
   -e CDC_TENANT_DB="$SLUG" -e CDC_TENANT_SLUG="$SLUG" \
-  -e CDC_WAREHOUSE_HOST="${CDC_WAREHOUSE_HOST:-odoo19-bct-cdc-fixture-db}" \
+  -e CDC_WAREHOUSE_HOST="${CDC_WAREHOUSE_HOST:-warehouse-db}" \
   -e CDC_VERIFY_DIGEST_SPEC=0 \
   odoo19-bct-cdc:local --print-publication-sql --log-level WARNING)"
 

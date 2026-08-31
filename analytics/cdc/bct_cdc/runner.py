@@ -35,8 +35,13 @@ EXIT_UNCLASSIFIED = 3
 EXIT_SLOT_INVALIDATED = 4
 EXIT_DIGEST_MISMATCH = 5
 EXIT_POLICY_MISSING = 6
+EXIT_SCHEMA_DRIFT = 7
 
 _stop = threading.Event()
+
+#: Set by the slot monitor when Postgres reports ``wal_status='lost'``. Read by the stream loop,
+#: which then stops rather than continuing to consume a slot whose history has been discarded.
+_slot_invalidated = threading.Event()
 
 
 def _configure_logging(level: str = "INFO") -> None:
@@ -128,10 +133,16 @@ def _slot_monitor(settings, stop_event) -> None:
                     1 if status["wal_status"] == "lost" else 0
                 )
                 if status["wal_status"] == "lost":
+                    # Logging alone would leave the consumer running against a slot whose WAL
+                    # Postgres has already discarded, quietly producing a mart with a hole. Stop.
                     _logger.error(
                         "replication slot %s is INVALIDATED (wal_status=lost). The 2 GB cap fired; "
-                        "the mart has a hole and a re-snapshot is required.", settings.slot
+                        "the mart has a hole and a re-snapshot is required. Stopping the consumer.",
+                        settings.slot,
                     )
+                    _slot_invalidated.set()
+                    stop_event.set()
+                    return
             except Exception as exc:  # pragma: no cover - monitoring must not kill the loader
                 _logger.warning("slot monitor: %s", exc)
             stop_event.wait(10.0)
@@ -170,8 +181,8 @@ def run(argv=None) -> int:
 
     warehouse_conn = wh.connect(settings.warehouse_dsn)
     try:
-        wh.ensure_pipeline_tables(warehouse_conn)
         try:
+            wh.assert_pipeline_tables(warehouse_conn)
             policy_rows = wh.load_column_policy(warehouse_conn)
         except wh.ColumnPolicyMissing as exc:
             _logger.error("%s", exc)
@@ -188,8 +199,12 @@ def run(argv=None) -> int:
                 return EXIT_OK
 
             # 2. Masking plans for every table, or a hard failure naming every offending column.
+            # The table list comes from the policy, not from a constant in this repository: DWH
+            # decides what is replicated by classifying it, and the loader follows.
+            tables = settings.source_tables or wh.policy_tables(warehouse_conn)
+            _logger.info("replicating %d tables declared in warehouse.column_policy", len(tables))
             try:
-                plans = build_plans(source_conn, policy, settings.source_tables, settings.salt)
+                plans = build_plans(source_conn, policy, tables, settings.salt)
             except (UnclassifiedColumn, UnhashableColumn) as exc:
                 _logger.error("refusing to start:\n%s", exc)
                 return EXIT_UNCLASSIFIED
@@ -219,14 +234,16 @@ def run(argv=None) -> int:
                 return EXIT_UNCLASSIFIED
             assert_publication_excludes_secrets(source_conn, settings.publication, policy, plans)
 
-            # 5. Landing tables.
-            for table, plan in plans.items():
-                types = {c: t for c, t in src.source_columns(source_conn, table)}
-                columns = [
-                    (c, wh.landing_column_type(types[c], action))
-                    for c, action in plan.columns.items()
-                ]
-                wh.ensure_landing_table(warehouse_conn, table, columns)
+            # 5. Landing tables must already exist. The loader holds no CREATE on schema raw --
+            #    a loader that could create its own landing table could land an unclassified
+            #    column, which would demote "unclassified is a hard failure" from a structural
+            #    fact to a convention. A missing table is schema drift, reported not repaired.
+            try:
+                for table, plan in plans.items():
+                    wh.assert_landing_table(warehouse_conn, table, plan.select_columns)
+            except wh.SchemaDrift as exc:
+                _logger.error("%s", exc)
+                return EXIT_SCHEMA_DRIFT
 
             if args.check_only:
                 total_hashed = sum(len(p.hashed_columns()) for p in plans.values())
@@ -248,6 +265,9 @@ def run(argv=None) -> int:
                 connection_factory=psycopg2.extras.LogicalReplicationConnection,
             )
             try:
+                # assert_slot_healthy RAISES SlotInvalidated on wal_status='lost' and returns the
+                # status dict otherwise; the return value is logged rather than discarded so an
+                # operator can see the retained-WAL figure at startup.
                 status = src.assert_slot_healthy(source_conn, settings.slot)
                 if status["exists"]:
                     _logger.info(
@@ -305,6 +325,13 @@ def _stream(settings, plans, warehouse_conn, replication_conn, args) -> int:
     class _Wrapped:
         def __call__(self, msg):
             consumer(msg)
+            if _slot_invalidated.is_set():
+                raise src.SlotInvalidated(
+                    "Replication slot %s was invalidated while streaming (wal_status=lost). "
+                    "Changes this consumer had not read are gone from the WAL, so continuing "
+                    "would silently leave a hole in the mart. A re-snapshot is required."
+                    % settings.slot
+                )
             if deadline is not None and time.time() > deadline:
                 raise KeyboardInterrupt
             if _stop.is_set():

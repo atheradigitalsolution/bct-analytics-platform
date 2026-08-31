@@ -28,6 +28,48 @@ from .pdp_hash import KNOWN_ANSWER_VECTORS, PDP_DIGEST_ALGORITHM, pdp_hmac_sha25
 
 _logger = logging.getLogger(__name__)
 
+#: An opener built with **only** HTTP and HTTPS handlers.
+#:
+#: ``urllib.request.urlopen`` uses the global opener, which carries ``FileHandler`` and
+#: ``FTPHandler``. In a process holding the warehouse credentials and the per-tenant masking salt,
+#: that is a local-file-read primitive the moment the configured URL can be influenced: a
+#: ``file:///etc/passwd`` or ``file:///run/secrets/...`` URL would be fetched and its contents
+#: compared against the digest spec.
+#:
+#: Removing the capability beats checking for it, so this is a structural fix rather than a
+#: validated one -- ``opener.open("file:///etc/passwd")`` raises ``URLError: unknown url type``.
+#: The scheme assertion at construction stays as well, because it turns a misconfiguration into a
+#: clear startup error instead of a runtime URLError.
+def _build_http_only_opener():
+    """Build an opener that physically cannot speak anything but HTTP(S).
+
+    ``build_opener()`` is the obvious call and it is WRONG here: it *adds* to the default handler
+    set rather than replacing it, so ``FileHandler`` and ``FTPHandler`` survive and
+    ``file:///etc/passwd`` still opens. Verified, not assumed -- the first version of this function
+    used ``build_opener`` and a test read ``/etc/passwd`` straight through it.
+
+    An ``OpenerDirector`` built by hand carries only what is added. ``UnknownHandler`` is required:
+    without it an unsupported scheme falls off the end of the handler chain and ``open()`` returns
+    ``None`` instead of raising, which is a silent failure rather than a refusal.
+
+    ``HTTPRedirectHandler`` is deliberately omitted. Odoo's JSON-RPC endpoint has no reason to
+    redirect, and following one would let a 302 walk this client to an arbitrary host while holding
+    the warehouse credentials and the masking salt.
+    """
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.HTTPHandler,
+        urllib.request.HTTPSHandler,
+        urllib.request.HTTPDefaultErrorHandler,
+        urllib.request.HTTPErrorProcessor,
+        urllib.request.UnknownHandler,
+    ):
+        opener.add_handler(handler())
+    return opener
+
+
+_HTTP_ONLY_OPENER = _build_http_only_opener()
+
 
 class DigestSpecMismatch(RuntimeError):
     """The Odoo module and the loader do not agree on the digest. Fatal at startup."""
@@ -41,9 +83,8 @@ class OdooClient:
     def __init__(self, url: str, db: str, login: str, password: str, timeout: float = 20.0) -> None:
         scheme = urllib.parse.urlparse(url).scheme
         if scheme not in ("http", "https"):
-            # Closes ruff S310 properly rather than silencing it: without this check a `file:` URL
-            # in CDC_ODOO_URL would turn the digest verification into a local file read that could
-            # be made to "agree" with anything.
+            # Defence in depth alongside _HTTP_ONLY_OPENER: this turns a misconfigured
+            # CDC_ODOO_URL into a clear startup error rather than a runtime URLError.
             raise ValueError("CDC_ODOO_URL must be http or https, got %r" % scheme)
         self.url = url.rstrip("/")
         self.db = db
@@ -59,21 +100,19 @@ class OdooClient:
             "params": {"service": service, "method": method, "args": args},
             "id": 1,
         }
-        request = urllib.request.Request(  # noqa: S310 - scheme validated in __init__
-            self.url + "/jsonrpc",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+        body = json.dumps(payload).encode("utf-8")
+        response = _HTTP_ONLY_OPENER.open(
+            self.url + "/jsonrpc", data=body, timeout=self.timeout
         )
-        # noqa justified: the scheme is validated to http/https in __init__.
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:  # noqa: S310
-            body = json.loads(response.read().decode("utf-8"))
-        if "error" in body:
+        with response:
+            parsed = json.loads(response.read().decode("utf-8"))
+        if "error" in parsed:
             # Never echo args: they can carry a salt or a personal value.
             raise OdooRpcError(
                 "Odoo JSON-RPC %s.%s failed: %s"
-                % (service, method, body["error"].get("message", "unknown"))
+                % (service, method, parsed["error"].get("message", "unknown"))
             )
-        return body.get("result")
+        return parsed.get("result")
 
     def authenticate(self) -> int:
         if self._uid is None:

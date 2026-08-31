@@ -30,19 +30,21 @@ done
 
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 
+# MSYS_NO_PATHCONV is scoped to this one invocation, never exported (contract 04 section 11).
+# Git Bash rewrites POSIX-looking arguments AND exported values before a native .exe sees them.
 # shellcheck disable=SC2086
-exec docker run --rm $DETACH --name "$NAME" \
+exec env MSYS_NO_PATHCONV=1 docker run --rm $DETACH --name "$NAME" \
   --network odoo19-bct_bct \
   --security-opt no-new-privileges \
   --cap-drop ALL \
   --read-only \
   -e WAREHOUSE_READER_USER -e WAREHOUSE_READER_PASSWORD \
-  -e WAREHOUSE_DB -e WAREHOUSE_DB_USER -e WAREHOUSE_DB_PASSWORD \
+  -e WAREHOUSE_DB -e WAREHOUSE_LOADER_USER -e WAREHOUSE_LOADER_PASSWORD \
   -e WAREHOUSE_MASK_SALT_DEFAULT -e WAREHOUSE_MASK_SALT_BCT \
   -e ODOO_DB_NAME \
   -e CDC_TENANT_DB="${CDC_TENANT_DB:-${ODOO_DB_NAME}}" \
   -e CDC_TENANT_SLUG="${CDC_TENANT_SLUG:-${ODOO_DB_NAME}}" \
-  -e CDC_WAREHOUSE_HOST="${CDC_WAREHOUSE_HOST:-odoo19-bct-cdc-fixture-db}" \
+  -e CDC_WAREHOUSE_HOST="${CDC_WAREHOUSE_HOST:-warehouse-db}" \
   -e CDC_SOURCE_HOST="${CDC_SOURCE_HOST:-postgres}" \
   -e CDC_ODOO_URL="${CDC_ODOO_URL:-http://odoo:8069}" \
   -e CDC_ODOO_LOGIN="${CDC_ODOO_LOGIN:-}" \
