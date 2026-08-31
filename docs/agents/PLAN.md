@@ -2145,3 +2145,69 @@ That is now:
 
 **Before believing a zero, establish that a non-zero was reachable.** Four agents have now hit this
 independently, which is the argument for it being a reflex rather than a lesson.
+
+## CI FULLY GREEN — run 33425815425, `e59afc6`
+
+```
+success  ci-gate
+success  container-scan × 6   (analytics/cdc, analytics/dbt, insight-portal,
+                               login-gateway, odoo, semantic-api)
+success  dbt-ci · discover · fs-scan · hadolint · lint · sast · sca-node
+         sca-python · secrets (gitleaks, full history)
+```
+
+**Progression across five runs: 8/6 -> 10/4 -> 11/3 -> 16/0.** Every failure was a real finding or a
+real defect; **Security's audit found zero first-run environment problems** where it expected several.
+The one exception was a genuine transient — a Docker Hub `i/o timeout` on the buildkit frontend,
+established as such from its log rather than assumed, and cleared by a re-run.
+
+### What the green actually cost, by owner
+
+| Owner | Fixed |
+|---|---|
+| Security | `dbt-ci`'s doubled `--profiles-dir`; `sast` writing a text report into a JSON artefact; a rule that would have destroyed a negative security test; `sca-python` stopping at manifest 1 of 6 |
+| Backend | `pytest` 8.3.4 -> 9.0.3 in **two** manifests (the second only visible after the fail-fast fix) |
+| Frontend | `postcss`/`sharp` overrides; npm, yarn and corepack removed from the runtime image; `libcrypto3`/`libssl3` pinned to `3.5.8-r0`; a Windows-generated lockfile that no clone could build from |
+
+### Frontend's last judgement call — removing a check rather than silencing a rule
+
+It wrote an in-build assertion (`apk info -v | grep -qx …`), hadolint flagged **DL4006** (pipe without
+`pipefail`), and the tempting fixes were a `SHELL` directive or a rule suppression. **It dropped the
+assertion instead**, because `apk add` with an exact constraint **already fails the build** with
+"unable to select packages" if the pin stops resolving. The grep only restated what the pin
+guaranteed.
+
+> The version is now checked in the built image, which is the artefact that ships — a stronger check
+> than one inside the build, and it removed the lint finding rather than silencing it.
+
+That is the right disposition of a redundant check: not suppressed, not worked around — **deleted,
+because something else already covers it**, with the stronger check kept.
+
+It also derived `3.5.8-r0` by querying the base image (`apk policy`) rather than reading it off the
+scan output, and put that command in the Dockerfile comment — transferring the *shape* of
+`odoo/Dockerfile`'s house pattern (ARG-pinned exact version, upgrade-only, resolution command
+recorded) rather than its `apt` commands.
+
+### Instance 28 — a lockfile that only one operating system could install
+
+Frontend's first `npm install` ran on Windows. npm pruned the platform-specific optionals and wrote a
+lockfile carrying only the win32 `sharp` variants. **Host install fine, `npm audit` clean, every gate
+green** — and `npm ci` inside Alpine failed outright:
+
+```
+npm error Missing: @emnapi/runtime@1.11.3 from lock file
+```
+
+**A fresh clone could not have built the image, while the working tree looked healthy throughout.**
+Instance 1's shape — the thing verified was not the thing that ships — and it surfaced only because
+Frontend moved its verification **into the container**. The lockfile is now generated inside the
+pinned `node:22-alpine` image and carries all 31 platform variants; the command is in the README so
+the next person does not rediscover it.
+
+### Still open, unchanged and declared
+
+`cd.yml` **has never executed** — it triggers on tag, and no tag exists. Backup/restore round trip and
+the `--into` rehearsal; Grafana in a browser; `application_name` on the wire; the §A.6 serving-period
+assertion; a full cold start since the ordering correction; a fresh-clone `docker build` of
+`insight-portal`. The three held Platform-Infra items: `dbt-run`/`dbt-test` chaining, the
+`up-semantic` prerequisite, and the `ARGS`/`MAKEFLAGS` leak.
