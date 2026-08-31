@@ -192,19 +192,30 @@ def test_the_observability_overlay_comes_back_and_alerting_is_live(foreign_befor
     )
     assert result.returncode == 0, "make up-obs failed after a cold start"
 
-    # `check-alerting` hard-fails on a down scrape target and on Prometheus having no active
-    # Alertmanager, and treats a skip as not-a-pass. Give the targets a scrape interval or two.
-    ok, seconds = wait_for(
-        lambda: run(["make", "check-alerting"], timeout=300).returncode == 0, 240, 15.0
-    )
+    # `check-alerting` exits **0** when it skips -- it prints "NOT a pass" and returns success, so
+    # an exit-code-only assertion passes while alerting is entirely unverified. That is the same
+    # vacuous shape this suite exists to catch, and it was caught here in this very test on its
+    # first run: Prometheus was still starting, the script skipped, rc was 0, and the assertion
+    # went green. Exit code AND output, therefore.
+    def verdict():
+        out = run(["make", "check-alerting"], timeout=300)
+        text = (out.stdout + out.stderr)
+        return out.returncode == 0 and "SKIP" not in text, text
+
+    ok, seconds = wait_for(lambda: verdict()[0], 300, 15.0)
     final = run(["make", "check-alerting"], timeout=300)
+    text = (final.stdout + final.stderr).strip()
     evidence.add(
-        "make check-alerting (rc=%d, settled after %.0fs)" % (final.returncode, seconds),
-        (final.stdout + final.stderr).strip()[-2500:],
+        "make check-alerting (rc=%d, settled after %.0fs)" % (final.returncode, seconds), text[-2500:]
     )
-    assert ok and final.returncode == 0, (
+    assert final.returncode == 0, (
         "alerting is not live after the cold start. Every rule in the project is currently firing "
         "into nothing, and no other check in this project would notice."
+    )
+    assert "SKIP" not in text, (
+        "check-alerting SKIPPED rather than verified. It exits 0 on a skip and says so in words "
+        "('NOT a pass'), so the exit code alone would have reported this cold start as having live "
+        "alerting when nothing had been checked."
     )
 
 
