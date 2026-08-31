@@ -156,8 +156,29 @@ hardcoded list — adding a dimension is backwards-compatible and will appear au
 
 ## 4. `GET /healthz` and `GET /metrics`
 
-`/healthz` → `{"status":"ok","metrics":7}`. `/metrics` → Prometheus text format. Neither requires a
-token; neither exposes data.
+`/metrics` → Prometheus text format. Neither endpoint requires a token; neither exposes data.
+
+`/healthz` probes the **warehouse**, not just the process:
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `{"status":"ok","registry_metrics":11,"warehouse":"ok"}` | serving |
+| `200` | `{"status":"degraded",…,"warehouse":"saturated"}` | pool saturated; the database is fine and the service is still serving |
+| `503` | `{"status":"down",…,"warehouse":"unreachable"}` | the warehouse cannot be reached |
+
+It previously returned `{"status":"ok","metrics":N}` after counting registry entries, which are
+read from a YAML file at import — so it reported healthy whenever the **process** was alive. That
+was found live rather than by review: after the warehouse container was destroyed, a semantic-api
+left over from a previous session answered **`200 {"status":"ok"}` while every `/v1/query`
+returned `500`**, on the port a cold start needed. Anything probing `/healthz` would have taken a
+green from a service incapable of answering a single question.
+
+`degraded` and `down` are deliberately distinct. A saturated pool means the database is healthy
+and the service is serving; reporting it as down would pull an instance out of rotation at exactly
+the moment it is busiest — the same 500-vs-503 conflation described in §2, one layer up.
+
+**Consumers should treat a `200` from `/healthz` as meaning the warehouse answered**, which is the
+only reading that makes the endpoint worth probing.
 
 ---
 

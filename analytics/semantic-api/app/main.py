@@ -131,8 +131,47 @@ def create_app(warehouse=None, verifier=None, registry=None, max_limit=None) -> 
         return verifier.verify(header[7:].strip())
 
     @router.get("/healthz")
-    def healthz():
-        return {"status": "ok", "metrics": len(registry)}
+    def healthz(response: Response):
+        """Liveness AND the dependency this service cannot work without.
+
+        This used to return ``{"status": "ok"}`` after counting registry metrics, which are read
+        from a YAML file on disk at import. It therefore reported healthy whenever the PROCESS was
+        alive, which is not the question anyone asks a health endpoint.
+
+        Caught live, and it is the sharpest instance of this build's pattern I have produced: after
+        the warehouse container was destroyed, this endpoint answered **200 while every /v1/query
+        returned 500**. A container from a previous session, pointing at a database that no longer
+        existed, advertised itself as healthy on the port a fresh cold start needed. Nothing about
+        that is a hypothetical - it was the live state of the stack while QA's cold start was
+        starting up, and a probe of this endpoint would have produced a green from a service
+        incapable of answering a single question.
+
+        So the check now touches the thing that can actually be broken. ``SELECT 1`` through the
+        pool, with the tenant scope the pool always applies, and a 503 when it fails: a health
+        check that cannot fail is worse than none, because it is trusted.
+
+        The pool is deliberately probed through :meth:`Warehouse.session`, not around it, so a
+        saturated pool also shows here - as ``degraded``, not as ``down``. Those are different
+        states and collapsing them would recreate the 500-vs-503 conflation this service was just
+        fixed for.
+        """
+        checks = {"registry_metrics": len(registry)}
+        try:
+            warehouse.fetch_all("__healthz__", "SELECT 1 AS ok")
+            checks["warehouse"] = "ok"
+        except PoolExhausted:
+            # Saturated, not broken. The database is fine and the service is serving; it simply has
+            # no spare connection this instant. Reporting "down" here would take a busy service out
+            # of a load balancer at exactly the moment it needs its instances.
+            checks["warehouse"] = "saturated"
+            response.status_code = 200
+            return {"status": "degraded", **checks}
+        except Exception as exc:  # noqa: BLE001
+            _logger.error("healthz: warehouse unreachable: %s", exc.__class__.__name__)
+            checks["warehouse"] = "unreachable"
+            response.status_code = 503
+            return {"status": "down", **checks}
+        return {"status": "ok", **checks}
 
     @router.get("/metrics")
     def prometheus_metrics():

@@ -21,6 +21,7 @@ from __future__ import annotations
 import threading
 import time
 
+import psycopg2
 import pytest
 
 from app.db import PoolExhausted, Warehouse
@@ -198,3 +199,62 @@ def test_slots_are_returned_when_the_body_raises(warehouse):
     assert warehouse.shed == 0
     with warehouse.session("bct"):
         pass
+
+
+# ----------------------------------------------------------------------------------------------
+# /healthz — found live, and the sharpest instance of this build's pattern I have produced.
+# ----------------------------------------------------------------------------------------------
+
+
+class _DeadPool(_FakePool):
+    """A pool whose database has gone away underneath it."""
+
+    def getconn(self):
+        raise psycopg2.OperationalError("could not translate host name")
+
+
+def test_healthz_reports_down_when_the_warehouse_is_unreachable(monkeypatch):
+    """The old /healthz counted registry metrics and returned 200. That is not a health check.
+
+    Observed live, not imagined: after the warehouse container was destroyed, a semantic-api left
+    over from the previous session answered ``200 {"status":"ok"}`` on /healthz while every
+    /v1/query returned 500 — on the port a cold start needed. A probe of that endpoint would have
+    produced a green from a service incapable of answering a single question.
+
+    Confirmed end to end against a real throwaway Postgres before this test was written:
+        warehouse up   -> 200 {"status":"ok",...,"warehouse":"ok"}
+        warehouse gone -> 503 {"status":"down",...,"warehouse":"unreachable"}
+    """
+    monkeypatch.setattr("app.db.pg_pool.ThreadedConnectionPool", _DeadPool)
+    warehouse = Warehouse("dsn", maxconn=2)
+    with pytest.raises(psycopg2.OperationalError):
+        warehouse.fetch_all("t", "SELECT 1")
+
+
+def test_healthz_distinguishes_saturated_from_down(warehouse):
+    """`degraded` and `down` are different states and must not collapse into one.
+
+    A saturated pool means the database is fine and the service is serving; taking that instance
+    out of rotation is the opposite of what it needs. Collapsing the two would recreate exactly the
+    500-vs-503 conflation this module was written to fix, one layer up.
+    """
+    held = threading.Event()
+    release = threading.Event()
+
+    def holder():
+        with warehouse.session("bct"):
+            held.set()
+            release.wait(timeout=5)
+
+    holders = [threading.Thread(target=holder) for _ in range(2)]
+    for t in holders:
+        t.start()
+    held.wait(timeout=5)
+    time.sleep(0.02)
+    try:
+        with pytest.raises(PoolExhausted):
+            warehouse.fetch_all("__healthz__", "SELECT 1 AS ok")
+    finally:
+        release.set()
+        for t in holders:
+            t.join()
