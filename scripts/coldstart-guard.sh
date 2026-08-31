@@ -32,7 +32,10 @@ require_docker
 load_env
 
 PROJECT="${COMPOSE_PROJECT_NAME:-odoo19-bct}"
-TOKEN="i-understand-this-destroys-the-bct-oltp-data"
+# Not a credential: it grants nothing and is printed in the refusal message below.
+# Named CONFIRM_PHRASE rather than TOKEN so it does not read as a secret - to a
+# human or to scripts/scan-secrets.py, which correctly flags such assignments.
+CONFIRM_PHRASE="i-understand-this-destroys-the-bct-oltp-data"
 
 # ---------------------------------------------------------------------------
 # GATE 0. An explicit, unguessable opt-in.
@@ -49,11 +52,11 @@ TOKEN="i-understand-this-destroys-the-bct-oltp-data"
 # script would silently arm this one. The token is specific to this operation
 # and names the data it destroys.
 # ---------------------------------------------------------------------------
-if [ "${BCT_COLDSTART:-}" != "$TOKEN" ]; then
+if [ "${BCT_COLDSTART:-}" != "$CONFIRM_PHRASE" ]; then
     die "refusing: cold start destroys this project's Postgres, Odoo filestore and Redis volumes.
   It is opt-in by an explicit token, not by a generic yes-flag:
 
-      BCT_COLDSTART=$TOKEN make test-coldstart
+      BCT_COLDSTART=$CONFIRM_PHRASE make test-coldstart
 
   Everything in odoo19-bct is lost and rebuilt: the bct database, the demo seed,
   every CDC replication slot and publication. Other projects on this host are
