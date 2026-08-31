@@ -84,7 +84,7 @@ images:
     context: analytics/semantic-api
     owner: Backend
     wave: 3
-    status: pending
+    status: present
     notes: >-
       Language not yet decided by the Backend agent. If it ships a package.json it must
       ALSO be added to node_projects below - the coverage check fails on an unregistered
@@ -95,7 +95,7 @@ images:
     context: login-gateway
     owner: Backend
     wave: 3
-    status: pending
+    status: present
     notes: >-
       Holds the RS256 signing key (contract 02). Highest-value image in the stack; its
       findings are release-blocking regardless of severity score.
@@ -109,12 +109,6 @@ images:
     notes: Next.js BFF. Server-side session verification only; no token reaches the browser.
 
 node_projects:
-  - name: login-gateway
-    path: login-gateway
-    owner: Backend
-    wave: 3
-    status: pending
-
   - name: insight-portal
     path: insight-portal
     owner: Frontend
@@ -122,6 +116,18 @@ node_projects:
     status: pending
 
 python_projects:
+  - name: login-gateway
+    path: login-gateway
+    owner: Backend
+    wave: 3
+    status: present
+
+  - name: semantic-api
+    path: analytics/semantic-api
+    owner: Backend
+    wave: 3
+    status: present
+
   - name: analytics-cdc
     path: analytics/cdc
     owner: Backend

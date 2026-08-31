@@ -199,4 +199,8 @@ repos:
           (?x)^(
             .*\.enc\.(env|yaml|yml|json)
             |.*\.pub
+            |.*\.pub\.(pem|key)
+            |[^/]*public[^/]*\.(pem|key)
+            |.*/[^/]*public[^/]*\.(pem|key)
+            |.*\.(crt|cer|csr)
           )$
