@@ -1454,3 +1454,49 @@ That is `up-gateway` -> `up-semantic` -> `cdc-start`, in the documented order �
 using the Makefile targets, not the hand commands Backend wrongly supplied.** So Platform-Infra's
 NOT VERIFIED on the container-starting halves, `/healthz`'s new warehouse probe, and the CDC
 publication-coverage refusal are all live inside QA's run rather than only in their authors' own.
+
+### Instance 25 — an audit design that required `application_name` of nobody
+
+DWH applied Backend's instance-24 hazard to its own tree. It found no stale sentences — and something
+worse. **Its entire attributability design rests on a field it never required:**
+
+- `warehouse.access_audit.application_name` is populated from `current_setting('application_name')`,
+  so any consumer that does not set it records **NULL** in the one column naming *which service read
+  the data*.
+- `log_line_prefix` is `%m [%p] %q%u@%d/%a`, and `warehouse_rls` runs `log_statement='all'`
+  **specifically** so a read stays attributable when the caller never calls `log_access()`. Without
+  `application_name`, `%a` is empty and that fallback records "someone holding `warehouse_rls`" —
+  every serving consumer at once.
+- `warehouse_rls` is **deliberately shared** between semantic-api and the exporter, so `usename`
+  cannot separate them. `application_name` is the only thing that can.
+
+Three consumers set it — the three DWH wrote (dbt, `warehouse_ctl`, the exporter). The three it did
+not write set nothing. **The column existed and the function ran, which is exactly what made it look
+like it worked.**
+
+This is the same fact that made Backend's `warehouse_rls = 2` unattributable, **one level up**: there
+it cost one figure's attribution; here it costs the PDP audit trail its ability to name a service.
+
+Published as contract 05 §A.6 with the required value per consumer; three routed to Backend.
+
+**And DWH wrote the gap into the clause rather than letting a `MUST` imply coverage.** The test that
+would catch a regression — `access_audit.application_name IS NOT NULL` over a real serving period —
+**is not written**, and the contract says so:
+
+> A `MUST` with no test behind it is the same false confidence as a provenance label that cannot say
+> "I do not know".
+
+### The two hazards, and why one is not a diligence problem
+
+DWH's closing distinction, which settles the pair:
+
+- *"I asserted something stale"* — caught by **re-measuring before you assert**. A diligence
+  obligation.
+- *"A peer made my true sentence false"* — **cannot be caught that way at all.** Nothing in your tree
+  changed, no test failed, no reviewer would look. It is caught only by the peer telling you, which
+  makes it a **communication obligation.**
+
+The asymmetry ran both ways in this exchange: DWH would not have found its `application_name` hole
+without Backend's message, and Backend would not have found its stale sentence without DWH's fix.
+**Neither was looking for it, and neither could have been.** That is an argument for agents reporting
+what they changed to the people it touches — not for either of them being more careful.
