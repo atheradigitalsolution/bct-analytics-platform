@@ -139,6 +139,65 @@ def test_the_modules_install_into_a_brand_new_database(foreign_before, evidence)
     )
 
 
+def test_the_documented_credential_works_and_the_default_one_does_not(foreign_before, evidence):
+    """A stack that came up is not a stack you can log into -- and worse, may be one anyone can.
+
+    This test exists because the cold start it belongs to handed back an Odoo whose `admin` password
+    was still Odoo's default `admin`, and reported success. Every assertion in this file was true:
+    the containers were healthy, `/web/login` answered 200, the modules were present. None of them
+    asked the question that mattered.
+
+    `BCT_DEV_USER_PASSWORD` was set once, by hand, in a shell. It appears nowhere in the repository
+    except an untracked local `.env` -- no Makefile target, no script, no seed model applies it, and
+    `.env.example` does not declare it, so a fresh clone cannot learn that it exists. The stack a
+    new machine gets therefore accepts `admin`/`admin`.
+
+    **Both halves are required.** Asserting only that the documented credential works passes on a
+    stack that accepts both, which is strictly worse than the one that accepts only the default:
+    it looks configured.
+
+    Owners: Platform-Addons for the demo users (in the seed, so it survives a rebuild) and
+    Platform-Infra for `admin` and for declaring the variable in `.env.example`. Not QA's to fix.
+    """
+    from helpers import odoo as odoo_helper
+
+    documented = env.env("BCT_DEV_USER_PASSWORD", "")
+    example = (env.repo_root() / ".env.example").read_text(encoding="utf-8")
+
+    default_admin = odoo_helper.authenticate("admin", "admin")
+    results = [("admin", "admin (Odoo default)", default_admin)]
+    if documented:
+        for login in ("admin", "demo.ou1@contoh.invalid", "demo.ou2@contoh.invalid"):
+            results.append((login, "$BCT_DEV_USER_PASSWORD", odoo_helper.authenticate(login, documented)))
+    evidence.add(
+        "authenticate() over JSON-RPC against the stack this cold start just built",
+        "\n".join("%-28s %-24s -> %s" % r for r in results),
+    )
+    evidence.add(
+        "BCT_DEV_USER_PASSWORD declared in .env.example",
+        "yes" if "BCT_DEV_USER_PASSWORD" in example else "NO -- a fresh clone cannot learn it exists",
+    )
+
+    assert documented, (
+        "BCT_DEV_USER_PASSWORD is not set, so there is no documented credential to verify. A cold "
+        "start cannot be said to produce a usable stack."
+    )
+    assert "BCT_DEV_USER_PASSWORD" in example, (
+        "BCT_DEV_USER_PASSWORD is absent from .env.example, so it exists only in one untracked "
+        "local file. A fresh clone gets a stack whose password nobody can discover from the repo."
+    )
+    assert not default_admin, (
+        "Odoo's DEFAULT password `admin` authenticates as uid %s on the stack this cold start just "
+        "built. The dev password was applied by hand, once, and never became repo, so every rebuild "
+        "hands back a default-credential Odoo." % default_admin
+    )
+    working = [login for login, _, uid in results[1:] if uid]
+    assert working, (
+        "no account accepts BCT_DEV_USER_PASSWORD on a freshly built stack. The documented "
+        "credential is documentation only."
+    )
+
+
 def test_make_up_analytics_brings_the_warehouse_up_from_nothing(foreign_before, evidence):
     started = time.time()
     result = run(["make", "up-analytics"], timeout=1800)

@@ -88,3 +88,32 @@ def unlink_partner(partner_id: int, database=None) -> bool:
         f"result = not bool(env['res.partner'].browse({partner_id}).exists())",
         database=database,
     )
+
+
+def authenticate(login: str, password: str, database=None, url=None):
+    """Authenticate over Odoo's JSON-RPC endpoint. Returns the uid, or False.
+
+    Deliberately the network path rather than `odoo shell`: a password is only meaningful if the
+    thing that accepts logins accepts it. `odoo shell` bypasses authentication entirely, so a check
+    made through it would pass on a stack whose credentials were never applied.
+    """
+    import json
+    import urllib.request
+
+    database = database or env("ODOO_DB_NAME", "bct")
+    url = url or "http://127.0.0.1:%s/jsonrpc" % env("ODOO_HOST_HTTP_PORT", "38069")
+    payload = {
+        "jsonrpc": "2.0", "method": "call",
+        "params": {"service": "common", "method": "authenticate",
+                   "args": [database, login, password, {}]},
+        "id": 1,
+    }
+    if not url.startswith(("http://127.0.0.1:", "http://localhost:")):
+        raise ValueError("refusing a non-loopback Odoo URL: %r" % url)
+    request = urllib.request.Request(  # noqa: S310 - scheme checked immediately above
+        url, data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+        body = json.loads(response.read().decode("utf-8"))
+    return body.get("result", False)

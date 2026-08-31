@@ -52,6 +52,37 @@ def _query(token, filters=None, metric=None):
     )
 
 
+def test_the_second_tenant_actually_holds_rows(semantic_up, marts_exist, evidence):
+    """The precondition every cross-tenant assertion in this file and in test_05 depends on.
+
+    `bct_t2` is **not** a second Odoo database -- only `bct` exists in Postgres. It is a
+    warehouse-only fixture tenant, loaded by `make up-analytics`'s `load-fixture --tenant bct_t2`.
+    That is a legitimate design, and it has one consequence worth its own test: if that fixture load
+    is skipped or fails, every "tenant A cannot see tenant B" assertion passes by having nothing to
+    leak. The 403 tests below and the RLS tests in test_05 are only evidence while this is green.
+    """
+    from helpers import db
+
+    grid = db.grid(
+        db.warehouse_admin(),
+        "SELECT tenant_id, count(*) FROM marts.fct_sale_order_line GROUP BY 1 "
+        "UNION ALL SELECT 'dim_partner:' || tenant_id, count(*) FROM marts.dim_partner GROUP BY 1 "
+        "ORDER BY 1;",
+    )
+    evidence.add("rows per tenant, read past RLS as the superuser", grid)
+    total = db.scalar(
+        db.warehouse_admin(),
+        "SELECT (SELECT count(*) FROM marts.fct_sale_order_line WHERE tenant_id = 'bct_t2') "
+        "     + (SELECT count(*) FROM marts.dim_partner WHERE tenant_id = 'bct_t2');",
+    )
+    evidence.add("bct_t2 rows across two marts", total)
+    assert int(total) > 0, (
+        "tenant bct_t2 holds no rows in the marts, so every cross-tenant assertion in this suite "
+        "would pass by having nothing to leak. Run `make up-analytics`, which loads the fixture "
+        "tenant, before treating any isolation result as evidence."
+    )
+
+
 def test_tenant_a_requesting_tenant_b_gets_403_with_the_contract_body(semantic_up, evidence):
     token = tokens.valid(tokens.claims(tenant="bct"))
     response = _query(token, filters={"tenant_id": "bct_t2"})
@@ -216,11 +247,33 @@ def test_the_unassigned_ou_branch_is_actually_exercised(semantic_up, marts_exist
         )
 
     name, mart, unassigned = usable[0]
+    declared = next(m for m in metrics if m["name"] == name)
+
+    # Ask for the metric on ITS OWN declared shape. Reusing the module-level query sent `date_day`
+    # to a metric that does not declare it and got a 400 back -- a test failing on its own malformed
+    # request while reporting it as a defect in the thing under test.
+    payload = {
+        "metric": name,
+        "dimensions": ["operating_unit_id"],
+        "filters": {
+            key: (["2020-01-01", "2030-12-31"] if spec.get("type") == "daterange" else [])
+            for key, spec in (declared.get("filters") or {}).items()
+            if spec.get("required")
+        },
+        "limit": 50,
+    }
+
+    def ask(token):
+        return web.request(
+            web.semantic_url("/v1/query"), method="POST", payload=payload,
+            headers={"Authorization": "Bearer %s" % token},
+        )
+
     empty = tokens.valid(tokens.claims(tenant="bct", allowed_ou=[], all_ou=False))
     everything = tokens.valid(tokens.claims(tenant="bct", all_ou=True))
 
-    restricted = _query(empty, metric=name)
-    unrestricted = _query(everything, metric=name)
+    restricted = ask(empty)
+    unrestricted = ask(everything)
     evidence.add(
         "metric %r (mart %s, %d unassigned rows)" % (name, mart, unassigned),
         "allowed_ou=[]  HTTP %s  %s\nall_ou=true    HTTP %s  %s"
