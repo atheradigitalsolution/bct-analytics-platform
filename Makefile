@@ -171,6 +171,10 @@ warehouse-reader-check: ## Prove warehouse_reader can SELECT and replicate but c
 check-gitignore: ## Fail if .gitignore would drop an addon data file or a dbt seed
 	@python3 scripts/check-gitignore.py
 
+.PHONY: check-alerting
+check-alerting: ## Fail if a scrape target is down, Alertmanager is absent, or a rule can never fire
+	@$(PYTHON) scripts/check-alerting.py
+
 .PHONY: scan-secret
 scan-secret: ## Fail if a real secret is committed, or .env.example drifts off `changeme`
 	@python3 scripts/scan-secrets.py

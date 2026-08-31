@@ -1,14 +1,29 @@
 # Prometheus scrape drop-in directory
 
 `prometheus.yml` loads every `*.yml` in this directory through
-`scrape_config_files`. Each file contains a **bare list of scrape configs** —
-no `global:`, no top-level `scrape_configs:` key, just the list:
+`scrape_config_files`. Each file must carry a **top-level `scrape_configs:`
+key**, exactly like the main config:
 
-    - job_name: warehouse
-      static_configs:
-        - targets: ["warehouse-exporter:9187"]
-          labels:
-            service: warehouse
+    scrape_configs:
+      - job_name: warehouse
+        static_configs:
+          - targets: ["warehouse-exporter:9187"]
+            labels:
+              service: warehouse
+
+No `global:` block — that stays in `prometheus.yml`.
+
+> **This paragraph used to say the opposite** — that a drop-in was a bare list
+> with no `scrape_configs:` key. That is wrong, and Prometheus 2.55 rejects it
+> at startup rather than ignoring it:
+>
+>     FAILED: error loading scrape configs:
+>       "/etc/prometheus/scrape.d/analytics-scrape.yml": yaml: unmarshal errors:
+>       line 28: cannot unmarshal !!seq into config.ScrapeConfigs
+>
+> The Data Warehouse agent hit it, wrote the correct form in
+> `analytics-scrape.yml`, and reported the README across the ownership boundary
+> instead of editing it. Corrected 2026-08-31.
 
 ## Ownership
 

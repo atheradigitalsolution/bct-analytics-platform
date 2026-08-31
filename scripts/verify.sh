@@ -106,6 +106,10 @@ check "odoo19-analytics-odoo still up" bash -c \
 step "12. .gitignore does not silently drop a file that must ship"
 check "gitignore guard" python3 "$REPO_ROOT/scripts/check-gitignore.py"
 
+# 13 ------------------------------------------------------------------------
+step "13. the alerting path is armed, not merely syntactically valid"
+check "alerting armed" python3 "$REPO_ROOT/scripts/check-alerting.py"
+
 # base-stack footprint ------------------------------------------------------
 step "base stack memory (constraint: idle under 4 GiB)"
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' \

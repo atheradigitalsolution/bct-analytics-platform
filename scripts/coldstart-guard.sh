@@ -28,6 +28,17 @@
 # ---------------------------------------------------------------------------
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
+DRY_RUN=0
+for a in "$@"; do
+    case "$a" in
+        --dry-run) DRY_RUN=1 ;;
+    esac
+done
+# Strip --dry-run before the args reach pytest.
+ARGS_OUT=()
+for a in "$@"; do [ "$a" = "--dry-run" ] || ARGS_OUT+=("$a"); done
+set -- "${ARGS_OUT[@]+"${ARGS_OUT[@]}"}"
+
 require_docker
 load_env
 
@@ -123,6 +134,19 @@ cat >&2 <<BANNER
   host are scoped out of compose, and checked afterwards.
 
 BANNER
+if [ "$DRY_RUN" -eq 1 ]; then
+    log "--dry-run: every gate passed. Nothing was destroyed."
+    cat >&2 <<DRY
+
+  To run it for real, non-interactively:
+
+      BCT_COLDSTART=$CONFIRM_PHRASE ASSUME_YES=1 make test-coldstart
+
+  Add BCT_COLDSTART_ALLOW_ACTIVE_SLOTS=1 if CDC is live and you accept the resync.
+DRY
+    exit 0
+fi
+
 confirm "Run the cold-start suite against project '${PROJECT}'?"
 
 # --- 4. run, with the scope forced into the environment --------------------
