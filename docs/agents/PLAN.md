@@ -648,3 +648,68 @@ supply-chain compromise. The precondition check — file size and type — showe
 transfer**, 97 MB against 199 MB; the re-download matched exactly. **A checksum mismatch means
 "these bytes differ", never "upstream was compromised"**, and the two coincide only once you have
 established the transfer completed. Same error as the Lead's `grep -c` returning 0.
+
+### `has_unit_cost` — the clearest statement of the empty-result rule this build has produced
+
+DWH's fixture request was granted, the branch is now exercised, and the numbers explain **why the
+column exists** rather than merely satisfying a checkbox. Re-run by the Lead:
+
+```
+mart_stock_position, tenant bct
+  rows_total                 28
+  sum() actually used        27      <- one row skipped
+  silently skipped            1
+  sum(stock_valuation)   130 190 629 000    <- reads as a finished number
+  units unaccounted for     250
+```
+
+`sum()` skips NULL **without comment**. Without `has_unit_cost`, a consumer reports that total as
+complete while 250 units of real stock sit outside it. Nothing errors, nothing is empty, and the
+figure looks finished — which is the whole family in one aggregate. The model's NOT VERIFIED note is
+now replaced by these numbers.
+
+The fixture also proved DWH's own analysis right: the two costless products in the original seed were
+non-storable (Tips, Down Payment), so they never reached a position row. That correlation was
+**structural, not accidental** — more seed volume would never have exercised the branch.
+
+### `account_type` landed — two joins where the obvious choice is wrong
+
+Verified by the Lead: `column_policy` 698 -> **714** (`account_account` exactly 16, as the corrected
+gate predicted), `raw` 15 -> 16 tables, `dbt-run` PASS=40, `dbt-test` PASS=292, 17/17 marts
+`rls_forced`, recon 0 failed. The fact splits correctly by filter.
+
+Both join decisions are worth keeping, because the default would have been silently wrong:
+
+- **LEFT, not inner, to `stg_account_account`.** `account_id` is nullable on a journal item — section
+  and note lines carry none — and an inner join would drop them from the fact entirely, **silently
+  changing the set over which `debit == credit` is asserted.** That invariant is the one thing the
+  table exists to guarantee. 0 imbalanced days confirmed after the join.
+- **`is_profit_and_loss` is NULL, not false, where there is no account.** A section line is neither
+  P&L nor balance sheet; `false` would file it under balance sheet by omission — the
+  coalesce-unknown-to-zero shape.
+
+The build also caught an assumption DWH would otherwise have shipped: **`account.account` has no
+`company_id` in Odoo 19.** The chart of accounts is shared and the per-company code lives in the
+`code_store` map. DWH had selected `company_id` by analogy with every other Odoo table, and the model
+failed on it — immediately and by name, which is the right kind of failure.
+
+**A Lead measurement note.** My verification of the fact table returned exactly double DWH's figures
+(622 vs 311 rows, 879.7M vs 439.85M). Not a discrepancy: DWH scoped to tenant `bct` and I did not,
+and `bct_t2` carries a mirror. Checked before reporting, because "the numbers do not match" is the
+kind of claim that costs another agent an hour.
+
+### New gap, self-declared and routed — `raw.account_account` is fixture-fed
+
+DWH could not get the table through CDC because Backend's publication does not carry it, so it used
+`load-fixture` and **said so** rather than letting `account_type` look fully wired. Confirmed by the
+Lead:
+
+```sql
+select _lsn::text, count(*) from raw.account_account group by 1;
+  0/0 | 104        -- every row at the lowest-precedence sentinel DWH itself defined in contract 05
+```
+
+`account_type` is correct today and **will go stale**. Routed to Backend, together with the stale
+seven-metric fixture set Frontend is currently building against, and the `SEMANTIC_API_JWKS_URL`
+drift. The proof required is a changed `account.account` row arriving with a real LSN — not a
+publication that merely lists the table.
