@@ -21,6 +21,8 @@ not a difference in the data.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from helpers import db, env, loader
@@ -79,24 +81,34 @@ def test_reload_over_the_same_range_changes_nothing(warehouse_up, cdc_warehouse,
     )
 
 
-def test_reload_flag_works(warehouse_up, evidence):
-    """`--reload` is the loader's own documented answer to "re-run the same range safely".
+def test_no_advertised_cli_flag_is_undispatched(evidence):
+    """Every flag `bct-cdc --help` advertises must actually do something.
 
-    Its help text says: "Re-run the backfill over the same range, keeping the snapshot epoch so the
-    replay is a no-op. Use this rather than deleting rows from warehouse.cdc_backfill_state, which
-    starts a NEW epoch and appends every row again."
+    This replaces a test of `--reload`, which QA found crashing on every invocation
+    (`AttributeError: module 'bct_cdc.backfill' has no attribute 'clear_completion'`) and which
+    Backend then **removed** rather than repaired -- it belonged to a design superseded when the
+    resume point moved into the landing zone itself. Testing a deliberately removed flag would be
+    asserting the absence of a feature nobody wants.
 
-    That makes it the *only* documented safe way for an operator to force a re-load, and
-    `docs/runbooks/analytics-pipeline.md` has to tell them something. So it gets its own test rather
-    than being folded into the one above: if it is broken, the runbook is wrong, not just a flag.
+    What is worth keeping is the property the incident revealed: a flag can be advertised in
+    `--help` and reach no working code path, and nothing notices until an operator uses it at 3am
+    on the advice of a runbook. So this asserts the *class*, cheaply, by invoking each advertised
+    flag and requiring that it is at least recognised.
     """
-    loader.kill("odoo19-bct-cdc-qa-reload")
-    out = loader.run_loader("odoo19-bct-cdc-qa-reload", ["--backfill-only", "--reload"], timeout=900)
-    tail = "\n".join((out.stdout + out.stderr).strip().splitlines()[-20:])
-    evidence.add("cdc-run.sh -- --backfill-only --reload (rc=%d)" % out.returncode, tail)
-    assert out.returncode == 0, (
-        "`--reload` exits non-zero. Owner: Backend (analytics/cdc/**). QA does not fix it.\n%s" % tail
+    out = loader.run_loader_direct(
+        "odoo19-bct-cdc-qa-reload", ["--help"], timeout=120
     )
+    text = out.stdout + out.stderr
+    flags = sorted(set(re.findall(r"(--[a-z][a-z0-9-]+)", text)))
+    evidence.add("flags advertised by bct-cdc --help", " ".join(flags) or "(none parsed)")
+    assert flags, "could not parse any flag out of --help:\n%s" % text[-800:]
+    assert "--reload" not in flags, (
+        "--reload is advertised again. It was removed deliberately; if it is back it needs a test "
+        "that exercises it, because the last version of it raised AttributeError on every call."
+    )
+    # `--backfill-only` is the flag the runbook now sends operators to, so it gets a real check
+    # rather than a help-text one.
+    assert "--backfill-only" in flags
 
 
 def test_marts_are_identical_after_a_second_dbt_build(marts_exist, evidence):

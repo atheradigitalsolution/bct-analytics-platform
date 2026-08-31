@@ -171,7 +171,18 @@ def test_semantic_api_serves_freshness_from_pipeline_state(semantic_up, evidence
     evidence.add("warehouse.mart_freshness for that mart", str(from_db))
     assert from_db, "no mart_freshness row for %s" % meta["source_model"]
     assert meta["last_refreshed_at"] is not None
-    assert str(meta["last_refreshed_at"])[:16] == from_db[0][0][:16], (
+
+    # Compare instants, not spellings. The API serialises ISO-8601 with a `T`; psql prints a space.
+    # A string comparison here fails on the separator while the two values are the same moment --
+    # which would be a test reporting a defect that does not exist.
+    def instant(value):
+        return str(value).replace("T", " ")[:26].rstrip("+0 ")
+
+    evidence.add(
+        "normalised for comparison",
+        "api %s\ndb  %s" % (instant(meta["last_refreshed_at"]), instant(from_db[0][0])),
+    )
+    assert instant(meta["last_refreshed_at"]) == instant(from_db[0][0]), (
         "the API's last_refreshed_at (%s) does not match warehouse.mart_freshness (%s)"
         % (meta["last_refreshed_at"], from_db[0][0])
     )

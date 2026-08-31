@@ -169,56 +169,81 @@ def test_the_unassigned_ou_branch_is_actually_exercised(semantic_up, marts_exist
     """`allowed_ou: []` maps to the UNASSIGNED member `-1`, not to `IS NULL`. Is that observable?
 
     Backend originally mapped `[]` to `operating_unit_id IS NULL` by analogy with Odoo's record
-    rules, and fixed it to `= -1` because the marts carry an explicit UNASSIGNED member rather than
-    a NULL. The fix is right. But on a dataset where **no fact row carries `-1`**, the old mapping
-    and the new one both return zero rows, so the fix is not distinguishable from the bug.
+    rules, and corrected it to `= -1` because the marts carry an explicit UNASSIGNED member rather
+    than a NULL. The fix is right. But on a mart where **no row carries `-1`** the old mapping and
+    the new one both return zero rows, so the fix is indistinguishable from the bug it replaced.
 
-    A fix that has never been observed to change an outcome is not yet known to work. So this test
-    refuses to report a pass on an empty dataset: it fails loudly as NOT COVERED, naming what has to
-    be seeded to cover it, rather than going green on a vacuous comparison.
+    A fix that has never been observed to change an outcome is not yet known to work. So the metric
+    is chosen from the data: whichever metric's source mart actually holds unassigned rows. Picking
+    one up front is how this test first failed against `revenue_net`, whose mart legitimately has
+    none -- a test asserting on the wrong subject, which is its own kind of false report.
     """
-    from helpers import db
+    import yaml
 
-    counts = db.grid(
-        db.warehouse_admin(),
-        "SELECT 'dim_operating_unit' AS src, count(*) FILTER (WHERE operating_unit_id = -1) AS unassigned, "
-        "count(*) AS total FROM marts.dim_operating_unit "
-        "UNION ALL SELECT 'fct_sale_order_line', count(*) FILTER (WHERE operating_unit_id = -1), "
-        "count(*) FROM marts.fct_sale_order_line "
-        "UNION ALL SELECT 'fct_ppob_transaction', count(*) FILTER (WHERE operating_unit_id = -1), "
-        "count(*) FROM marts.fct_ppob_transaction "
-        "UNION ALL SELECT 'fct_account_move_line', count(*) FILTER (WHERE operating_unit_id = -1), "
-        "count(*) FROM marts.fct_account_move_line;",
+    from helpers import db, env
+
+    catalogue = yaml.safe_load(
+        (env.repo_root() / "analytics" / "semantic-api" / "metrics" / "core.yml").read_text(
+            encoding="utf-8"
+        )
     )
-    evidence.add("rows carrying the UNASSIGNED operating unit (-1)", counts)
+    metrics = catalogue if isinstance(catalogue, list) else catalogue.get("metrics", catalogue)
 
-    facts = db.query(
-        db.warehouse_admin(),
-        "SELECT (SELECT count(*) FROM marts.fct_sale_order_line WHERE operating_unit_id = -1) "
-        "     + (SELECT count(*) FROM marts.fct_ppob_transaction WHERE operating_unit_id = -1) "
-        "     + (SELECT count(*) FROM marts.fct_account_move_line WHERE operating_unit_id = -1);",
-    )
-    unassigned_facts = int(facts[0][0])
-    evidence.add("fact rows with operating_unit_id = -1", unassigned_facts)
+    report, usable = [], []
+    for metric in metrics:
+        mart = metric["source_model"]
+        try:
+            unassigned, total = db.query(
+                db.warehouse_admin(),
+                "SELECT count(*) FILTER (WHERE operating_unit_id = -1), count(*) "
+                "FROM marts.%s;" % mart,
+            )[0]
+        except db.PsqlError as exc:
+            report.append("%-28s %-24s (unreadable: %s)" % (metric["name"], mart, exc))
+            continue
+        report.append("%-28s %-24s unassigned=%-5s total=%s"
+                      % (metric["name"], mart, unassigned, total))
+        if int(unassigned) > 0:
+            usable.append((metric["name"], mart, int(unassigned)))
+    evidence.add("metric -> source mart -> rows carrying operating_unit_id = -1", "\n".join(report))
 
-    if unassigned_facts == 0:
+    if not usable:
         pytest.fail(
-            "NOT COVERED: no fact row carries operating_unit_id = -1, so `allowed_ou: []` -> `= -1` "
-            "and the old `IS NULL` mapping are indistinguishable -- both return zero rows. Every "
-            "fact row has a real Operating Unit because the propagation fix in "
-            "custom_operating_unit ensures documents never lose one.\n"
-            "To cover it, seed one document with no Operating Unit (e.g. clear operating_unit_id on "
-            "a single sale order in the OLTP so the CDC stream lands the change), rebuild with "
-            "`make dbt-run`, and re-run. This test then asserts that an `allowed_ou: []` session "
-            "sees exactly those rows and no others."
+            "NOT COVERED: no mart backing any metric holds a row with operating_unit_id = -1, so "
+            "`allowed_ou: []` -> `= -1` and the old `IS NULL` mapping are indistinguishable -- both "
+            "return zero rows. Seed one document with no Operating Unit, rebuild with "
+            "`make dbt-run`, and this test starts asserting instead of reporting."
         )
 
+    name, mart, unassigned = usable[0]
     empty = tokens.valid(tokens.claims(tenant="bct", allowed_ou=[], all_ou=False))
-    response = _query(empty, metric="revenue_net")
-    evidence.add("allowed_ou=[] against a dataset that HAS unassigned rows",
-                 "HTTP %s rows=%s" % (response.status, len(response.json().get("rows", []))))
-    assert response.status == 200, response.body[:300]
-    assert response.json()["rows"], (
-        "there are %d fact rows with operating_unit_id = -1, but an allowed_ou=[] session saw none. "
-        "That is the `IS NULL` mapping, not the `= -1` one." % unassigned_facts
+    everything = tokens.valid(tokens.claims(tenant="bct", all_ou=True))
+
+    restricted = _query(empty, metric=name)
+    unrestricted = _query(everything, metric=name)
+    evidence.add(
+        "metric %r (mart %s, %d unassigned rows)" % (name, mart, unassigned),
+        "allowed_ou=[]  HTTP %s  %s\nall_ou=true    HTTP %s  %s"
+        % (restricted.status, restricted.body[:300],
+           unrestricted.status, unrestricted.body[:300]),
     )
+    assert restricted.status == 200, restricted.body[:300]
+    assert unrestricted.status == 200, unrestricted.body[:300]
+
+    restricted_rows = restricted.json()["rows"]
+    unrestricted_rows = unrestricted.json()["rows"]
+    assert restricted_rows, (
+        "mart %s holds %d rows with operating_unit_id = -1, but an allowed_ou=[] session saw none. "
+        "That is the `IS NULL` mapping, not the `= -1` one." % (mart, unassigned)
+    )
+    assert len(restricted_rows) < len(unrestricted_rows), (
+        "the no-entitlement session saw as much as the explicit bypass (%d vs %d rows); the "
+        "restriction is not restricting" % (len(restricted_rows), len(unrestricted_rows))
+    )
+    # And what it saw is ONLY the unassigned member -- the property that distinguishes the fix.
+    seen = {r.get("operating_unit_id") for r in restricted_rows if "operating_unit_id" in r}
+    if seen:
+        assert seen == {-1}, (
+            "an allowed_ou=[] session saw operating units %r; it must see only the UNASSIGNED "
+            "member (-1)" % sorted(seen)
+        )
