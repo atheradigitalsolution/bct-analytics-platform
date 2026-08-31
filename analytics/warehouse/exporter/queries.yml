@@ -45,7 +45,10 @@ bct_warehouse_dbt_test:
     )
     SELECT
       r.resource_type                                          AS resource_type,
-      coalesce(r.severity, 'none')                             AS severity,
+      -- lower(): dbt reports the same severity as both 'ERROR' and 'error'
+      -- depending on where it was configured, which would split one alert
+      -- into two time series that each look half as bad as they are.
+      lower(coalesce(r.severity, 'none'))                       AS severity,
       r.status                                                 AS status,
       count(*)::bigint                                         AS nodes,
       coalesce(sum(r.failures), 0)::bigint                     AS failures,
@@ -115,6 +118,13 @@ bct_warehouse_mart:
     SELECT
       mart_name                        AS mart,
       tenant_id                        AS tenant,
+      -- Carried as a LABEL so Alertmanager can route by the ADR's own
+      -- page/alert distinction instead of the rules re-deciding it. ADR 0001
+      -- deliberately made the SLAs non-uniform (PPOB 60 s pages, finance
+      -- 60 min alerts) and rejected uniform-strict as wasting VPS headroom;
+      -- an alert file that flattened that back out would undo a GATE 2
+      -- decision by accident.
+      on_breach                        AS on_breach,
       sla_seconds::bigint              AS sla_seconds,
       coalesce(age_seconds, 0)::bigint AS age_seconds,
       CASE WHEN is_stale THEN 1 ELSE 0 END::bigint AS stale
@@ -126,6 +136,9 @@ bct_warehouse_mart:
     - tenant:
         usage: "LABEL"
         description: "Tenant slug"
+    - on_breach:
+        usage: "LABEL"
+        description: "page or alert, from ADR 0001's freshness table"
     - sla_seconds:
         usage: "GAUGE"
         description: "Freshness SLA for this mart, from ADR 0001"

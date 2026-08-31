@@ -151,6 +151,24 @@ services:
     logging: *default-logging
     user: "65534:65534"
     mem_limit: 128m
+    # ONLY the custom queries, none of the exporter's built-in collectors.
+    #
+    # Two reasons, and the first one is a real access-control decision rather
+    # than tidiness. The built-in `wal` collector calls pg_ls_waldir(), which
+    # needs pg_monitor. This exporter connects as warehouse_rls - the SAME
+    # identity the semantic-api uses - and widening that role to pg_monitor to
+    # silence a log line would widen the serving identity. The collector is
+    # turned off instead. (It logged `permission denied for function
+    # pg_ls_waldir` on every scrape until this was added; least privilege is
+    # working, not failing.)
+    #
+    # Second: generic Postgres metrics for this cluster are not interesting
+    # here. Replication-slot lag lives on the OLTP primary, which the
+    # observability overlay's postgres-exporter already covers. This exporter
+    # exists for the bct_warehouse_* series and nothing else.
+    command:
+      - --disable-default-metrics
+      - --disable-settings-metrics
     environment:
       DATA_SOURCE_NAME: "postgresql://${WAREHOUSE_RLS_USER:-warehouse_rls}:${WAREHOUSE_RLS_PASSWORD:?WAREHOUSE_RLS_PASSWORD is required}@warehouse-db:5432/${WAREHOUSE_DB:-warehouse}?sslmode=disable"
       PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres_exporter/queries.yml

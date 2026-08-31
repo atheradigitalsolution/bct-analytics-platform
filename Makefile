@@ -23,6 +23,7 @@ PROJECT      ?= odoo19-bct
 COMPOSE_BASE := docker-compose.yml
 COMPOSE_DEV  := docker-compose.dev.yml
 COMPOSE_OBS  := docker-compose.observability.yml
+COMPOSE_ANALYTICS := docker-compose.analytics.yml
 
 DC     := docker compose -p $(PROJECT) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV)
 DC_OBS := docker compose -p $(PROJECT) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV) -f $(COMPOSE_OBS)
@@ -35,6 +36,10 @@ FROM    ?=
 INTO    ?=
 SERVICE ?=
 ARGS    ?=
+
+# python3, not python: the Windows hosts here have no `python` on PATH.
+PYTHON  ?= python3
+OUT     ?=
 
 # ---------------------------------------------------------------------------
 # help — the default target.
@@ -174,6 +179,20 @@ scan-secret: ## Fail if a real secret is committed, or .env.example drifts off `
 verify: ## Run every Phase 1 acceptance check and print the evidence
 	@bash scripts/verify.sh
 
+# ==== Tests
+
+.PHONY: test
+test: ## Run the integration suite in tests/ (ARGS='-k live' to filter)
+	@bash tests/run.sh $(ARGS)
+
+.PHONY: test-coldstart
+test-coldstart: ## DESTRUCTIVE: cold-start suite; scoped to THIS project, other stacks checked after
+	@bash scripts/coldstart-guard.sh $(ARGS)
+
+.PHONY: metric-fixtures
+metric-fixtures: ## Generate the semantic-api metric fixtures the Frontend agent builds against
+	@$(PYTHON) scripts/analytics/metric-fixtures.py $(ARGS)
+
 # ==== Observability
 
 .PHONY: up-obs
@@ -188,14 +207,70 @@ down-obs: ## Stop only the observability services (the base stack keeps running)
 	@$(DC_OBS) stop prometheus grafana loki promtail alertmanager postgres-exporter node-exporter
 	@$(DC_OBS) rm -f prometheus grafana loki promtail alertmanager postgres-exporter node-exporter
 
+# ==== Analytics warehouse (Data Warehouse agent)
+#
+# Every target here is scoped -p $(PROJECT) through $(DC_ANALYTICS), like the
+# rest of this file. Names are taken from the namespace reserved in
+# docs/agents/contracts/04-platform.md 6 and collide with nothing above.
+
+DC_ANALYTICS := docker compose -p $(PROJECT) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV) -f $(COMPOSE_ANALYTICS)
+
+# `run --rm --no-deps`, not `exec`: dbt is a batch job, not a service. Leaving a
+# restart-policy container idling would burn ~150 MiB of the VPS budget for
+# something that runs for twelve seconds. --no-deps because the compose
+# dependency is only there to order a `up`, and re-checking warehouse-db health
+# on every invocation adds a second to every command.
+DBT := MSYS_NO_PATHCONV=1 $(DC_ANALYTICS) run --rm --no-deps dbt
+WCTL := MSYS_NO_PATHCONV=1 $(DC_ANALYTICS) run --rm --no-deps --entrypoint python dbt /warehouse/bin/warehouse_ctl.py
+
+.PHONY: up-analytics
+up-analytics: ## Start the warehouse, apply its DDL, sync the PDP policy and load the landing zone
+	@$(DC_ANALYTICS) up -d warehouse-db warehouse-exporter
+	@bash analytics/warehouse/bin/warehouse-apply.sh
+	@$(DC_ANALYTICS) --profile tools build dbt
+	@$(WCTL) sync-policy
+	@$(WCTL) gen-raw-ddl
+	@$(WCTL) gen-fdw
+	@$(WCTL) load-fixture --tenant bct_t2
+	@echo "warehouse    127.0.0.1:$${WAREHOUSE_HOST_PORT:-35433}  (db $${WAREHOUSE_DB:-warehouse})"
+
+.PHONY: down-analytics
+down-analytics: ## Stop only the analytics services (the base stack keeps running)
+	@$(DC_ANALYTICS) stop warehouse-db warehouse-exporter
+	@$(DC_ANALYTICS) rm -f warehouse-db warehouse-exporter
+
+.PHONY: dbt-run
+dbt-run: ## Build every dbt model (seeds, snapshots, staging, marts)
+	@$(DBT) build --exclude-resource-type test
+
+.PHONY: dbt-test
+dbt-test: ## Run every dbt test, including the reconciliation against live Odoo
+	@$(DBT) test
+
+.PHONY: dbt-docs
+dbt-docs: ## Generate the dbt catalogue into analytics/dbt/target
+	@$(DBT) docs generate
+
+.PHONY: warehouse-backup
+warehouse-backup: ## pg_dump the warehouse with a manifest and SHA256SUMS
+	@bash analytics/warehouse/bin/warehouse-backup.sh $(if $(OUT),--out $(OUT),)
+
+.PHONY: warehouse-restore
+warehouse-restore: ## Restore a warehouse backup: make warehouse-restore FROM=backups/warehouse/<stamp>
+	@test -n "$(FROM)" || { echo "FROM=<backup dir> is required"; exit 2; }
+	@bash analytics/warehouse/bin/warehouse-backup.sh --restore $(FROM)
+
 # ===========================================================================
 # RESERVED — do not define these here.
 #
 # Namespace claimed by later agents (docs/agents/contracts/04-platform.md):
-#   Data Warehouse : up-analytics  down-analytics  dbt-run  dbt-test
-#                    dbt-docs  warehouse-backup  warehouse-restore
+#   Data Warehouse : CLAIMED above, in the "Analytics warehouse" section.
 #   Backend        : up-gateway  up-semantic  cdc-start  cdc-status
 #   Frontend       : up-portal  portal-build
+#
+# Claimed since publication, on request via the Lead:
+#   QA             : test  test-coldstart          (recipes here, tests/run.sh is QA's)
+#   Backend        : metric-fixtures               (recipe here, the script is Backend's)
 #   Security       : lint  sast  sbom  sign  ci-local
 #
 # Adding a target with one of those names silently overrides theirs, because
