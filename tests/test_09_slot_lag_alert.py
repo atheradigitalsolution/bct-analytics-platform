@@ -354,6 +354,24 @@ def test_no_loaded_alert_rule_depends_on_a_series_that_does_not_exist(evidence):
             if blocked:
                 report.append("precondition %-41s %s" % (rule["name"], ", ".join(blocked)))
 
+    # A series can be legitimately absent for one scrape interval after its exporter restarts --
+    # and this suite restarts the CDC loader itself, two tests earlier. Confirming the absence
+    # persists is the difference between "never emitted" and "caught mid-restart"; without it this
+    # test is flaky in exactly the way that gets a test muted.
+    if dead:
+        time.sleep(25)
+        _seen.clear()
+        confirmed, report = [], [r for r in report if not r.startswith("NEVER SEEN")]
+        for name, missing in dead:
+            still = [n for n in missing if not has_samples(n)]
+            if still:
+                confirmed.append((name, still))
+                report.append("NEVER SEEN   %-42s %s" % (name, ", ".join(still)))
+            else:
+                report.append("transient    %-42s %s (present on re-check)"
+                              % (name, ", ".join(missing)))
+        dead = confirmed
+
     evidence.add("scrape targets currently down", ", ".join(down_jobs) or "none")
     evidence.add(
         "alert rules referencing a series with no samples",
