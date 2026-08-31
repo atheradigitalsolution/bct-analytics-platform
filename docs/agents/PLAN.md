@@ -713,3 +713,74 @@ select _lsn::text, count(*) from raw.account_account group by 1;
 seven-metric fixture set Frontend is currently building against, and the `SEMANTIC_API_JWKS_URL`
 drift. The proof required is a changed `account.account` row arriving with a real LSN — not a
 publication that merely lists the table.
+
+### Instance 16 — a check that skipped its subject before it could find it missing
+
+Backend found the root cause of the fixture-fed `account_account`, and it is the purest specimen yet.
+`assert_publication_excludes_secrets` (`analytics/cdc/bct_cdc/runner.py:86`) opens its loop with:
+
+```python
+if not secrets: continue
+```
+
+`account_account` has 16 columns and **zero** `secret`-class ones, so it was skipped **before**
+reaching the `columns is None` branch that would have reported it absent from the publication. The
+check asked *"did any secret leak?"*, got *"none"*, and had no way to distinguish that from *"this
+table is not published at all."*
+
+**What hid it:** the backfill is a plain `SELECT` and does not go through the publication. So the
+table was **fully populated and permanently frozen at the same time** — the most convincing possible
+appearance of working.
+
+**Generalised rule: a check that `continue`s past a subject cannot report that subject missing.**
+Absence of the thing you filter on and absence of the subject itself are different states. This is
+the loop-level form of the empty-result rule.
+
+Verified by the Lead after the fix: `pg_publication_tables` now carries `account_account`;
+`raw.account_account` holds 108 rows, 5 distinct `_lsn`, **4 CDC-fed**.
+
+**Backend's red proof established its own precondition, which is the discipline propagating.** Before
+claiming "nothing arrived", it showed the consumer was demonstrably alive — an Odoo write at WAL
+`0/1202D278`, slot `confirmed_flush_lsn` advancing *past* it to `0/1202D2B0`, and still zero rows
+landed. Without that control, "nothing arrived" is indistinguishable from a dead consumer, which is
+exactly the Lead's instance-7 error. It also kept the red proof permanently as
+`test_the_secret_check_alone_cannot_see_a_missing_table`, which runs the **old** check over the
+**broken** input and asserts silence.
+
+It further refused a vacuous masking pass: "0 unmasked notes in raw" proved nothing because the
+source held zero non-null notes. It set a probe string through Odoo, watched the row land with `note`
+NULL and the probe absent, then reverted.
+
+### A Lead error — I relayed an unverified claim as established fact
+
+Frontend reported that the metric fixtures were "still the seven-metric set". **I passed that to
+Backend as fact without checking it.** Backend checked: they were **ten**, and had been since
+`578623b`, with the working tree matching HEAD byte for byte. Verified by the Lead — the directory
+holds 12 files today and held 11 at that commit.
+
+Re-running an agent's evidence is §2.5 and it applies to claims I *forward*, not only to claims I
+accept. Routing an unverified report costs the receiving agent real time.
+
+**The finding underneath is better than the correction.** Nothing in this repo could have told anyone
+which was true. Frontend's `contract-shape.test.ts` parses every fixture **present** through the
+app's own guards — correct design — but `readdirSync` cannot see a file that is not there. **Seven
+correct fixtures for a ten-metric registry is a green run.** Completeness of a generated set can only
+be asserted on the producing side, which is the only side that knows what the set should be; Backend
+added that test, guarded by an explicit "registry >= 10 metrics" assertion first, because every set
+comparison below it is satisfied perfectly by an empty registry.
+
+Two more of the same family in that work: `make metric-fixtures` with no token silently wrote
+**offline synthetic shapes over live transcripts** — same envelope, same filenames, exit 0 — and now
+refuses (exit 2); and `stock_valuation` is declared **with `has_unit_cost` as a dimension**, because
+`SUM()` skips NULL and the total otherwise reads as finished.
+
+Backend declined to declare `pnl_`/`balance_sheet_` metrics although now possible: *"a second metric
+name for the same measure over a filtered set is a view, not a metric."* Correct, and the restraint
+is worth as much as the additions.
+
+### `bash -n` is a syntax check, not a correctness check
+
+Backend nearly shipped the JWKS fix broken by putting a comment **inside** a backslash-continued
+`docker run`. `bash -n` passed on **both** the broken and the working version, because the construct
+is syntactically fine. Only running the script found it. Recorded because `bash -n` appears in this
+repo's tooling and reads like a safety net it is not.
