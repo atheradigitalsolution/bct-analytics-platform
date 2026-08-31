@@ -283,8 +283,17 @@ expecting `semantic-api` and `cdc-loader` beside `dbt`, `warehouse_ctl` and `war
 (`runner.py:315`, opened with `connection_factory=LogicalReplicationConnection`) sets no
 `application_name`. It is a **source-side** connection to the Odoo Postgres and §A.6 governs
 *warehouse* consumers, so it is outside this clause rather than an unexplained exception. Naming it
-would still help attribute WAL-sender sessions on the OLTP side — worth doing for Platform-Infra's
-slot monitoring, not required here, and not to be changed speculatively while the stack is held.
+would still help attribute WAL-sender sessions on the OLTP side, which is worth having for
+Platform-Infra's slot monitoring. **If it is ever wanted it arrives as a Platform-Infra request
+against contract 04, not as a tidy-up here** — that is the route, and it does not depend on who
+happens to hold the stack.
+
+> The previous version of this sentence ended "and not to be changed speculatively while the stack
+> is held". True when written, and the wrong reason: the decision is driven by SCOPE, not by
+> timing. A timing constraint expires, and the next reader finds it expired and reads the sentence
+> as permission — for exactly the change this paragraph exists to prevent. Backend hit the identical
+> defect in their own docstring for this same connection and fixed it first; I had it here, in the
+> sentence telling them not to do it.
 
 **Why this is a contract clause and not a style note.** The whole attributability design in §B rests
 on this field, and I had required it of no one:
