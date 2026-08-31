@@ -523,3 +523,65 @@ what every other caller in this repo already does — `tests/helpers/loader.py:2
   declined to take it: it edits `observability/prometheus/scrape.d` and needs a reload while QA and
   Frontend hold the stack. Recorded as a deliberate deferral, not an oversight.
 - **`scripts/analytics/*.sh` are still `100644`** — Backend's path, same exec-bit condition.
+
+### §6 rollback — DEMONSTRATED, re-run by the Lead
+
+The brief requires the rollback demonstrated, not documented. It now is, and the Lead re-ran it
+rather than accepting the report:
+
+```
+bash security/deploy/test-rollback.sh
+  3. pre-deploy backup failure aborts before anything is swapped   PASS exit 3, digest UNCHANGED
+  4. unsigned / unverifiable image is refused                      PASS exit 4, never ran
+  5. empty verifier fails closed                                   PASS exit 4
+  6. deploying a tag instead of a digest is rejected               PASS exit 2
+  7. migration failure triggers rollback, not a silent pass        PASS exit 5, rolled back to sha256:6baf4358...
+  8. re-deploying the running digest is a no-op that still passes  PASS exit 0
+  PASS=19  FAIL=0   ROLLBACK_SELFTEST_OK
+```
+
+Safe to run: isolated compose project `bct-deploy-selftest`, every `down` scoped to it. The 23
+foreign containers and `odoo19-bct` were untouched — checked before running, not after.
+
+**Scope of the claim, stated precisely.** The deploy/rollback *mechanism* is demonstrated against
+real containers and real digests. The *workflow orchestration* in `cd.yml` has never executed and
+cannot until a remote exists. Security's own header says so — "THIS FILE HAS NEVER EXECUTED... Do
+not read a green CI badge as evidence that this workflow works" — which is the standard this build
+asks for, applied by the agent to its own deliverable.
+
+Test 5 deserves note: **"empty verifier fails closed (the 'check that cannot fail' case)"**. Security
+wrote a test case named after this build's defect catalogue. The catalogue became design input
+rather than a post-mortem.
+
+### Exec bit — closed, with two instructive false positives
+
+Platform-Infra checked QA's 21 shebang-but-not-executable files empirically rather than by
+reasoning, and two are correct at `100644` for **different** reasons:
+
+| File | Why `100644` is right |
+|---|---|
+| `odoo/docker-entrypoint.sh` | `odoo/Dockerfile:65` is `COPY --chmod=0555`. The bit is supplied downstream; a `git chmod` would be **inert**. Verified independently by the Lead. |
+| `postgres/init/00-init.sh` | The Postgres entrypoint **sources** non-executable init scripts. Its absence is **load-bearing** — marking it executable changes how it runs. |
+
+One where the bit is supplied later, one where its absence *is* the mechanism. QA's test excludes
+both for the right reason (command position, not shebang presence) rather than by luck.
+
+**QA's sharper finding was about its own test.** Its tightened pattern missed
+`"$REPO_ROOT/scripts/init-db.sh"` — the very defect that motivated it — because the path was quoted
+*and* variable-prefixed. It found this by running the test against the known defect. **A test that
+cannot detect its own motivating case is a check that cannot fail, one level up.** QA wrote it wrong
+twice and reported both failures rather than only the working version.
+
+**A shared-index hazard nobody had documented.** Committing a mode-only change via the private-index
+route leaves the *shared* index still saying `100644` while HEAD says `100755` — a pending **revert**
+that the next agent's commit would silently apply. Fix: `git update-index --chmod=+x <file>` after
+the commit. Both agents hit it; QA correctly backed out rather than pressing on.
+
+### Routing decisions carried forward
+
+- **`scripts/analytics/*` exec bit** — Backend's path, and QA's test finds none of them in command
+  position today. **Latent, not active.** The one place it would bite is `ci.yml`'s `-x` guard,
+  which Security is fixing. Not worth waking Backend for.
+- **An `alertmanager` scrape job** would let check 1 cover its liveness for free. Deferred by the
+  Lead, not forgotten: it edits `observability/prometheus/scrape.d` and needs a reload while three
+  agents hold the stack. The direct probe already closes the hole.
