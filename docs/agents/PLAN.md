@@ -1187,3 +1187,48 @@ DWH's own words applied to DWH's own work: *"the number is right the day it is w
 three months later when one consumer is retuned by someone who never saw the others."* **A hardcoded
 16 in the checker is that same frozen number, one level up.** Routed with the requirement to prove it
 red by raising the knob above the budget.
+
+### Instance 21 — the suggested fix would have been strictly worse than the bug
+
+Backend found DWH's budget check hardcoded `16`, and proposed the obvious one-line fix:
+`os.environ.get("SEMANTIC_API_POOL_MAX", "16")`. The Lead relayed it. **DWH checked before editing
+and found it would not have worked, while looking exactly as though it had:**
+
+```
+inside the dbt container:  SEMANTIC_API_POOL_MAX=[<absent>]   DBT_THREADS=[4]
+```
+
+`verify` runs inside the dbt container, which never received that variable. `os.environ.get` there
+returns the `16` default **forever**, while presenting as a live reading. In DWH's words: *"strictly
+worse than the literal it replaces, because a literal is at least honest about being one."*
+
+It passed the variable through `docker-compose.analytics.yml` and **confirmed the container could see
+it before touching the Python.**
+
+**The real fix was printing provenance**, which reframes the defect correctly: the failure was never
+the hardcoded number, it was that an asymmetric check did not *look* asymmetric.
+
+```
+   16  semantic-api pool      [env SEMANTIC_API_POOL_MAX]
+    5  dbt (threads + 1)      [env DBT_THREADS]
+    3  CDC loader             [literal - not configurable (runner.py 229/413/444)]
+    3  postgres_exporter      [literal - fixed in docker-compose.analytics.yml]
+    4  ad-hoc psql headroom   [literal - policy allowance, not a setting]
+```
+
+The CDC loader's 3 stays a literal on Backend's evidence — but is now visibly **a claim of record
+rather than passing for a live reading.** Every number in a computed check should say where it came
+from; a mixture of live and frozen values that renders identically is a lie of formatting.
+
+Made red at Backend's exact scenario: `SEMANTIC_API_POOL_MAX=32` -> `47 claimed vs 37 usable`,
+exit 5. **47 is the figure Backend predicted from reading the code** — an independent peer's
+prediction used as the check on the fix, which is better evidence than the author's own arithmetic
+agreeing with itself.
+
+DWH's own summary of the shape: *"the check was correct on default values, which is the same trap as
+a test that has only ever run against data where it cannot fail."*
+
+**Three agents in sequence on one number:** Backend froze an estimate in a docstring; DWH froze it
+again in a checker; Backend caught DWH; DWH caught Backend's proposed fix. Nobody was careless. The
+number simply has no owner, which is the finding DWH stated at the outset and then demonstrated
+twice by accident.
