@@ -1,88 +1,88 @@
 {
-  "metric": "sales_total",
+  "metric": "account_balance",
   "dimensions": [
     "date_day"
   ],
   "rows": [
     {
       "date_day": "2026-06-29",
-      "value": 9210000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-04-08",
-      "value": 1497500.0
+      "value": 0.0
     },
     {
       "date_day": "2026-02-18",
-      "value": 8210000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-01-20",
-      "value": 1250000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-06-10",
-      "value": 1800000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-04-04",
-      "value": 105000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-01-03",
-      "value": 5107500.0
+      "value": 0.0
     },
     {
       "date_day": "2026-08-02",
-      "value": 7120000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-01-29",
-      "value": 6375000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-05-11",
-      "value": 405000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-07-26",
-      "value": 8900000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-04-18",
-      "value": 3800000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-02-03",
-      "value": 3615000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-08-07",
-      "value": 8815000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-04-21",
-      "value": 5077500.0
+      "value": 0.0
     },
     {
       "date_day": "2026-08-20",
-      "value": 3147500.0
+      "value": 0.0
     },
     {
       "date_day": "2026-06-24",
-      "value": 12710000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-03-19",
-      "value": 1942500.0
+      "value": 0.0
     },
     {
       "date_day": "2026-04-01",
-      "value": 8900000.0
+      "value": 0.0
     },
     {
       "date_day": "2026-03-21",
-      "value": 245000.0
+      "value": 0.0
     }
   ],
   "meta": {
@@ -90,10 +90,10 @@
     "row_count": 20,
     "last_refreshed_at": "2026-08-31T05:49:35.560613+00:00",
     "is_stale": false,
-    "refresh_sla_seconds": 300,
-    "source_model": "mart_sales_daily",
+    "refresh_sla_seconds": 3600,
+    "source_model": "fct_account_move_line",
     "unit": "IDR",
     "type": "decimal",
-    "query_duration_ms": 9.9
+    "query_duration_ms": 8.3
   }
 }

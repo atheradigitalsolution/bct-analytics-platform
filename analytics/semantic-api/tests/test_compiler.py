@@ -162,3 +162,93 @@ def test_limit_must_be_a_positive_integer():
     for bad in (0, -1, "10", 1.5, True):
         with pytest.raises(QueryRejected):
             compile_ok(limit=bad)
+
+
+# -- ratio and period_growth -------------------------------------------------------------------
+
+RATIO_METRIC = Metric({
+    "name": "ppob_success_rate",
+    "label": "Success rate",
+    "grain": ["date_day", "tenant_id"],
+    "dimensions": ["date_day", "tenant_id", "biller_code"],
+    "filters": {"date_range": {"type": "daterange", "required": True, "column": "date_day"}},
+    "type": "percent",
+    "aggregation": "ratio",
+    "numerator": {"measure": "is_success", "agg": "count_true"},
+    "denominator": {"measure": "ppob_transaction_id", "agg": "count"},
+    "source_model": "fct_ppob_transaction",
+    "refresh_sla_seconds": 60,
+    "pdp_class": "internal",
+})
+
+GROWTH_METRIC = Metric({
+    "name": "revenue_mom_growth",
+    "label": "MoM growth",
+    "grain": ["date_month", "tenant_id"],
+    "dimensions": ["date_month", "tenant_id", "revenue_channel"],
+    "derived_dimensions": {"date_month": {"from": "date_day", "grain": "month"}},
+    "filters": {"date_range": {"type": "daterange", "required": True, "column": "date_day"}},
+    "type": "percent",
+    "aggregation": "period_growth",
+    "measure": "revenue_net",
+    "growth_over": "date_month",
+    "channel_note": "summed across channels deliberately",
+    "source_model": "mart_revenue_daily",
+    "refresh_sla_seconds": 900,
+    "pdp_class": "internal",
+})
+
+
+def compile_metric(metric, **kwargs):
+    params = dict(
+        metric=metric, dimensions=["tenant_id"], filters=dict(VALID_FILTERS),
+        order_by=None, limit=100, tenant_id="bct", allowed_ou=[], all_ou=True,
+    )
+    params.update(kwargs)
+    return compile_query(**params)
+
+
+def test_ratio_uses_count_true_not_sum_of_a_boolean():
+    """SUM(boolean) is invalid in Postgres and SUM(col::int) silently truncates a numeric column."""
+    statement, _ = compile_metric(RATIO_METRIC)
+    text = str(statement)
+    assert "COUNT(*) FILTER (WHERE" in text
+    assert "is_success" in text
+
+
+def test_ratio_guards_division_by_zero_with_nullif():
+    """An empty denominator must yield NULL, not 0.
+
+    "No rate" and "a rate of zero" are different statements, and a chart plotting 0 for an empty
+    denominator asserts something the data does not say.
+    """
+    statement, _ = compile_metric(RATIO_METRIC)
+    assert "NULLIF(" in str(statement)
+
+
+def test_period_growth_emits_a_lag_window_over_the_declared_dimension():
+    # str() on a psycopg2 Composed renders its REPR, not SQL, so the fragments are asserted
+    # individually rather than as one contiguous string. Found by this test failing on its own
+    # first run, which is the cheapest possible place to learn it.
+    statement, _ = compile_metric(GROWTH_METRIC, dimensions=["date_month"])
+    text = str(statement)
+    assert "lag(" in text
+    assert "OVER (ORDER BY" in text
+    assert "SUM(" in text
+    assert "revenue_net" in text
+    assert "date_trunc(" in text  # date_month is derived: the window orders by the expression
+
+
+def test_period_growth_without_its_time_dimension_is_rejected():
+    """Without the growth dimension every row is its own group and every value would be NULL."""
+    with pytest.raises(QueryRejected) as exc:
+        compile_metric(GROWTH_METRIC, dimensions=["tenant_id"])
+    assert exc.value.field == "dimensions"
+    assert "growth over" in exc.value.detail
+
+
+def test_neither_new_aggregation_lets_a_caller_string_into_sql():
+    """The allow-list still holds: numerator/denominator/growth_over come from the metric file."""
+    for metric in (RATIO_METRIC, GROWTH_METRIC):
+        with pytest.raises(QueryRejected):
+            compile_metric(metric, dimensions=["1; DROP TABLE marts.x; --"])

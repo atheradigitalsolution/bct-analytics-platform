@@ -29,8 +29,15 @@ AGGREGATIONS = {
     "avg": "AVG",
     "count": "COUNT",
     "count_distinct": "COUNT",  # DISTINCT is added separately
-    "ratio": "SUM",             # ratio metrics carry their own measure expression
 }
+
+#: Aggregations a ratio's numerator or denominator may use. Enumerated, not free-form, so a ratio
+#: cannot smuggle an expression into the SELECT list.
+#:
+#: ``count_true`` exists because ``SUM(boolean)`` is not valid in Postgres, and the obvious
+#: workaround -- ``SUM(col::int)`` -- silently truncates when someone later points it at a numeric
+#: column. ``COUNT(*) FILTER (WHERE col)`` is exact and fails loudly on a non-boolean.
+RATIO_AGGREGATIONS = {"sum", "count", "count_true"}
 
 MAX_LIMIT_CEILING = 10000
 
@@ -82,6 +89,27 @@ def _check_date(value, field):
     return value
 
 
+def _ratio_side(side):
+    """Render one half of a ratio. ``side`` comes from the metric file, never from a request."""
+    column = sql.Identifier(side["measure"])
+    agg = side["agg"]
+    if agg == "count_true":
+        return sql.SQL("COUNT(*) FILTER (WHERE {})").format(column)
+    if agg == "count":
+        return sql.SQL("COUNT({})").format(column)
+    return sql.SQL("SUM({})").format(column)
+
+
+def _dimension_expr(metric, name):
+    """The SQL for a dimension, derived or plain. Used by ORDER BY inside a window."""
+    derived = metric.derived_dimensions.get(name)
+    if derived:
+        return sql.SQL("date_trunc({}, {})::date").format(
+            sql.Literal(DATE_GRAINS[derived["grain"]]), sql.Identifier(derived["from"])
+        )
+    return sql.Identifier(name)
+
+
 def compile_query(metric, dimensions, filters, order_by, limit, tenant_id, allowed_ou, all_ou,
                   max_limit=5000):
     """Return ``(psycopg2.sql.Composed, params)``.
@@ -127,6 +155,17 @@ def compile_query(metric, dimensions, filters, order_by, limit, tenant_id, allow
     # rather than rejected so a generous client gets data, not an error.
     limit = min(limit, max_limit, MAX_LIMIT_CEILING)
 
+    # A growth metric is meaningless without the dimension it grows over: without it every row is
+    # its own group and lag() has nothing to look back at, so every value would be NULL. Rejected
+    # rather than served as an empty column.
+    if metric.aggregation == "period_growth" and metric.growth_over not in dimensions:
+        raise QueryRejected(
+            "Metric %r reports growth over %r, so that dimension must be requested. Without it "
+            "there is no prior period to compare against and every value would be null."
+            % (metric.name, metric.growth_over),
+            "dimensions",
+        )
+
     params = []
     select_parts = []
     group_parts = []
@@ -146,14 +185,32 @@ def compile_query(metric, dimensions, filters, order_by, limit, tenant_id, allow
             select_parts.append(sql.Identifier(dimension))
             group_parts.append(sql.Identifier(dimension))
 
-    aggregation = AGGREGATIONS[metric.aggregation]
-    measure = sql.Identifier(metric.measure)
-    if metric.aggregation == "count_distinct":
-        value_expr = sql.SQL("COUNT(DISTINCT {})").format(measure)
+    if metric.aggregation == "ratio":
+        # numerator / denominator, both aggregated over the SAME model and the same GROUP BY.
+        # NULLIF guards division by zero: a group with an empty denominator yields NULL, which is
+        # honest -- "no rate" is not "a rate of zero", and a chart that plots 0 for an empty
+        # denominator is asserting something the data does not say.
+        value_expr = sql.SQL("({})::numeric / NULLIF({}, 0)").format(
+            _ratio_side(metric.numerator), _ratio_side(metric.denominator)
+        )
+    elif metric.aggregation == "period_growth":
+        # (this period - prior period) / prior period, over a declared time dimension.
+        # Frontend refuses to compute ratios in React and is right to: the browser would have to
+        # re-sort, re-window and re-divide server-side aggregates, which is business logic living
+        # in a component. The window runs over the grouped rows, so the growth dimension must be
+        # requested -- enforced below, not assumed.
+        base = sql.SQL("SUM({})").format(sql.Identifier(metric.measure))
+        order = _dimension_expr(metric, metric.growth_over)
+        prior = sql.SQL("lag({}) OVER (ORDER BY {})").format(base, order)
+        value_expr = sql.SQL("({} - {})::numeric / NULLIF({}, 0)").format(base, prior, prior)
+    elif metric.aggregation == "count_distinct":
+        value_expr = sql.SQL("COUNT(DISTINCT {})").format(sql.Identifier(metric.measure))
     elif metric.aggregation == "count":
-        value_expr = sql.SQL("COUNT({})").format(measure)
+        value_expr = sql.SQL("COUNT({})").format(sql.Identifier(metric.measure))
     else:
-        value_expr = sql.SQL("{}({})").format(sql.SQL(aggregation), measure)
+        value_expr = sql.SQL("{}({})").format(
+            sql.SQL(AGGREGATIONS[metric.aggregation]), sql.Identifier(metric.measure)
+        )
     select_parts.append(sql.SQL("{} AS {}").format(value_expr, sql.Identifier("value")))
 
     # -- WHERE ------------------------------------------------------------------------

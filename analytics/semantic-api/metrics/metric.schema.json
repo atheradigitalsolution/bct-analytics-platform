@@ -14,7 +14,6 @@
     "type",
     "aggregation",
     "source_model",
-    "measure",
     "refresh_sla_seconds",
     "pdp_class"
   ],
@@ -104,7 +103,8 @@
         "avg",
         "count",
         "count_distinct",
-        "ratio"
+        "ratio",
+        "period_growth"
       ]
     },
     "source_model": {
@@ -115,7 +115,7 @@
     "measure": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{1,62}$",
-      "description": "The column the aggregation is applied to."
+      "description": "The column the aggregation is applied to. Not used by 'ratio' metrics, which declare numerator and denominator instead."
     },
     "refresh_sla_seconds": {
       "type": "integer",
@@ -164,6 +164,55 @@
       "type": "string",
       "maxLength": 500,
       "description": "Required when source_model unions channels: states explicitly that summing across the channel column is intended. mart_revenue_daily UNIONs invoice/pos/ppob_commission, and summing across them must be a declared decision rather than an accident of a missing GROUP BY."
+    },
+    "numerator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measure",
+        "agg"
+      ],
+      "properties": {
+        "measure": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,62}$"
+        },
+        "agg": {
+          "enum": [
+            "sum",
+            "count",
+            "count_true"
+          ]
+        }
+      },
+      "description": "Ratio numerator. Required when aggregation is 'ratio'. 'count_true' is COUNT(*) FILTER (WHERE col) - SUM(boolean) is invalid in Postgres and SUM(col::int) silently truncates a numeric column."
+    },
+    "denominator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measure",
+        "agg"
+      ],
+      "properties": {
+        "measure": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,62}$"
+        },
+        "agg": {
+          "enum": [
+            "sum",
+            "count",
+            "count_true"
+          ]
+        }
+      },
+      "description": "Ratio denominator. Required when aggregation is 'ratio'. Division is guarded by NULLIF, so an empty denominator yields NULL rather than 0."
+    },
+    "growth_over": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,62}$",
+      "description": "The time dimension a 'period_growth' metric lags across. Must also appear in dimensions, and the caller must request it."
     }
   }
 }

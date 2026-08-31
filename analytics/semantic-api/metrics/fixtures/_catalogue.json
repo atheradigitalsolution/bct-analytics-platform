@@ -1,6 +1,54 @@
 {
   "metrics": [
     {
+      "name": "account_balance",
+      "label": "Saldo Akun",
+      "description": "Signed general-ledger balance (debit minus credit) from posted move lines, summed per account. Deliberately NOT split into profit-and-loss and balance-sheet metrics: fct_account_move_line carries account_id but no account TYPE, and there is no dim_account, so nothing in the warehouse distinguishes an income account from an asset one. Two metrics differing only in name would return identical numbers under two different headings, which is worse than one honest metric. Use the account_id dimension to break it down, and is_revenue_line to isolate revenue lines.",
+      "grain": [
+        "date_day",
+        "tenant_id",
+        "account_id"
+      ],
+      "dimensions": [
+        "date_day",
+        "date_month",
+        "tenant_id",
+        "operating_unit_id",
+        "account_id",
+        "partner_key",
+        "product_key",
+        "company_id",
+        "move_type",
+        "payment_state",
+        "is_revenue_line"
+      ],
+      "filters": {
+        "date_range": {
+          "type": "daterange",
+          "required": true,
+          "column": "date_day"
+        },
+        "operating_unit_id": {
+          "type": "int[]",
+          "required": false
+        },
+        "account_id": {
+          "type": "int[]",
+          "required": false
+        },
+        "move_type": {
+          "type": "string[]",
+          "required": false
+        }
+      },
+      "type": "decimal",
+      "unit": "IDR",
+      "aggregation": "sum",
+      "refresh_sla_seconds": 3600,
+      "pdp_class": "internal",
+      "source_model": "fct_account_move_line"
+    },
+    {
       "name": "ppob_commission_revenue",
       "label": "Pendapatan Komisi PPOB",
       "description": "Commission earned on PPOB transactions. This is the ONLY PPOB revenue measure. The much larger pass_through_amount on the same mart is money owed to the biller \u2014 it is not revenue, and the registry refuses any metric that sums it as an IDR amount.",
@@ -81,6 +129,47 @@
       "source_model": "mart_ppob_transaction"
     },
     {
+      "name": "ppob_success_rate",
+      "label": "Tingkat Keberhasilan PPOB",
+      "description": "Share of PPOB transactions that succeeded. Numerator counts rows flagged is_success by the mart; the denominator is every transaction row, so draft, failed and reversed all sit in the denominator and drag the rate down, which is the operationally honest reading. Measured on the live mart: 328 success of 362 total.",
+      "grain": [
+        "date_day",
+        "tenant_id",
+        "operating_unit_id"
+      ],
+      "dimensions": [
+        "date_day",
+        "date_month",
+        "tenant_id",
+        "operating_unit_id",
+        "biller_key",
+        "biller_code",
+        "biller_category",
+        "state"
+      ],
+      "filters": {
+        "date_range": {
+          "type": "daterange",
+          "required": true,
+          "column": "date_day"
+        },
+        "operating_unit_id": {
+          "type": "int[]",
+          "required": false
+        },
+        "biller_code": {
+          "type": "string[]",
+          "required": false
+        }
+      },
+      "type": "percent",
+      "unit": null,
+      "aggregation": "ratio",
+      "refresh_sla_seconds": 60,
+      "pdp_class": "internal",
+      "source_model": "fct_ppob_transaction"
+    },
+    {
       "name": "ppob_transaction_count",
       "label": "Jumlah Transaksi PPOB",
       "description": "Count of PPOB transactions. The 60-second SLA is the tightest in the platform because PPOB is operational: an SLA breach is the point of the view, not an inconvenience (ADR 0001).",
@@ -124,6 +213,42 @@
       "refresh_sla_seconds": 60,
       "pdp_class": "internal",
       "source_model": "mart_ppob_transaction"
+    },
+    {
+      "name": "revenue_mom_growth",
+      "label": "Pertumbuhan Pendapatan (Bulanan)",
+      "description": "Month-over-month change in net revenue, as a fraction. 0.12 means twelve percent up on the prior month. The first month in any result has no prior month and is therefore NULL, not zero - \"no comparison\" and \"no growth\" are different statements and the API will not conflate them. DO NOT \"FIX\" THIS BACK TO YEAR-OVER-YEAR. Year-over-year was commissioned and is deliberately not what this is. The warehouse holds 2025-09-01 to 2026-08-31 - twelve months exactly - so no month has a same-month-prior-year counterpart, and a YoY metric would return NULL for every row while looking perfectly healthy: a green panel with no data in it. Month-over-month is the strongest comparison this dataset actually supports, and it renders for 11 of 12 months. YoY becomes correct the moment the warehouse holds more than 13 months for a tenant; until then switching this back produces an empty chart, not a better one.",
+      "grain": [
+        "date_month",
+        "tenant_id"
+      ],
+      "dimensions": [
+        "date_month",
+        "tenant_id",
+        "operating_unit_id",
+        "revenue_channel"
+      ],
+      "filters": {
+        "date_range": {
+          "type": "daterange",
+          "required": true,
+          "column": "date_day"
+        },
+        "operating_unit_id": {
+          "type": "int[]",
+          "required": false
+        },
+        "revenue_channel": {
+          "type": "string[]",
+          "required": false
+        }
+      },
+      "type": "percent",
+      "unit": null,
+      "aggregation": "period_growth",
+      "refresh_sla_seconds": 900,
+      "pdp_class": "internal",
+      "source_model": "mart_revenue_daily"
     },
     {
       "name": "revenue_net",

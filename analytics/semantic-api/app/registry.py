@@ -34,7 +34,10 @@ class Metric:
         self.unit = raw.get("unit")
         self.aggregation = raw["aggregation"]
         self.source_model = raw["source_model"]
-        self.measure = raw["measure"]
+        self.measure = raw.get("measure")
+        self.numerator = raw.get("numerator")
+        self.denominator = raw.get("denominator")
+        self.growth_over = raw.get("growth_over")
         self.refresh_sla_seconds = int(raw["refresh_sla_seconds"])
         self.pdp_class = raw["pdp_class"]
         self.derived_dimensions = dict(raw.get("derived_dimensions") or {})
@@ -119,13 +122,43 @@ def load_registry(directory: str) -> Registry:
                     "requested at its own grain." % (filename, metric.name, ungroupable)
                 )
 
+            # Shape rules the JSON schema cannot express, because they are conditional on
+            # `aggregation`. Checked here so a malformed metric fails the BUILD rather than
+            # returning a plausible number at query time.
+            if metric.aggregation == "ratio":
+                if not (metric.numerator and metric.denominator):
+                    problems.append(
+                        "%s: metric %r is a ratio and must declare both numerator and denominator."
+                        % (filename, metric.name)
+                    )
+            elif metric.aggregation == "period_growth":
+                if not metric.measure:
+                    problems.append(
+                        "%s: metric %r is period_growth and must declare a measure."
+                        % (filename, metric.name)
+                    )
+                if not metric.growth_over:
+                    problems.append(
+                        "%s: metric %r is period_growth and must declare growth_over."
+                        % (filename, metric.name)
+                    )
+                elif metric.growth_over not in metric.dimensions:
+                    problems.append(
+                        "%s: metric %r grows over %r, which is not one of its dimensions, so it "
+                        "could never be requested." % (filename, metric.name, metric.growth_over)
+                    )
+            elif not metric.measure:
+                problems.append(
+                    "%s: metric %r must declare a measure." % (filename, metric.name)
+                )
+
             # TRAP 1, and it is not a hypothetical: mart_ppob_transaction carries both
             # `pass_through_amount` (money owed to the biller -- not ours, not revenue) and
             # `commission_revenue` (what we actually earn). Measured on live data, binding the
             # wrong one overstates revenue by 481x. That is not an error a reviewer eyeballs in a
             # YAML diff, so it is refused here.
             if (
-                metric.measure.startswith("pass_through")
+                (metric.measure or "").startswith("pass_through")
                 and metric.aggregation == "sum"
                 and (metric.unit or "").upper() == "IDR"
             ):

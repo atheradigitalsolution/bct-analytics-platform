@@ -215,3 +215,148 @@
   measure: net_qty
   refresh_sla_seconds: 300
   pdp_class: internal
+
+# ----------------------------------------------------------------------------------------------
+# Phase 3 addition — metrics for the Finance, Sales and PPOB views.
+#
+# Declared ONLY where the built marts already carry the data. Where the requested metric could not
+# be computed correctly from what exists, it is NOT declared with a substituted column: the whole
+# defect pattern of this build was a plausible answer that is wrong, and a mis-bound finance metric
+# is that pattern with money attached. The gaps are named precisely in the report instead.
+# ----------------------------------------------------------------------------------------------
+
+- name: ppob_success_rate
+  label: "Tingkat Keberhasilan PPOB"
+  description: >-
+    Share of PPOB transactions that succeeded. Numerator counts rows flagged is_success by the mart;
+    the denominator is every transaction row, so draft, failed and reversed all sit in the
+    denominator and drag the rate down, which is the operationally honest reading. Measured on the
+    live mart: 328 success of 362 total.
+  grain: [date_day, tenant_id, operating_unit_id]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - biller_key
+    - biller_code
+    - biller_category
+    - state
+  derived_dimensions:
+    date_month: {from: date_day, grain: month}
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    biller_code: {type: "string[]", required: false}
+  type: percent
+  aggregation: ratio
+  numerator: {measure: is_success, agg: count_true}
+  denominator: {measure: ppob_transaction_id, agg: count}
+  source_model: fct_ppob_transaction
+  refresh_sla_seconds: 60
+  pdp_class: internal
+
+- name: revenue_mom_growth
+  label: "Pertumbuhan Pendapatan (Bulanan)"
+  description: >-
+    Month-over-month change in net revenue, as a fraction. 0.12 means twelve percent up on the prior
+    month. The first month in any result has no prior month and is therefore NULL, not zero -
+    "no comparison" and "no growth" are different statements and the API will not conflate them.
+    DO NOT "FIX" THIS BACK TO YEAR-OVER-YEAR. Year-over-year was commissioned and is deliberately
+    not what this is. The warehouse holds 2025-09-01 to 2026-08-31 - twelve months exactly - so no
+    month has a same-month-prior-year counterpart, and a YoY metric would return NULL for every row
+    while looking perfectly healthy: a green panel with no data in it. Month-over-month is the
+    strongest comparison this dataset actually supports, and it renders for 11 of 12 months.
+    YoY becomes correct the moment the warehouse holds more than 13 months for a tenant; until then
+    switching this back produces an empty chart, not a better one.
+  channel_note: >-
+    mart_revenue_daily UNIONs revenue_channel in (invoice, pos, ppob_commission). Growth is computed
+    across ALL THREE by default, which is the intended reading for a headline revenue trend. To see
+    one channel's trend, request revenue_channel as a dimension - the window then runs within the
+    grouped rows, so each channel is compared against its own prior month rather than against the
+    total.
+  grain: [date_month, tenant_id]
+  dimensions:
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - revenue_channel
+  derived_dimensions:
+    date_month: {from: date_day, grain: month}
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    revenue_channel: {type: "string[]", required: false}
+  type: percent
+  aggregation: period_growth
+  measure: revenue_net
+  growth_over: date_month
+  source_model: mart_revenue_daily
+  refresh_sla_seconds: 900
+  pdp_class: internal
+
+- name: account_balance
+  label: "Saldo Akun"
+  description: >-
+    Signed general-ledger balance (debit minus credit) from posted move lines, summed per account.
+    Deliberately NOT split into profit-and-loss and balance-sheet metrics: fct_account_move_line
+    carries account_id but no account TYPE, and there is no dim_account, so nothing in the warehouse
+    distinguishes an income account from an asset one. Two metrics differing only in name would
+    return identical numbers under two different headings, which is worse than one honest metric.
+    Use the account_id dimension to break it down, and is_revenue_line to isolate revenue lines.
+  grain: [date_day, tenant_id, account_id]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - account_id
+    - partner_key
+    - product_key
+    - company_id
+    - move_type
+    - payment_state
+    - is_revenue_line
+  derived_dimensions:
+    date_month: {from: date_day, grain: month}
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    account_id: {type: "int[]", required: false}
+    move_type: {type: "string[]", required: false}
+  type: decimal
+  unit: IDR
+  aggregation: sum
+  measure: balance
+  source_model: fct_account_move_line
+  refresh_sla_seconds: 3600
+  pdp_class: internal
+
+# ----------------------------------------------------------------------------------------------
+# DELIBERATELY NOT DECLARED — two metrics were commissioned and are absent on purpose.
+# Recorded here rather than only in a message, because the next person to notice the gap will read
+# this file, not the thread.
+#
+# 1. stock_valuation (IDR)
+#    Needs a per-product COST. What exists:
+#      - dim_product.list_price  -> the SALES price. Valuing inventory at list price overstates it
+#        by the entire margin. This is the pass_through_amount shape exactly: a plausible column
+#        that yields a wrong number by a large factor, with nothing to make the error visible.
+#      - raw.product_product.standard_price -> the real cost, ALREADY LANDED and classified
+#        internal/none. But it is `jsonb`, because standard_price is company-dependent in Odoo 19:
+#        the value is a map keyed by company id, not a number. Same shape as res.partner.barcode.
+#      - fct_stock_move carries quantities only; no value column anywhere in marts.
+#    TO ENABLE: DWH surfaces `standard_price` on dim_product, unpacked per company from the jsonb.
+#    That is a dim_product change, not a new mart, and not something the semantic layer may fake.
+#
+# 2. pnl_account_balance / balance_sheet_account_balance
+#    Splitting the ledger needs an account TYPE (income/expense vs asset/liability/equity).
+#    fct_account_move_line carries account_id and nothing else about the account, and there is no
+#    dim_account in marts. Declaring two metrics that differ only in name would return IDENTICAL
+#    numbers under two headings - a balance sheet that is actually invoice revenue lines.
+#    TO ENABLE: DWH adds `account_type` to fct_account_move_line from account.account.account_type
+#    (one column). `account_balance` above then splits by filtering on it, with no new metric.
+#
+# Until then both render "Not available in this build", naming the metric required. An empty panel
+# that says why is worth more than a populated one that is wrong.
+# ----------------------------------------------------------------------------------------------
