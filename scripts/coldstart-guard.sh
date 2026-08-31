@@ -32,6 +32,34 @@ require_docker
 load_env
 
 PROJECT="${COMPOSE_PROJECT_NAME:-odoo19-bct}"
+TOKEN="i-understand-this-destroys-the-bct-oltp-data"
+
+# ---------------------------------------------------------------------------
+# GATE 0. An explicit, unguessable opt-in.
+#
+# Requested by the Lead as a deliverable after this target's payload destroyed
+# odoo19-bct_pgdata, _odoodata and _redisdata mid-phase. The point is that
+# exercising it must be a DELIBERATE act, not something reachable by a stray
+# `make test`, a tab-completion, a CI default, or - as actually happened - a
+# backtick inside a double-quoted git commit message, which bash expands as
+# command substitution before git ever runs.
+#
+# ASSUME_YES is deliberately NOT sufficient. It is a generic flag other scripts
+# in this repo also honour, so a caller that sets it once for an unrelated
+# script would silently arm this one. The token is specific to this operation
+# and names the data it destroys.
+# ---------------------------------------------------------------------------
+if [ "${BCT_COLDSTART:-}" != "$TOKEN" ]; then
+    die "refusing: cold start destroys this project's Postgres, Odoo filestore and Redis volumes.
+  It is opt-in by an explicit token, not by a generic yes-flag:
+
+      BCT_COLDSTART=$TOKEN make test-coldstart
+
+  Everything in odoo19-bct is lost and rebuilt: the bct database, the demo seed,
+  every CDC replication slot and publication. Other projects on this host are
+  scoped out and checked afterwards, but this project is not recoverable from
+  this repository."
+fi
 
 # --- 1. would this actually run anything? ----------------------------------
 log "[1/5] checking that the 'coldstart' marker selects at least one test"
@@ -48,6 +76,31 @@ if [ "$COLLECT_RC" -eq 5 ] || printf '%s' "$COLLECTED" | grep -q 'no tests colle
 fi
 N="$(printf '%s' "$COLLECTED" | grep -cE '^tests/.*::' || true)"
 info "$N test(s) carry the coldstart marker"
+
+# --- 1b. is CDC in flight? -------------------------------------------------
+# A cold start removes pgdata, and every replication slot lives inside it. An
+# active slot means a consumer is mid-stream: destroying it strands the
+# warehouse at an LSN that no longer exists and forces a full resync. That is
+# recoverable, but it should be a decision rather than a surprise.
+log "[1b/5] checking for active CDC replication slots"
+if docker ps --format '{{.Names}}' | grep -qx "${PROJECT}-postgres"; then
+    ACTIVE_SLOTS="$(docker exec "${PROJECT}-postgres" psql -U "${POSTGRES_USER:-odoo}" -tAc         "SELECT string_agg(slot_name, ' ') FROM pg_replication_slots WHERE active" 2>/dev/null | tr -d '
+' || true)"
+    if [ -n "$ACTIVE_SLOTS" ]; then
+        if [ "${BCT_COLDSTART_ALLOW_ACTIVE_SLOTS:-}" = "1" ]; then
+            warn "active slot(s) will be destroyed and the warehouse will need a full resync: $ACTIVE_SLOTS"
+        else
+            die "refusing: CDC is live on slot(s): $ACTIVE_SLOTS
+  Destroying pgdata destroys the slot and strands the warehouse mid-stream.
+  Stop the consumer first, or accept the resync with:
+      BCT_COLDSTART_ALLOW_ACTIVE_SLOTS=1"
+        fi
+    else
+        info "no active replication slots"
+    fi
+else
+    info "postgres is not running; no slots to strand"
+fi
 
 # --- 2. snapshot everything that is NOT ours -------------------------------
 log "[2/5] recording resources belonging to OTHER projects"
