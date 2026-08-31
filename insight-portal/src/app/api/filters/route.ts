@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { config } from "@/lib/config";
+import { redirectTo } from "@/lib/redirect";
 import { defaultFilters, isIsoDate, presetRange, serialiseFilters, type PortalFilters } from "@/lib/filters";
 
 export const runtime = "nodejs";
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     .filter((id) => Number.isInteger(id));
   filters.ou = ou;
 
-  const response = NextResponse.redirect(new URL(next, request.url), 303);
+  const response = redirectTo(next);
   response.cookies.set(config.filtersCookieName, serialiseFilters(filters), {
     httpOnly: true,
     secure: config.cookieSecure,

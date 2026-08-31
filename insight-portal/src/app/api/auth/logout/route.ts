@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { cacheClear } from "@/lib/cache";
 import { config } from "@/lib/config";
+import { redirectTo } from "@/lib/redirect";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
   cacheClear();
-  const response = NextResponse.redirect(new URL("/login", request.url), 303);
+  const response = redirectTo("/login");
   response.cookies.delete(config.sessionCookieName);
   response.cookies.delete(config.refreshCookieName);
   return response;

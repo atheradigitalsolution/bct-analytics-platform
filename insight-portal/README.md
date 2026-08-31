@@ -383,6 +383,30 @@ reports **healthy** - the healthcheck is `node -e fetch(/healthz)` running insid
 rather than a CVE mitigation: at 0.35.4 the libvips CVEs are fixed at source, the image optimizer is
 off in `next.config.ts`, and nothing imports `next/image`.
 
+### Redirects
+
+Route handlers emit a **relative** `Location` via `src/lib/redirect.ts`. Middleware does not use that
+helper and must not: the two runtimes differ in a way that is easy to "tidy up" into a bug.
+
+| | `request.nextUrl` comes from | correct form |
+|---|---|---|
+| middleware | the incoming `Host` header | `NextResponse.redirect(request.nextUrl.clone())` |
+| route handler | `request.url`, i.e. the **bind address** | a relative `Location` |
+
+Inside the container `HOSTNAME=0.0.0.0` — correct for binding, meaningless as a destination — so a
+route handler that builds its target from `request.url` **or** from `nextUrl` answers
+`location: http://0.0.0.0:3000/...`, which a browser resolves verbatim and fails on. Middleware was
+never affected. Unifying them the other way (relative everywhere) 500s every request:
+middleware parses its own `Location` with `new URL()` and rejects a relative one.
+
+Both wrong turns were taken and measured before the current shape was settled on. `redirect.ts`
+records them next to the code so the asymmetry reads as deliberate rather than untidy.
+
+`tests/live-redirects.test.ts` follows every redirect rather than reading its status. **A redirect
+status code is not evidence of a working redirect** — the original bug shipped with the whole suite
+green, because the suite carried a session cookie and requested views directly, so nothing ever
+followed one.
+
 ### OS packages
 
 `libcrypto3` and `libssl3` are pinned to an exact version and upgraded in the runtime stage,
@@ -445,7 +469,7 @@ node scripts/screenshot.mjs evidence
 node scripts/freshness-freeze-proof.mjs   # stops and restarts odoo19-bct-cdc
 ```
 
-100 tests. The runner prints, loudly, whether the live suite ran — a green run that never reached the
+107 tests. The runner prints, loudly, whether the live suite ran — a green run that never reached the
 database is the defect pattern this build keeps producing, and the runner refuses to let that look
 like a full pass.
 

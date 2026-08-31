@@ -68,6 +68,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "unauthorized", detail: "Invalid token." }, { status: 401 });
     }
+    // NOT `redirectTo()`. Middleware parses its own Location with `new URL()`, so a relative one
+    // throws ERR_INVALID_URL and the request 500s - measured, after trying exactly that. Here
+    // `nextUrl` is populated from the incoming Host header rather than from the bind address, so
+    // it is already correct, and Next serialises a same-origin redirect back out relative anyway.
+    // See src/lib/redirect.ts for why route handlers cannot do this.
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = "";

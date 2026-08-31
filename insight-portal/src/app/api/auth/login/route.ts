@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { config } from "@/lib/config";
+import { redirectTo } from "@/lib/redirect";
 import { verifyToken } from "@/lib/jwt";
 
 export const runtime = "nodejs";
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ? nextRaw
       : null;
 
-  const failure = NextResponse.redirect(new URL("/login?error=1", request.url), 303);
+  const failure = redirectTo("/login?error=1");
 
   if (typeof login !== "string" || typeof password !== "string") return failure;
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (session === null) return failure;
 
   const destination = next ?? "/t/" + session.tenant_id + "/overview";
-  const response = NextResponse.redirect(new URL(destination, request.url), 303);
+  const response = redirectTo(destination);
   response.cookies.set(config.sessionCookieName, token, {
     httpOnly: true,
     secure: config.cookieSecure,
