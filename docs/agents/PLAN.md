@@ -1553,3 +1553,58 @@ the regression guard, written on both sides, and it asserts **the exact contract
 non-emptiness** — because `cdc_loader` would satisfy a truthiness check and still break the join a
 reader makes against A.6's table. The `MUST` now has unit coverage on one side and a declared gap on
 the other, rather than implying either.
+
+### Instance 12 CLOSED — the repair ran on the operator's own machine
+
+`make dev-bootstrap`, run by QA as step 0 of the final cold start. Verified by the Lead in the file
+itself, not from the report:
+
+```
+.env:139          ODOO_INIT_MODULES=custom_pdp_core,...,custom_demo_seed   (was :122 base,web)
+.env:298          SEMANTIC_API_JWKS_URL=http://odoo19-bct-login-gateway:8080/...
+.env.example:298  SEMANTIC_API_JWKS_URL=http://odoo19-bct-login-gateway:8080/...   identical
+backup            .env.bak-20260831T114159Z
+```
+
+The repair output names **what it changed, what it was, and why** — citing that the value was shipped
+by `.env.example` until 2026-08-31 and that a fresh clone therefore died on
+`relation "pdp_field_classification" does not exist`. All 16 secrets preserved. **`SEMANTIC_API_JWKS_URL`
+did not appear in the drift report at all**, because the two files now agree — instance 17 closed by
+the same run.
+
+This is the shape the whole instance-12 finding asked for: a defect that a tool was silently
+preserving is now repaired **by that same tool**, announced rather than done quietly, with the
+divergence report proving the absence rather than a human confirming it.
+
+### Platform-Infra's NOT VERIFIED closed by QA's run
+
+The four Backend targets, which Platform-Infra would not test under Frontend's measurements:
+
+```
+up-gateway   rc=0  -> /healthz in 3s
+up-semantic  rc=0  -> /healthz in 3s
+cdc-start    rc=0  -> publication bct_cdc_bct, slot bct_slot_bct
+```
+
+**QA did not record Backend's stale "no make target exists" claim as a finding**, on the Lead's
+correction — *"a false entry in the §6 mapping is worse than the gap it describes."*
+
+### QA's first run: 7 passed, 2 failed, and both failures were its own
+
+Reported as its own sequencing rather than as system defects:
+
+- `check-alerting` ran **before** `cdc-start`, so the `analytics-cdc` scrape target did not exist.
+  QA's verdict: *"a true statement about an incomplete stack, useless about alerting."* Exactly the
+  precondition discipline this catalogue keeps arriving at.
+- The cross-tenant assertion ran against a mart with **zero rows**, because nothing had run
+  `seed-demo` or `dbt-run` yet. **Its own `bct_t2` precondition caught it** — the guard working as
+  designed, on its author.
+
+Two further fixes from that run, both instance-shaped: the slot-active check sampled **once** and
+caught `active=f` a moment before the consumer attached (now waits), and per Backend's warning the
+**absence** of the `docker run --rm` containers is now asserted before starting them, because a stale
+container answers `/healthz` just as well as a fresh one.
+
+**Under watch, not yet a finding:** mid-run, Odoo shows 5 partners, 0 sale orders, 0 operating units
+with all five modules installed — `make seed-demo` may not be populating. QA will report it with the
+target's output attached if it holds.
