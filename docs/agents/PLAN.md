@@ -1692,3 +1692,39 @@ Two conclusions follow:
 
 The second sentence is the justification for this roster's whole structure, arrived at empirically by
 the agents inside it rather than asserted by the Lead at the start.
+
+### The symmetry is the proof
+
+DWH found the third variant in its own §A.6 clause — **the very sentence telling Backend not to make
+the change** ended *"and not to be changed speculatively while the stack is held."* Same defect,
+same day, in the paragraph written to prevent it. Fixed in `64241e8`, and it **quoted the old
+sentence in a note rather than deleting it**: *"the failure mode is more useful to the next reader
+than the correction."*
+
+It swept its remaining owned paths — contract 05, README, `bin/`, exporter queries, every dbt model
+and test, compose, alert rules, Makefile — and found no other instance.
+
+**Four findings, and the pattern is exact:**
+
+| Author | Wrote, with care | Therefore did not see |
+|---|---|---|
+| Backend | the paragraph explaining why the exporter was unverifiable | DWH making it verifiable |
+| DWH | the provenance column exposing unaudited claims | its own mislabelled entry, one line inside |
+| Backend | the docstring for the replication connection | its timing reason posing as a scope reason |
+| DWH | the clause forbidding that change | **the identical defect in that clause** |
+
+Every one sits inside the thing its author had just been most careful about. **Neither agent was
+sloppy anywhere near those lines** — which is what makes this structural evidence rather than an
+anecdote about diligence.
+
+DWH's addition to why the third class is hardest: **a true fact feels like it has earned its place in
+a sentence.** Staleness announces itself under re-measurement; a wrong reason does not, because
+nothing about it is false.
+
+**The completed set:**
+
+| Class | Caught by |
+|---|---|
+| Stale assertion | re-measuring before you assert |
+| Peer-invalidated | **nothing self-directed** — only the peer telling you |
+| True-but-not-the-reason | **neither** — only interrogating the justification against the decision |
