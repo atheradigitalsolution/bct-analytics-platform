@@ -1796,3 +1796,67 @@ DWH also accepted the description exemption on Backend's stronger ground: past-t
 expire into permission because it never granted any, and **a sweep that flags correct cases costs
 more than the instances it catches** — the same trade as an ERROR firing every 4.7 minutes with no
 remediation. Severity tracking actionability, arrived at for the third time from a third direction.
+
+## Cold start, interim — two results banked, one Lead verification impossible
+
+### `make seed-demo` works, and QA refused to guess about the earlier run
+
+Reproduced directly against the post-cold-start stack:
+
+```
+SEED ppob_transactions=360   sale_orders=120   sale_order_lines=311
+     pos_orders=96           stock_moves=248   products=12
+DEVPW_RESULT changed=2 unchanged=1 demo_users=2
+==> done. Odoo's default 'admin' password is no longer accepted in 'bct'.
+```
+
+So the mid-run `0 sale orders` QA flagged was **not** the target being broken. **And QA declined to
+say which of two explanations it was.** It had run the first cold start with `-q`, which discarded
+the evidence blocks, so it cannot tell from the log whether `make seed-demo` returned non-zero inside
+the run, or returned 0 having done nothing. *"I will not guess between those two."* The run in flight
+uses `-s -ra` so the answer is in the transcript verbatim rather than inferred.
+
+That is the discipline this whole catalogue argues for, applied to an ambiguity in its own evidence
+rather than to someone else's code.
+
+### A real finding — four alert rules are dark on any stack following the documented path
+
+```
+WarehouseReconciliationFailing: no current samples for bct_warehouse_reconciliation_failed
+WarehouseDbtTestFailing:        no current samples for bct_warehouse_dbt_test_failures
+WarehouseBuildStale:            no current samples for bct_warehouse_dbt_run_age_seconds
+WarehouseTestsNotRunning:       no current samples for bct_warehouse_dbt_test_age_seconds
+  -- "never seen; this rule can never fire, however green it looks"
+```
+
+`make dbt-run` is `dbt build --exclude-resource-type test`, so on a **freshly built** warehouse no
+test-bearing invocation has ever existed and the exporter has nothing to scope to. **This is not
+instance 8 recurring** — DWH's fix correctly selects the newest test-bearing invocation; here there
+is none at all. The documented path leaves four rules dark until `make dbt-test` runs once.
+
+QA's cold-start suite now runs both (`bee3ded`), and it correctly declined to decide whether the
+Makefile should chain them: *"Platform-Infra's call, not mine to make in their file."*
+
+The overlay itself came back correctly in that run: 5/5 scrape targets up, 1 alertmanager answering.
+
+### The §A.6 test is written, and it skips honestly
+
+`test_access_audit_names_the_service_that_read` measures **first**, then skips with the reason:
+
+```
+(unset)  warehouse_admin  1
+(unset)  warehouse_rls    2
+psql     warehouse_admin  1
+SKIPPED: ... NOT YET ON THE WIRE ... Rebuild both images and re-run; this then asserts instead of skipping.
+```
+
+It confirms Backend's "not yet on the wire" **independently rather than taking it on report**, keeps
+the gap visible, and converts to a real assertion the moment the images are rebuilt. A `MUST` with no
+test behind it is a convention; this is the minimum that makes it a rule.
+
+### Lead verification not possible — recorded rather than inferred
+
+The Lead attempted to confirm the alerting finding by querying `warehouse.dbt_run_result` and could
+not: **`odoo19-bct-warehouse-db` does not currently exist**, because the cold start has torn the
+stack down and is mid-rebuild. The reading will be taken when the run reports. Stated as
+**not verified** rather than reasoned around — which is the whole point of the exercise.
