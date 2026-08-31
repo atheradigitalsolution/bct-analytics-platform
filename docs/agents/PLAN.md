@@ -1978,3 +1978,79 @@ it as one."**
 
 `dbt-run`/`dbt-test` chaining · the `up-semantic` -> `up-gateway` prerequisite · the `ARGS`/`MAKEFLAGS`
 leak. Each was found by an agent that correctly declined to edit another's file.
+
+## The remote exists — CI's first execution
+
+Repo: https://github.com/sarangrumah/bct-analytics-platform (public, operator's decision).
+195 commits, PR #1 with 194. **8 jobs passed, 6 failed.** The structural result is that CI executes
+and genuinely gates: `ci-gate` went red rather than reporting green over failing dependencies, and
+`secrets (gitleaks, full history)` passed, matching the Lead's own local run over 193 commits.
+
+**Security classified all six and found ZERO first-run environment problems.** It expected some.
+
+### Instance 15 CLOSED by execution — and the Lead's consequence was wrong
+
+The Lead diagnosed `dbt-ci`'s doubled `--profiles-dir` correctly, then concluded that tier 1 dying
+meant "the init-SQL fix still has not executed." **Wrong — init-SQL runs before tier 1.** Verified by
+the Lead in the run's step list:
+
+```
+success  Create the warehouse role and schemas
+success  Prove dbt is NOT connecting as a superuser
+failure  Tier 1 - dbt deps + parse
+```
+
+Its log shows `applying 6 init SQL file(s)`, three CREATE ROLE, five CREATE SCHEMA, and the
+`count = 5` assertion passing. **Instance 15 — the CI step that created nothing and reported success
+— is now verified by execution in CI, not only locally.** Right mechanism, wrong consequence, and it
+would have left a closed item recorded as open.
+
+### Instance 27 — a security rule that would have eaten the control it protects
+
+`sast` failed on one finding: `bct-contract02-jwt-weak-algorithm` firing on
+`analytics/semantic-api/tests/test_auth.py:113` — **Backend's negative security test**, which mints
+an `alg: none` token precisely to prove the verifier rejects it.
+
+> A verifier is only proven to reject `alg: none` by a test that mints one. Blocking it pressures
+> Backend into deleting the test to go green — **the rule eating the control it exists to protect.**
+
+This is a new class: a gate whose enforcement destroys the evidence the gate exists to require. The
+pressure is real and quiet — the fastest way to a green pipeline is to delete the test, and nothing
+would record that the coverage was lost.
+
+Fixed with a **rule-scoped carve-out**, not a `.semgrepignore` path entry, which would have exempted
+those paths from **every** rule at once.
+
+**Security's proof of that carve-out failed its own precondition**, and it said so: the old rule did
+not fire on its fixture either, because semgrep's **default** ignores exclude `tests/` and the
+fixture directory had no `.semgrepignore`, while the repo ships one that deliberately does not.
+Copying the real one reproduced CI. *"Instance 7 again, and I nearly shipped a carve-out whose proof
+was vacuous."*
+
+### Two more of the family, in the scanners themselves
+
+- **`sast` printed no finding and its artefact was not JSON.** `--json --output F --text` together
+  makes semgrep write the **text** report into the file, so the machine-readable artefact was a
+  box-drawing table and the console said only "1 finding". Learning *what* failed required
+  downloading and eyeballing an artefact. Now one scan, JSON only, findings rendered as `::error`
+  annotations — and the renderer **fails when semgrep scanned zero files**, because "no findings"
+  over an empty target set is the empty-result tell and a broken config produces exactly that.
+- **`sca-python` aborted at manifest 1 of 6 under `set -e`**, reporting one advisory and never
+  examining the other five. A six-run loop fixing one manifest at a time would have looked like
+  progress.
+
+### Three gates, three questions — keep all three
+
+Security's ruling, and the reason it refused to reconcile them:
+
+> `npm audit` and trivy-fs read the **declared** tree; container-scan reads **what ships**. Frontend
+> was right that its mitigation makes `sharp` not ship; the gates were right to fail anyway. Both
+> were correct because they were answering different questions — and the container scan then found a
+> **CRITICAL** that the declared-tree argument would never have surfaced.
+
+That CRITICAL is `tar` 7.5.11, which is not in any lockfile: it arrives inside **npm and yarn present
+in the runtime image**. A Next standalone runtime needs `node`, not a package manager.
+
+**And Security refused the dated exception on principle:** that instrument is for findings with **no
+fix**. All of these have one. *"Using the exception mechanism here would spend the one control that
+makes genuine exceptions credible, on three findings that are simply fixable."*
