@@ -72,6 +72,15 @@ def get(path: str):
 
 
 def main() -> int:
+    # A misconfigured PROMETHEUS_URL must not masquerade as "Prometheus is down".
+    # Reporting a config error as a SKIP is the same failure shape as a check
+    # that cannot fail: it reads as "nothing to see here".
+    parsed = urllib.parse.urlparse(PROM)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        print(f"check-alerting: FAIL - PROMETHEUS_URL is not a usable http(s) URL: {PROM!r}",
+              file=sys.stderr)
+        return 1
+
     try:
         get("/-/healthy")
     except Exception as exc:
