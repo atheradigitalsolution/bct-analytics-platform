@@ -6,8 +6,17 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "name", "label", "grain", "dimensions", "filters", "type",
-    "aggregation", "source_model", "measure", "refresh_sla_seconds", "pdp_class"
+    "name",
+    "label",
+    "grain",
+    "dimensions",
+    "filters",
+    "type",
+    "aggregation",
+    "source_model",
+    "measure",
+    "refresh_sla_seconds",
+    "pdp_class"
   ],
   "properties": {
     "name": {
@@ -15,32 +24,59 @@
       "pattern": "^[a-z][a-z0-9_]{1,62}$",
       "description": "snake_case, unique, stable. Renaming is a breaking change (contract 03 rule 5)."
     },
-    "label": { "type": "string", "minLength": 1, "maxLength": 120 },
-    "description": { "type": "string", "maxLength": 2000 },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000
+    },
     "grain": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,62}$" },
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{1,62}$"
+      },
       "description": "The lowest level the metric may be requested at. tenant_id is always present."
     },
     "dimensions": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,62}$" },
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{1,62}$"
+      },
       "description": "Legal group-by keys. The compiler allow-lists against exactly this."
     },
     "filters": {
       "type": "object",
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{1,62}$" },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{1,62}$"
+      },
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["type"],
+        "required": [
+          "type"
+        ],
         "properties": {
-          "type": { "enum": ["daterange", "int", "int[]", "string", "string[]"] },
-          "required": { "type": "boolean" },
+          "type": {
+            "enum": [
+              "daterange",
+              "int",
+              "int[]",
+              "string",
+              "string[]"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
           "column": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]{1,62}$",
@@ -49,9 +85,28 @@
         }
       }
     },
-    "type": { "enum": ["decimal", "integer", "percent", "duration_seconds", "count"] },
-    "unit": { "type": "string", "maxLength": 32 },
-    "aggregation": { "enum": ["sum", "avg", "count", "count_distinct", "ratio"] },
+    "type": {
+      "enum": [
+        "decimal",
+        "integer",
+        "percent",
+        "duration_seconds",
+        "count"
+      ]
+    },
+    "unit": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "aggregation": {
+      "enum": [
+        "sum",
+        "avg",
+        "count",
+        "count_distinct",
+        "ratio"
+      ]
+    },
     "source_model": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{1,62}$",
@@ -62,7 +117,53 @@
       "pattern": "^[a-z][a-z0-9_]{1,62}$",
       "description": "The column the aggregation is applied to."
     },
-    "refresh_sla_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
-    "pdp_class": { "enum": ["public", "internal", "personal", "sensitive"] }
+    "refresh_sla_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400
+    },
+    "pdp_class": {
+      "enum": [
+        "public",
+        "internal",
+        "personal",
+        "sensitive"
+      ]
+    },
+    "derived_dimensions": {
+      "type": "object",
+      "description": "Dimensions computed from a base column rather than selected directly, e.g. date_month from date_day. Deliberately NOT free-form SQL: only a base column and an enumerated date grain, so 'the API never accepts raw SQL' holds without qualification.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{1,62}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "grain"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,62}$"
+          },
+          "grain": {
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "quarter",
+              "year"
+            ]
+          }
+        }
+      }
+    },
+    "channel_note": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Required when source_model unions channels: states explicitly that summing across the channel column is intended. mart_revenue_daily UNIONs invoice/pos/ppob_commission, and summing across them must be a declared decision rather than an accident of a missing GROUP BY."
+    }
   }
 }

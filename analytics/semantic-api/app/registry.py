@@ -37,6 +37,8 @@ class Metric:
         self.measure = raw["measure"]
         self.refresh_sla_seconds = int(raw["refresh_sla_seconds"])
         self.pdp_class = raw["pdp_class"]
+        self.derived_dimensions = dict(raw.get("derived_dimensions") or {})
+        self.channel_note = raw.get("channel_note")
 
     def __repr__(self) -> str:
         return "<Metric %s -> %s>" % (self.name, self.source_model)
@@ -116,6 +118,41 @@ def load_registry(directory: str) -> Registry:
                     "%s: metric %r declares grain %s that are not in dimensions, so it cannot be "
                     "requested at its own grain." % (filename, metric.name, ungroupable)
                 )
+
+            # TRAP 1, and it is not a hypothetical: mart_ppob_transaction carries both
+            # `pass_through_amount` (money owed to the biller -- not ours, not revenue) and
+            # `commission_revenue` (what we actually earn). Measured on live data, binding the
+            # wrong one overstates revenue by 481x. That is not an error a reviewer eyeballs in a
+            # YAML diff, so it is refused here.
+            if (
+                metric.measure.startswith("pass_through")
+                and metric.aggregation == "sum"
+                and (metric.unit or "").upper() == "IDR"
+            ):
+                problems.append(
+                    "%s: metric %r sums %r as an IDR amount. A pass-through is money owed to the "
+                    "biller: it is not revenue, and binding it here overstates revenue by orders "
+                    "of magnitude (measured at 481x on live data). Use commission_revenue."
+                    % (filename, metric.name, metric.measure)
+                )
+
+            # TRAP 2: mart_revenue_daily is three channels UNIONed, not summed. Summing across
+            # revenue_channel must be a declared decision, not an accident of a missing GROUP BY.
+            if metric.source_model == "mart_revenue_daily" and not metric.channel_note:
+                problems.append(
+                    "%s: metric %r reads mart_revenue_daily, which UNIONs revenue_channel in "
+                    "(invoice, pos, ppob_commission). Declare channel_note to confirm that summing "
+                    "across channels is intended; credit notes are already netted off inside "
+                    "'invoice' and must not be netted again." % (filename, metric.name)
+                )
+
+            # A derived dimension must be declared as a dimension too, or it can never be requested.
+            for name in metric.derived_dimensions:
+                if name not in metric.dimensions:
+                    problems.append(
+                        "%s: metric %r derives %r but does not list it in dimensions."
+                        % (filename, metric.name, name)
+                    )
 
             if metric.name in metrics:
                 problems.append("%s: duplicate metric name %r" % (filename, metric.name))

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -27,6 +28,29 @@ _logger = logging.getLogger(__name__)
 #: validated one -- ``opener.open("file:///etc/passwd")`` raises ``URLError: unknown url type``.
 #: The scheme assertion at construction stays as well, because it turns a misconfiguration into a
 #: clear startup error instead of a runtime URLError.
+class _JsonContentTypeHandler(urllib.request.BaseHandler):
+    """Set ``Content-Type: application/json`` on every outgoing request.
+
+    Needed because this opener deliberately does not build a ``urllib.request.Request`` to carry
+    headers. ``OpenerDirector.addheaders`` cannot do the job: ``AbstractHTTPHandler.do_request_``
+    applies the default ``application/x-www-form-urlencoded`` *before* it consults ``addheaders``,
+    and only fills a header that is not already present -- so the default always wins and Odoo
+    answers ``415 UNSUPPORTED MEDIA TYPE``. Found by running it, not by reading the source.
+
+    ``handler_order`` below 500 puts this ahead of ``AbstractHTTPHandler`` in the request-processing
+    chain, so the correct type is already set by the time the default would be applied.
+    """
+
+    handler_order = 100
+
+    def http_request(self, request):
+        if request.data is not None and not request.has_header("Content-type"):
+            request.add_unredirected_header("Content-type", "application/json")
+        return request
+
+    https_request = http_request
+
+
 def _build_http_only_opener():
     """Build an opener that physically cannot speak anything but HTTP(S).
 
@@ -50,6 +74,7 @@ def _build_http_only_opener():
         urllib.request.HTTPDefaultErrorHandler,
         urllib.request.HTTPErrorProcessor,
         urllib.request.UnknownHandler,
+        _JsonContentTypeHandler,
     ):
         opener.add_handler(handler())
     return opener
@@ -102,6 +127,13 @@ class OdooClient:
             )
             with response:
                 parsed = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # An HTTP status is diagnostic and carries nothing sensitive, so it is kept. The body
+            # is NOT read: Odoo error pages echo the request, and this request holds a password.
+            # `from None` for the same reason as below.
+            raise OdooError(
+                "Odoo returned HTTP %s for %s.%s" % (exc.code, service, method)
+            ) from None
         except OSError as exc:
             # `from None`, deliberately, not `from exc`. A chained OSError renders the full
             # request context in the traceback, and this call carries the user's password in its
@@ -146,14 +178,18 @@ def read_session_claims(client: OdooClient, db: str, uid: int, password: str) ->
     # `all_ou`, and it is only ever true for a member of the explicit bypass group -- never inferred
     # from emptiness. So a claim this code forgot to populate grants nothing rather than everything.
     allowed_ou = list(row.get("allowed_operating_unit_ids") or [])
+    # has_group is a recordset method, not @api.model, so execute_kw must pass the ids first:
+    # [[uid], group]. Calling it as [group] raises "missing 1 required positional argument".
     all_ou = bool(
-        client.execute(db, uid, password, "res.users", "has_group", [GROUP_ALL_OPERATING_UNITS])
+        client.execute(
+            db, uid, password, "res.users", "has_group", [[uid], GROUP_ALL_OPERATING_UNITS]
+        )
     )
 
     roles = [DEFAULT_ROLE]
     for group, role in ROLE_MAP:
         try:
-            if client.execute(db, uid, password, "res.users", "has_group", [group]):
+            if client.execute(db, uid, password, "res.users", "has_group", [[uid], group]):
                 roles.append(role)
         except OdooError:
             # A group that does not exist in this database is not an authentication failure.

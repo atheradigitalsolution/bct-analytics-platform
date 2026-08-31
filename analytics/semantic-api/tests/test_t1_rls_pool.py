@@ -25,19 +25,32 @@ import pytest
 
 from app.db import TENANT_SETTING, PoolGuardTripped, TenantScopeError, Warehouse
 
-DSN = os.environ.get("T1_TEST_DSN")
-pytestmark = pytest.mark.skipif(not DSN, reason="T1_TEST_DSN not set")
+#: Superuser DSN, used ONLY to build the fixture.
+ADMIN_DSN = os.environ.get("T1_ADMIN_DSN")
+#: The DSN under test. Must be a role that is NOT superuser and NOT BYPASSRLS -- see
+#: :func:`test_the_role_under_test_cannot_bypass_rls`, which is not optional.
+RLS_DSN = os.environ.get("T1_RLS_DSN")
+
+pytestmark = pytest.mark.skipif(
+    not (ADMIN_DSN and RLS_DSN), reason="T1_ADMIN_DSN / T1_RLS_DSN not set"
+)
 
 TENANT_A = "tenant_a"
 TENANT_B = "tenant_b"
+RLS_ROLE = "t1_rls"
 
 
 @pytest.fixture(scope="module")
 def seeded():
     """Create a mart-shaped table with contract 05's policies, seeded with two tenants."""
-    conn = psycopg2.connect(DSN)
+    conn = psycopg2.connect(ADMIN_DSN)
     conn.autocommit = True
     with conn.cursor() as cur:
+        cur.execute(
+            "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 't1_rls') THEN "
+            "CREATE ROLE t1_rls LOGIN PASSWORD 'rlspass' NOSUPERUSER NOBYPASSRLS; END IF; END $$"
+        )
+        cur.execute("ALTER ROLE t1_rls NOSUPERUSER NOBYPASSRLS")
         cur.execute("CREATE SCHEMA IF NOT EXISTS marts")
         cur.execute("DROP TABLE IF EXISTS marts.fct_t1 CASCADE")
         cur.execute(
@@ -62,9 +75,11 @@ def seeded():
             "CREATE POLICY p_tenant_isolation ON marts.fct_t1 FOR ALL TO PUBLIC "
             "USING (tenant_id = current_setting('app.tenant_id', true))"
         )
+        cur.execute("GRANT USAGE ON SCHEMA marts TO t1_rls")
+        cur.execute("GRANT SELECT ON marts.fct_t1 TO t1_rls")
     conn.close()
     yield
-    conn = psycopg2.connect(DSN)
+    conn = psycopg2.connect(ADMIN_DSN)
     conn.autocommit = True
     with conn.cursor() as cur:
         cur.execute("DROP TABLE IF EXISTS marts.fct_t1 CASCADE")
@@ -74,12 +89,36 @@ def seeded():
 @pytest.fixture
 def pool_of_one(seeded):
     """A pool with exactly ONE connection, so reuse across tenants is guaranteed, not hoped for."""
-    warehouse = Warehouse(DSN, minconn=1, maxconn=1)
+    warehouse = Warehouse(RLS_DSN, minconn=1, maxconn=1)
     yield warehouse
     warehouse.close()
 
 
 SELECT_ALL = "SELECT tenant_id, revenue_net FROM marts.fct_t1 ORDER BY date_day"
+
+
+def test_the_role_under_test_cannot_bypass_rls(seeded):
+    """The most important assertion in this file, and it is about the FIXTURE, not the code.
+
+    A superuser, or any role with BYPASSRLS, ignores row-level security entirely. Run these tests
+    as such a role and every isolation assertion passes while proving absolutely nothing. That is
+    not hypothetical: this project already had a CDC fixture database whose only role was
+    `Superuser, Bypass RLS`, and it would have made the whole isolation suite green.
+
+    So the properties of the identity are asserted before anything is concluded from its results.
+    """
+    conn = psycopg2.connect(RLS_DSN)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT current_user, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
+            )
+            user, is_super, bypasses = cur.fetchone()
+    finally:
+        conn.close()
+    assert user == RLS_ROLE
+    assert is_super is False, "the role under test is a superuser; RLS would not apply to it"
+    assert bypasses is False, "the role under test has BYPASSRLS; these tests would prove nothing"
 
 
 def test_the_fixture_would_actually_catch_a_leak(pool_of_one):

@@ -34,6 +34,30 @@ AGGREGATIONS = {
 
 MAX_LIMIT_CEILING = 10000
 
+#: The explicit UNASSIGNED member of ``dim_operating_unit`` (``is_unassigned = true``, code
+#: ``UNASSIGNED``). Verified against the live warehouse: every mart carries a NOT NULL
+#: ``operating_unit_id`` and unassigned rows are represented as ``-1``, never as SQL NULL.
+#:
+#: This matters more than it looks. An earlier version of this compiler mapped an empty
+#: ``allowed_ou`` to ``operating_unit_id IS NULL``, reasoning by analogy with Odoo, where an empty
+#: entitlement means "only documents that carry no Operating Unit". In the warehouse those
+#: documents carry ``-1``, so ``IS NULL`` matched nothing at all: a user with no entitlement would
+#: have seen an empty dashboard forever, including the unassigned rows they ARE entitled to. The
+#: dimension convention and the source convention are not the same thing, and assuming they were is
+#: the same class of mistake that produced the allowed_ou escalation in the first place.
+UNASSIGNED_OPERATING_UNIT_ID = -1
+
+#: Safe date derivations a metric may declare. Deliberately a fixed map rather than free-form SQL:
+#: these come from the version-controlled metric contract, not from a request, but keeping them to
+#: an enumerated set means "the API never accepts raw SQL" stays true without qualification.
+DATE_GRAINS = {
+    "day": "day",
+    "week": "week",
+    "month": "month",
+    "quarter": "quarter",
+    "year": "year",
+}
+
 
 class QueryRejected(Exception):
     """The request named something the contract does not declare. Always a 400."""
@@ -108,8 +132,19 @@ def compile_query(metric, dimensions, filters, order_by, limit, tenant_id, allow
     group_parts = []
 
     for dimension in dimensions:
-        select_parts.append(sql.Identifier(dimension))
-        group_parts.append(sql.Identifier(dimension))
+        derived = metric.derived_dimensions.get(dimension)
+        if derived:
+            # date_trunc over a declared base column at a declared grain. Both halves come from the
+            # metric contract and are validated against DATE_GRAINS, so no caller string reaches SQL.
+            grain = DATE_GRAINS[derived["grain"]]
+            expression = sql.SQL("date_trunc({}, {})::date").format(
+                sql.Literal(grain), sql.Identifier(derived["from"])
+            )
+            select_parts.append(sql.SQL("{} AS {}").format(expression, sql.Identifier(dimension)))
+            group_parts.append(expression)
+        else:
+            select_parts.append(sql.Identifier(dimension))
+            group_parts.append(sql.Identifier(dimension))
 
     aggregation = AGGREGATIONS[metric.aggregation]
     measure = sql.Identifier(metric.measure)
@@ -135,7 +170,11 @@ def compile_query(metric, dimensions, filters, order_by, limit, tenant_id, allow
             where.append(sql.SQL("{} = ANY(%s)").format(sql.Identifier("operating_unit_id")))
             params.append(list(allowed_ou))
         else:
-            where.append(sql.SQL("{} IS NULL").format(sql.Identifier("operating_unit_id")))
+            # No entitlement: the user sees only the UNASSIGNED member, mirroring Odoo's record
+            # rules, which fail closed on an empty entitlement. See UNASSIGNED_OPERATING_UNIT_ID
+            # for why this is -1 and emphatically not IS NULL.
+            where.append(sql.SQL("{} = %s").format(sql.Identifier("operating_unit_id")))
+            params.append(UNASSIGNED_OPERATING_UNIT_ID)
 
     for key, value in filters.items():
         spec = metric.filters[key]
