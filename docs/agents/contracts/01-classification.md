@@ -122,6 +122,63 @@ violation. Startup means the operator learns before anything lands.
 it, but the choice of canonical rendering is precisely the ambiguity that produced this defect. Any
 non-text type requires an explicit contract decision, not an implicit cast.
 
+### The map rule is a transform rule, not a drop rule (clarified 2026-08-31, `account.account`)
+
+Ruled by Security, whose veto governs this file's classifications. Recorded by the Lead because
+`docs/agents/contracts/**` is the Lead's path.
+
+The barcode ruling above has two separable limbs, and **only the first generalises**:
+
+- **Limb A — the rule.** "A value that is a map keyed by anything other than the data subject is
+  never HMAC'd as a whole." This constrains the **transform**. It is satisfied by any class whose
+  transform is not a hash — `public` and `internal` satisfy it *by construction*.
+- **Limb B — the barcode remedy.** Reclassify to `sensitive` + `drop_to_null`. This followed from
+  `res.partner.barcode` being **personal data of a natural person** that no metric required. It does
+  **not** follow from the storage shape.
+
+The question that precedes both is *"is this personal data at all?"*. `account.account.code_store`
+is a company-keyed jsonb map (`{"1": "101000"}`, `company_dependent = t`) with the same physical
+shape as barcode, and it identifies a **ledger account, not a person**. Neither Art. 4(2) nor
+Art. 4(3) is engaged, so limb A is satisfied and limb B does not apply: `internal` / `none`, and the
+map lands verbatim. The same holds for `account.account.name` and `.description`, which are
+`translate = standard` and therefore jsonb maps keyed by **language** — also `internal`.
+
+Positive form of limb A, for readers rather than maskers: a consumer that wants a value out of such
+a map extracts it **per key** (`code_store ->> <company_id>`) and never casts the blob to text.
+
+**Free text is the mirror-image case, and the automated guard does not cover it.**
+`account.account.note` is physical type `text`, so the `TEXT_TYPES` startup check in
+`analytics/cdc/bct_cdc/policy.py:42` would **not** flag a `personal` classification: it would pass
+validation and land a clean 64-character digest for every note. That digest is **a pseudonym of
+nothing** — prose is not a join key, distinct notes stay distinguishable, and the value looks
+exactly like a working hash. Free text is therefore `sensitive` + `drop_to_null` on its **content
+risk, not its type**, joining `res.partner.comment`, `account.move.narration`, `sale.order.note`,
+`stock.picking.note` and `pos.order.line.note`.
+
+**The type guard catches unhashable columns; it cannot catch pointlessly-hashable ones. That
+judgement stays with the classifier.**
+
+#### Why this clarification was needed
+
+The GATE 3 barcode section, as written, let a careful reader derive "company-dependent map =>
+`drop_to_null`" for **any** such column. That is wrong, and it is what made Platform-Addons stop and
+escalate rather than decide — correctly, since the text supported the wrong reading. The Lead
+generalised limb A without marking limb B as fact-specific; this paragraph repairs that.
+
+#### Gate evidence for this ruling
+
+Per the process rule below, and stated in the **positive** form the empty-result rule requires:
+
+```sql
+select count(*) from pdp_field_classification where model_name = 'account.account';   -- MUST be 16
+select count(*) from warehouse.column_policy where source_table = 'account_account';  -- MUST be 16
+```
+
+**Assert the count is 16 — not that no bad row appeared.** Both queries return empty today, and both
+would return empty after a botched upgrade; the two outcomes are indistinguishable. As of
+2026-08-31 the live table holds **0** rows for this model against 724 total across 16 models, while
+the CSV on disk holds all 16. The ruling is therefore **NOT YET IN FORCE**.
+
 ## Process rule — an amendment is not in force until it reaches its producer
 
 This ruling was written into this document while
