@@ -158,7 +158,7 @@ and in every case the surrounding work was correct. This is the pattern to desig
 | 2 | Contract 01's barcode amendment | Written into the contract while the producer CSV and the live table still said `personal`; the loader reads the table | Security |
 | 3 | `git check-ignore` exit code | Exits 0 on a **negation** match too, so a guard asserting "`.env` is ignored" passes even when a negation made it committable | Backend → Security |
 | 4 | `rolsuper` compared as `'f'` | Through `\|\|` a boolean renders `true`/`false`, never psql's `t`/`f`, so the comparison never matched and passed forever | Platform-Infra |
-| 5 | `promtool` + Prometheus `health: ok` on six alert rules | Both validate syntax and loading; neither says the selector matches **any series**. `postgres-exporter` emitted zero `pg_replication_slot*`, so four load-bearing ADR alerts were permanently inactive | QA |
+| 5 | Alerting believed healthy | `promtool` passes and Prometheus reports `health: ok` without either saying whether a selector matches any series. The real defect turned out to be different and worse: **alertmanager, loki, promtail and node-exporter were not running at all**, so every rule fired into nothing. A cold start rebuilds the base stack via `make up-dev`, which never touches the observability overlay | QA, Platform-Infra |
 | 6 | `make install-modules` / `make up-dev` | Reported success while all five modules stayed `uninstalled`; and `.env.example` shipped `ODOO_INIT_MODULES=base,web`, so a fresh clone gets no domain model and `up-analytics` fails hard | Platform-Infra, QA |
 
 ### What actually catches this class
@@ -181,3 +181,26 @@ that it is green for the right reason:
 **A check that has never been observed to fail is not yet known to work.** Before any gate accepts a
 green result, the author states how they made it go red. If they cannot, the criterion is recorded as
 **not verified** — never as passing.
+
+### Instance 7 — the Lead, on the very pattern he had just catalogued
+
+Verifying QA's Finding 4, the Lead ran `curl … | grep -c 'pg_replication_slot'`, got `0`, and
+reported four load-bearing ADR alerts as permanently inactive. **The measurement was taken at a
+moment when zero replication slots existed**, because the cold start had just destroyed them, and
+per-slot series only exist while slots do. Platform-Infra disproved it by creating a slot and
+querying Prometheus directly:
+
+```
+pg_replication_slots_pg_wal_lsn_diff {slot_name="bct_slot_bct"} = 56
+pg_replication_slots_active == 0     -> 1 series (fires)
+```
+
+postgres_exporter v0.16 emits **both** the built-in `pg_replication_slot_slot_*` family and the
+legacy `pg_replication_slots_*` names the rules already use. No rule expression needed changing and
+no `PG_EXPORTER_EXTEND_QUERY_PATH` was needed — a rename would have broken working rules.
+
+The lesson is not that the check was wrong but that **it was run without establishing its
+precondition**, which is the same defect as every row in the table above. A `grep -c` returning 0
+means "no match", never "the thing is broken" — the two are only the same if you have separately
+established that a match *should* exist. This entry stays because the Lead is not exempt from the
+rule, and because an error corrected in the record is worth more than one quietly dropped.
