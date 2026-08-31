@@ -296,7 +296,11 @@ def landing_amplification(conn, tenant: str, table: str) -> tuple:
       LSN**. A change is identified by its WAL position, so this has no legitimate cause and should
       be exactly 0. This is the number that distinguishes "the table grew because the data changed"
       from "the loader landed the same change twice".
-    * ``unordered_rows`` counts rows with a NULL ``_lsn``.
+    * ``unordered_rows`` counts rows with a NULL ``_lsn``. They are **not** lost to the marts —
+      DWH's ``raw_latest`` macro orders by ``coalesce(_lsn, '0/0')``, so a NULL sorts last in
+      precedence and any real CDC row supersedes it for the same key, which is exactly what makes a
+      re-snapshot safe over live data. What a NULL costs is a *total* order: ``(_tenant_id, pk,
+      _lsn)`` stops being unique, so two distinct changes can share a key.
 
     The ``_lsn IS NOT NULL`` filter is not tidiness, it is a correctness fix for this metric. SQL
     row comparison treats two NULL-bearing rows as equal for ``DISTINCT``, so two genuinely

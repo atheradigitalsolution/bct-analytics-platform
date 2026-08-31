@@ -318,8 +318,10 @@ def _publish_amplification(conn, tenant, tables) -> None:
         m.LANDING_UNORDERED.labels(tenant=tenant, source_table=table).set(unordered)
         if unordered:
             _logger.warning(
-                "raw.%s holds %d row(s) with a NULL _lsn for tenant %s. They cannot be ordered by "
-                "the mart's latest-version rule. This loader never writes one.",
+                "raw.%s holds %d row(s) with a NULL _lsn for tenant %s. They still reach the marts "
+                "(raw_latest coalesces a NULL to '0/0', so real CDC rows supersede them), but "
+                "(_tenant_id, pk, _lsn) is no longer a total order while they exist. This loader "
+                "never writes one.",
                 table, unordered, tenant,
             )
         if duplicates:

@@ -99,9 +99,12 @@ LANDING_DUPLICATE_CHANGES = Gauge(
 
 LANDING_UNORDERED = Gauge(
     "bct_cdc_landing_unordered_rows",
-    "Landing rows with a NULL _lsn. Contract 05 makes (_tenant_id, pk, _lsn) the ordering key, so "
-    "such a row cannot take part in the mart's latest-non-deleted-version rule. This loader never "
-    "writes one -- every row it lands carries format_lsn of a real WAL position -- so a non-zero "
-    "value means rows reached the landing zone by another route.",
+    "Landing rows with a NULL _lsn. These are NOT lost to the marts: DWH's raw_latest macro orders "
+    "by coalesce(_lsn, '0/0'), so a NULL sorts last in precedence and any real CDC row supersedes "
+    "it for the same key -- which is what makes a re-snapshot safe to run over live data. What a "
+    "NULL does cost is a TOTAL order: (_tenant_id, pk, _lsn) stops being unique, so two distinct "
+    "changes can share a key. This loader never writes one (every row carries format_lsn of a real "
+    "WAL position), so a non-zero value means rows arrived by another route -- historically DWH's "
+    "warehouse_ctl.py load-fixture, which is moving to an explicit '0/0'.",
     ["tenant", "source_table"],
 )
