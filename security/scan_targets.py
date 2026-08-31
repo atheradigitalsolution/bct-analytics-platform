@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -168,29 +169,73 @@ def _skip(rel: str, exclusions: list[str]) -> bool:
     return False
 
 
-def find_files(exclusions: list[str]) -> tuple[list[str], list[str]]:
+def _git_tracked_or_untracked() -> list[str] | None:
+    """Every path a fresh clone would contain, plus untracked files not yet ignored.
+
+    ``git ls-files --cached --others --exclude-standard`` is a POSITIVE enumeration and
+    deliberately not ``git check-ignore``: check-ignore exits 0 on a NEGATION match too,
+    so a guard built on its exit code passes even when a negation made a file visible
+    (PLAN.md defect instance 3, found by Backend). This asks git what is in the set
+    rather than asking whether one path is out of it.
+
+    Why the set and not ``os.walk``: os.walk sees this developer's disk, which on
+    2026-08-31 contained four ``insight-portal/.next/**/package.json`` files -- Next.js
+    build output, gitignored, never in a clone, never built by CI. The sweep failed on
+    all four. A coverage gate that fires on artefacts no consumer can see is a gate
+    people learn to re-run until it passes, and the whole value of this check is that a
+    failure means something.
+
+    Untracked-but-not-ignored files stay IN the set on purpose. PLAN.md instance 9 was a
+    dbt model that existed on disk and was never ``git add``ed; the mirror of that is a
+    Dockerfile someone writes and forgets to add, which should still be registered.
+
+    A gitignored Dockerfile is invisible here. That is the correct boundary, not a hole:
+    CI builds from the clone, so a file no clone contains cannot ship an image.
+
+    Returns ``None`` when git is unavailable or the repo is not a work tree, so the
+    caller can fall back and say so.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "-C", REPO_ROOT, "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            capture_output=True, check=True, timeout=60,
+        ).stdout.decode("utf-8", "replace")
+    except (OSError, subprocess.SubprocessError):
+        return None
+    paths = [p.replace("\\", "/") for p in out.split(chr(0)) if p]
+    return paths or None
+
+
+def find_files(exclusions: list[str]) -> tuple[list[str], list[str], str]:
+    """Return (dockerfiles, package.json files, the name of the source used)."""
+    paths = _git_tracked_or_untracked()
+    source = "git"
+    if paths is None:
+        source = "os.walk"
+        paths = []
+        for root, dirs, files in os.walk(REPO_ROOT):
+            rel_root = os.path.relpath(root, REPO_ROOT).replace("\\", "/")
+            if rel_root == ".":
+                rel_root = ""
+            dirs[:] = [d for d in dirs if not _skip(f"{rel_root}/{d}".lstrip("/"), exclusions)]
+            paths += [f"{rel_root}/{n}".lstrip("/") for n in files]
+
     dockerfiles, packages = [], []
-    for root, dirs, files in os.walk(REPO_ROOT):
-        rel_root = os.path.relpath(root, REPO_ROOT).replace("\\", "/")
-        if rel_root == ".":
-            rel_root = ""
-        dirs[:] = [d for d in dirs if not _skip(f"{rel_root}/{d}".lstrip("/"), exclusions)]
-        for name in files:
-            rel = f"{rel_root}/{name}".lstrip("/")
-            if _skip(rel, exclusions):
-                continue
-            lowered = name.lower()
-            if lowered == "dockerfile" or lowered.startswith("dockerfile."):
-                dockerfiles.append(rel)
-            elif lowered == "package.json":
-                packages.append(rel)
-    return sorted(dockerfiles), sorted(packages)
+    for rel in paths:
+        if _skip(rel, exclusions):
+            continue
+        name = rel.rsplit("/", 1)[-1].lower()
+        if name == "dockerfile" or name.startswith("dockerfile."):
+            dockerfiles.append(rel)
+        elif name == "package.json":
+            packages.append(rel)
+    return sorted(dockerfiles), sorted(packages), source
 
 
 def resolve(doc: dict) -> dict:
     """Attach live filesystem state to every registered target."""
     exclusions = _exclusions(doc)
-    dockerfiles, packages = find_files(exclusions)
+    dockerfiles, packages, source = find_files(exclusions)
 
     images = []
     for entry in doc.get("images", []):
@@ -216,10 +261,22 @@ def resolve(doc: dict) -> dict:
     registered_dockerfiles = {str(i.get("dockerfile", "")) for i in doc.get("images", [])}
     registered_packages = {f"{str(n.get('path',''))}/package.json" for n in doc.get("node_projects", [])}
 
+    fixtures = []
+    for entry in doc.get("ci_fixtures", []):
+        path = str(entry.get("path", ""))
+        full = os.path.join(REPO_ROOT, path)
+        fixtures.append({
+            **entry,
+            "exists": os.path.exists(full),
+            "is_file": os.path.isfile(full),
+        })
+
     return {
         "images": images,
         "node": node,
         "python": python,
+        "fixtures": fixtures,
+        "scan_source": source,
         "found_dockerfiles": dockerfiles,
         "found_packages": packages,
         "unregistered_dockerfiles": [d for d in dockerfiles if d not in registered_dockerfiles],
@@ -229,6 +286,18 @@ def resolve(doc: dict) -> dict:
 
 def check(state: dict) -> tuple[str, list[str]]:
     problems, warnings = [], []
+
+    # THE EMPTY-RESULT ASSERTION (PLAN.md, binding rule).
+    # Everything below concludes "nothing is unregistered" from an empty difference. An
+    # empty difference is also what a broken sweep produces, and the two are
+    # indistinguishable. So assert the population first: this repository builds images,
+    # and a sweep that found none did not find a clean tree, it found nothing.
+    if not state["found_dockerfiles"]:
+        problems.append(
+            f"EMPTY SUBJECT SET: the {state['scan_source']} sweep found no Dockerfile anywhere. "
+            f"Every 'unregistered' check below searched an empty population, so all of them "
+            f"passed vacuously. This is a broken enumeration, not a clean repository."
+        )
 
     for path in state["unregistered_dockerfiles"]:
         problems.append(
@@ -263,6 +332,56 @@ def check(state: dict) -> tuple[str, list[str]]:
             warnings.append(
                 f"REGISTRY DRIFT: node project '{project['name']}' has landed but is still marked pending. "
                 f"It IS being scanned; flip status to present. Owner: {project.get('owner')}."
+            )
+
+    # python_projects were resolved but never checked until 2026-08-31 - the section
+    # existed, the drift and broken-registration rules did not apply to it, so a Python
+    # service that lost its requirements.txt (and with it its pip-audit coverage) was
+    # reported nowhere. sca-python reads `git ls-files`, not this registry, so nothing
+    # else would have noticed either.
+    for project in state["python"]:
+        declared, exists = project.get("status"), project["exists"]
+        if declared == "present" and not exists:
+            problems.append(
+                f"BROKEN REGISTRATION: python project '{project['name']}' is registered present "
+                f"but {project.get('path')} holds no requirements.txt / requirements.in / "
+                f"pyproject.toml / constraints.txt, so pip-audit sees nothing for it."
+            )
+        elif declared == "pending" and exists:
+            warnings.append(
+                f"REGISTRY DRIFT: python project '{project['name']}' has landed "
+                f"({', '.join(project['manifests'])}) but is still marked pending. Flip status "
+                f"to present. Owner: {project.get('owner')}."
+            )
+
+    # ci_fixtures: the expiry control for a declared skip inside a workflow.
+    #
+    # A `run:` step has exactly two outcomes, so a skip cannot be given an exit code
+    # distinct from a pass (PLAN.md instance 11). ci.yml's dbt-ci tier 3 legitimately
+    # skips while its fixture is undelivered - but nothing made that skip EXPIRE, so a
+    # fixture that landed and later moved or was deleted would return the job to a
+    # silent, permanent, green skip. That control has to live outside the step. It lives
+    # here, in `discover`, which every CI run executes and `ci-gate` requires.
+    for fx in state["fixtures"]:
+        declared = fx.get("status")
+        if declared == "present" and not fx["exists"]:
+            problems.append(
+                f"BROKEN REGISTRATION: CI fixture '{fx['name']}' is registered present but "
+                f"{fx.get('path')} does not exist. {fx.get('consumer', 'Its consumer job')} is "
+                f"now skipping silently and green. Restore the file, or deregister it and accept "
+                f"that the job no longer runs."
+            )
+        elif declared == "present" and not fx["is_file"]:
+            problems.append(
+                f"BROKEN REGISTRATION: CI fixture '{fx['name']}' at {fx.get('path')} exists but "
+                f"is not a regular file."
+            )
+        elif declared == "pending" and fx["exists"]:
+            warnings.append(
+                f"REGISTRY DRIFT: CI fixture '{fx['name']}' has landed ({fx.get('path')}) but is "
+                f"still marked pending. {fx.get('consumer', 'Its consumer job')} IS now running it; "
+                f"flip status to present so a later disappearance becomes a failure instead of a "
+                f"silent skip. Owner: {fx.get('owner')}."
             )
 
     if problems:
@@ -324,11 +443,28 @@ def summary(state: dict, verdict: str, messages: list[str]) -> str:
             f"| `{n['name']}` | `{n.get('path')}` | {n.get('owner')} | {n.get('wave')} "
             f"| {n.get('status')} | {action} |"
         )
+    out += ["", "| Python project | Path | Owner | Wave | Registered | Manifests |", "|---|---|---|---|---|---|"]
+    for y in state["python"]:
+        found = ", ".join(f"`{m}`" for m in y["manifests"]) or "**none - not present yet**"
+        out.append(
+            f"| `{y['name']}` | `{y.get('path')}` | {y.get('owner')} | {y.get('wave')} "
+            f"| {y.get('status')} | {found} |"
+        )
+    if state["fixtures"]:
+        out += ["", "| CI fixture | Path | Consumer | Registered | On disk |", "|---|---|---|---|---|"]
+        for f in state["fixtures"]:
+            out.append(
+                f"| `{f['name']}` | `{f.get('path')}` | {f.get('consumer')} "
+                f"| {f.get('status')} | {'yes' if f['exists'] else '**no - consumer job is skipping**'} |"
+            )
     out += [
         "",
-        f"Dockerfiles on disk: {len(state['found_dockerfiles'])} - "
+        f"Enumeration source: `{state['scan_source']}` "
+        "(what a fresh clone contains, plus untracked files git does not ignore - "
+        "never this developer's build output).",
+        f"Dockerfiles found: {len(state['found_dockerfiles'])} - "
         f"unregistered: {len(state['unregistered_dockerfiles'])}",
-        f"package.json on disk: {len(state['found_packages'])} - "
+        f"package.json found: {len(state['found_packages'])} - "
         f"unregistered: {len(state['unregistered_packages'])}",
         "",
         f"**Coverage verdict: {verdict.upper()}**",
@@ -356,7 +492,8 @@ def selftest() -> int:
     with open(REGISTRY, encoding="utf-8") as handle:
         reference = yaml.safe_load(handle)
     mismatches = []
-    for section in ("schema_version", "images", "node_projects", "python_projects", "coverage_exclusions"):
+    for section in ("schema_version", "images", "node_projects", "python_projects",
+                    "ci_fixtures", "coverage_exclusions"):
         if doc.get(section) != reference.get(section):
             mismatches.append(section)
             print(f"  MISMATCH in {section}:")

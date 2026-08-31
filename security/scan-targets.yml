@@ -105,8 +105,12 @@ images:
     context: insight-portal
     owner: Frontend
     wave: 4
-    status: pending
-    notes: Next.js BFF. Server-side session verification only; no token reaches the browser.
+    status: present
+    notes: >-
+      Next.js BFF. Server-side session verification only; no token reaches the browser.
+      Flipped pending -> present by Security on 2026-08-31: the Dockerfile had landed and
+      the drift warning was firing on every run. It was already being scanned; the flip
+      makes a later disappearance a hard failure instead of a silent skip.
 
 node_projects:
   - name: insight-portal
@@ -138,7 +142,38 @@ python_projects:
     path: analytics/dbt
     owner: Data-Warehouse
     wave: 3
+    status: present
+
+# ======================================================================================
+# CI FIXTURES - the expiry control for a declared skip inside a workflow.
+#
+# A GitHub Actions `run:` step has exactly two outcomes, so a step that legitimately skips
+# cannot be given an exit code distinct from a pass (PLAN.md instance 11: a skip must never
+# share an exit code with a pass). The skip itself is honest; what it lacks is an END. A
+# fixture that lands and is later moved or deleted returns its job to a permanent, silent,
+# green skip, and nothing in that job can tell.
+#
+# So the expiry lives here instead, checked by `discover`, which every CI run executes and
+# which `ci-gate` requires. Same three-state semantics as an image:
+#
+#   pending + missing  -> the consumer job skips and reports why. Normal, pre-delivery.
+#   pending + present  -> the consumer job RUNS it, plus a loud drift warning to flip this.
+#   present + missing  -> HARD FAIL. This is the state the whole section exists for.
+# ======================================================================================
+ci_fixtures:
+  - name: dbt-ci-fixture
+    path: scripts/analytics/dbt-ci-fixture.sh
+    consumer: ci.yml dbt-ci tier 3
+    owner: Data-Warehouse + QA
+    wave: 5
     status: pending
+    notes: >-
+      Must seed the raw_* source tables so `dbt build` has data, be idempotent, and exit
+      non-zero on failure. It does NOT need the executable bit: ci.yml invokes it as
+      `bash <path>`, deliberately, because every file in scripts/analytics/ is committed
+      100644 (this host is Windows with core.filemode=false) and the guard used to test
+      -x. That guard would have skipped a delivered fixture while reporting that the file
+      did not exist. Flip status to present the day it lands.
 
 # Paths excluded from the unregistered-artefact sweep. Each needs a reason. These are
 # directories that cannot contain a shippable artefact, not a way to hide one.
