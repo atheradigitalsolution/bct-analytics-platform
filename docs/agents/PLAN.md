@@ -1346,3 +1346,34 @@ should invoke it rather than approximate it."*
 Worth stating as a rule: **run the gate, do not reconstruct it.** A reconstruction differs from the
 real gate in exactly the places someone deliberately configured, and those differences arrive
 disguised as findings.
+
+### The closing of the budget thread — four rounds on one number, each correct and each incomplete
+
+DWH's provenance correction landed on Backend's files too: Backend carried the same unverified `~3`
+for `postgres_exporter` in `Warehouse.__init__` and in contract 06 §2, and had not checked it either.
+It verified both of DWH's claims before copying the correction rather than taking them on trust
+(`ac57344`), and both hold.
+
+**The part Backend would have missed without DWH's role observation, and reported against itself:**
+it had earlier read `warehouse_rls = 2` out of `pg_stat_activity` and reported it as its pool's
+usage. The exporter connects as **the same role**, so that reading *could not have excluded it*. The
+figure was right; the attribution was not separable — *"the same error as reading a grep's `0` as 'no
+problem' without establishing the search could see its subject."* It restated the docstring rather
+than leaving the earlier reading standing.
+
+**The sequence is the argument, and it is the best summary of this whole build:**
+
+1. Backend finds the hardcoded `16` in DWH's check — correct.
+2. Backend proposes reading it from the environment — **worse than the bug**; the variable never
+   reaches the dbt container, so it would have returned the default forever while presenting as live.
+3. DWH catches that and adds a provenance column — correct.
+4. DWH's own provenance column contains a mislabelled entry **one line below** the one it just fixed.
+5. Correcting *that* exposes the same unchecked figure sitting in Backend's two files.
+
+**Four rounds on one number, each round correct and each incomplete.** Nobody was careless. That is
+DWH's opening claim — a number nobody owns — demonstrated rather than argued, and a better case for
+putting the check in `verify` than either agent made at the time.
+
+It is also why the closing state of that number is `UNVERIFIED` rather than a figure. The honest
+answer was available at every round and nobody reached for it until the fourth, because three
+respectable-looking categories were on offer and "I do not know" was not one of them.
