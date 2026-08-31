@@ -76,7 +76,8 @@ ADR 0001 sized against a measured comparable stack rather than an estimate:
 ## 3. Bring-up order, and why it is this order
 
 ```bash
-make up-dev                      # Odoo + Postgres + Redis; creates and initialises the database
+make up-dev                      # Odoo + Postgres + Redis; DB init; applies the dev password [5/5]
+make seed-demo                   # demo volume + passwords its users. NOT run by up-dev, by design
 make up-obs                      # Prometheus, Alertmanager, Grafana, exporters
 make up-analytics                # warehouse-db, DDL, policy sync, raw DDL
 bash scripts/analytics/cdc-provision.sh      # publication + slot, as the `odoo` role
@@ -94,6 +95,18 @@ make dbt-run                     # build staging and marts
         "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level','max_slot_wal_keep_size');"
       ```
 - [ ] `make warehouse-reader-check` passes: `SELECT` works, every write is denied.
+- [ ] **`make check-dev-passwords` passes.** It asserts both directions: that
+      `$BCT_DEV_USER_PASSWORD` authenticates *and* that Odoo's default `admin`/`admin` is refused.
+      The second half is the one that matters — a check that only proves the documented credential
+      works passes on a stack that accepts both, which is worse than one accepting only the default,
+      because it looks configured. Verified able to fail: against an uninitialised database it exits
+      **1**, unlike `make check-alerting` (§4).
+      `make up-dev` applies the password as its last step, and `make seed-demo` passwords the demo
+      users it creates, so on a fresh clone this should already be true.
+
+      Note when testing by hand: the script sources `.env`, which **overrides** an inherited
+      environment variable. `BCT_DEV_USER_PASSWORD=wrong make check-dev-passwords` therefore proves
+      nothing — it silently uses the `.env` value. Use a bad `--db` to exercise the failure path.
 
 ---
 
