@@ -1918,3 +1918,63 @@ pipeline targets.
 2. `ARGS` leaking via `MAKEFLAGS` into nested `make` and thence into shell scripts.
 
 Both deliberately not routed while QA holds the stack and is verifying those same targets.
+
+## FINAL GATE — verified by the Lead on the cold-started stack
+
+```
+portal   307 (-> /login)   semantic 200   gateway 200   odoo 200   grafana 200
+marts    bct 777 | bct_t2 777        recon 1636 checks, 0 failed
+credential  admin/admin -> false     admin/$BCT_DEV_USER_PASSWORD -> uid 2
+check-alerting  5/5 targets, 1 alertmanager answering, 24 rules, 21/21 metrics with CURRENT SAMPLES, RC=0
+foreign containers 23, untouched     bct compose 12
+```
+
+**"Alerting live after a cold start" is PROVEN** — by the assertion that used to pass on a skip. That
+gate spent this entire build unable to execute one of its own checks; it now evaluates 24 rules and
+confirms every referenced metric has live samples.
+
+### Run 3: 9 passed, 2 failed — and both failures were QA's own ordering
+
+QA's test ran `up-analytics` **before** `seed-demo`, contradicting `docs/prod-deploy-checklist.md` §3
+— which QA wrote. `up-analytics` copies whatever Odoo holds *at that moment* into `bct_t2` over FDW,
+so the fixture tenant received 10 rows instead of 2,109. **Nothing errored.**
+
+| | before | after re-running `up-analytics` on a seeded Odoo |
+|---|---|---|
+| rows into `bct_t2` | 10 | **2,109** |
+| `dbt test` | PASS=291 **ERROR=1** | PASS=292 **ERROR=0** |
+| reconciliation failures | **714**, every one `bct_t2`; `bct` clean at 0/818 | **0** |
+
+**The 714 reconciliation failures and the empty-tenant failure were the same defect.** Fixed in
+`a5e2e6b`, and the hazard is now a checklist item, because *a silently-empty second tenant makes
+every isolation claim vacuous and surfaces only as a reconciliation failure attributed to the wrong
+thing.*
+
+That is the catalogue's shape one final time, in the run meant to close it: no error, a plausible
+number, and a symptom pointing somewhere else.
+
+### The full suite on the cold-started stack
+
+```
+70 passed, 4 skipped, 11 deselected in 191.76s
+```
+
+QA also reported an earlier attempt showing 5 failures — all "CDC consumer absent", caused by its own
+`up-analytics` re-run killing the consumer. Restarted, green. **"Not a defect, and I am not reporting
+it as one."**
+
+### NOT PROVEN — declared, with the Lead's own decision named as the cause of the first
+
+1. **The cold start end-to-end since the ordering correction.** There was no fourth teardown, because
+   **the Lead instructed QA not to run one** — "a failure with a named cause is worth more than a
+   fourth run hoping for green." That instruction stands, and its cost is this: the corrected
+   ordering is proven in both directions by direct measurement, but not by a full run.
+   Closing command: `BCT_COLDSTART=i-understand-this-destroys-the-bct-oltp-data ASSUME_YES=1 make test-coldstart`
+2. **Backup/restore green round trip** — failure direction proven, `--into` rehearsal unimplemented.
+3. **Grafana rendered in a browser.**
+4. `application_name` on the wire; the §A.6 serving-period assertion.
+
+### Three items held for Platform-Infra, none adopted by the Lead
+
+`dbt-run`/`dbt-test` chaining · the `up-semantic` -> `up-gateway` prerequisite · the `ARGS`/`MAKEFLAGS`
+leak. Each was found by an agent that correctly declined to edit another's file.
