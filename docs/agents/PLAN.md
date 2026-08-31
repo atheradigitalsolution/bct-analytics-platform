@@ -933,3 +933,49 @@ make a number look nicer."* Correct.
 `(_tenant_id, id, _op, _lsn)`, so exactly-once landing rests on the loader rather than the storage
 layer. `raw` DDL is DWH's. **Held until Frontend finishes measuring** — the two agents currently in
 the tree have both sequenced around that run, and the Lead will not be the one to break it.
+
+## Phase 4 delivered — §6 items closed, with the red proofs
+
+Frontend finished: 8 commits, 88 files, **every commit path-limited to `insight-portal/`** — audited
+by the Lead with `git show --name-only` per commit, all clean. Portal live (`307` to `/login`
+unauthenticated, `healthz=200`), 10 evidence artefacts present.
+
+| §6 item | Result | How it was made red |
+|---|---|---|
+| Five views from real data | PASS, all 11 declared metrics consumed, none undeclared | — |
+| Cross-tenant 403 | PASS, 21 assertions | Inverted the middleware comparison: **the two portal tests failed while the semantic-API test kept passing**, proving the guards are independent and the portal test is not riding on the API's |
+| p95 < 2 s, 12 months | **39 ms cached / 213 ms uncached**, worst view | Both figures reported, "because only one is honest alone" |
+| Freshness not a client clock | PASS 12/12 | Asserts the frozen value is **non-blank** (an empty field also stops advancing) and that it **resumes** (a hardcoded string also never advances) |
+| No browser path to the database | PASS | 81 requests over 6 page loads, all to `127.0.0.1:33000` |
+| 375 px | PASS | Measured content width **equals** viewport width on all 10 screenshots |
+| Keyboard | PASS, 15 checks × 5 views | Real Tab keystrokes over CDP reading `document.activeElement`, not a `querySelectorAll` of what *looks* focusable |
+| Export masking | PASS | Asserted against the 32-hex `partner_key` read out of the warehouse by psql, not "differs from plaintext" |
+
+Three properties are **structural rather than remembered**, which is the right way to hold them:
+`query()` takes no tenant argument at all, so no URL, header, cookie or form field can reach it;
+`claims.ts` maps absent `all_ou` to `false` via `=== true`; the cache keys on the verified session.
+
+**Frontend's own near-miss, worth keeping.** Its first freshness run reported "the timestamp advanced
+while frozen" and it was one step from filing a portal defect. The loader had been **recreated inside
+its window** — `cdc-run.sh` uses `docker run --rm`, so a `docker stop` deletes it and a re-run
+silently un-freezes the test. The proof now asserts the loader is **absent** at both ends.
+
+### A real server defect found by measuring, routed to Backend
+
+Cache disabled, the ten-panel PPOB view issued ten concurrent queries against
+`ThreadedConnectionPool(maxconn=8)`. It exhausted and produced **133 upstream 500s in a 300-request
+run**. Critically this is **not** the T-1 scope guard: `bct_semantic_pool_guard_trips` stayed `0` and
+the documented `503 scope_guard` never appeared — an **undocumented 500** instead. Contract 06 §2 does
+not describe the failure mode.
+
+Frontend capped itself at four in flight, so its failed-panel count is 0. **That is a mitigation in
+one client, not a fix** — any other caller still gets 500s, and the dashboard currently works because
+one consumer agreed to be polite. Routed to Backend with the requirement to choose queue-or-shed and
+prove the chosen response by exceeding the limit deliberately.
+
+### Frontend's NOT VERIFIED, carried forward honestly
+
+The container running **in the compose stack** (measured against the standalone host server); a
+**fresh-clone build** (all evidence is from the working tree — and given instance 1, that distinction
+is exactly the one this build keeps punishing); `is_profit_and_loss = NULL` against live data; silent
+token refresh; type-checking of `tests/**`; and CSP, which is Security's.
