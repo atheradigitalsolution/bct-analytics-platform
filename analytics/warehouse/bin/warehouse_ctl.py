@@ -814,7 +814,19 @@ def cmd_verify(args) -> int:
         # Backend's runner (warehouse_conn, heartbeat, status_conn), none of
         # them configurable. Confirmed with Backend rather than assumed.
         ("CDC loader", 3, "literal - not configurable (runner.py 229/413/444)"),
-        ("postgres_exporter", 3, "literal - fixed in docker-compose.analytics.yml"),
+        # CORRECTED. This said "literal - fixed in docker-compose.analytics.yml",
+        # which cited evidence that does not support it: that file sets
+        # --disable-default-metrics and a custom query path, both of which
+        # change WHAT the exporter queries, not HOW MANY connections it opens.
+        # Nothing pins this number. It is an allowance I chose, and labelling it
+        # a structural constant was the same overstatement this column exists to
+        # expose - in the column itself.
+        #
+        # Not measurable from here either: the exporter connects as
+        # warehouse_rls, the same role the semantic-api uses, so
+        # pg_stat_activity cannot separate them by usename. Isolating it needs a
+        # distinct application_name or its own role.
+        ("postgres_exporter", 3, "UNVERIFIED allowance - not pinned anywhere; shares warehouse_rls"),
         ("ad-hoc psql headroom", 4, "literal - policy allowance, not a setting"),
     ]
     with wh.cursor() as cur:
