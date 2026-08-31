@@ -163,3 +163,62 @@ def test_absent_all_ou_is_not_treated_as_a_bypass(semantic_up, evidence):
         assert len(a.json()["rows"]) <= len(b.json()["rows"]), (
             "a token with no all_ou claim saw as much as an explicit bypass; absence was read as true"
         )
+
+
+def test_the_unassigned_ou_branch_is_actually_exercised(semantic_up, marts_exist, evidence):
+    """`allowed_ou: []` maps to the UNASSIGNED member `-1`, not to `IS NULL`. Is that observable?
+
+    Backend originally mapped `[]` to `operating_unit_id IS NULL` by analogy with Odoo's record
+    rules, and fixed it to `= -1` because the marts carry an explicit UNASSIGNED member rather than
+    a NULL. The fix is right. But on a dataset where **no fact row carries `-1`**, the old mapping
+    and the new one both return zero rows, so the fix is not distinguishable from the bug.
+
+    A fix that has never been observed to change an outcome is not yet known to work. So this test
+    refuses to report a pass on an empty dataset: it fails loudly as NOT COVERED, naming what has to
+    be seeded to cover it, rather than going green on a vacuous comparison.
+    """
+    from helpers import db
+
+    counts = db.grid(
+        db.warehouse_admin(),
+        "SELECT 'dim_operating_unit' AS src, count(*) FILTER (WHERE operating_unit_id = -1) AS unassigned, "
+        "count(*) AS total FROM marts.dim_operating_unit "
+        "UNION ALL SELECT 'fct_sale_order_line', count(*) FILTER (WHERE operating_unit_id = -1), "
+        "count(*) FROM marts.fct_sale_order_line "
+        "UNION ALL SELECT 'fct_ppob_transaction', count(*) FILTER (WHERE operating_unit_id = -1), "
+        "count(*) FROM marts.fct_ppob_transaction "
+        "UNION ALL SELECT 'fct_account_move_line', count(*) FILTER (WHERE operating_unit_id = -1), "
+        "count(*) FROM marts.fct_account_move_line;",
+    )
+    evidence.add("rows carrying the UNASSIGNED operating unit (-1)", counts)
+
+    facts = db.query(
+        db.warehouse_admin(),
+        "SELECT (SELECT count(*) FROM marts.fct_sale_order_line WHERE operating_unit_id = -1) "
+        "     + (SELECT count(*) FROM marts.fct_ppob_transaction WHERE operating_unit_id = -1) "
+        "     + (SELECT count(*) FROM marts.fct_account_move_line WHERE operating_unit_id = -1);",
+    )
+    unassigned_facts = int(facts[0][0])
+    evidence.add("fact rows with operating_unit_id = -1", unassigned_facts)
+
+    if unassigned_facts == 0:
+        pytest.fail(
+            "NOT COVERED: no fact row carries operating_unit_id = -1, so `allowed_ou: []` -> `= -1` "
+            "and the old `IS NULL` mapping are indistinguishable -- both return zero rows. Every "
+            "fact row has a real Operating Unit because the propagation fix in "
+            "custom_operating_unit ensures documents never lose one.\n"
+            "To cover it, seed one document with no Operating Unit (e.g. clear operating_unit_id on "
+            "a single sale order in the OLTP so the CDC stream lands the change), rebuild with "
+            "`make dbt-run`, and re-run. This test then asserts that an `allowed_ou: []` session "
+            "sees exactly those rows and no others."
+        )
+
+    empty = tokens.valid(tokens.claims(tenant="bct", allowed_ou=[], all_ou=False))
+    response = _query(empty, metric="revenue_net")
+    evidence.add("allowed_ou=[] against a dataset that HAS unassigned rows",
+                 "HTTP %s rows=%s" % (response.status, len(response.json().get("rows", []))))
+    assert response.status == 200, response.body[:300]
+    assert response.json()["rows"], (
+        "there are %d fact rows with operating_unit_id = -1, but an allowed_ou=[] session saw none. "
+        "That is the `IS NULL` mapping, not the `= -1` one." % unassigned_facts
+    )
