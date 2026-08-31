@@ -249,6 +249,9 @@ Stated because a reader will otherwise assume the master prompt's world:
   and DSAR lifecycle are not modelled in Odoo at all.
 - **Any DSAR erasure automation.** See `docs/pdp-compliance.md` §5 — it is a manual runbook, and
   that document says so in those words.
+- **`insight-portal`.** The dashboard does not exist yet; the box in §1 is where it attaches, and
+  contract 06 is the shape it will bind to. Nothing in this repository renders a chart today, so
+  the §6 "five views render" item is not merely untested — it is unbuilt.
 - **A workflow orchestrator.** ADR 0001 rejected Airflow and Dagster: the CDC consumer is a
   long-running process, and the only scheduled work is `dbt build` on an interval.
 
