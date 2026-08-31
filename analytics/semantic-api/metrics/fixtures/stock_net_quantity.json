@@ -5,22 +5,22 @@
   ],
   "rows": [
     {
+      "operating_unit_id": 1,
+      "value": -724.0
+    },
+    {
       "operating_unit_id": -1,
       "value": 900000.0
     },
     {
-      "operating_unit_id": 72,
+      "operating_unit_id": 2,
       "value": -869.0
-    },
-    {
-      "operating_unit_id": 71,
-      "value": -724.0
     }
   ],
   "meta": {
     "tenant_id": "bct",
     "row_count": 3,
-    "last_refreshed_at": "2026-08-31T01:15:23.733446+00:00",
+    "last_refreshed_at": "2026-08-31T02:00:24.772493+00:00",
     "is_stale": false,
     "refresh_sla_seconds": 300,
     "source_model": "mart_stock_position",

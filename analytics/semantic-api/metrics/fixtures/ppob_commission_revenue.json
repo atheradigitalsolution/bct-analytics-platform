@@ -88,12 +88,12 @@
   "meta": {
     "tenant_id": "bct",
     "row_count": 20,
-    "last_refreshed_at": "2026-08-31T01:15:23.733446+00:00",
+    "last_refreshed_at": "2026-08-31T02:00:24.772493+00:00",
     "is_stale": false,
     "refresh_sla_seconds": 60,
     "source_model": "mart_ppob_transaction",
     "unit": "IDR",
     "type": "decimal",
-    "query_duration_ms": 8.4
+    "query_duration_ms": 7.3
   }
 }
