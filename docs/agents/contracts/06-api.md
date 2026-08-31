@@ -133,9 +133,13 @@ whether the bug was its own.
 
 `SEMANTIC_API_POOL_MAX` defaults to **16**, derived from the warehouse's budget rather than chosen
 to make a symptom disappear: `max_connections` 40 − 3 `superuser_reserved_connections` = 37 usable,
-less ~8 for a dbt build, ~3 for `postgres_exporter`, 3 for the CDC loader, ~4 for operator/ad-hoc
-psql and ~3 margin. Raising it moves the cliff; it does not remove one. **The fix is that exceeding
-the ceiling now degrades correctly at any concurrency.**
+less 5 for a dbt build (`DBT_THREADS + 1`, **measured** by DWH through a full build; total peak
+concurrency was 10), ~3 for `postgres_exporter`, 3 for the CDC loader, ~4 for operator/ad-hoc psql
+and margin. Raising it moves the cliff; it does not remove one. **The fix is that exceeding the
+ceiling now degrades correctly at any concurrency**, and slack being larger than first estimated is
+not a reason to grow the pool. `analytics/warehouse/bin/warehouse_ctl.py verify` checks the total
+against the live `max_connections` and names each claimant, so oversubscription is caught rather
+than discovered as a 503.
 
 Clients should honour `Retry-After` rather than retrying immediately. A client-side concurrency cap
 (Frontend caps itself at four in flight) is a good neighbour policy, **not** a substitute for this:

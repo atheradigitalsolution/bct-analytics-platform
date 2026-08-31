@@ -41,7 +41,8 @@ DSN="$DSN dbname=${WAREHOUSE_DB} user=${WAREHOUSE_RLS_USER} password=${WAREHOUSE
 # MSYS_NO_PATHCONV is scoped to this one invocation, never exported (contract 04 section 11).
 # shellcheck disable=SC2086
 # Sized against the warehouse's connection budget, not against the current panel count:
-# max_connections 40 - 3 reserved = 37, less dbt ~8, exporter ~3, CDC 3, ad-hoc ~4, margin ~3.
+# max_connections 40 - 3 reserved = 37, less dbt 5 (measured: DBT_THREADS+1), exporter ~3,
+# CDC 3, ad-hoc psql ~4, margin. warehouse_ctl.py verify checks the total against the live limit.
 # Exceeding it QUEUES for the acquire timeout and then sheds a documented 503 (contract 06 s2);
 # it used to raise psycopg2 PoolError and surface as an undocumented 500.
 

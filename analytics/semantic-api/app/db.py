@@ -137,11 +137,23 @@ class Warehouse:
             max_connections               40
             superuser_reserved_connections 3   ->  37 usable
 
-        Allocated: dbt build ~8 (its thread count), postgres_exporter ~3, the CDC loader 3
-        (warehouse_loader held 3 when measured), operator/QA psql and ad-hoc ~4, and ~3 of margin.
-        37 - 8 - 3 - 3 - 4 - 3 = **16 for this service.** If any of those consumers changes, this
-        number is the thing to revisit, which is why the arithmetic is written down instead of the
-        answer alone.
+        Allocated: dbt build 5, postgres_exporter ~3, the CDC loader 3 (warehouse_loader held 3
+        when measured; three fixed connections at runner.py 229/413/444, not env-driven),
+        operator/QA psql and ad-hoc ~4, and margin. **16 for this service.**
+
+        The dbt figure is DWH's measurement, not an estimate: sampled through a full build,
+        ``warehouse`` peaked at 5 and total concurrency at 10. It is ``DBT_THREADS + 1``, and
+        ``DBT_THREADS`` is 4. My original budget said ~8, which was conservative in the right
+        direction but was never a real number - and a documented derivation containing a figure
+        nobody measured invites the next reader to re-derive from fiction. Corrected rather than
+        left because it happened to be safe.
+
+        **The conclusion does not change and 16 stands.** Slack being larger than believed is not
+        a reason to grow a pool: 40 concurrent already queues to zero shed. If any of these
+        consumers changes, this arithmetic is the thing to revisit, which is why it is written down
+        instead of the answer alone. DWH's ``warehouse_ctl.py verify`` now checks the total against
+        the live ``max_connections`` and names each claimant, so an oversubscription is caught
+        rather than discovered as a 503.
 
         Raising the ceiling is NOT the fix here and must not be mistaken for one -- it moves the
         cliff from ten panels to seventeen. The fix is that hitting the ceiling now degrades
