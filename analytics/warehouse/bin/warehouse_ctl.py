@@ -459,6 +459,37 @@ def _landing_ddl(odoo, wh, table: str) -> str:
         # table has an integer `id`, so the pk is always `id`.
         f"CREATE INDEX IF NOT EXISTS {table}_order_idx ON raw.{table} (_tenant_id, id, _lsn);",
         f"CREATE INDEX IF NOT EXISTS {table}_ingested_idx ON raw.{table} (_tenant_id, _ingested_at);",
+        # EXACTLY-ONCE LANDING, enforced by the storage layer rather than only
+        # by the loader. Logical replication is at-least-once: a consumer that
+        # dies between committing the warehouse transaction and sending
+        # feedback gets those changes redelivered. Backend now floors the
+        # stream at max(_lsn) already landed, but that is the loader policing
+        # itself; this makes the database refuse the second copy.
+        #
+        # PARTIAL, and the predicate is the whole point. A plain UNIQUE on
+        # (_tenant_id, id, _op, _lsn) would also forbid re-running a SNAPSHOT,
+        # because every fixture/backfill row carries _lsn '0/0' and a second
+        # full snapshot legitimately re-appends the same keys. ADR 0001
+        # requires the pipeline be re-seedable from snapshot, so that must stay
+        # possible. Measured before choosing: raw.res_partner today holds 47
+        # duplicate groups at '0/0' (re-runs, correct) and 2 above it (genuine
+        # redelivery, the incident). The predicate separates exactly those.
+        f"""DO $ux$
+BEGIN
+  BEGIN
+    CREATE UNIQUE INDEX IF NOT EXISTS {table}_cdc_change_uidx
+      ON raw.{table} (_tenant_id, id, _op, _lsn)
+      WHERE _lsn <> '0/0'::pg_lsn;
+  EXCEPTION WHEN unique_violation THEN
+    -- Do NOT fail the whole DDL run: a routine `make up-analytics` should not
+    -- break because of rows that landed before this control existed. But do
+    -- not pass silently either - the guarantee is absent for this table until
+    -- somebody removes the duplicates, and `warehouse_ctl.py verify` reports
+    -- it as missing every time it runs.
+    RAISE WARNING 'raw.{table}: exactly-once index NOT created - pre-existing duplicate CDC rows. Guarantee absent until they are removed; see warehouse_ctl.py verify.';
+  END;
+END
+$ux$;""",
     ]
     return "\n".join(ddl)
 
@@ -711,6 +742,35 @@ def cmd_verify(args) -> int:
         print(f"SECRET COLUMNS PRESENT IN raw: {leaked}", file=sys.stderr)
     else:
         print("OK  no `secret`-class column exists as a warehouse column")
+
+    # EXACTLY-ONCE COVERAGE. The partial unique index is created by
+    # gen-raw-ddl, but it cannot be created on a table that already holds
+    # duplicate CDC rows - and that failure is a WARNING there, so that a
+    # routine bring-up is not broken by rows which landed before the control
+    # existed. This is where the absence stops being a log line and becomes a
+    # reported gap, every run, until somebody clears the duplicates.
+    with wh.cursor() as cur:
+        cur.execute(
+            "SELECT t.tablename FROM pg_tables t WHERE t.schemaname = 'raw' "
+            "AND NOT EXISTS (SELECT 1 FROM pg_indexes i WHERE i.schemaname = 'raw' "
+            "  AND i.tablename = t.tablename AND i.indexname LIKE '%_cdc_change_uidx') "
+            "ORDER BY 1"
+        )
+        unprotected = [r[0] for r in cur.fetchall()]
+    if unprotected:
+        ok = False
+        print(
+            f"NO EXACTLY-ONCE INDEX on {len(unprotected)} raw table(s): {', '.join(unprotected)}",
+            file=sys.stderr,
+        )
+        print(
+            "  A redelivered CDC change can land twice on these. Logical replication is "
+            "at-least-once, so this is a real gap, not a theoretical one. Clear the duplicate "
+            "rows (see the query in the message above) and re-run gen-raw-ddl.",
+            file=sys.stderr,
+        )
+    else:
+        print("OK  every raw table refuses a redelivered CDC change at the storage layer")
     return 0 if ok else 5
 
 
