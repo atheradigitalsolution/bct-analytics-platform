@@ -202,6 +202,19 @@ def test_every_landed_column_is_classified(warehouse_up, cdc_warehouse, evidence
         "                WHERE p.source_table = c.table_name AND p.source_column = c.column_name) "
         "ORDER BY 1, 2;",
     )
+    # The subject set must be non-empty, or "nothing unclassified" is just "nothing". DWH found this
+    # exact shape in one of their own tests: an assertion whose subject could be empty, passing
+    # because there was nothing to find rather than because nothing was wrong.
+    landed = db.scalar(
+        cdc_warehouse,
+        "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'raw' "
+        "AND left(column_name, 1) <> '_';",
+    )
+    evidence.add("business columns present across raw.*", landed)
+    assert int(landed) > 100, (
+        "only %s business columns exist in raw.*; an empty landing zone would make this assertion "
+        "pass by having nothing to classify" % landed
+    )
     evidence.add(
         "landed columns with no classification row",
         "\n".join("%s.%s" % (t, c) for t, c in unclassified) or "none",

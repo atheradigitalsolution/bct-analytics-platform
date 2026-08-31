@@ -59,6 +59,19 @@ def test_reload_over_the_same_range_changes_nothing(warehouse_up, cdc_warehouse,
                   for t in TABLES),
     )
 
+    # An empty landing zone makes every checksum equal and the diff below trivially true. DWH found
+    # exactly this shape in one of their own tests -- a subject set that could be empty, passing
+    # because there was nothing to find. Guard it here rather than trust that it will not happen.
+    populated = [t for t in TABLES if int(before[t][1]) > 0]
+    evidence.add(
+        "tables with rows to compare",
+        "%d of %d: %s" % (len(populated), len(TABLES), ", ".join(populated) or "NONE"),
+    )
+    assert len(populated) >= 4, (
+        "only %d of the %d tables hold any rows, so an unchanged checksum is the absence of data "
+        "rather than idempotency: %r" % (len(populated), len(TABLES), populated)
+    )
+
     differing = [t for t in TABLES if before[t] != after[t]]
     evidence.add(
         "DIFF",
