@@ -1,30 +1,34 @@
 /**
- * Panels the brief asks for that no declared metric can answer in this build.
+ * Panels the brief asks for that no declared metric can answer.
  *
- * Every entry here is a panel that renders an explicit unavailable state naming the metric that
- * would be required. None of them is computed in this application, and none is approximated from a
- * metric that is merely nearby.
+ * Every entry renders an explicit unavailable state naming the metric that would be required.
+ * None is computed here, and none is approximated from a metric that is merely nearby.
  *
- * Two different reasons appear below and they are not interchangeable:
+ * Three reasons appear below and they are not interchangeable:
  *
- *   - `no_metric` — the figure is a legitimate thing to want, the warehouse may even hold the
- *     underlying rows, but contract 03 does not declare a metric for it. Deriving it here would be
- *     reimplementing business logic in TypeScript, which the brief forbids in as many words. It is
- *     a request to Backend, and it has been raised with the Lead.
- *   - `not_in_build` — the source does not exist at all. The operator chose a four-addon set, so
+ *   - `no_metric` - a legitimate figure to want, possibly with the rows sitting in the warehouse,
+ *     but contract 03 declares no metric for it. Deriving it here would be business logic
+ *     reimplemented in TypeScript, which the brief forbids in as many words.
+ *   - `not_in_build` - the source does not exist at all. The operator chose a four-addon set, so
  *     there are no Coretax/e-Faktur or PPh withholding modules and no data behind a tax summary.
- *     Fabricating one would be worse than an empty panel by a wide margin.
+ *   - `no_data` - the metric could exist and the model is there, but the warehouse does not hold
+ *     enough history for the figure to mean anything. Year-on-year is the case: the marts span
+ *     2025-09-01 to 2026-08-31, so no month has a prior-year counterpart and every value would be
+ *     null. Rendering an all-null chart would look like a broken panel rather than a stated limit.
  *
  * A ratio is called out wherever it is one, because "a ratio computed in a React component is a
- * brief violation" is the specific line this file exists to keep true.
+ * brief violation" is the specific line this file exists to keep true. Where Backend has since
+ * declared the ratio as a metric - `ppob_success_rate`, `revenue_mom_growth` - the panel renders
+ * from the semantic layer and the entry is gone from this file rather than being kept as a
+ * decorative caveat.
  */
 
-export type GapReason = "no_metric" | "not_in_build";
+export type GapReason = "no_metric" | "not_in_build" | "no_data";
 
 export interface MetricGap {
   /** What the brief asks for. */
   panel: string;
-  /** The metric name that would answer it, for the Lead to hand to Backend. */
+  /** The metric or model that would answer it, for the Lead to hand to Backend. */
   requires: string;
   reason: GapReason;
   /** Why this application does not produce the number itself. */
@@ -34,110 +38,102 @@ export interface MetricGap {
 export const GAPS: Record<string, MetricGap[]> = {
   overview: [
     {
-      panel: "Marjin kotor (gross margin)",
+      panel: "Marjin kotor",
       requires: "gross_margin",
       reason: "no_metric",
       detail:
-        "Margin is revenue minus cost of goods sold, and no metric exposes cost. Dividing revenue by anything available here would be a ratio computed in the client.",
+        "Marjin adalah pendapatan dikurangi harga pokok penjualan, dan tidak ada metrik yang memuat biaya. Membagi pendapatan dengan angka lain yang kebetulan tersedia di sini adalah rasio yang dihitung di klien.",
     },
     {
-      panel: "Umur piutang (AR ageing)",
+      panel: "Umur piutang",
       requires: "ar_ageing_bucket_amount",
       reason: "no_metric",
       detail:
-        "Ageing buckets are a function of due date and settlement, which live in account.move.line. No metric binds that model.",
+        "Ember umur piutang adalah fungsi tanggal jatuh tempo dan pelunasan. account_balance memuat payment_state tetapi bukan tanggal jatuh tempo, sehingga umur tidak dapat diturunkan darinya.",
     },
     {
-      panel: "Posisi kas (cash position)",
+      panel: "Posisi kas",
       requires: "cash_position",
       reason: "no_metric",
       detail:
-        "Requires bank and cash journal balances. No metric exposes account balances in this build.",
+        "Memerlukan saldo jurnal bank dan kas. account_balance memuat account_id tetapi warehouse tidak memiliki dim_account, sehingga tidak ada yang membedakan akun kas dari akun lain.",
     },
   ],
   sales: [
     {
-      panel: "Corong penjualan (sales funnel)",
+      panel: "Corong penjualan",
       requires: "sales_funnel_stage_count",
       reason: "no_metric",
       detail:
-        "A funnel needs stage counts (quotation to order to invoice to payment). sales_total and sales_untaxed differ only by tax, so presenting them as funnel stages would be a fabrication.",
+        "Corong memerlukan jumlah per tahap (penawaran, pesanan, faktur, pelunasan). sales_total dan sales_untaxed hanya berbeda pajak, jadi menyajikannya sebagai tahap corong adalah pemalsuan.",
     },
     {
-      panel: "Pertumbuhan tahun-ke-tahun (YoY growth %)",
+      panel: "Pertumbuhan tahun-ke-tahun (YoY)",
       requires: "revenue_yoy_growth",
-      reason: "no_metric",
+      reason: "no_data",
       detail:
-        "Both periods are shown side by side below, which is rendering. The growth percentage is a ratio and is not computed here.",
+        "Warehouse memuat 2025-09-01 sampai 2026-08-31. Tidak ada bulan yang memiliki pembanding bulan yang sama tahun sebelumnya, sehingga setiap nilai YoY akan null. Pertumbuhan bulanan (MoM) ditampilkan sebagai gantinya dan diberi label MoM.",
     },
   ],
   inventory: [
     {
-      panel: "Nilai persediaan (stock value)",
+      panel: "Nilai persediaan",
       requires: "stock_valuation",
       reason: "no_metric",
       detail:
-        "stock_net_quantity is a quantity in units. Multiplying it by a price fetched from somewhere else would be inventory valuation reimplemented in a React component.",
+        "stock_net_quantity adalah kuantitas dalam satuan. Mengalikannya dengan harga yang diambil dari tempat lain adalah penilaian persediaan yang ditulis ulang di dalam komponen React.",
     },
     {
-      panel: "Umur persediaan (stock ageing)",
+      panel: "Umur persediaan",
       requires: "stock_ageing_bucket_qty",
       reason: "no_metric",
       detail:
-        "mart_stock_position is a position and carries no date column, so age cannot be derived from it at all.",
+        "mart_stock_position adalah posisi dan tidak memuat kolom tanggal sama sekali, sehingga umur tidak dapat diturunkan darinya.",
     },
     {
-      panel: "Perputaran persediaan (turnover)",
+      panel: "Perputaran persediaan",
       requires: "stock_turnover_ratio",
       reason: "no_metric",
-      detail: "Turnover is cost of goods sold over average inventory: a ratio, and neither term is available.",
+      detail:
+        "Perputaran adalah harga pokok penjualan dibagi rata-rata persediaan: sebuah rasio, dan kedua sukunya tidak tersedia.",
     },
   ],
   finance: [
     {
-      panel: "Laba rugi (profit and loss)",
-      requires: "pnl_account_balance",
+      panel: "Pemisahan Laba Rugi dan Neraca",
+      requires: "dim_account (jenis akun), lalu pnl_account_balance / balance_sheet_account_balance",
       reason: "no_metric",
       detail:
-        "marts.fct_account_move_line exists in the warehouse, but no metric in contract 03 binds it and mart_account_move_line is not built. There is no declared figure to render.",
-    },
-    {
-      panel: "Neraca (balance sheet)",
-      requires: "balance_sheet_account_balance",
-      reason: "no_metric",
-      detail:
-        "Same source, same gap. A balance sheet assembled from raw journal lines here would be an accounting engine in the dashboard.",
+        "account_balance memberikan saldo buku besar per akun dan ditampilkan di bawah. Yang belum ada adalah JENIS akun: fct_account_move_line memuat account_id tetapi tidak memuat tipe akun, dan tidak ada dim_account, sehingga tidak ada yang membedakan akun pendapatan dari akun aset. Membagi dua laporan hanya berdasarkan nama akan menghasilkan dua judul dengan angka yang sama persis.",
     },
     {
       panel: "Ringkasan PPN dan PPh",
       requires: "ppn_output_tax, pph_withheld",
       reason: "not_in_build",
       detail:
-        "The operator chose a four-addon set. There are no Coretax/e-Faktur or PPh withholding modules in this build, so there is no tax data to summarise. This panel is deliberately empty rather than fabricated.",
+        "Operator memilih empat addon. Tidak ada modul Coretax/e-Faktur maupun pemotongan PPh pada build ini, sehingga tidak ada data pajak untuk diringkas. Panel ini sengaja dikosongkan, bukan dikarang.",
     },
   ],
-  ppob: [
-    {
-      panel: "Tingkat keberhasilan biller (biller success rate)",
-      requires: "ppob_success_rate",
-      reason: "no_metric",
-      detail:
-        "Successful transactions over total transactions is a ratio. The count per state is shown below, which is rendering the rows the semantic layer returned; the rate itself is not computed here.",
-    },
-  ],
+  ppob: [],
 };
 
 export function gapsFor(view: string): MetricGap[] {
   return GAPS[view] ?? [];
 }
 
-/** Every metric this application actually queries, for the Lead to check against contract 03. */
+/**
+ * Every metric this application queries, for the Lead to check against contract 03.
+ * All ten are declared in the live registry; the portal queries no figure that is not on this list.
+ */
 export const METRICS_CONSUMED: ReadonlyArray<string> = [
   "revenue_net",
+  "revenue_mom_growth",
   "sales_total",
   "sales_untaxed",
   "stock_net_quantity",
+  "account_balance",
   "ppob_transaction_count",
   "ppob_commission_revenue",
   "ppob_sla_breach_count",
+  "ppob_success_rate",
 ];

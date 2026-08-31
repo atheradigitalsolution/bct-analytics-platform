@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { formatDimension, formatValue } from "@/lib/format";
+import { formatDimension, formatMeasure } from "@/lib/format";
 import type { MetricGap } from "@/lib/gaps";
 import { exportHref, type PanelQuery } from "@/lib/panel";
 import type { QueryResult } from "@/lib/semantic";
@@ -103,10 +103,12 @@ export function Kpi({
   label,
   result,
   hint,
+  signed = false,
 }: {
   label: string;
   result: QueryResult;
   hint?: string;
+  signed?: boolean;
 }) {
   if (!result.ok) {
     return (
@@ -128,7 +130,7 @@ export function Kpi({
     >
       <p className="text-xs text-ink-2">{label}</p>
       <p className="tabular mt-1 text-xl font-semibold text-ink sm:text-2xl">
-        {value === null ? "—" : formatValue(value, result.data.meta.unit)}
+        {formatMeasure(value, result.data.meta, { signed })}
       </p>
       {hint === undefined ? null : <p className="mt-0.5 text-[11px] text-ink-3">{hint}</p>}
       <div className="mt-2">
@@ -180,6 +182,8 @@ export function MetricSection({
   const data = result.data;
   const dimension = data.dimensions[0];
   const unit = data.meta.unit;
+  const type = data.meta.type;
+  const signed = data.metric.endsWith("_growth");
   const label = seriesLabel ?? title;
 
   let plot: ReactNode = null;
@@ -189,14 +193,21 @@ export function MetricSection({
       value: row.value,
     }));
     plot = (
-      <TimeSeriesChart data={points} series={[{ key: "value", label }]} unit={unit} title={title} />
+      <TimeSeriesChart
+        data={points}
+        series={[{ key: "value", label }]}
+        unit={unit}
+        type={type}
+        signed={signed}
+        title={title}
+      />
     );
   } else if (chart === "category" && dimension !== undefined) {
     const points: CategoryPoint[] = data.rows.map((row) => ({
       label: formatDimension(dimension, row[dimension] ?? null),
       value: row.value,
     }));
-    plot = <CategoryBarChart data={points} unit={unit} title={title} />;
+    plot = <CategoryBarChart data={points} unit={unit} type={type} title={title} />;
   }
 
   return (
@@ -204,7 +215,7 @@ export function MetricSection({
       <figure className="m-0">
         {plot}
         <figcaption className="mt-2 text-xs text-ink-2">
-          {chartDescription(title, data.rows.length, dimension, unit)}
+          {chartDescription(title, data.rows.length, dimension, unit, type)}
         </figcaption>
       </figure>
       <div className="mt-2">
@@ -244,9 +255,10 @@ function chartDescription(
   rows: number,
   dimension: string | undefined,
   unit: string | null,
+  type: string,
 ): string {
   const by = dimension === undefined ? "" : " menurut " + dimension;
-  const unitText = unit === null ? "" : " dalam " + unit;
+  const unitText = unit === null ? (type === "percent" ? " dalam persen" : "") : " dalam " + unit;
   return (
     title +
     by +

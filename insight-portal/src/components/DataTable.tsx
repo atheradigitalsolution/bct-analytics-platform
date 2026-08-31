@@ -1,4 +1,4 @@
-import { dimensionLabel, formatDimension, formatValue } from "@/lib/format";
+import { dimensionLabel, formatDimension, formatMeasure } from "@/lib/format";
 import type { QueryResponse } from "@/lib/types";
 
 /**
@@ -25,6 +25,7 @@ export function DataTable({
 }) {
   const rows = data.rows.slice(0, max);
   const unit = data.meta.unit;
+  const signed = data.metric.endsWith("_growth");
   return (
     <div
       tabIndex={0}
@@ -69,7 +70,7 @@ export function DataTable({
                 </td>
               ))}
               <td className="tabular whitespace-nowrap px-2 py-1 text-right text-ink">
-                {formatValue(row.value, unit)}
+                {formatMeasure(row.value, data.meta, { signed })}
               </td>
             </tr>
           ))}

@@ -42,12 +42,25 @@ export interface QueryMeta {
 
 /**
  * One result row. Every requested dimension appears as a key; the measure is ALWAYS keyed `value`
+ *
+ * A dimension cell may be a BOOLEAN as well as a string or a number. Contract 06 section 2 shows
+ * only string and numeric dimensions, but `account_balance` declares `is_revenue_line`, and the
+ * warehouse returns it as a real JSON boolean. The guard rejected the whole response when it first
+ * met one, which took out every panel on the finance view at once - the right failure mode for a
+ * shape mismatch, and the reason the guard exists, but the shape is legitimate and the guard was
+ * the thing that was wrong.
  * (contract 06 §2), which is why every chart in this app binds to one key and never to a name it
  * has to look up.
+ *
+ * **`value` is nullable and the distinction is load-bearing.** `revenue_mom_growth` returns `null`
+ * for the first month of any window, because that month has no prior month to compare against.
+ * "No comparison" and "no growth" are different statements; the API refuses to conflate them, and
+ * so does this application. A chart plots a gap and a table prints an em dash - neither prints
+ * zero.
  */
 export interface QueryRow {
-  value: number;
-  [dimension: string]: string | number | null;
+  value: number | null;
+  [dimension: string]: string | number | boolean | null;
 }
 
 export interface QueryResponse {
@@ -118,10 +131,17 @@ export function isQueryMeta(value: unknown): value is QueryMeta {
 
 export function isQueryRow(value: unknown): value is QueryRow {
   if (!isRecord(value)) return false;
-  if (typeof value.value !== "number") return false;
+  if (typeof value.value !== "number" && value.value !== null) return false;
   for (const key of Object.keys(value)) {
     const cell = value[key];
-    if (cell !== null && typeof cell !== "string" && typeof cell !== "number") return false;
+    if (
+      cell !== null &&
+      typeof cell !== "string" &&
+      typeof cell !== "number" &&
+      typeof cell !== "boolean"
+    ) {
+      return false;
+    }
   }
   return true;
 }

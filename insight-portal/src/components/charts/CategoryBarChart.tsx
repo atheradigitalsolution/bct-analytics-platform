@@ -10,13 +10,13 @@ import {
   YAxis,
 } from "recharts";
 
-import { formatCompact, formatValue } from "@/lib/format";
+import { formatCompact, formatMeasure } from "@/lib/format";
 
 import { CHART } from "./chart-theme";
 
 export interface CategoryPoint {
   label: string;
-  value: number;
+  value: number | null;
 }
 
 /**
@@ -32,10 +32,12 @@ export interface CategoryPoint {
 export function CategoryBarChart({
   data,
   unit,
+  type = "decimal",
   title,
 }: {
   data: CategoryPoint[];
   unit: string | null;
+  type?: string;
   title: string;
 }) {
   const height = Math.max(160, data.length * 30 + 36);
@@ -56,7 +58,7 @@ export function CategoryBarChart({
             tick={{ fill: CHART.axis, fontSize: 11 }}
             tickLine={false}
             axisLine={{ stroke: CHART.grid }}
-            tickFormatter={(value: number) => formatCompact(value, unit)}
+            tickFormatter={(value: number) => formatCompact(value, unit, type)}
           />
           <YAxis
             type="category"
@@ -76,8 +78,11 @@ export function CategoryBarChart({
               color: CHART.text,
             }}
             labelStyle={{ color: CHART.textMuted }}
-            formatter={(value: number | string) =>
-              formatValue(typeof value === "number" ? value : Number(value), unit)
+            formatter={(value) =>
+              formatMeasure(
+                typeof value === "number" ? value : null,
+                { unit, type },
+              )
             }
           />
           <Bar

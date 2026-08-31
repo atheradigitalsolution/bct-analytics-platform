@@ -2,6 +2,7 @@ import "server-only";
 
 import { cacheGet, cacheKey, cacheSet } from "./cache";
 import { config } from "./config";
+import { limited } from "./limit";
 import { getAccessToken, getSession } from "./session";
 import {
   isApiErrorBody,
@@ -47,6 +48,14 @@ async function postJson(
   token: string,
   body: unknown,
 ): Promise<{ status: number; json: unknown }> {
+  return limited(() => postJsonUnlimited(path, token, body));
+}
+
+async function postJsonUnlimited(
+  path: string,
+  token: string,
+  body: unknown,
+): Promise<{ status: number; json: unknown }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.requestTimeoutMs);
   try {
@@ -70,6 +79,13 @@ async function postJson(
 }
 
 async function getJson(path: string, token: string): Promise<{ status: number; json: unknown }> {
+  return limited(() => getJsonUnlimited(path, token));
+}
+
+async function getJsonUnlimited(
+  path: string,
+  token: string,
+): Promise<{ status: number; json: unknown }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.requestTimeoutMs);
   try {

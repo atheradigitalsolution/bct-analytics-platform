@@ -21,6 +21,15 @@ const IDR_COMPACT = new Intl.NumberFormat("id-ID", {
 });
 
 const PLAIN = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
+const PERCENT = new Intl.NumberFormat("id-ID", {
+  style: "percent",
+  maximumFractionDigits: 1,
+  signDisplay: "exceptZero",
+});
+const PERCENT_PLAIN = new Intl.NumberFormat("id-ID", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
 const PLAIN_COMPACT = new Intl.NumberFormat("id-ID", {
   notation: "compact",
   maximumFractionDigits: 1,
@@ -33,7 +42,31 @@ export function formatValue(value: number, unit: string | null): string {
   return PLAIN.format(value);
 }
 
-export function formatCompact(value: number, unit: string | null): string {
+/**
+ * Format a measure using BOTH `meta.unit` and `meta.type`.
+ *
+ * `percent` metrics carry `unit: null`, so unit alone cannot tell a rate from a count: rendering
+ * `ppob_success_rate` as "0,98" instead of "98,4%" is the kind of quiet misreading that survives
+ * review. `signDisplay: "exceptZero"` is used only for growth, where the sign IS the reading.
+ *
+ * A null measure prints an em dash. `revenue_mom_growth` returns null for the first month of a
+ * window because there is no prior month; printing 0 there would assert flat growth that nobody
+ * measured.
+ */
+export function formatMeasure(
+  value: number | null,
+  meta: { unit: string | null; type: string },
+  options: { signed?: boolean } = {},
+): string {
+  if (value === null) return "—";
+  if (meta.type === "percent") {
+    return options.signed === true ? PERCENT.format(value) : PERCENT_PLAIN.format(value);
+  }
+  return formatValue(value, meta.unit);
+}
+
+export function formatCompact(value: number, unit: string | null, type?: string): string {
+  if (type === "percent") return PERCENT_PLAIN.format(value);
   if (unit === "IDR") return IDR_COMPACT.format(value);
   return PLAIN_COMPACT.format(value);
 }
@@ -84,8 +117,11 @@ export function formatRefreshedAt(value: string | null): string {
 
 /** "60 detik" / "15 menit" / "60 menit". Describes the SLA the API reported; derives nothing. */
 export function formatSla(seconds: number): string {
-  if (seconds < 60) return seconds + " detik";
-  if (seconds % 3600 === 0 && seconds >= 3600) return seconds / 3600 + " jam";
+  if (seconds >= 3600 && seconds % 3600 === 0) return seconds / 3600 + " jam";
+  // Below two minutes the number of seconds IS the story. PPOB's SLA is 60 s and rendering it as
+  // "1 menit" made the tightest SLA in the platform read like the loosest unit of measurement -
+  // which is exactly the distinction ADR 0001 spends a table making.
+  if (seconds < 120) return seconds + " detik";
   return Math.round(seconds / 60) + " menit";
 }
 
@@ -103,7 +139,34 @@ const DIMENSION_LABELS: Record<string, string> = {
   biller_code: "Kode Biller",
   biller_category: "Kategori Biller",
   state: "Status",
+  account_id: "Akun",
+  move_type: "Jenis Jurnal",
+  payment_state: "Status Pembayaran",
+  is_revenue_line: "Baris Pendapatan",
   value: "Nilai",
+};
+
+/**
+ * Odoo journal entry types, spelled out. The raw codes are what the warehouse stores and what the
+ * export contains; the screen shows them expanded so a reader does not have to know the schema.
+ */
+const MOVE_TYPES: Record<string, string> = {
+  entry: "Jurnal umum",
+  out_invoice: "Faktur pelanggan",
+  out_refund: "Nota kredit pelanggan",
+  in_invoice: "Tagihan pemasok",
+  in_refund: "Nota kredit pemasok",
+  out_receipt: "Kuitansi penjualan",
+  in_receipt: "Kuitansi pembelian",
+};
+
+const PAYMENT_STATES: Record<string, string> = {
+  not_paid: "Belum dibayar",
+  in_payment: "Dalam proses",
+  paid: "Lunas",
+  partial: "Sebagian",
+  reversed: "Dibalik",
+  invoicing_legacy: "Legacy",
 };
 
 export function dimensionLabel(name: string): string {
@@ -116,10 +179,24 @@ export function dimensionLabel(name: string): string {
  * `operating_unit_id === -1` is the explicit UNASSIGNED member of `dim_operating_unit`, not a
  * missing value, and it is labelled as such so a viewer does not read it as a bug.
  */
-export function formatDimension(dimension: string, value: string | number | null): string {
+export function formatDimension(
+  dimension: string,
+  value: string | number | boolean | null,
+): string {
   if (value === null) return "—";
   if (dimension === "operating_unit_id" && value === -1) return "Tanpa Operating Unit";
   if (dimension === "date_month" && typeof value === "string") return formatMonth(value);
   if (dimension === "date_day" && typeof value === "string") return formatDay(value);
+  if (dimension === "move_type" && typeof value === "string") {
+    return MOVE_TYPES[value] ?? value;
+  }
+  if (dimension === "payment_state" && typeof value === "string") {
+    return PAYMENT_STATES[value] ?? value;
+  }
+  if (dimension === "is_revenue_line") {
+    if (value === true || value === "true" || value === 1) return "Ya";
+    if (value === false || value === "false" || value === 0) return "Tidak";
+  }
+  if (dimension === "account_id") return "Akun " + String(value);
   return String(value);
 }

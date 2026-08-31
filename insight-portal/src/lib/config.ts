@@ -32,6 +32,8 @@ export const config = {
   sessionCookieName: env("INSIGHT_PORTAL_SESSION_COOKIE_NAME", "insight_portal_session"),
   refreshCookieName: env("INSIGHT_PORTAL_REFRESH_COOKIE_NAME", "insight_portal_refresh"),
   filtersCookieName: env("INSIGHT_PORTAL_FILTERS_COOKIE_NAME", "insight_portal_filters"),
+  /** The gateway's own refresh cookie name, so logout can spend it upstream. */
+  gatewayRefreshCookieName: env("INSIGHT_PORTAL_GATEWAY_REFRESH_COOKIE_NAME", "bct_refresh"),
   /** `false` only for plain-HTTP local development; the compose overlay leaves it at the default. */
   cookieSecure: env("INSIGHT_PORTAL_COOKIE_SECURE", "false") === "true",
   /** Upstream request timeout in ms. A hung warehouse must not hang the dashboard. */

@@ -32,13 +32,17 @@ export function Freshness({ meta, compact = false }: { meta: QueryMeta; compact?
         <span aria-hidden="true">{stale ? "▲" : "●"}</span>
         <span>{stale ? "Basi" : "Segar"}</span>
       </span>
-      <span className="text-ink-3">
-        Diperbarui {formatRefreshedAt(meta.last_refreshed_at)}
-      </span>
-      <span className="text-ink-3">· SLA {formatSla(meta.refresh_sla_seconds)}</span>
-      <span className="text-ink-3">· {meta.source_model}</span>
+      {/*
+        Each of these is ONE interpolated string rather than a literal next to an expression.
+        React separates adjacent text nodes with an HTML comment, so `SLA {value}` renders as
+        `SLA <!-- -->60 detik` - which reads correctly on screen but breaks find-in-page, breaks
+        copy-paste of the timestamp, and is not the contiguous text a screen reader announces.
+      */}
+      <span className="text-ink-3">{"Diperbarui " + formatRefreshedAt(meta.last_refreshed_at)}</span>
+      <span className="text-ink-3">{"· SLA " + formatSla(meta.refresh_sla_seconds)}</span>
+      <span className="text-ink-3">{"· " + meta.source_model}</span>
       {meta.note === undefined ? null : (
-        <span style={{ color: "var(--status-warning)" }}>· {meta.note}</span>
+        <span style={{ color: "var(--status-warning)" }}>{"· " + meta.note}</span>
       )}
     </p>
   );
@@ -78,11 +82,14 @@ export function FreshnessSummary({ metas }: { metas: QueryMeta[] }) {
           {isStale ? `${stale.length} dari ${metas.length} panel basi` : "Semua panel segar"}
         </span>
         <span className="text-ink-2">
-          Data tertua dalam tampilan ini: {formatRefreshedAt(oldest.last_refreshed_at)}
+          {"Data tertua dalam tampilan ini: " + formatRefreshedAt(oldest.last_refreshed_at)}
         </span>
         <span className="text-ink-3">
-          · SLA paling ketat di sini: {formatSla(tightest.refresh_sla_seconds)} (
-          {tightest.source_model})
+          {"· SLA paling ketat di sini: " +
+            formatSla(tightest.refresh_sla_seconds) +
+            " (" +
+            tightest.source_model +
+            ")"}
         </span>
       </p>
       <p className="mt-1 text-ink-3">

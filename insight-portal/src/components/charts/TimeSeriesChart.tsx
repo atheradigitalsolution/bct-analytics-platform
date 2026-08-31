@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { formatCompact, formatValue } from "@/lib/format";
+import { formatCompact, formatMeasure } from "@/lib/format";
 
 import { CHART, DASH } from "./chart-theme";
 import { ChartLegend, type SeriesSpec } from "./Legend";
@@ -39,11 +39,15 @@ export function TimeSeriesChart({
   data,
   series,
   unit,
+  type = "decimal",
+  signed = false,
   title,
 }: {
   data: TimePoint[];
   series: SeriesSpec[];
   unit: string | null;
+  type?: string;
+  signed?: boolean;
   title: string;
 }) {
   return (
@@ -72,7 +76,7 @@ export function TimeSeriesChart({
               tickLine={false}
               axisLine={false}
               width={56}
-              tickFormatter={(value: number) => formatCompact(value, unit)}
+              tickFormatter={(value: number) => formatCompact(value, unit, type)}
             />
             <Tooltip
               cursor={{ stroke: CHART.border, strokeWidth: 1 }}
@@ -84,8 +88,12 @@ export function TimeSeriesChart({
                 color: CHART.text,
               }}
               labelStyle={{ color: CHART.textMuted }}
-              formatter={(value: number | string) =>
-                formatValue(typeof value === "number" ? value : Number(value), unit)
+              formatter={(value) =>
+                formatMeasure(
+                  typeof value === "number" ? value : null,
+                  { unit, type },
+                  { signed },
+                )
               }
             />
             {series.map((entry, index) => (
