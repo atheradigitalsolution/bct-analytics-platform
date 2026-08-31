@@ -1024,3 +1024,53 @@ DWH's closing note, unprompted and agreeing with Backend's own: *"Backend's most
 prose, not code — three comments asserting the duplication had 'no legitimate cause' sent me searching
 my own snapshots for a fixture artefact before I could rule it out. The code was fine. A comment can
 be the defect."*
+
+### The pool fix — a branch that had never executed, found by applying the standing rule to itself
+
+Backend reproduced Frontend's finding before changing anything: `200 x 248, 500 x 52` with
+`{"error":"query_failed","detail":"PoolError"}`, and `bct_semantic_pool_guard_trips` at `0`
+throughout, confirming it was never T-1.
+
+**Decision: queue, then shed, in that order — neither alone is defensible.** Queue-only turns a
+saturated service into a hung one. Shed-only turns a 15 ms burst into user-visible failure; ten
+panels against sixteen connections is a burst, not overload. The implementation detail matters:
+psycopg2's `getconn` does **not** block, it raises the instant `used == maxconn`, so the wait is a
+`BoundedSemaphore` held across the whole checkout — which makes `PoolError` **structurally
+unreachable rather than merely caught.**
+
+Sizing was derived against the database, not the symptom: `max_connections` 40 − 3 reserved = 37,
+less dbt ~8, exporter ~3, CDC 3 (measured), operator ~4, margin ~3 = **16**. The arithmetic lives in
+`Warehouse.__init__` so it can be re-derived. Backend was explicit that this is not the fix:
+*"raising the ceiling moves the cliff from ten panels to seventeen."*
+
+**Then the part worth keeping.** After the fix, 240 requests at **40 concurrent** — 2.5× the new
+ceiling — returned `200 x 240, 144 queued, 0 shed`. Backend read that correctly: **the shed branch
+had never once executed**, so by the standing rule it was not known to work. It forced the branch on
+a throwaway instance under a documented configuration (`maxconn=2`, timeout 1 ms, 60 concurrent):
+`503 x 49, 200 x 11, 500 x 0`, `Retry-After: 1`.
+
+A green load test that never reaches the failure path is not evidence about the failure path. Backend
+applied the rule to its own fix without being asked.
+
+**One thing the Lead's brief did not name, found by Backend:** `read_freshness` is a **second** pool
+checkout per request and sat outside the handler. Left alone, the fix would have been half-done —
+the query succeeds, freshness cannot get a connection, and the caller gets an unhandled 500 for a
+request whose data was already in hand.
+
+Verified by the Lead: `bct_semantic_pool_max_connections 16.0`, `waits_total` and `shed_total` live,
+contract 06 §2 carrying the `503` row and the queue-then-shed rule.
+
+### Two more probes that could not have returned the right answer
+
+- **Backend's `Retry-After: None`.** `dict(e.headers)` destroys the case-insensitivity of an
+  `email.Message`; the wire carries lowercase `retry-after` and the header was there all along. It
+  was one step from reporting the header missing, and re-measured **before** reporting rather than
+  after. Same family as instance 7 and the Lead's exporter-port probe — now five occurrences across
+  four agents.
+- **`bash -n` again.** Backend broke `semantic-run.sh` twice with comments inside a
+  backslash-continued `docker run` — the second time *after* documenting that exact mistake in its
+  own previous commit message. `bash -n` passes on both forms. ~1 minute of downtime, self-reported:
+  *"an unrecorded self-inflicted outage is worse than a recorded one."*
+
+That second one is the more useful entry. Knowing about a trap, having just written it down, did not
+prevent repeating it — which is an argument for a **check**, not for more documentation.
