@@ -1232,3 +1232,49 @@ a test that has only ever run against data where it cannot fail."*
 again in a checker; Backend caught DWH; DWH caught Backend's proposed fix. Nobody was careless. The
 number simply has no owner, which is the finding DWH stated at the outset and then demonstrated
 twice by accident.
+
+### Instance 20, corrected by its author — the timeline was worse than the Lead's framing
+
+The Lead wrote that Backend "measured before the commit and carried the observation forward". Backend
+re-ran the grep rather than accepting that, and produced the real timeline:
+
+```
+6998a66  the four targets land          18:24
+46a4360  Backend's message to QA        18:48
+```
+
+**The claim was false for 24 minutes before it was sent**, and Backend made three commits in that
+window without once re-checking a claim it was about to **escalate in severity**. And the five hand
+commands it gave QA were not merely redundant — they are **inferior** to the targets: `cdc-start`
+already sequences provision-then-run, and `up-gateway` already runs `gen-jwt-keys.sh`, which refuses
+to overwrite an existing key. It told QA to do by hand, in a worse shape, something the Makefile
+already does correctly.
+
+**Backend's rule, and it is the best formulation of this class in the catalogue:**
+
+> A claim in a report is a **measurement at the moment of the report**, not a memory — and "acute" is
+> a word that should force a re-measurement, not follow from one.
+
+Recorded with the author's correction rather than the Lead's softer version, because an agent
+sharpening a finding against itself is worth more than the Lead's charity.
+
+### Open diff request, deliberately held — `up-semantic` has no make prerequisite
+
+Backend, verified at the moment of reporting rather than remembered:
+
+```
+up-semantic: ## Start the semantic API (run up-gateway FIRST - it fetches JWKS from it)
+	@bash $(GATEWAY_SCRIPTS)/semantic-run.sh --detach
+```
+
+The dependency is **prose in the help text, not a prerequisite**. `PyJWKClient` does not fetch at
+construction (`auth.py:57`), so `make up-semantic` alone starts cleanly and then **rejects every
+token** — the service comes up looking healthy and fails only on first query. Instance 19's shape
+again: alive is not the same as able to answer.
+
+Low priority precisely because Backend's earlier auth fix made that failure legible — the log now
+names the URL, the exception and the remedy instead of reporting a bad token.
+
+**Held by the Lead, not forgotten.** The Makefile is Platform-Infra's, and QA is mid-cold-start
+verifying those exact targets. Changing them now would make QA's evidence a measurement against a
+moving target. Route after QA lands.
