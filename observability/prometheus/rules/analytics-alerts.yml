@@ -95,6 +95,17 @@ groups:
   # =========================================================================
   - name: analytics-freshness
     rules:
+      # `for: 2m` on a 60-second SLA, and NOT lengthened to ride out a planned
+      # rebuild. It was tempting: a cold start does make this fire. But the
+      # same longer `for:` would delay a REAL PPOB outage by the same amount,
+      # and PPOB is the one mart ADR 0001 deliberately gave the tightest SLA
+      # and a page. The right operational answer to a planned rebuild is a
+      # silence with an end time, not a permanently slower page.
+      #
+      # Verified firing rather than assumed: with pipeline_state an hour stale,
+      # this reached `pending` with 4 instances, all severity=critical,
+      # on_breach=page. Before the on_breach label existed it matched nothing
+      # and could never have fired at all.
       - alert: MartStalePage
         expr: bct_warehouse_mart_stale{on_breach="page"} == 1
         for: 2m
@@ -121,6 +132,36 @@ groups:
             dashboard is already showing meta.is_stale for it - both read the same
             warehouse.mart_freshness view, so an operator and a user are looking at one
             number rather than two that can disagree.
+
+      - alert: WarehouseFreshnessUnknown
+        # THE GAP THE OTHER TWO CANNOT COVER, and it is the one a cold start
+        # creates. warehouse.mart_freshness JOINs pipeline_state, so when a
+        # re-seed clears that table the freshness series do not go HIGH - they
+        # go ABSENT. MartStalePage and MartStaleAlert are then silent, and a
+        # rebuild that stalls halfway looks exactly like a rebuild that is
+        # going fine.
+        #
+        # Guarded on the exporter being up, so this is "the warehouse cannot
+        # say how fresh it is" rather than "monitoring is down" - the latter is
+        # WarehouseExporterDown and deserves its own name.
+        #
+        # 30m, deliberately: long enough for a full cold start on this hardware
+        # (teardown, module install, seed, backfill, dbt build) to complete
+        # without paging, short enough that a stalled one is noticed.
+        expr: |
+          absent(bct_warehouse_mart_stale) and on() (up{job="warehouse-exporter"} == 1)
+        for: 30m
+        labels:
+          severity: warning
+          component: warehouse
+        annotations:
+          summary: "The warehouse cannot report freshness for any mart"
+          description: >-
+            warehouse.mart_freshness is returning no rows, which means
+            warehouse.pipeline_state is empty. During a deliberate re-seed that is
+            expected and clears itself; after 30 minutes it means the backfill has not
+            finished or has not started. Note that MartStalePage and MartStaleAlert are
+            BLIND in this state - they alert on a stale value, and there is no value.
 
       - alert: PipelineNeverSucceeded
         # -1 is the exporter's sentinel for "last_success_at is NULL". A mart
