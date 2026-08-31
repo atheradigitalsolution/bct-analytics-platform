@@ -979,3 +979,48 @@ The container running **in the compose stack** (measured against the standalone 
 **fresh-clone build** (all evidence is from the working tree — and given instance 1, that distinction
 is exactly the one this build keeps punishing); `is_profit_and_loss = NULL` against live data; silent
 token refresh; type-checking of `tests/**`; and CSP, which is Security's.
+
+### An agent correcting a peer's specification — the partial unique index
+
+Backend asked DWH for `UNIQUE (_tenant_id, id, _op, _lsn)` on the raw tables, to move exactly-once
+landing from the loader into the storage layer. **DWH found the literal request would break a
+documented ADR requirement and built the correct form instead** (`2af19f9`).
+
+A plain unique constraint also forbids **re-running a snapshot**. Every fixture and backfill row
+carries `_lsn '0/0'`, and a second full snapshot legitimately re-appends the same keys — ADR 0001
+requires the pipeline be re-seedable from snapshot. DWH measured before choosing rather than
+reasoning about it:
+
+```
+raw.res_partner duplicate groups at _lsn =  '0/0' : 47   <- snapshot re-runs, CORRECT
+raw.res_partner duplicate groups at _lsn <> '0/0' :  2   <- genuine redelivery, the incident
+```
+
+`WHERE _lsn <> '0/0'::pg_lsn` separates exactly those two populations. Verified by the Lead: **16 of
+16 raw tables carry the index, all 16 partial; real-LSN duplicates now 0; the 47 snapshot duplicates
+intact.** Both halves are the point — a plain index would have shown 0 and 0, and the second zero
+would have been a regression wearing the costume of a fix.
+
+Proven in both directions: a CDC change at a fresh LSN inserts, the same change again raises
+`duplicate key value violates unique constraint`, and a re-run snapshot row at `'0/0'` still inserts.
+
+**"Tolerant creation, intolerant reporting"** is the design worth copying. A pre-existing duplicate
+makes index creation **warn** rather than fail, so a routine `make up-analytics` does not break over
+rows that landed before the control existed — but `verify` now reports any unprotected raw table and
+**exits non-zero**. That converts a log line into a gate, and it named `res_partner` on every run
+until the cause was cleared.
+
+DWH then removed Backend's two rows, and the change of justification is the interesting part.
+Backend had declined to delete them — *"a write into another agent's data to make a number look
+nicer"* — which was correct **at the time**. Once the index existed, those rows were the only thing
+preventing a structural guarantee on that table. Byte-identity confirmed first
+(`distinct_payloads = 1` for both groups), only the later copy of each pair removed, and `dim_partner`
+unchanged at 48 current rows — which is the proof that nothing but redundancy went.
+
+**Two agents reached opposite correct conclusions about the same rows because the surrounding
+guarantees changed.** Neither was wrong.
+
+DWH's closing note, unprompted and agreeing with Backend's own: *"Backend's most expensive defect was
+prose, not code — three comments asserting the duplication had 'no legitimate cause' sent me searching
+my own snapshots for a fixture artefact before I could rule it out. The code was fine. A comment can
+be the defect."*
