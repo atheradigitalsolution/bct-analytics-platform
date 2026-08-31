@@ -51,8 +51,26 @@ if db_initialised "$DB" && [ "$FORCE" -eq 0 ]; then
     info "re-run with --force to update modules: $MODULES"
 else
     if db_initialised "$DB"; then
-        log "updating modules in '$DB': $MODULES"
-        ODOO_ARGS=(-d "$DB" -u "$MODULES")
+        # -u only UPGRADES modules that are already installed; on a module that
+        # is merely present in addons_path it is a silent no-op. Using -u alone
+        # here meant `make install-modules` could not install anything - it
+        # reported success and changed nothing, which is how five custom modules
+        # stayed `uninstalled` through a recovery that looked clean.
+        #
+        # So split the list: -i for what is not installed yet, -u for what is.
+        # Odoo accepts both flags in one run.
+        WANT="$(printf '%s' "$MODULES" | tr ',' ' ')"
+        PRESENT="$(psql_super "$DB" -tAc "SELECT string_agg(name, ' ') FROM ir_module_module WHERE state = 'installed'" 2>/dev/null || true)"
+        TO_INSTALL=""; TO_UPGRADE=""
+        for m in $WANT; do
+            case " $PRESENT " in
+                *" $m "*) TO_UPGRADE="${TO_UPGRADE:+$TO_UPGRADE,}$m" ;;
+                *)        TO_INSTALL="${TO_INSTALL:+$TO_INSTALL,}$m" ;;
+            esac
+        done
+        ODOO_ARGS=(-d "$DB")
+        [ -n "$TO_INSTALL" ] && { log "installing (not yet present): $TO_INSTALL"; ODOO_ARGS+=(-i "$TO_INSTALL"); }
+        [ -n "$TO_UPGRADE" ] && { log "upgrading (already installed): $TO_UPGRADE"; ODOO_ARGS+=(-u "$TO_UPGRADE"); }
     else
         log "initialising database '$DB' with modules: $MODULES"
         # Odoo creates the database itself, with the encoding and LC_COLLATE it
@@ -107,6 +125,15 @@ else
 
     [ "$odoo_rc" -eq 0 ] || die "odoo exited $odoo_rc during '${ODOO_ARGS[*]}'. See the traceback above."
     db_initialised "$DB" || die "odoo exited 0 but '$DB' has no ir_module_module — check 'make logs'."
+
+    # Assert the outcome, not the exit code. `odoo -u` on an absent module exits
+    # 0 having done nothing; without this check that reads as success.
+    NOT_INSTALLED=""
+    for m in $(printf '%s' "$MODULES" | tr ',' ' '); do
+        st="$(psql_super "$DB" -tAc "SELECT state FROM ir_module_module WHERE name = '$m'" 2>/dev/null || true)"
+        [ "$st" = "installed" ] || NOT_INSTALLED="${NOT_INSTALLED:+$NOT_INSTALLED }$m(${st:-absent})"
+    done
+    [ -z "$NOT_INSTALLED" ] || die "odoo exited 0 but these are not installed: $NOT_INSTALLED"
     log "database '$DB' modules applied: $MODULES"
 fi
 
