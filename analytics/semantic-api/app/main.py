@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 
 from .auth import TokenRejected, Verifier
 from .compiler import QueryRejected, compile_query
-from .db import PoolGuardTripped, TenantScopeError, Warehouse
+from .db import PoolExhausted, PoolGuardTripped, TenantScopeError, Warehouse
 from .freshness import read_freshness
 from .registry import load_registry
 
@@ -54,6 +54,26 @@ POOL_GUARD_TRIPS = Gauge(
     "bct_semantic_pool_guard_trips",
     "Times a pooled connection was checked out carrying a stale tenant scope (finding T-1). "
     "Should be 0 forever; a non-zero value means the SET LOCAL discipline was bypassed.",
+)
+POOL_WAITS = Gauge(
+    "bct_semantic_pool_waits_total",
+    "Requests that had to QUEUE for a warehouse connection and then got one. This is the pool "
+    "absorbing a burst, which is the designed behaviour -- non-zero here is healthy. Compare "
+    "against bct_semantic_pool_shed_total: waits rising with shed flat means the timeout is doing "
+    "its job; both rising means real saturation.",
+)
+POOL_SHED = Gauge(
+    "bct_semantic_pool_shed_total",
+    "Requests SHED with 503 overloaded because no connection freed within the acquire timeout. "
+    "Distinct from bct_semantic_pool_guard_trips, which is the T-1 scope guard and unrelated: "
+    "during the incident that motivated this metric, guard_trips was 0 while 52 of 300 requests "
+    "failed. A sustained non-zero value means SEMANTIC_API_POOL_MAX is too low for real demand; a "
+    "brief spike means a burst exceeded the queue timeout.",
+)
+POOL_MAX = Gauge(
+    "bct_semantic_pool_max_connections",
+    "Configured ceiling on concurrent warehouse connections for this service. Exported so the "
+    "saturation metrics can be read against the limit they are relative to.",
 )
 
 #: Contract 02's scope-violation body, verbatim. Not built from a template: this exact JSON is what
@@ -117,6 +137,9 @@ def create_app(warehouse=None, verifier=None, registry=None, max_limit=None) -> 
     @router.get("/metrics")
     def prometheus_metrics():
         POOL_GUARD_TRIPS.set(warehouse.guard_trips)
+        POOL_WAITS.set(getattr(warehouse, "waits", 0))
+        POOL_SHED.set(getattr(warehouse, "shed", 0))
+        POOL_MAX.set(getattr(warehouse, "maxconn", 0))
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     @router.get("/v1/metrics")
@@ -188,6 +211,16 @@ def create_app(warehouse=None, verifier=None, registry=None, max_limit=None) -> 
 
         try:
             rows = warehouse.fetch_all(session.tenant_id, statement, params)
+        except PoolExhausted as exc:
+            # Saturation, not breakage. Ordered ahead of the generic handler deliberately: this
+            # used to fall through to it and the caller got 500 query_failed, which tells a client
+            # "stop, the server is broken" when the truth was "come back in a moment".
+            QUERY_TOTAL.labels(metric=metric.name, status="503").inc()
+            return JSONResponse(
+                {"error": "overloaded", "detail": str(exc), "retry_after": exc.retry_after},
+                503,
+                headers={"Retry-After": str(exc.retry_after)},
+            )
         except PoolGuardTripped:
             QUERY_TOTAL.labels(metric=metric.name, status="503").inc()
             return JSONResponse(
@@ -204,7 +237,20 @@ def create_app(warehouse=None, verifier=None, registry=None, max_limit=None) -> 
                 {"error": "query_failed", "detail": exc.__class__.__name__}, 500
             )
 
-        freshness = read_freshness(warehouse, session.tenant_id, metric.source_model)
+        # SECOND checkout of the request, and it must shed the same way as the first. Leaving it
+        # outside the handler above would have kept the exact bug this change is about: the query
+        # succeeds, freshness cannot get a connection, and the caller gets an unhandled 500 for a
+        # request whose data was already in hand. Every path that touches the pool returns the
+        # documented response, or the contract is only true of the path someone remembered.
+        try:
+            freshness = read_freshness(warehouse, session.tenant_id, metric.source_model)
+        except PoolExhausted as exc:
+            QUERY_TOTAL.labels(metric=metric.name, status="503").inc()
+            return JSONResponse(
+                {"error": "overloaded", "detail": str(exc), "retry_after": exc.retry_after},
+                503,
+                headers={"Retry-After": str(exc.retry_after)},
+            )
         if freshness.get("is_stale"):
             STALE_TOTAL.labels(metric=metric.name).inc()
 

@@ -47,7 +47,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import threading
+import time
 
 import psycopg2
 import psycopg2.extras
@@ -67,14 +69,112 @@ class PoolGuardTripped(RuntimeError):
     """A pooled connection carried a tenant scope on checkout. Fail closed, never reuse."""
 
 
+class PoolExhausted(RuntimeError):
+    """Every connection is busy and one did not free up within the acquire timeout.
+
+    This is **saturation, not breakage**, and the distinction is the whole point of this class
+    existing. Before it, psycopg2's ``PoolError`` fell through to a generic handler and the caller
+    got a bare ``500 query_failed``. A 500 tells a caller "this server is broken, stop"; the truth
+    was "every connection is busy for the next few milliseconds, come back". Callers behave
+    completely differently under those two contracts, and Frontend had to spend time deciding
+    whether the bug was its own before it could report this.
+
+    Reproduced before it was fixed, with Frontend's recipe (a ten-panel PPOB view, cache disabled,
+    10 concurrent queries, 300 requests): **52 x 500 PoolError**, while
+    ``bct_semantic_pool_guard_trips`` stayed at 0 -- proving it was never the T-1 scope guard.
+    """
+
+    #: Seconds to advertise in ``Retry-After``. Deliberately small: the queries that saturate this
+    #: pool take milliseconds, so the honest advice is "almost immediately", not a punitive backoff.
+    retry_after = 1
+
+
+def _acquire_slot(warehouse):
+    """Wait for a free connection slot. Return the seconds waited, or raise :class:`PoolExhausted`.
+
+    Returns 0.0 when a slot was free immediately, which is the overwhelmingly common case and the
+    one that must stay free of overhead: ``acquire(blocking=False)`` first, and only then the
+    timed wait.
+    """
+    if warehouse._slots.acquire(blocking=False):
+        return 0.0
+    started = time.time()
+    if warehouse._slots.acquire(timeout=warehouse.acquire_timeout_s):
+        waited = time.time() - started
+        with warehouse._lock:
+            warehouse.waits += 1
+        return waited
+    with warehouse._lock:
+        warehouse.shed += 1
+    _logger.warning(
+        "pool saturated: all %d connections busy for %.0f ms; shedding this request with 503 "
+        "rather than reporting it as a server fault. This is backpressure, not breakage -- if it "
+        "is sustained rather than bursty, SEMANTIC_API_POOL_MAX is the knob, and it is sized "
+        "against the warehouse's max_connections budget (see Warehouse.__init__).",
+        warehouse.maxconn, warehouse.acquire_timeout_s * 1000.0,
+    )
+    raise PoolExhausted(
+        "All %d warehouse connections are busy and none freed within %.0f ms."
+        % (warehouse.maxconn, warehouse.acquire_timeout_s * 1000.0)
+    )
+
+
+def m_wait_observe(warehouse, waited):
+    """Record a non-zero queue wait. Split out so the fast path calls nothing at all."""
+    _logger.debug("waited %.1f ms for a warehouse connection", waited * 1000.0)
+
+
 class Warehouse:
     """A read-only, tenant-scoped connection pool over the warehouse."""
 
-    def __init__(self, dsn, minconn=1, maxconn=8, statement_timeout_ms=15000):
+    def __init__(self, dsn, minconn=1, maxconn=None, statement_timeout_ms=15000,
+                 acquire_timeout_s=None):
+        """Size the pool against the DATABASE's budget, not against the current panel count.
+
+        ``maxconn`` defaults to 16, and that number is derived rather than picked. Measured on the
+        warehouse:
+
+            max_connections               40
+            superuser_reserved_connections 3   ->  37 usable
+
+        Allocated: dbt build ~8 (its thread count), postgres_exporter ~3, the CDC loader 3
+        (warehouse_loader held 3 when measured), operator/QA psql and ad-hoc ~4, and ~3 of margin.
+        37 - 8 - 3 - 3 - 4 - 3 = **16 for this service.** If any of those consumers changes, this
+        number is the thing to revisit, which is why the arithmetic is written down instead of the
+        answer alone.
+
+        Raising the ceiling is NOT the fix here and must not be mistaken for one -- it moves the
+        cliff from ten panels to seventeen. The fix is that hitting the ceiling now degrades
+        correctly at ANY concurrency, via queue-then-shed below.
+        """
+        if maxconn is None:
+            maxconn = int(os.environ.get("SEMANTIC_API_POOL_MAX", "16"))
+        if acquire_timeout_s is None:
+            acquire_timeout_s = (
+                float(os.environ.get("SEMANTIC_API_POOL_ACQUIRE_TIMEOUT_MS", "2000")) / 1000.0
+            )
+        self.maxconn = maxconn
+        self.acquire_timeout_s = acquire_timeout_s
         self._pool = pg_pool.ThreadedConnectionPool(minconn, maxconn, dsn)
         self._statement_timeout_ms = statement_timeout_ms
         self._lock = threading.Lock()
         self.guard_trips = 0
+        #: QUEUE, then SHED -- in that order, because neither alone is right.
+        #:
+        #: Queue-only is how a saturated service becomes a hung one: latency grows without bound,
+        #: callers time out anyway, and their retries make it worse. Shed-only turns a burst that
+        #: would have cleared in 15 ms into user-visible failures -- ten panels against eight
+        #: connections is a burst, not overload, and the queries take milliseconds.
+        #:
+        #: So: block up to ``acquire_timeout_s`` (absorbs the burst; the caller sees 200), and past
+        #: that return a documented 503 with Retry-After (bounds the damage; the caller sees the
+        #: truth). psycopg2's ThreadedConnectionPool.getconn does NOT block -- it raises PoolError
+        #: the instant used == maxconn -- so the waiting is implemented here. Holding the semaphore
+        #: makes getconn structurally incapable of exhausting, which is better than catching the
+        #: error it would have raised.
+        self._slots = threading.BoundedSemaphore(maxconn)
+        self.waits = 0
+        self.shed = 0
 
     def close(self):
         self._pool.closeall()
@@ -92,10 +192,18 @@ class Warehouse:
             # is indistinguishable from "this tenant genuinely has no data". Refuse instead.
             raise TenantScopeError("No tenant scope on the request; refusing to query.")
 
-        conn = self._pool.getconn()
+        waited = _acquire_slot(self)
+
+        try:
+            conn = self._pool.getconn()
+        except Exception:
+            self._slots.release()
+            raise
         try:
             self._assert_unscoped_on_checkout(conn)
         except Exception:
+            # The guard already returned the connection with close=True; only the slot is ours.
+            self._slots.release()
             raise
 
         discard = False
@@ -116,7 +224,15 @@ class Warehouse:
                 discard = True
             raise
         finally:
-            self._pool.putconn(conn, close=discard)
+            try:
+                self._pool.putconn(conn, close=discard)
+            finally:
+                # Released last and unconditionally. A slot leaked here is permanent: the pool
+                # would shed for ever while the database sat idle, which is a worse failure than
+                # the one this whole change is about.
+                self._slots.release()
+                if waited:
+                    m_wait_observe(self, waited)
 
     def _assert_unscoped_on_checkout(self, conn):
         """Guard: a connection must arrive with no tenant scope.

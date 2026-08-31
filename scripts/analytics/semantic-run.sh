@@ -40,6 +40,11 @@ DSN="$DSN dbname=${WAREHOUSE_DB} user=${WAREHOUSE_RLS_USER} password=${WAREHOUSE
 
 # MSYS_NO_PATHCONV is scoped to this one invocation, never exported (contract 04 section 11).
 # shellcheck disable=SC2086
+# Sized against the warehouse's connection budget, not against the current panel count:
+# max_connections 40 - 3 reserved = 37, less dbt ~8, exporter ~3, CDC 3, ad-hoc ~4, margin ~3.
+# Exceeding it QUEUES for the acquire timeout and then sheds a documented 503 (contract 06 s2);
+# it used to raise psycopg2 PoolError and surface as an undocumented 500.
+
 exec env MSYS_NO_PATHCONV=1 docker run --rm $DETACH --name "$NAME" \
   --network odoo19-bct_bct \
   -p "${BIND_ADDRESS:-127.0.0.1}:${SEMANTIC_API_HOST_PORT:-38200}:8080" \
@@ -51,4 +56,6 @@ exec env MSYS_NO_PATHCONV=1 docker run --rm $DETACH --name "$NAME" \
   -e SEMANTIC_API_JWT_ISSUER="${SEMANTIC_API_JWT_ISSUER:-${LOGIN_GATEWAY_JWT_ISSUER}}" \
   -e SEMANTIC_API_JWT_AUDIENCE="${SEMANTIC_API_JWT_AUDIENCE:-${LOGIN_GATEWAY_JWT_AUDIENCE}}" \
   -e SEMANTIC_API_MAX_LIMIT="${SEMANTIC_API_MAX_LIMIT:-5000}" \
+  -e SEMANTIC_API_POOL_MAX="${SEMANTIC_API_POOL_MAX:-16}" \
+  -e SEMANTIC_API_POOL_ACQUIRE_TIMEOUT_MS="${SEMANTIC_API_POOL_ACQUIRE_TIMEOUT_MS:-2000}" \
   odoo19-bct-semantic-api:local "$@"
