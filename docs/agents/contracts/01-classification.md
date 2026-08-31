@@ -174,10 +174,28 @@ select count(*) from pdp_field_classification where model_name = 'account.accoun
 select count(*) from warehouse.column_policy where source_table = 'account_account';  -- MUST be 16
 ```
 
-**Assert the count is 16 — not that no bad row appeared.** Both queries return empty today, and both
-would return empty after a botched upgrade; the two outcomes are indistinguishable. As of
-2026-08-31 the live table holds **0** rows for this model against 724 total across 16 models, while
-the CSV on disk holds all 16. The ruling is therefore **NOT YET IN FORCE**.
+**Assert the count is 16 — not that no bad row appeared.** Both queries would return empty after a
+botched upgrade exactly as they do before the work starts, and the two outcomes are
+indistinguishable.
+
+**The two queries become due at different times, and conflating them will make a correct state look
+broken.** Corrected by the Lead 2026-08-31 after checking, because the original wording implied they
+land together:
+
+| # | Query | Owner | Due when | Status 2026-08-31 |
+|---|---|---|---|---|
+| 1 | `pdp_field_classification` = 16 | Platform-Addons | on module upgrade | **16 — PASSED** |
+| 2 | `warehouse.column_policy` = 16 | Data Warehouse | only after `account_account` joins the replicated set | **0 — NOT YET DUE** |
+
+`warehouse.column_policy` covers **replicated tables only**: it holds 698 rows across exactly the 15
+tables present in `raw.*`, and `account_account` is not among them. A `0` there today is the correct
+reading of a correct state, not a propagation failure. It becomes a real failure the moment DWH adds
+the table to the replicated set and regenerates `raw.*` — which DWH deferred precisely until these
+classification rows existed.
+
+Verified in the live database: `account_type` -> `internal` / `drop_to_null=f`, `code_store` ->
+`internal` / `f`, `note` -> `sensitive` / `t`, matching Security's ruling exactly. **Limb 1 of the
+ruling is IN FORCE. Limb 2 is pending Data Warehouse.**
 
 ## Process rule — an amendment is not in force until it reaches its producer
 
