@@ -2093,3 +2093,55 @@ Fail-fast is a reasonable default for a build step and a poor one for an audit: 
 answer, an audit has a **blast radius**, and stopping early makes that radius unknowable from any
 single run. The Lead's original diff request to Backend named one file because that is all the
 previous run could see; corrected to two.
+
+### CI 11/3 — and two additions from Backend
+
+`sca-python` green, verified by the Lead. Progression across three runs: **8/6 -> 10/4 -> 11/3.**
+The three remaining are all `insight-portal`, all covered by Security's ruling.
+
+**Backend deviated from the Lead's wording twice, surfaced both, and was right both times.**
+
+1. **`==9.0.3`, not `>=9.0.3`.** The Lead wrote `>=` out of habit. Backend checked the convention —
+   **zero ranges across every manifest in the repo**, 59 exact pins in the dbt one alone — and gave
+   the stronger reason: *a range makes pip-audit's verdict depend on whatever resolves that day*,
+   undermining the reproducibility the loop that just caught this depends on. An exact pin plus
+   pip-audit catching the next advisory **is** the loop. Verified by the Lead; deviation upheld.
+
+2. **It verified the bump rather than assuming it.** pytest 9 is a **major**, so a changed collection
+   rule would let "passes" hide "collects fewer":
+   ```
+   cdc           8.3.4 collected 59  ->  9.0.3  59 passed
+   semantic-api  8.3.4 collected 59  ->  9.0.3  50 passed + 9 skipped = 59
+   ```
+   Same totals both sides. A major version bump is exactly where a green suite can conceal tests that
+   no longer run.
+
+**A correction to the Lead's attribution, worth a rule.** The Lead called the remaining failures "in
+Frontend's path". Backend checked rather than accepting it: `fs-scan` is repo-wide and its log **does**
+name `analytics/cdc`, `analytics/semantic-api` and `login-gateway` — as **scanned targets, not
+findings**. None of its ten Python dependencies appears in a finding row.
+
+> **"My path appears in the failing job's log" is exactly the shape that looks like ownership and is
+> not.**
+
+The conclusion survived; the reasoning behind it did not exist until Backend did that. The failure
+mode runs both ways — an agent can burn hours on a job that merely mentions its directory, or dismiss
+one that genuinely implicates it.
+
+### Four occurrences, four agents, one shape: a zero that meant "cannot see"
+
+Backend's first read of the `sca-python` log returned zero matching lines and it nearly reported *"the
+job audited nothing"*. `gh run view --log` refuses to download while the run is in progress overall —
+**even for a job that has completed**. The zero meant "cannot see", not "nothing there".
+
+That is now:
+
+| Occurrence | The zero | What it actually meant |
+|---|---|---|
+| Lead, instance 7 | `grep -c pg_replication_slot` = 0 | measured when zero slots existed |
+| Lead, exporter probe | `curl` returned nothing | the exporter publishes no host port |
+| Backend, exec-bit sweep | `bash-invoked` = 0 | regex could not see `$(GATEWAY_SCRIPTS)/` |
+| Backend, CI log | zero matching lines | logs undownloadable mid-run |
+
+**Before believing a zero, establish that a non-zero was reachable.** Four agents have now hit this
+independently, which is the argument for it being a reflex rather than a lesson.
