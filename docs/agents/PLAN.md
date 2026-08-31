@@ -1126,3 +1126,64 @@ points elsewhere.
 This is the first entry in this catalogue written **before** the defect occurred rather than after.
 It is also the answer to the question Backend's `bash -n` repeat raised: knowing about a trap does
 not prevent it — **a check does.**
+
+### Instance 19 — `/healthz` returned 200 with its database destroyed
+
+Found by Backend while QA's cold start was tearing the stack down.
+
+```
+GET  /healthz   -> 200  {"status":"ok","metrics":11}
+POST /v1/query  -> 500  {"error":"query_failed","detail":"OperationalError"}
+```
+
+`/healthz` counted registry metrics loaded from a YAML file **at import**, so it answered "ok"
+whenever the *process* was alive — never whether the service could answer a single question.
+
+**What made it acute rather than academic:** `login-gateway` and `semantic-api` are started by
+`docker run --rm` from `scripts/analytics/`, **not by compose**, so a compose teardown does not stop
+them. Two stale containers from a previous session were left running against a destroyed warehouse,
+**advertising themselves healthy on ports 38200 and 38120 — the ports the cold start needs.** A
+reader would have taken a green from last session's container, not from anything the clone started.
+Backend removed both before QA's run.
+
+Now probes `SELECT 1` through the pool, and distinguishes `degraded` (saturated) from `down`
+(unreachable) on actionability.
+
+**The failed first proof is the instructive part.** Pointing the service at a nonexistent host makes
+it **exit at startup**, because `ThreadedConnectionPool` opens `minconn` eagerly. **The service
+cannot start without a warehouse; it can only lose one.** So the proof had to be a green->red
+*transition* against a real database that was then removed, not a bad DSN. A whole class of "prove it
+fails" attempts is unavailable when the failure mode is unreachable from a cold start.
+
+### Instance 20 — an observation that was true when taken, restated later as present tense
+
+Backend's final report escalated "no make target starts the Backend services" from latent to acute
+and sent it to QA **mid-cold-start**. All four targets existed by then — `Makefile:334, 344, 349,
+356`, landed in `6998a66`, working tree clean. Backend had grepped before that commit and carried the
+result forward.
+
+Caught by the Lead because it **contradicted something the Lead had verified an hour earlier**. QA
+would otherwise have recorded a gap that does not exist, or hand-run five commands instead of using
+the targets.
+
+**This is instance 18 from the other side, and by the same agent.** Backend had written that its most
+expensive defect was prose rather than code — three comments asserting a condition had "no legitimate
+cause", which sent DWH searching its own snapshots. Here the claim was true when formed and false
+when restated. **Verify a claim at the moment you make it, not at the moment you first formed it**,
+and re-check anything you are escalating in severity: escalation is exactly when a stale fact does
+the most damage.
+
+The corollary for the Lead: cross-checking an agent's claim against something already verified is
+cheap and catches this class. The contradiction was the tell, not the content.
+
+### The preventive gate had the defect it was built to prevent
+
+Backend found that DWH's new connection-budget check reads `DBT_THREADS` live but **hardcodes**
+`semantic-api pool: 16`, while `SEMANTIC_API_POOL_MAX` is a documented operator knob — and Backend's
+own shed log tells operators that knob is the remedy. Set it to 32 and the check reports *"OK, 31
+claimed of 37 usable, 6 spare"* while the real claim is 47.
+
+DWH's own words applied to DWH's own work: *"the number is right the day it is written and wrong
+three months later when one consumer is retuned by someone who never saw the others."* **A hardcoded
+16 in the checker is that same frozen number, one level up.** Routed with the requirement to prove it
+red by raising the knob above the budget.
