@@ -1377,3 +1377,34 @@ putting the check in `verify` than either agent made at the time.
 It is also why the closing state of that number is `UNVERIFIED` rather than a figure. The honest
 answer was available at every round and nobody reached for it until the fourth, because three
 respectable-looking categories were on offer and "I do not know" was not one of them.
+
+### "Measurable" is not "measured" — the label that stayed UNVERIFIED
+
+DWH closed the root cause Backend surfaced: **the exporter was the only consumer without an
+`application_name`.** dbt sets `dbt`, `warehouse_ctl` sets `warehouse_ctl`, the exporter's DSN set
+nothing — so it was the one connection nobody could name, which is precisely why Backend's
+`warehouse_rls = 2` reading could not exclude it. Fixed in `c5094db`, verified through
+`docker compose config` rather than by editing and hoping.
+
+**And it left the label at `UNVERIFIED` anyway.** What changed is that the measurement is now
+*possible*, not that it has been *taken*:
+
+> Marking it verified because the means exists would be the same overstatement this column was added
+> to expose — one commit after I corrected exactly that.
+
+It now reads `measurable via application_name, not yet measured` and carries the query that closes
+it. Not run, because QA owns the stack and it is not worth a connection during a cold-start
+measurement.
+
+That distinction is worth holding onto generally: **building the instrument is not the same as taking
+the reading**, and the gap between them is exactly where an honest label decays into a confident one.
+
+### Two closing formulations, both better than the Lead's
+
+**On the shared number**, DWH: *"a number nobody owns doesn't get fixed by one careful person; it
+gets fixed by being checkable."* Four rounds of careful people is the evidence.
+
+**On approximating a gate**, DWH sharpened the rule with an edge the Lead missed: reconstructing a
+**stricter** authority produces **false findings**; reconstructing a **looser** one produces **false
+confidence**. *Both feel like diligence.* The second is the dangerous direction and the one nobody
+notices, because its output is silence.
