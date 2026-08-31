@@ -210,58 +210,51 @@ is proved by `tests/prometheus/slot_lag_alerts_test.yml`, run by
 > is up.
 >
 > `make up-dev` and `make up-analytics` do not touch the observability overlay, so a teardown leaves
-> Prometheus, Alertmanager, Loki, promtail and node-exporter down — and every rule above then fires
-> into nothing while `make verify` still passes. The cold-start suite now brings the overlay back
-> and asserts `make check-alerting`, but **that assertion has never actually run its checks**:
-> `scripts/check-alerting.py` probes `/-/healthy`, which returns plain text, JSON-decodes it, catches
-> the resulting `JSONDecodeError` as "Prometheus not reachable", and returns **0**. It prints
-> "NOT a pass" and exits successfully, so every consumer that reads an exit code sees a pass.
+> Prometheus, Alertmanager, Loki, promtail and node-exporter down -- and every rule above then fires
+> into nothing while `make verify` still passes. The cold-start suite brings the overlay back and
+> asserts `make check-alerting`, but **that assertion has never yet run inside a cold start**, so
+> the end-to-end claim is unverified. The command that will prove it:
 >
-> Until that is fixed (owner: Platform-Infra), verify by hand:
-> ```bash
-> curl -s http://127.0.0.1:39090/api/v1/targets?state=active   # every target "health":"up"
-> curl -s http://127.0.0.1:39090/api/v1/alertmanagers          # activeAlertmanagers must be non-empty
-> curl -s 'http://127.0.0.1:39090/api/v1/query?query=pg_replication_slots_pg_wal_lsn_diff'
-> ```
-> The last one must return a non-empty `result` **while a replication slot exists** — these are
-> per-slot series, and with no slot their absence means nothing.
->
-> The command that will prove it end to end, once the fix lands:
 > ```bash
 > BCT_COLDSTART=i-understand-this-destroys-the-bct-oltp-data make test-coldstart
 > ```
 
-### 3.5 A DIFFERENT and nastier case: the source database was restored or recreated
+### `make check-alerting` -- what it now proves, and how it failed before
 
-§3 assumes Odoo's database is the same database, further along. **If the OLTP database was restored
-from a backup, recreated, or re-initialised, that assumption is false and the safe behaviour of §9
-becomes the dangerous one here.**
+Run it after `make up-obs`. It is the fastest way to find out whether the alerting above is real:
 
-The backfill resumes from `max(id)` already landed. That is exactly right when the source is
-continuous, and exactly wrong when the source has been replaced:
+```bash
+make check-alerting
+#   scrape targets: 5/5 up
+#   alertmanagers: 1 configured, http://127.0.0.1:39093/-/ready answering
+#   alerting rules: 24 evaluated, 21/21 referenced metrics have current samples
+# check-alerting: OK
+```
 
-- **If the restored ids differ from the landed ones**, the old rows survive as orphans that exist in
-  no upstream system. Reconciliation fails permanently and no amount of re-running fixes it.
-- **If the restored ids collide** — which is the *likely* case, because sequences restart and
-  deterministic seed data reproduces the same ids — two different entities share a primary key and
-  the latest-version-per-key projection **silently merges them**. That is not a failure. It is a
-  wrong answer that reconciles, which is the worst outcome available.
+Exit codes: **0** pass, **non-zero** fail, **77** skip (Prometheus not running). `ALLOW_SKIP=1`
+downgrades a skip to 0 for an environment where the overlay is deliberately absent.
 
-**Therefore a restored or recreated source is always a full re-seed, never a resume**, and:
+Two earlier versions of this check passed while proving nothing, and both are worth knowing because
+an operator who remembers "check-alerting was green" may be remembering one of them:
 
-1. **Truncate every tenant, not just the one you were thinking about.** A second tenant seeded from
-   the same source database inherits the same id-collision problem, and leaving it defeats the point.
-2. Follow §3.2 steps 4–6 exactly. Step 4 needs `warehouse_admin`; `warehouse_loader` holds neither
-   `DELETE` nor `TRUNCATE` on `raw.*`, which is the point of the grant:
-   ```
-   warehouse_loader:  sel=t ins=t upd=f del=f trunc=f
-   TRUNCATE raw.ppob_transaction;    -> ERROR: permission denied for table ppob_transaction
-   ```
-3. **Between the truncate and `make dbt-run`, the marts keep serving pre-loss data.** The dashboard
-   is confidently wrong rather than empty, which is the more dangerous of the two. If anyone is
-   looking at it, take the dashboard down for that window or accept that they are reading fiction.
+1. It probed `/-/healthy`, which returns **plain text**, and JSON-decoded it. The resulting
+   `JSONDecodeError` was caught as "Prometheus not reachable" and it returned **0** -- printing
+   "NOT a pass" while exiting successfully. Every check below that line was unreachable code.
+2. It then reported `alertmanagers: 1 active` **with Alertmanager stopped**, because
+   `prometheus.yml` discovers it via `static_configs` and `/api/v1/alertmanagers` reports the
+   *configured* target whether or not anything is listening. Alertmanager is also not a scrape
+   target, so the targets check did not cover it either. A firing alert would have gone nowhere
+   with every gate green.
 
----
+It now probes Alertmanager directly at `ALERTMANAGER_URL`. Verified in both directions:
+
+```
+alertmanager stopped -> check-alerting: FAIL ... "1 configured, NONE answering"   (non-zero)
+alertmanager started -> check-alerting: OK                                        (rc 0)
+```
+
+If Alertmanager is deliberately not published on `127.0.0.1:39093`, set `ALERTMANAGER_URL` rather
+than ignoring the failure.
 
 ---
 

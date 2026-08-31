@@ -205,7 +205,8 @@ rather than decorative:
 
 **NOT PROVEN, and recorded as such:** that this alerting is live after a cold start. The overlay is
 not brought up by `make up-dev` or `make up-analytics`, and the check that would confirm it
-(`make check-alerting`) exits 0 without running any of its checks. See
+(`make check-alerting`) now works and is verified able to fail, but has not yet run inside a
+cold-start execution. See
 `docs/runbooks/analytics-pipeline.md` §3.4 for the manual verification and for the command that will
 prove it once the fix lands.
 

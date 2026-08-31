@@ -136,14 +136,16 @@ make dbt-run                     # build staging and marts
       configuration and the on-call destination are Security's to specify. An alert that fires into
       a channel nobody reads is worse than no alert, because it manufactures the belief that
       something is watching.
-- [ ] **NOT PROVEN: do NOT tick the box above on the strength of `make check-alerting`.** It cannot currently
-      pass: it probes `/-/healthy`, JSON-decodes the plain text that endpoint returns, reports the
-      resulting error as "Prometheus not reachable", and exits **0**. It prints "NOT a pass" and
-      succeeds. Verify by hand until Platform-Infra fixes it:
-      ```bash
-      curl -s http://127.0.0.1:39090/api/v1/targets?state=active   # all "health":"up"
-      curl -s http://127.0.0.1:39090/api/v1/alertmanagers          # activeAlertmanagers non-empty
-      ```
+- [ ] **`make check-alerting` passes** (exit 0, and not the 77 it returns when it skips). It now
+      probes Alertmanager directly rather than trusting Prometheus's `/api/v1/alertmanagers`, which
+      under `static_configs` reports the configured target whether or not anything is listening.
+      Verified able to fail: with Alertmanager stopped it exits non-zero with
+      "1 configured, NONE answering". If Alertmanager is deliberately not on `127.0.0.1:39093`, set
+      `ALERTMANAGER_URL` rather than ignoring the failure.
+- [ ] **Still NOT PROVEN: that alerting comes back after a cold start.** The overlay is not brought
+      up by `make up-dev` or `make up-analytics`, and the assertion that would prove it end to end
+      has not yet run inside a cold-start execution. Do not record §6's alerting item as satisfied
+      on the strength of a green `check-alerting` on a warm stack.
 
 ---
 

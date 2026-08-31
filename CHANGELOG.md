@@ -135,10 +135,14 @@ Integration tests exercising the seams between components, runnable with `make t
 - **A fresh stack accepts Odoo's default `admin`/`admin` password.** `BCT_DEV_USER_PASSWORD` was
   applied by hand once and exists only in an untracked local `.env`; it is not declared in
   `.env.example`, so a clone cannot learn it exists. Red test, deliberately.
-- **`make check-alerting` can never pass.** It probes `/-/healthy`, which returns plain text, then
-  JSON-decodes it; the resulting `JSONDecodeError` is reported as "Prometheus not reachable" and the
-  script returns **0**. Every check it performs is unreachable code, and every consumer that reads
-  exit codes sees a pass. Consequently **"alerting is live after a cold start" is not proven.**
+- **"Alerting is live after a cold start" is NOT PROVEN.** The observability overlay is not brought
+  up by `make up-dev` or `make up-analytics`, and the assertion that would prove it end to end has
+  not yet run inside a cold-start execution. `make check-alerting` itself is now fixed and verified
+  able to fail in both directions — it exits non-zero with Alertmanager stopped, 0 with it running,
+  and 77 on a skip. It reached that state through two versions that passed while proving nothing:
+  one JSON-decoded the plain-text `/-/healthy` and returned 0 on the resulting error, the other
+  reported `1 active` Alertmanager with Alertmanager stopped, because `static_configs` makes
+  `/api/v1/alertmanagers` report the configured target whether or not anything is listening.
 - **Demo data is not seeded by any `make` target.** `demo.seed.generator.generate()` must be called
   explicitly, so a cold start yields an empty Odoo and nothing downstream can be verified until
   someone runs it by hand.
