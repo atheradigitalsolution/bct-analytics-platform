@@ -160,6 +160,10 @@ and in every case the surrounding work was correct. This is the pattern to desig
 | 4 | `rolsuper` compared as `'f'` | Through `\|\|` a boolean renders `true`/`false`, never psql's `t`/`f`, so the comparison never matched and passed forever | Platform-Infra |
 | 5 | Alerting believed healthy | `promtool` passes and Prometheus reports `health: ok` without either saying whether a selector matches any series. The real defect turned out to be different and worse: **alertmanager, loki, promtail and node-exporter were not running at all**, so every rule fired into nothing. A cold start rebuilds the base stack via `make up-dev`, which never touches the observability overlay | QA, Platform-Infra |
 | 6 | `make install-modules` / `make up-dev` | Reported success while all five modules stayed `uninstalled`; and `.env.example` shipped `ODOO_INIT_MODULES=base,web`, so a fresh clone gets no domain model and `up-analytics` fails hard | Platform-Infra, QA |
+| 7 | Lead's replication-slot check | Recorded separately below — the Lead's own instance of this pattern | Platform-Infra |
+| 8 | `bct_warehouse_reconciliation_failed` believed live | The exporter scoped its `latest` CTE with `ORDER BY run_started_at DESC LIMIT 1`, and `make dbt-run` excludes tests, so the newest invocation carries **zero test rows** and the whole reconciliation series vanishes. The perturbation proof passed only because it ran `dbt-test` immediately before reading the metric — an order production never uses. Under the real loop (build often, test rarely) the alert is dark while Prometheus reports `health: ok` | QA, verified by Lead |
+| 9 | `dim_product_cost.sql` in the working tree | The model existed on disk and dbt built it; it was never `git add`ed, so a fresh clone builds 34 models and silently omits the cost dimension. Identical shape to instance 1 | QA |
+| 10 | "Dev password is set" | `BCT_DEV_USER_PASSWORD` exists **only** in the untracked local `.env`. No Makefile target, script, or seed model ever applies it. Login worked all session because an agent set it by hand in a live shell. After the documented `make up-dev`, `authenticate('bct','admin','admin')` returns uid `2` — Odoo's **default** password — while `.env` advertises a strong one that nothing consumes | Lead, from Frontend's report |
 
 ### What actually catches this class
 
@@ -204,3 +208,116 @@ precondition**, which is the same defect as every row in the table above. A `gre
 means "no match", never "the thing is broken" — the two are only the same if you have separately
 established that a match *should* exist. This entry stays because the Lead is not exempt from the
 rule, and because an error corrected in the record is worth more than one quietly dropped.
+
+
+### Instances 8–10 — the unifying shape, stated by QA
+
+QA's summary of instances 8 and 9 is the sharpest framing this build has produced:
+
+> a thing that exists locally but not in the clone, and a thing that exists in the database but not
+> in the metric — both look fine from where the author is standing.
+
+Instance 10 is the third member of that set and the most dangerous, because it is a **security**
+defect wearing the costume of a fixed one. The operator explicitly chose "set a local dev password".
+That decision was carried out — in a shell, against a running container, once. It never became a
+line of repo. The result is worse than having skipped it:
+
+- a fresh clone gets `admin`/`admin`, Odoo's default;
+- `.env` contains a 20-character random string that **looks** like the decision was implemented;
+- every piece of evidence that authentication works was collected against the hand-made state.
+
+`.env.example` does not even declare the variable, so a fresh clone has no way to learn it exists.
+
+**Generalised rule, now binding on every agent:** if a step had to be performed by hand for your
+evidence to pass, that step is part of the deliverable and is not done until it is in a file the
+clone gets. State such steps explicitly in your report under the heading **"performed by hand"** —
+an unrecorded manual step is indistinguishable from a fabricated result at the gate.
+
+### Lead re-verification of instances 8 and 9 (§2.5), 2026-08-31
+
+**Instance 9 (untracked model) — VERIFIED.** `find` 35 `.sql` models, `git ls-files` 35, equal;
+`dim_product_cost.sql` tracked; `git status --untracked-files=all analytics/` clean.
+
+**Instance 8 (reconciliation metric) — VERIFIED, and note how.** DWH's code is correct but its
+summary sentence is not: it reported "both `latest` CTEs now scope to the most recent invocation
+that CONTAINED tests". Only one does. `bct_warehouse_dbt_test` (queries.yml:52) carries the
+`WHERE resource_type = 'test'` filter and the reconciliation series; `bct_warehouse_dbt_run`
+(queries.yml:106) deliberately has **no** filter, because it answers "since anything ran". Adding
+the filter there would restore exactly the conflation this finding was about. **The prose is the
+hazard, not the code** — a future reader "fixing" the inconsistency would reintroduce the bug.
+
+Live scrape confirmed 7 `bct_warehouse_reconciliation_failed` series and
+`count(...) = 7` in Prometheus. **That observation alone proves nothing**, because at the time of
+measurement the newest invocation was test-bearing — the one state in which the OLD code also
+works. The discriminating condition had to be constructed. Done read-only, without running dbt and
+without disturbing two working agents, by evaluating both scopings against a horizon just after a
+`dbt-run`:
+
+```
+OLD scoping (ORDER BY run_started_at DESC LIMIT 1)  ->   0 series   <- alert dark
+NEW scoping (newest TEST-BEARING invocation)        -> 287 test rows
+```
+
+**Method note worth keeping.** Reproducing a broken condition does not always require breaking
+something. Where the defect is in *which rows a query selects*, the broken state can be recreated
+with a `WHERE` clause over data that is already there. That is cheaper than a perturbation, it is
+non-destructive, and it can be run while other agents hold the stack.
+
+**A Lead error avoided, recorded because instance 7 was not.** Before the above, the Lead curled
+`127.0.0.1` on four guessed ports for the exporter, got nothing, and was one step from reporting
+"reconciliation series: 0" as a defect. The exporter publishes **no host port** — `9187/tcp`,
+unmapped, scraped by Prometheus over the docker network. The measurement was incapable of returning
+anything else. Same shape as instance 7: a probe run without establishing that a positive result was
+even possible. The precondition check (`docker ps` ports, then `count(*)` on
+`warehouse.dbt_run_result` = 1853 rows / 16 invocations) is what caught it.
+
+### The rule, sharpened by Data Warehouse — the empty-result tell
+
+DWH closed Findings 6 and 7 with the best formulation this build has produced, and it supersedes the
+looser wording above:
+
+> Instance 8 (config on disk, not in the process), instance 9 (model on disk, not in the clone) and
+> Finding 7 (results in the table, not in the metric) are all "the author's view includes something
+> the consumer's does not". The reason none of the three errored is that every one of them is a
+> **missing row**, and a query returning nothing looks identical to a query returning nothing to
+> worry about.
+
+**Binding rule.** Distrust any check whose passing state is an **empty result**, unless it also
+asserts the subject set was non-empty. Concretely, every such check must assert two things, not one:
+
+1. the bad condition is absent, **and**
+2. the population it searched was not empty.
+
+QA retrofitted exactly this onto its own suite (minimum subject-set size, printed). Lead's aborted
+exporter probe is the same failure from the other side: `curl` returned nothing because the exporter
+publishes no host port, and "no output" was indistinguishable from "no problem".
+
+This single rule would have caught instances 1, 5, 8, 9 and the Lead's instance 7.
+
+### Lead verification of DWH's final state (§2.5), 2026-08-31 — all claims hold
+
+```
+seed landed          sale_order_line 311 | ppob_transaction 360 | account_move_line 431 | demo users 2
+recon_daily          1636 checks | 1636 passed | 0 failed
+marts                17 tables, 17 rls_enabled, 17 rls_forced
+dim_product_cost     tracked; the 1.46x measurement written into the model at lines 18-30
+mart_revenue_daily   bct 777 rows | bct_t2 777 rows
+```
+
+**`bct_t2` now holds real rows, which is the precondition the isolation tests were missing.** Until
+this moment a cross-tenant 403 and the RLS test would both have passed by having nothing to leak —
+the empty-result tell again. Both Frontend and QA have been told to assert the row count first and
+the isolation second.
+
+One Lead miss worth recording: the verification query looked for `marts.recon_daily`, which does not
+exist — the table is `warehouse.recon_daily`. That is a wrong-schema error in the checker, not a
+missing table, and it briefly looked like a discrepancy in DWH's report. Checked before reporting.
+
+### Open gap from DWH's "performed by hand" declaration
+
+Item 2 of DWH's declaration is a finding in its own right, of the instance-10 family: the ordering
+**Backend backfills -> DWH resyncs `load-fixture --tenant bct_t2` -> DWH builds** is currently
+"coordination by message rather than by a target". `load-fixture` is inside `make up-analytics`, but
+the *ordering* relative to Backend's backfill exists only in this conversation. A fresh clone cannot
+reproduce it. Owner: Platform-Infra (Makefile), after the credential work. Recorded so it does not
+evaporate when this session ends — which is precisely how instance 10 came to exist.
