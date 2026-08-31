@@ -252,9 +252,39 @@ no access to the landing zone at all.
 | dbt | `dbt` | set (`analytics/dbt/profiles.yml`) |
 | `warehouse_ctl.py` | `warehouse_ctl` | set |
 | `warehouse-exporter` | `warehouse-exporter` | set (`docker-compose.analytics.yml`) |
-| **semantic-api** | `semantic-api` | **NOT SET — Backend action** |
-| **CDC loader** | `cdc-loader` | **NOT SET — Backend action** |
-| **login-gateway** | `login-gateway` | **NOT SET — Backend action** (if it connects at all) |
+| semantic-api | `semantic-api` | set (`app/db.py:73,205`) — **not yet on the wire**, see below |
+| CDC loader | `cdc-loader` | set (`bct_cdc/warehouse.py:32,74`) — **not yet on the wire** |
+| login-gateway | — | **N/A. It connects to no database at all.** |
+
+`login-gateway` is **not a pending action and never was**. Verified from source rather than assumed,
+because "set `application_name` on a service that has no connection" is exactly the kind of task one
+can appear to complete: its `requirements.txt` carries no `psycopg2`, `sqlalchemy` or `asyncpg`, and
+zero files in `login-gateway/` reference a driver or a `postgresql://` DSN. It authenticates against
+Odoo over JSON-RPC and holds only the signing keys. The original clause hedged this with "(if it
+connects at all)"; the hedge was load-bearing and should not have needed to be.
+
+**Set in code, not in the run scripts** — deliberately. The semantic-api's DSN reaches it by two
+routes (`scripts/analytics/semantic-run.sh` and `docker-compose.analytics.yml`), so a value set in
+one is silently absent from the other. It lives at the single point every route passes through, as a
+`psycopg2` keyword that `make_dsn` merges into whatever DSN arrives. Same divergence shape as an
+exporter config that exists on disk but not in the process.
+
+**NOT VERIFIED ON THE WIRE.** Both services are running from images built *before* the change, so
+the values are not live in QA's current run. Neither agent has restarted anything — QA holds the
+stack. After a restart, this closes it:
+
+```sql
+SELECT application_name, count(*) FROM pg_stat_activity
+ WHERE datname = 'warehouse' GROUP BY 1;
+```
+expecting `semantic-api` and `cdc-loader` beside `dbt`, `warehouse_ctl` and `warehouse-exporter`.
+
+**One connection is deliberately out of scope.** The loader's logical-replication connection
+(`runner.py:315`, opened with `connection_factory=LogicalReplicationConnection`) sets no
+`application_name`. It is a **source-side** connection to the Odoo Postgres and §A.6 governs
+*warehouse* consumers, so it is outside this clause rather than an unexplained exception. Naming it
+would still help attribute WAL-sender sessions on the OLTP side — worth doing for Platform-Infra's
+slot monitoring, not required here, and not to be changed speculatively while the stack is held.
 
 **Why this is a contract clause and not a style note.** The whole attributability design in §B rests
 on this field, and I had required it of no one:
@@ -274,9 +304,20 @@ obliged to fill. The column existed and the function ran, which is what made it 
 — the same shape as a check whose passing state is an empty result.
 
 **This was found by writing it down, not by a test failing**, and nothing here will fail while it
-stays unset: audits will simply carry NULL and the log will show an empty `%a`. A test asserting
-`access_audit.application_name IS NOT NULL` over a real serving period is the thing that would catch
-a regression, and it is **not yet written** — stated so it is not mistaken for covered.
+stays unset: audits simply carry NULL and the log shows an empty `%a`.
+
+**Test ownership, split by what each side can actually assert.**
+
+| Test | Owner | Status |
+|---|---|---|
+| Dropping the kwarg fails a unit test (exact string, not truthiness) | Backend | **written** — 1 semantic-api test, 2 loader tests |
+| `access_audit.application_name IS NOT NULL` over a real serving period | **QA** | **not written** |
+
+The unit guards assert the *exact* string from the table above rather than non-emptiness, because
+`cdc_loader` or `bct-cdc` would satisfy a truthiness check and still break the join a reader makes
+against this clause. The serving-period assertion needs a live warehouse and real traffic, so it is
+an integration test and belongs in QA's suite — it is neither Backend's nor mine to write, and it is
+**still unwritten**. Stated so this `MUST` is not mistaken for a covered one.
 
 
 ## B. Tables in `warehouse` beyond the two the Lead froze
