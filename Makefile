@@ -225,6 +225,12 @@ WCTL := MSYS_NO_PATHCONV=1 $(DC_ANALYTICS) run --rm --no-deps --entrypoint pytho
 
 .PHONY: up-analytics
 up-analytics: ## Start the warehouse, apply its DDL, sync the PDP policy and load the landing zone
+	@# PRECONDITION, and it is here because the failure without it is a
+	@# psycopg2 traceback ending in "could not translate host name postgres",
+	@# which reads like a warehouse bug and is not one. The policy sync, the
+	@# raw DDL generator and the reconciliation FDW all read the OLTP database
+	@# as warehouse_reader; none of them can do anything useful without it.
+	@$(DC_ANALYTICS) ps --services --filter status=running | grep -qx postgres || { 		echo ""; 		echo "  The base stack is not running. up-analytics reads Odoo's Postgres"; 		echo "  as warehouse_reader to sync the PDP policy, generate raw.* and wire"; 		echo "  the reconciliation FDW, and it cannot do any of that without it."; 		echo ""; 		echo "      make up-dev"; 		echo ""; 		exit 1; 	}
 	@$(DC_ANALYTICS) up -d warehouse-db warehouse-exporter
 	@bash analytics/warehouse/bin/warehouse-apply.sh
 	@$(DC_ANALYTICS) --profile tools build dbt

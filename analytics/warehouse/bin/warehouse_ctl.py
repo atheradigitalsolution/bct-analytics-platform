@@ -611,9 +611,28 @@ def cmd_load_fixture(args) -> int:
             cols = [c for c in source_columns(odoo, table) if pol.get(c["column_name"], {}).get("transform") != "drop"]
             target = ", ".join(f'"{c["column_name"]}"' for c in cols)
             exprs = ", ".join(_mask_expr(c, pol[c["column_name"]]) for c in cols)
+            # _lsn = '0/0', NOT NULL.
+            #
+            # A snapshot row has no WAL position, and NULL is the obvious way to
+            # say so. It is the wrong way. Contract 05 makes
+            # (_tenant_id, pk, _lsn) the ordering key and says nothing about
+            # what a NULL means there, so every consumer has to decide for
+            # itself: my raw_latest macro coalesces to '0/0' and gets the right
+            # answer, but Backend's landing-growth metric read NULL as
+            # "unordered" and its duplicate detector counted two different
+            # NULL-bearing changes as one, because SQL treats NULLs as equal
+            # for DISTINCT.
+            #
+            # '0/0' is the lowest possible pg_lsn, so it carries the same
+            # precedence - every real CDC row supersedes every snapshot row for
+            # the same key, which is what makes a re-snapshot safe to run over
+            # live data - while making the ordering key a TOTAL order with no
+            # NULL semantics for anyone to interpret. Found by Backend's
+            # bct_cdc_landing_unordered_rows metric; fixed here rather than
+            # worked around there.
             sql = (
                 f"INSERT INTO raw.{table} ({target}, _op, _tenant_id, _lsn) "
-                f"SELECT {exprs}, 'I', %(tenant)s, NULL FROM {schema}.{table}"
+                f"SELECT {exprs}, 'I', %(tenant)s, '0/0'::pg_lsn FROM {schema}.{table}"
             )
             with wh.cursor() as cur:
                 cur.execute(sql, {"salt": salt, "tenant": tid})
@@ -650,7 +669,7 @@ def cmd_tombstone(args) -> int:
     with wh.cursor() as cur:
         cur.execute(
             f"INSERT INTO raw.{args.table} (id, _op, _tenant_id, _lsn) "
-            f"SELECT %s, 'D', %s, NULL",
+            f"SELECT %s, 'D', %s, '0/0'::pg_lsn",
             (args.id, args.tenant),
         )
     wh.commit()

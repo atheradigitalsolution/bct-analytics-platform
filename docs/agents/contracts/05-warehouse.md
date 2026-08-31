@@ -413,3 +413,42 @@ seconds ago whose WAL record is not decoded yet, both numbers are correct, and t
 that flaps is a test everyone learns to ignore. Freshness for the current day is served from
 `warehouse.mart_freshness`, which is what `meta.is_stale` is for — the two answer different
 questions and neither substitutes for the other.
+
+## D. `_lsn` ordering — what the lowest value means, and why NULL is not it
+
+The frozen text says the ordering key is `(_tenant_id, <pk>, _lsn)` and stops there. It does not say
+what a producer should write when it has **no** WAL position, and two agents interpreted the gap
+differently, which is how it surfaced.
+
+**Rule: a producer with no WAL position writes `'0/0'::pg_lsn`, never `NULL`.**
+
+`0/0` is the lowest possible `pg_lsn`, so it carries exactly the precedence a snapshot should have:
+
+> Every streamed CDC row supersedes every snapshot row for the same key.
+
+That is what makes a re-snapshot safe to run over live data — a backfill can be replayed at any time
+and it will never overwrite a newer streamed change.
+
+### Why NULL was wrong even though it "worked"
+
+DWH's `raw_latest` macro coalesces (`coalesce(_lsn, '0/0'::pg_lsn)`) and gets the right answer, so
+the marts were correct. The problem was never the marts:
+
+- Backend's `bct_cdc_landing_unordered_rows` metric read a NULL `_lsn` as *unordered*, i.e. as a row
+  that cannot participate in the projection at all. Reasonable reading of the frozen text; wrong
+  about the behaviour.
+- Backend's duplicate-change detector counted two genuinely different NULL-bearing changes as one
+  duplicate, because SQL treats NULLs as equal for `DISTINCT`.
+
+Neither was a bug in either agent's code. Both were the contract leaving a value undefined and each
+side defining it privately. `0/0` makes `(_tenant_id, pk, _lsn)` a **total order** with no NULL
+semantics for anyone to interpret.
+
+### Status
+
+- DWH's fixture loader writes `'0/0'` (`analytics/warehouse/bin/warehouse_ctl.py`).
+- The `raw_latest` macro keeps its `coalesce` as a belt-and-braces guard for any producer that still
+  writes NULL. It gives the same answer and costs nothing.
+- `bct_cdc_landing_unordered_rows` should read **zero** once no producer writes NULL. A non-zero
+  value then means a genuinely unordered write from somewhere neither agent expects, which is a real
+  signal rather than a known artefact.

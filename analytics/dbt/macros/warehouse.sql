@@ -64,10 +64,13 @@ md5(concat_ws('|'
 
       1. LATEST VERSION PER KEY. The landing zone is append-only, so an UPDATE
          is a second row. Ordering is (_lsn, _ingested_at, _row_id) descending.
-      2. NULL _lsn SORTS FIRST. A snapshot/backfill row has no WAL position;
-         coalescing to '0/0' means every streamed CDC row supersedes every
-         snapshot row for the same key, which is the correct precedence and
-         is what makes a re-snapshot safe to run over live data.
+      2. THE LOWEST _lsn SORTS FIRST. A snapshot/backfill row has no WAL
+         position and is written with '0/0', the lowest possible pg_lsn, so
+         every streamed CDC row supersedes every snapshot row for the same key
+         - the correct precedence, and what makes a re-snapshot safe to run
+         over live data. The coalesce() is kept as a belt-and-braces guard for
+         any producer that still writes NULL: it gives the same answer, and
+         costs nothing.
       3. TOMBSTONES. If the surviving version is _op='D', the row is gone —
          not filtered before ranking, which would resurrect the previous
          version of a deleted record.
