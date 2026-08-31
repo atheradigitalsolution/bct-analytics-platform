@@ -35,6 +35,7 @@ from helpers import db, env, web
 pytestmark = [pytest.mark.coldstart, pytest.mark.destructive, pytest.mark.slow]
 
 PROJECT = "odoo19-bct"
+NEWLINE = chr(10)
 
 
 def _foreign_resources():
@@ -276,6 +277,100 @@ def test_the_observability_overlay_comes_back_and_alerting_is_live(foreign_befor
         "('NOT a pass'), so the exit code alone would have reported this cold start as having live "
         "alerting when nothing had been checked."
     )
+
+
+def test_the_documented_pipeline_targets_bring_the_rest_of_the_stack_up(
+    foreign_before, evidence
+):
+    """`up-gateway` -> `up-semantic` -> `cdc-start`, in the documented order, from a cold start.
+
+    Platform-Infra reported the container-starting halves of these targets as NOT VERIFIED, because
+    verifying them would have meant restarting services underneath Frontend's live measurements.
+    This run is the one that can: everyone else has finished, so the stack is disposable.
+
+    The order is load-bearing and encoded in the Makefile's own help text -- `up-semantic` fetches
+    JWKS from the gateway, and `cdc-start` provisions the publication before the consumer creates
+    the slot. Running them out of order is a different test; running them in order is this one.
+    """
+    from helpers import web
+
+    for target, ready in (
+        ("up-gateway", lambda: web.service_up(web.gateway_url("/healthz"))),
+        ("up-semantic", lambda: web.service_up(web.semantic_url("/healthz"))),
+        ("cdc-start", None),
+    ):
+        started = time.time()
+        result = run(["make", target], timeout=1800)
+        evidence.add(
+            "make %s (rc=%d, %.0fs)" % (target, result.returncode, time.time() - started),
+            (result.stdout + result.stderr).strip()[-1200:],
+        )
+        assert result.returncode == 0, "make %s failed from a cold start" % target
+        if ready is not None:
+            ok, seconds = wait_for(ready, 180, 3.0)
+            evidence.add("%s answers /healthz" % target, "after %.0fs: %s" % (seconds, bool(ok)))
+            assert ok, "make %s returned 0 but the service never answered /healthz" % target
+
+    status = run(["make", "cdc-status"], timeout=300)
+    evidence.add("make cdc-status", (status.stdout + status.stderr).strip()[-1500:])
+
+    # The loader must actually be streaming, not merely started. A slot with a consumer is the
+    # observable fact; `cdc-status` deliberately never fails, so it cannot be the assertion.
+    slots = db.grid(
+        db.oltp_odoo(),
+        "SELECT slot_name, active, wal_status FROM pg_replication_slots ORDER BY slot_name;",
+    )
+    evidence.add("replication slots after cdc-start", slots)
+    rows = db.query(
+        db.oltp_odoo(), "SELECT slot_name, active FROM pg_replication_slots;"
+    )
+    assert rows, "cdc-start returned 0 but created no replication slot"
+    assert any(r[1] == "t" for r in rows), (
+        "a slot exists but has no consumer after cdc-start: %r" % (rows,)
+    )
+
+
+def test_the_fixture_tenant_and_cross_tenant_403_survive_a_cold_start(
+    foreign_before, evidence
+):
+    """`bct_t2` must hold rows before any isolation claim, then the 403 must still be exact.
+
+    Order matters here and it is the whole point: the precondition is asserted first, so that a 403
+    returned because the other tenant has no data cannot be mistaken for a 403 returned because the
+    boundary held.
+    """
+    from helpers import tokens, web
+
+    admin = db.warehouse_admin()
+    grid = db.grid(
+        admin,
+        "SELECT tenant_id, count(*) FROM marts.fct_sale_order_line GROUP BY 1 ORDER BY 1;",
+    )
+    evidence.add("rows per tenant in marts.fct_sale_order_line", grid)
+    other = db.scalar(
+        admin,
+        "SELECT count(*) FROM marts.fct_sale_order_line WHERE tenant_id = 'bct_t2';",
+    )
+    evidence.add("bct_t2 rows", other)
+    assert int(other or 0) > 0, (
+        "tenant bct_t2 holds no rows after the cold start, so a cross-tenant 403 below would pass "
+        "by having nothing to leak. `make up-analytics` loads this fixture tenant."
+    )
+
+    token = tokens.valid(tokens.claims(tenant="bct"))
+    response = web.request(
+        web.semantic_url("/v1/query"), method="POST",
+        payload={"metric": "revenue_net", "dimensions": ["date_day"],
+                 "filters": {"date_range": ["2026-01-01", "2026-12-31"],
+                             "tenant_id": "bct_t2"}, "limit": 5},
+        headers={"Authorization": "Bearer %s" % token},
+    )
+    evidence.add("bct token requesting bct_t2", "HTTP %s%s%s" % (response.status, NEWLINE, response.body))
+    assert response.status == 403, "expected 403, got %s: %s" % (response.status, response.body[:300])
+    assert response.json() == {
+        "error": "tenant_scope_violation",
+        "detail": "Session is not scoped to the requested tenant.",
+    }, "the 403 body no longer matches frozen contract 02: %s" % response.body
 
 
 def test_the_other_stacks_on_this_host_are_still_there(foreign_before, evidence):
