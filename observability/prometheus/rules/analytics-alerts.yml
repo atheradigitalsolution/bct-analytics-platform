@@ -70,20 +70,53 @@ groups:
             the PDP masking assertions, RLS-forced-on-every-mart, and tenant_id coverage.
 
       - alert: WarehouseBuildStale
-        # The exporter reports the age of the most recent dbt run. If nothing has
-        # run for two hours the marts are frozen, and every freshness number
+        # Age of the most recent dbt invocation OF ANY KIND. If nothing has run
+        # for two hours the marts are frozen, and every freshness number
         # downstream is describing a build that is no longer happening.
-        expr: min(bct_warehouse_dbt_test_age_seconds) > 7200
+        expr: min(bct_warehouse_dbt_run_age_seconds) > 7200
         for: 15m
         labels:
           severity: warning
           component: warehouse
         annotations:
-          summary: "No dbt build has completed for over 2 hours"
+          summary: "No dbt run has completed for over 2 hours"
           description: >-
             warehouse.dbt_run_result's most recent invocation is
             {{ $value | humanizeDuration }} old. The scheduled `dbt build` is not
             running, so marts are stale regardless of what the CDC consumer is doing.
+
+      - alert: WarehouseTestsNotRunning
+        # THE ALERT THAT WOULD HAVE CAUGHT THE BUG THAT CREATED IT.
+        #
+        # Every correctness series in this file - reconciliation included - is
+        # derived from the most recent dbt invocation that CONTAINED TESTS.
+        # `make dbt-run` is `dbt build --exclude-resource-type test` and carries
+        # none. So a pipeline that builds every few minutes and never tests has
+        # a perfectly healthy WarehouseBuildStale and a reconciliation check
+        # that has not run since whenever somebody last typed `make dbt-test` -
+        # while Prometheus reports every rule's health as ok.
+        #
+        # That is not a hypothetical: the exporter previously scoped to the
+        # newest invocation of ANY kind, landed on a test-free `dbt-run`, and
+        # silently emitted no reconciliation series at all. Fixed - but the
+        # underlying condition (tests simply not being run) is still possible,
+        # and it makes every other alert here vacuous rather than loud. So it
+        # gets a name.
+        #
+        # Threshold is deliberately looser than the build one: tests are
+        # expected to run less often than builds, just not never.
+        expr: min(bct_warehouse_dbt_test_age_seconds) > 14400
+        for: 15m
+        labels:
+          severity: warning
+          component: warehouse
+        annotations:
+          summary: "dbt tests have not run for over 4 hours - reconciliation is unchecked"
+          description: >-
+            The newest test-bearing dbt invocation is {{ $value | humanizeDuration }}
+            old. WarehouseReconciliationFailing and WarehouseDbtTestFailing read
+            that invocation, so both are reporting on stale results. A green
+            reconciliation panel means nothing while this is firing.
 
   # =========================================================================
   # Per-mart freshness, against ADR 0001's own SLA table.

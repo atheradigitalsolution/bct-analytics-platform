@@ -236,6 +236,14 @@ up-analytics: ## Start the warehouse, apply its DDL, sync the PDP policy and loa
 	@# as warehouse_reader; none of them can do anything useful without it.
 	@$(DC_ANALYTICS) ps --services --filter status=running | grep -qx postgres || { 		echo ""; 		echo "  The base stack is not running. up-analytics reads Odoo's Postgres"; 		echo "  as warehouse_reader to sync the PDP policy, generate raw.* and wire"; 		echo "  the reconciliation FDW, and it cannot do any of that without it."; 		echo ""; 		echo "      make up-dev"; 		echo ""; 		exit 1; 	}
 	@$(DC_ANALYTICS) up -d warehouse-db warehouse-exporter
+	@# RESTART, not just up. The exporter reads
+	@# analytics/warehouse/exporter/queries.yml from a bind mount, and
+	@# `up -d` only recreates a container when its DEFINITION changes - a
+	@# changed mounted file is invisible to it. That gap already produced
+	@# one alert (MartStalePage) whose selector matched zero series while
+	@# promtool passed and Prometheus reported health=ok. Restarting on
+	@# every bring-up costs a second and removes the whole class.
+	@$(DC_ANALYTICS) restart warehouse-exporter >/dev/null
 	@bash analytics/warehouse/bin/warehouse-apply.sh
 	@$(DC_ANALYTICS) --profile tools build dbt
 	@$(WCTL) sync-policy

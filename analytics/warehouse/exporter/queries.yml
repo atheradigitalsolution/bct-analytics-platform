@@ -37,9 +37,20 @@
 # ---------------------------------------------------------------------------
 bct_warehouse_dbt_test:
   query: |
+    -- THE MOST RECENT INVOCATION THAT ACTUALLY CONTAINED TESTS, not simply the
+    -- most recent invocation. `make dbt-run` is
+    -- `dbt build --exclude-resource-type test`, so its invocation carries ZERO
+    -- test rows. Scoping to the newest invocation of any kind lands on one of
+    -- those, the join yields nothing, and every series below VANISHES - so in
+    -- the normal operating loop (build often, test less often) the
+    -- reconciliation alert is dark almost all of the time while Prometheus
+    -- still reports the rule health as ok. The test results are sitting in the
+    -- table; the exporter simply could not see them.
     WITH latest AS (
       SELECT invocation_id
       FROM warehouse.dbt_run_result
+      WHERE resource_type = 'test'
+      GROUP BY invocation_id, run_started_at
       ORDER BY run_started_at DESC
       LIMIT 1
     )
@@ -77,15 +88,71 @@ bct_warehouse_dbt_test:
         description: "Seconds since the most recent dbt run started"
 
 # ---------------------------------------------------------------------------
+# The most recent invocation OF ANY KIND. Deliberately a separate series from
+# bct_warehouse_dbt_test_*, because after the fix above those two answer
+# different questions and conflating them is what made the reconciliation
+# alert dark:
+#
+#   bct_warehouse_dbt_run_age_seconds   how long since ANYTHING ran
+#   bct_warehouse_dbt_test_age_seconds  how long since TESTS ran
+#
+# A pipeline where builds run every few minutes and tests never run has a
+# healthy first number and an unbounded second one. That is precisely the state
+# in which reconciliation stops being checked while every dashboard still looks
+# alive, so it gets its own alert rather than being inferred.
+# ---------------------------------------------------------------------------
+bct_warehouse_dbt_run:
+  query: |
+    WITH latest AS (
+      SELECT invocation_id
+      FROM warehouse.dbt_run_result
+      GROUP BY invocation_id, run_started_at
+      ORDER BY run_started_at DESC
+      LIMIT 1
+    )
+    SELECT
+      r.resource_type                                          AS resource_type,
+      r.status                                                 AS status,
+      count(*)::bigint                                         AS nodes,
+      coalesce(max(extract(epoch FROM (now() - r.run_started_at))), 0)::bigint AS age_seconds
+    FROM warehouse.dbt_run_result r
+    JOIN latest l ON l.invocation_id = r.invocation_id
+    GROUP BY 1, 2
+  metrics:
+    - resource_type:
+        usage: "LABEL"
+        description: "dbt resource type: model, test, snapshot or seed"
+    - status:
+        usage: "LABEL"
+        description: "dbt node status"
+    - nodes:
+        usage: "GAUGE"
+        description: "Nodes in this state in the most recent invocation of any kind"
+    - age_seconds:
+        usage: "GAUGE"
+        description: "Seconds since the most recent dbt invocation of any kind started"
+
+# ---------------------------------------------------------------------------
 # Reconciliation specifically, labelled per check and per tenant-agnostic node
 # name, so the alert can say WHICH reconciliation broke rather than "a test
 # failed". The naming convention `recon_*` is enforced by the dbt project.
 # ---------------------------------------------------------------------------
 bct_warehouse_reconciliation:
   query: |
+    -- THE MOST RECENT INVOCATION THAT ACTUALLY CONTAINED TESTS, not simply the
+    -- most recent invocation. `make dbt-run` is
+    -- `dbt build --exclude-resource-type test`, so its invocation carries ZERO
+    -- test rows. Scoping to the newest invocation of any kind lands on one of
+    -- those, the join yields nothing, and every series below VANISHES - so in
+    -- the normal operating loop (build often, test less often) the
+    -- reconciliation alert is dark almost all of the time while Prometheus
+    -- still reports the rule health as ok. The test results are sitting in the
+    -- table; the exporter simply could not see them.
     WITH latest AS (
       SELECT invocation_id
       FROM warehouse.dbt_run_result
+      WHERE resource_type = 'test'
+      GROUP BY invocation_id, run_started_at
       ORDER BY run_started_at DESC
       LIMIT 1
     )

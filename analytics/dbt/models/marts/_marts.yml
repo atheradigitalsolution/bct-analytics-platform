@@ -425,6 +425,39 @@ models:
                 [tenant_id, date_day, operating_unit_id, company_id, revenue_channel,
                  partner_key, product_key]
 
+  - name: dim_product_cost
+    description: >-
+      "GRAIN: (tenant_id, product_key, company_id). Unit cost unpacked from
+      Odoo's company_dependent standard_price map. A separate model rather than
+      a column on dim_product because that is the grain the DATA has - putting
+      it on dim_product would mean either picking one company's cost and calling
+      it the cost, or exploding dim_product and breaking product_key uniqueness,
+      the SCD2 version key and every relationships test pointing at it."
+    columns:
+      - name: product_cost_key
+        data_tests: [not_null, unique]
+      - name: tenant_id
+        data_tests: [not_null]
+      - name: product_key
+        description: Resolves against dim_product; many cost rows per product is expected.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
+      - name: company_id
+        description: >-
+          The company the cost belongs to, parsed from the jsonb map key. Never
+          NULL - a row only exists because a company key was present.
+        data_tests: [not_null]
+      - name: unit_cost
+        description: >-
+          Cost in the company's own currency. NOT list_price, which is the sales
+          price and would overstate inventory by the entire margin.
+        data_tests: [not_null]
+    data_tests:
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, product_key, company_id]}
+
   - name: mart_stock_position
     description: >-
       "GRAIN: (tenant_id, product_key, company_id, operating_unit_id). Net
@@ -440,6 +473,18 @@ models:
               arguments: {to: ref('dim_product'), field: product_key}
       - name: net_qty
         data_tests: [not_null]
+      - name: has_unit_cost
+        description: >-
+          False when the product has no standard_price for this company, in
+          which case stock_valuation is NULL rather than 0. Carried so a
+          consumer can report how much of a position is unvalued instead of
+          summing over NULLs and presenting a partial total as a whole one.
+        data_tests: [not_null]
+      - name: stock_valuation
+        description: >-
+          net_qty * unit_cost, in company currency. NULL - not 0 - where the
+          cost is unknown. NULL means "we do not know what this is worth"; 0
+          would mean "this is worth nothing".
     data_tests:
       - unique_combination:
           arguments:

@@ -17,6 +17,13 @@ select
     product_tmpl_id,
     default_code,
     barcode,
+    -- LEFT AS jsonb ON PURPOSE. standard_price is company_dependent in
+    -- Odoo 19, so the value is a MAP keyed by company id -
+    -- {"1": 42000.0} - not a scalar. Casting it to text or numeric here
+    -- would be the res.partner.barcode mistake again: a map keyed by
+    -- something other than this row's grain treated as a single value.
+    -- It is unpacked at its true grain in dim_product_cost.
+    standard_price,
     active,
     create_date,
     write_date
