@@ -131,8 +131,13 @@ def settings_from_env(environ: dict[str, str] | None = None) -> Settings:
         warehouse_dsn=(
             f"host={wh_host} port={wh_port} dbname={wh_db} user={wh_user} password={wh_password}"
         ),
-        publication=env.get("CDC_PUBLICATION", f"bct_cdc_{slug}"),
-        slot=env.get("CDC_SLOT", f"bct_slot_{slug}"),
+        # `or`, not a dict default. An env var that is PRESENT BUT EMPTY must mean "not set" here:
+        # the run script forwards `-e CDC_PUBLICATION="${CDC_PUBLICATION:-}"` so the variable is
+        # always defined in the container, and `env.get(name, default)` would then return "" and
+        # silently override the per-tenant default. That produced `publication=''` and a startup
+        # refusal that named the right problem for the wrong reason.
+        publication=env.get("CDC_PUBLICATION") or "bct_cdc_%s" % slug,
+        slot=env.get("CDC_SLOT") or "bct_slot_%s" % slug,
         source_tables=source_tables,
         batch_size=int(env.get("CDC_BATCH_SIZE", "2000")),
         status_interval_seconds=float(env.get("CDC_STATUS_INTERVAL_SECONDS", "10")),
