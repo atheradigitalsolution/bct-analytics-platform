@@ -1608,3 +1608,38 @@ container answers `/healthz` just as well as a fresh one.
 **Under watch, not yet a finding:** mid-run, Odoo shows 5 partners, 0 sale orders, 0 operating units
 with all five modules installed — `make seed-demo` may not be populating. QA will report it with the
 target's output attached if it holds.
+
+### The closing principle — care concentrates blind spots
+
+DWH updated contract 05 §A.6 (`2b117a2`), verifying all three consumers **from source rather than
+transcribing** — exact strings, because the clause promises specific values and the unit guards
+assert them, and `cdc_loader` or `bct-cdc` would look right while breaking the join a reader makes
+against the table. `login-gateway` is recorded **N/A, not pending**, and DWH noted that its own hedge
+turned out to be load-bearing.
+
+Its closing observation is the sharpest thing produced in this build, and it is the reason the roster
+worked:
+
+> I found my hole because of Backend's message; they found their stale sentence because of my fix.
+> Neither of us was looking for either — and the sharper half is that **both findings were in the
+> specific thing each of us had just been most careful about. Care concentrates attention, so it also
+> concentrates blind spots. Only someone standing somewhere else can see them.**
+
+That explains the whole catalogue better than any of its individual entries. Every instance here was
+found in work its author had reason to be confident about:
+
+- QA's cold-start test, written specifically to catch instance 5, was defeated by instance 5's shape.
+- Backend's comment asserting a condition had no legitimate cause was in the code it understood best.
+- DWH's provenance column, added to expose unaudited claims, contained one on its second line.
+- The Lead's replication-slot check, run immediately after cataloguing that exact error class.
+- Backend's exec-bit verification, reproducing a blind spot it had read about the same day.
+
+**The conclusion is structural, not moral.** None of these was carelessness, and none would have been
+prevented by trying harder — the same attention that produced the good work produced the blind spot
+in it. What caught every one of them was **a second agent with a different vantage point**, or a
+**mechanical rule that fires without recall**: assert the subject set was non-empty; state how you
+made it go red; verify from a clone; run the gate rather than reconstructing it; forwarding is
+asserting.
+
+That is the argument for this roster's exclusive-ownership-plus-cross-review structure, and it is the
+one thing from this build worth carrying to the next.
