@@ -245,6 +245,40 @@ New variables, added per contract 04 §5's documented procedure (`changeme` in `
 The same is true of `raw` seen from `warehouse_rls`, and that is deliberate: the serving identity has
 no access to the landing zone at all.
 
+### 6. Every consumer MUST set `application_name` — added after finding it required of nobody
+
+| Consumer | `application_name` | Status |
+|---|---|---|
+| dbt | `dbt` | set (`analytics/dbt/profiles.yml`) |
+| `warehouse_ctl.py` | `warehouse_ctl` | set |
+| `warehouse-exporter` | `warehouse-exporter` | set (`docker-compose.analytics.yml`) |
+| **semantic-api** | `semantic-api` | **NOT SET — Backend action** |
+| **CDC loader** | `cdc-loader` | **NOT SET — Backend action** |
+| **login-gateway** | `login-gateway` | **NOT SET — Backend action** (if it connects at all) |
+
+**Why this is a contract clause and not a style note.** The whole attributability design in §B rests
+on this field, and I had required it of no one:
+
+- `warehouse.access_audit.application_name` is populated from
+  `current_setting('application_name')`, so every audit row written by a consumer that does not set
+  it records **NULL** for the one column that says *which service* did the read.
+- `log_line_prefix` is `%m [%p] %q%u@%d/%a` and `warehouse_rls` runs with `log_statement='all'`
+  specifically so a warehouse read is attributable even when the caller never calls `log_access()`.
+  With no `application_name`, `%a` is empty and that whole layer records *"someone holding
+  warehouse_rls"* — which is every serving consumer at once.
+- `warehouse_rls` is deliberately shared by the semantic-api and the exporter, so `usename` cannot
+  separate them. `application_name` is the **only** thing that can.
+
+So the audit table, the statement log and the connection budget were all built on a field nothing was
+obliged to fill. The column existed and the function ran, which is what made it look like it worked
+— the same shape as a check whose passing state is an empty result.
+
+**This was found by writing it down, not by a test failing**, and nothing here will fail while it
+stays unset: audits will simply carry NULL and the log will show an empty `%a`. A test asserting
+`access_audit.application_name IS NOT NULL` over a real serving period is the thing that would catch
+a regression, and it is **not yet written** — stated so it is not mistaken for covered.
+
+
 ## B. Tables in `warehouse` beyond the two the Lead froze
 
 Backend and Frontend may read the **published** rows. The rest are DWH-internal: nothing should build
