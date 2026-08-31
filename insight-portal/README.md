@@ -52,8 +52,8 @@ Always `-p odoo19-bct`. This host also runs `odoo19-platform-*`, `odoo19-analyti
 | `/healthz` | Route Handler | `{"status":"ok"}`. No token, no data. Container healthcheck. |
 | `/t/[tenant]/overview` | Server Component | Revenue, MoM growth, channel and Operating Unit splits. |
 | `/t/[tenant]/sales` | Server Component | Sales by month, product, partner, Operating Unit. |
-| `/t/[tenant]/inventory` | Server Component | Stock position by product and Operating Unit. |
-| `/t/[tenant]/finance` | Server Component | General ledger balances from `fct_account_move_line`. |
+| `/t/[tenant]/inventory` | Server Component | Stock position and valuation by product and Operating Unit. |
+| `/t/[tenant]/finance` | Server Component | General ledger balances by account type, P&L / balance-sheet split. |
 | `/t/[tenant]/ppob` | Server Component | Volume, success rate, commission, SLA breaches. |
 | `/t/[tenant]/drill` | Server Component | Generic drill-down, validated against `GET /v1/metrics`. |
 
@@ -91,11 +91,11 @@ symbol would unmask anything.
 
 ## Metrics consumed
 
-All ten declared metrics, and nothing else:
+All eleven declared metrics, and nothing else:
 
 `revenue_net`, `revenue_mom_growth`, `sales_total`, `sales_untaxed`, `stock_net_quantity`,
-`account_balance`, `ppob_transaction_count`, `ppob_commission_revenue`, `ppob_sla_breach_count`,
-`ppob_success_rate`.
+`stock_valuation`, `account_balance`, `ppob_transaction_count`, `ppob_commission_revenue`,
+`ppob_sla_breach_count`, `ppob_success_rate`.
 
 Three bindings that are easy to get wrong and are deliberate here:
 
@@ -104,9 +104,18 @@ Three bindings that are easy to get wrong and are deliberate here:
 - **`revenue_net` sums three UNIONed channels** (`invoice`, `pos`, `ppob_commission`) on purpose, as
   the metric's own `channel_note` declares. The channel split is on the overview so the total is
   never read as one line of business.
-- **`stock_net_quantity` gets no `date_range`.** `mart_stock_position` is a position, not a daily
-  series, and declares no such filter; sending one is a 400. The inventory view says so on screen
-  rather than leaving a viewer to discover it by changing dates and watching nothing happen.
+- **`stock_net_quantity` and `stock_valuation` get no `date_range`.** `mart_stock_position` is a
+  position, not a daily series, and declares no such filter; sending one is a 400. The inventory
+  view says so on screen rather than leaving a viewer to discover it by changing dates and watching
+  nothing happen.
+- **`stock_valuation` is a SUBTOTAL and is labelled as one.** Products with no unit cost carry a
+  NULL valuation, and SQL `SUM()` skips NULL without comment — 250 units of real stock on tenant
+  `bct` sit outside a number that reads as finished. A "Cakupan harga pokok" panel grouped by
+  `has_unit_cost` is rendered *before* the product breakdown so the excluded bucket is seen first.
+- **`is_profit_and_loss` can be NULL**, meaning neither — section and note lines carry no account —
+  and NULL is not `false`. This seed has zero such rows, which is not evidence they cannot occur, so
+  the group is still rendered and labelled. `tests/format.test.ts` proves the label, because no live
+  query can reach that branch today.
 
 ### What is not available, and why
 
@@ -119,11 +128,18 @@ it. Three distinct reasons, which are not interchangeable:
 - **`no_data`** — year-on-year growth. The warehouse spans 2025-09-01 to 2026-08-31, so no month has
   a prior-year counterpart and every value would be null. Month-over-month is shown instead and is
   labelled month-over-month.
-- **`no_metric`** — gross margin, AR ageing, cash position, sales funnel stages, stock valuation,
-  stock ageing, stock turnover, and the profit-and-loss / balance-sheet split. Each would be
-  business logic reimplemented in TypeScript. `account_balance` gives balances per account, but
-  `fct_account_move_line` carries `account_id` and no account *type*, and there is no `dim_account`,
-  so nothing distinguishes an income account from an asset one.
+- **`no_metric`** — gross margin, AR ageing, cash position, sales funnel stages, stock ageing and
+  stock turnover. Each would be business logic reimplemented in TypeScript, and several are ratios,
+  which the brief forbids outright in a component.
+
+Two entries that used to sit here are gone because Backend declared the metrics:
+
+- **Stock valuation** is now `stock_valuation`, at `standard_price`. `list_price` would have
+  overstated inventory by the entire margin.
+- **The profit-and-loss / balance-sheet split** is a group-by on `account_balance` over
+  `account_type` and `is_profit_and_loss`, not two metrics. Two names for the same measure over a
+  filtered set is a view wearing a metric's clothes, and Backend declined to declare them for that
+  reason.
 
 ---
 
@@ -161,7 +177,7 @@ Method — stated because the number means nothing without it:
   reported separately rather than folded in.
 - p95 is nearest-rank: the value at `ceil(0.95 × 60)`, the 57th slowest sample. No interpolation.
 - Data: 12 months, 2025-09-01 to 2026-08-31. `mart_revenue_daily` 777 rows, `mart_sales_daily` 290,
-  `mart_ppob_transaction` 345, `mart_stock_position` 27, `fct_account_move_line` 862.
+  `mart_ppob_transaction` 345, `mart_stock_position` 27/28, `fct_account_move_line` 862.
 - Hardware: Windows 11 (10.0.26200), 16 logical CPUs, 31.3 GiB RAM, Node 24.11.1. The whole stack —
   Odoo, both Postgres instances, the gateway, the semantic API and the portal — on one machine.
 
@@ -169,26 +185,26 @@ Shipped default (`INSIGHT_PORTAL_CACHE_TTL_SECONDS=30`), all times in ms:
 
 | view | n | cold | min | p50 | **p95** | p99 | max | ttfb p95 | kB | failed panels |
 |---|---|---|---|---|---|---|---|---|---|---|
-| overview | 60 | 177 | 24 | 30 | **43** | 52 | 52 | 17 | 83 | 0 |
-| sales | 60 | 169 | 19 | 32 | **49** | 53 | 53 | 17 | 99 | 0 |
-| inventory | 60 | 70 | 14 | 18 | **24** | 28 | 28 | 11 | 68 | 0 |
-| finance | 60 | 105 | 15 | 19 | **22** | 23 | 23 | 11 | 74 | 0 |
-| ppob | 60 | 119 | 19 | 23 | **26** | 42 | 42 | 10 | 96 | 0 |
+| overview | 60 | 132 | 16 | 19 | **27** | 31 | 31 | 11 | 83 | 0 |
+| sales | 60 | 73 | 18 | 24 | **39** | 48 | 48 | 14 | 99 | 0 |
+| inventory | 60 | 95 | 18 | 21 | **27** | 35 | 35 | 10 | 91 | 0 |
+| finance | 60 | 94 | 16 | 20 | **31** | 45 | 45 | 13 | 88 | 0 |
+| ppob | 60 | 121 | 18 | 22 | **30** | 35 | 35 | 11 | 96 | 0 |
 
-Worst p95 across the five views: **49 ms**.
+Worst p95 across the five views: **39 ms**.
 
 Cache disabled (`INSIGHT_PORTAL_CACHE_TTL_SECONDS=0`), every panel queries the warehouse — the
 honest worst case:
 
 | view | n | cold | min | p50 | **p95** | p99 | max | ttfb p95 | kB | failed panels |
 |---|---|---|---|---|---|---|---|---|---|---|
-| overview | 60 | 394 | 117 | 149 | **233** | 300 | 300 | 42 | 83 | 0 |
-| sales | 60 | 125 | 115 | 135 | **192** | 211 | 211 | 35 | 99 | 0 |
-| inventory | 60 | 119 | 64 | 88 | **107** | 142 | 142 | 31 | 68 | 0 |
-| finance | 60 | 94 | 75 | 105 | **135** | 188 | 188 | 33 | 74 | 0 |
-| ppob | 60 | 198 | 156 | 177 | **224** | 472 | 472 | 35 | 96 | 0 |
+| overview | 60 | 290 | 104 | 128 | **153** | 162 | 162 | 32 | 83 | 0 |
+| sales | 60 | 143 | 90 | 121 | **164** | 190 | 190 | 34 | 99 | 0 |
+| inventory | 60 | 129 | 98 | 113 | **142** | 182 | 182 | 30 | 91 | 0 |
+| finance | 60 | 114 | 86 | 111 | **150** | 155 | 155 | 28 | 88 | 0 |
+| ppob | 60 | 143 | 125 | 144 | **213** | 314 | 314 | 33 | 96 | 0 |
 
-Worst p95 across the five views: **233 ms**.
+Worst p95 across the five views: **213 ms**.
 
 Both are reported because only one of them is honest on its own. The cached number is what an
 operator experiences; the uncached number is what the system can actually do, and it is the one to
@@ -348,7 +364,7 @@ node scripts/screenshot.mjs evidence
 node scripts/freshness-freeze-proof.mjs   # stops and restarts odoo19-bct-cdc
 ```
 
-94 tests. The runner prints, loudly, whether the live suite ran — a green run that never reached the
+100 tests. The runner prints, loudly, whether the live suite ran — a green run that never reached the
 database is the defect pattern this build keeps producing, and the runner refuses to let that look
 like a full pass.
 
