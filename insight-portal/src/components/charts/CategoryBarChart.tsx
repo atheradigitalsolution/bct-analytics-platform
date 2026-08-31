@@ -34,11 +34,14 @@ export function CategoryBarChart({
   unit,
   type = "decimal",
   title,
+  seriesLabel,
 }: {
   data: CategoryPoint[];
   unit: string | null;
   type?: string;
   title: string;
+  /** What the tooltip and the screen reader call this series. Defaults to the panel title. */
+  seriesLabel?: string;
 }) {
   const height = Math.max(160, data.length * 30 + 36);
   return (
@@ -87,6 +90,10 @@ export function CategoryBarChart({
           />
           <Bar
             dataKey="value"
+            // Without an explicit name the tooltip and the screen-reader announcement both read
+            // the literal key: "value : 99.851 unit". Found by the keyboard audit, which reads the
+            // announced text rather than assuming it is sensible.
+            name={seriesLabel ?? title}
             fill={CHART.series[0]}
             radius={[0, 4, 4, 0]}
             barSize={16}

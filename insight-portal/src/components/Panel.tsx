@@ -207,7 +207,15 @@ export function MetricSection({
       label: formatDimension(dimension, row[dimension] ?? null),
       value: row.value,
     }));
-    plot = <CategoryBarChart data={points} unit={unit} type={type} title={title} />;
+    plot = (
+      <CategoryBarChart
+        data={points}
+        unit={unit}
+        type={type}
+        title={title}
+        seriesLabel={label}
+      />
+    );
   }
 
   return (
