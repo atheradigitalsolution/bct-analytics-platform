@@ -143,11 +143,21 @@ class Warehouse:
 
         The exporter's ~3 is an allowance nobody has checked, and it is recorded as unverified
         rather than left looking like the other figures. Nothing pins it: the exporter's compose
-        `command:` flags change WHAT it queries, not how many connections it opens. It also cannot
-        be measured from here, because it connects as ``warehouse_rls`` -- the SAME role this pool
-        uses -- so ``pg_stat_activity`` cannot separate the two by ``usename``. Isolating it needs
-        a distinct ``application_name`` or its own role. Found by DWH in its own copy of this
-        budget, one line below the asymmetry I had found in it.
+        `command:` flags change WHAT it queries, not how many connections it opens. Found by DWH in
+        its own copy of this budget, one line below the asymmetry I had found in it.
+
+        It is now MEASURABLE and still NOT MEASURED, and those are different states. Until
+        DWH's c5094db the exporter was the only warehouse consumer with no ``application_name``,
+        and it connects as ``warehouse_rls`` -- the SAME role this pool uses -- so
+        ``pg_stat_activity`` could not separate the two by ``usename``. Its DSN now carries
+        ``application_name=warehouse-exporter``, which closes that. The figure stays unverified
+        because the means existing is not the measurement being taken::
+
+            SELECT application_name, count(*) FROM pg_stat_activity
+             WHERE datname = 'warehouse' GROUP BY 1;
+
+        Not run: QA holds the stack and this is not worth a connection during its cold-start
+        measurement.
 
         Consequence for a measurement I reported earlier and should restate: when I observed
         ``warehouse_rls = 2`` and read it as this pool, that count could not have excluded the
