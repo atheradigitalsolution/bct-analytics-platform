@@ -302,3 +302,28 @@ here, in three layers, because no single one of them is sufficient:
 Postgres cannot trigger on `SELECT`, so layer 2 cannot be made mandatory inside the database without
 pgaudit, which `postgres:16-alpine` does not ship. Layer 1 is what closes that gap. Stated plainly
 rather than left as an implied guarantee.
+
+## Amendment at GATE 3 — `_row_id` is a fifth meta column, and that is accepted
+
+QA noticed `raw.*` carries `_row_id` beyond the four this contract called "exactly these", and asked
+whether to amend the contract or drop the column. **Amending.**
+
+| Column | Type | Meaning |
+|---|---|---|
+| `_row_id` | surrogate | unique identity of one landed row |
+
+It earns its place: `_lsn` orders changes but is **not unique** — several changes committed in one
+transaction share an LSN — so `(_tenant_id, pk, _lsn)` cannot always name a single landed row.
+`_row_id` can, which matters for dedup, for pointing at a specific landing row in a bug report, and
+for stable pagination over an append-only table.
+
+**Constraints on its use, binding on every agent:**
+- It is a *landing-zone* surrogate. It has no meaning in Odoo and must never be exposed as a business
+  key, joined on across tables, or surfaced in a mart or a metric.
+- Ordering semantics are unchanged: `(_tenant_id, <pk>, _lsn)` remains the ordering key. `_row_id`
+  breaks ties within an LSN; it does not replace the ordering.
+- Dropping the column later is a breaking change to `stg_` models.
+
+Raising this rather than silently tolerating the drift was the right call — "exactly these" is the
+kind of wording that either binds or should be changed, and a contract nobody enforces is worse than
+no contract.
