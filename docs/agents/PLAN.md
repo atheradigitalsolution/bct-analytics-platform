@@ -1074,3 +1074,55 @@ contract 06 §2 carrying the `503` row and the queue-then-shed rule.
 
 That second one is the more useful entry. Knowing about a trap, having just written it down, did not
 prevent repeating it — which is an argument for a **check**, not for more documentation.
+
+### Arithmetic that lived in a commit message is now a gate
+
+Backend sized its pool against `max_connections` and wrote the arithmetic into a docstring. DWH —
+named in it as the largest other consumer — measured its own actual usage, then observed that the
+whole calculation was in the wrong place.
+
+**Measured first, which corrected one input:**
+
+```
+peak by role during a full dbt build:  warehouse (dbt) 5 | warehouse_loader 3 | warehouse_rls 2
+peak total concurrent: 10
+```
+
+dbt peaks at **5**, not the 8 Backend budgeted — `DBT_THREADS` is 4, so it is threads+1, and one of
+those 5 was DWH's own sampler. Backend's figure was conservative in DWH's favour, so nothing needed
+changing. **DWH checked before proposing a correction, and then did not propose one.**
+
+**The real finding:** *"Nobody owns `max_connections`; every consumer sizes its pool against it in
+isolation — which is exactly the number that is right the day it is written and wrong three months
+later when one consumer is retuned by someone who never saw the others."*
+
+`verify` now computes the budget from the **live** `max_connections` and fails when claims exceed it:
+
+```
+OK  connection budget: 31 claimed of 37 usable (6 spare)
+```
+
+**Proven able to fail**, re-run with `DBT_THREADS=12`:
+
+```
+CONNECTION BUDGET OVERSUBSCRIBED: 39 claimed vs 37 usable (40 - 3 reserved)
+     16  semantic-api pool (Backend)
+     13  dbt (DBT_THREADS + 1)
+      3  CDC loader
+      3  postgres_exporter
+      4  ad-hoc psql headroom
+exit 5
+```
+
+Backend's 16 is a **named line** in that output, so raising `DBT_THREADS` tells you whose budget you
+are spending rather than merely that you are over.
+
+**The failure mode DWH named is the build's signature shape, caught before it happened:** raising
+`DBT_THREADS` is a one-word edit in `.env` with **no local symptom**, and the damage lands on someone
+else's service. Exhaustion would surface as a 503 from semantic-api and a failed dbt thread, and
+**neither message names the connection budget as the cause** — a real fault whose visible symptom
+points elsewhere.
+
+This is the first entry in this catalogue written **before** the defect occurred rather than after.
+It is also the answer to the question Backend's `bash -n` repeat raised: knowing about a trap does
+not prevent it — **a check does.**
