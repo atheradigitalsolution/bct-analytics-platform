@@ -258,10 +258,31 @@ Notes that matter for panel design:
   consumer dies** — which is the failure it would most need to report. **Page on
   `postgres_exporter`'s `pg_replication_slots_pg_wal_lsn_diff` instead**, which keeps reporting after
   this process is gone. The value of publishing both is that they can *disagree*.
+
+  > **UNMET DEPENDENCY, as of Phase 3.** QA measured that `postgres-exporter` currently emits **no**
+  > `pg_replication_slots_*` series at all: the v0.16 collector is off by default and the compose
+  > service passes neither the flag nor a query file. So the paging path this section prescribes
+  > **does not exist yet**, and until Platform-Infra enables it the consumer-side gauge above is the
+  > only slot-lag signal in the system — which is precisely the configuration this note warns
+  > against, because it cannot report the failure that matters most. Do not read this paragraph as
+  > describing something that works today. Whichever metric naming Platform-Infra lands on has to
+  > reach `observability/prometheus/rules/analytics-alerts.yml` as well as `platform.rules.yml`.
 - `bct_cdc_landing_row_amplification` (rows ÷ distinct ids) is legitimately **above 1** — append-only
   means one row per change, and the backfill/stream overlap adds one more. It is a trend.
   `bct_cdc_landing_duplicate_changes` (rows sharing `(id, _op, _lsn)`) has **no legitimate cause**
   and should be `0`.
+
+#### A trap when running the loader against a probe slug
+
+`CDC_TENANT_SLUG` names the **publication and the replication slot**. The value written to
+`_tenant_id` in the landing zone comes from **`CDC_TENANT_DB`**. The two are independent.
+
+The consequence is the dangerous part, found by QA while designing a resumability test: a probe run
+under a *new slug* but the *live database* resumes from the live tenant's high-water mark and
+therefore **lands nothing — which is indistinguishable from a passing test**. A throwaway run must
+set `CDC_TENANT_DB` as well as `CDC_TENANT_SLUG`, or it is measuring nothing.
+
+Both are forwarded by `scripts/analytics/cdc-run.sh`, along with `CDC_PUBLICATION` and `CDC_SLOT`.
 
 ### semantic-api — `odoo19-bct-semantic-api:8080/metrics`
 
