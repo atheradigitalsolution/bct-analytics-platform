@@ -1860,3 +1860,61 @@ The Lead attempted to confirm the alerting finding by querying `warehouse.dbt_ru
 not: **`odoo19-bct-warehouse-db` does not currently exist**, because the cold start has torn the
 stack down and is mid-rebuild. The reading will be taken when the run reports. Stated as
 **not verified** rather than reasoned around — which is the whole point of the exercise.
+
+### Instance 26 — `ARGS` leaks through `MAKEFLAGS` into every nested `make`
+
+**The Lead's own instruction triggered this.** I asked QA for verbatim evidence, so it ran
+`make test-coldstart ARGS="-s -ra"`. `-s` is a **pytest** flag. Both cold starts then died at:
+
+```
+error: unknown argument: -s (try --help)
+make[1]: *** [Makefile:143: seed-demo] Error 1
+```
+
+`seed-demo`'s recipe is `bash scripts/seed-demo.sh $(if $(TENANT),--db $(TENANT),) $(ARGS)`, so it
+received `-s` and refused.
+
+**QA proved the mechanism with a two-line makefile rather than reasoning about it:**
+
+```
+$ make -f leak.mk outer ARGS="-s -ra"
+outer ARGS=[-s -ra]  MAKEFLAGS=[ -- ARGS=-s\ -ra]
+inner ARGS=[-s -ra]        <- a wholly separate `make` process, not $(MAKE)
+```
+
+A command-line variable is exported through `MAKEFLAGS` to **every** nested `make`, including one
+spawned as a separate process by a test.
+
+**One flag produced four red tests, none of them about what they were testing:** no seed -> no CDC
+rows -> no marts -> the cross-tenant test erroring on a missing relation, plus four alert rules with
+no samples. A cascade that looks exactly like a broken pipeline and is a single argument in the wrong
+place.
+
+**QA's earlier refusal to guess is what made this findable.** It had declined to say whether
+`seed-demo` *"returned non-zero"* or *"returned 0 having done nothing"* — *"it was the first, for a
+reason outside the script."* Had it guessed the second, the investigation would have gone into the
+seed generator, which was never at fault.
+
+Fixed on QA's side in `97cc183`: every nested `make` passes an explicit `ARGS=`, which beats
+`MAKEFLAGS` on the child's own command line.
+
+**Held for Platform-Infra, not routed while QA is running.** This is not specific to the test suite:
+**any** target forwarding `$(ARGS)` to a script inherits an unrelated parent invocation's `ARGS`, and
+`make test ARGS='-k foo'` composes the same way. `MAKEFLAGS=` in the recipe, or `unexport ARGS`,
+closes it.
+
+### The alerting finding survives, and is independent of the leak
+
+Confirmed by QA as separate: four warehouse rules have **no current samples** because `make dbt-run`
+excludes tests, so the exporter has no test-bearing invocation to scope to on a fresh warehouse. Dark
+on any stack following the documented path until `make dbt-test` runs once. Also banked from that
+run before the cascade: the overlay returned correctly (5/5 targets, 1 alertmanager), and all seven
+earlier tests passed **including the credential assertion in both directions** and the four Backend
+pipeline targets.
+
+### Two items now held for Platform-Infra
+
+1. `up-semantic` has no make prerequisite on `up-gateway` — it starts clean and rejects every token.
+2. `ARGS` leaking via `MAKEFLAGS` into nested `make` and thence into shell scripts.
+
+Both deliberately not routed while QA holds the stack and is verifying those same targets.
