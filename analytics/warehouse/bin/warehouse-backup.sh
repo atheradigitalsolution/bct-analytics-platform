@@ -7,7 +7,7 @@
 #
 # Follows scripts/tenant-backup.sh's conventions exactly, because one runbook
 # is the whole point of ADR 0001 choosing Postgres: same layout, same
-# pg_dump --format=custom --compress=9 --no-owner --no-acl, same manifest.json,
+# pg_dump --format=custom --compress=9, same manifest.json,
 # same SHA256SUMS verified BEFORE anything is dropped.
 #
 # WHAT IS AND IS NOT BACKED UP, and why the difference matters here more than
@@ -64,23 +64,126 @@ log() { printf '  %s\n' "$*" >&2; }
 # --- restore ---------------------------------------------------------------
 if [ "$MODE" = restore ]; then
   [ -d "$RESTORE_DIR" ] || { echo "no such backup directory: $RESTORE_DIR" >&2; exit 1; }
-  log "[1/3] verifying SHA256SUMS BEFORE touching the database"
+  log "[1/4] verifying SHA256SUMS BEFORE touching the database"
   ( cd "$RESTORE_DIR" && sha256sum -c SHA256SUMS ) >&2
 
-  log "[2/3] restoring into database ${WH_DB}"
+  log "[2/4] restoring into database ${WH_DB}"
   # --clean --if-exists rather than DROP DATABASE: dbt, the CDC loader and the
   # semantic API all hold pooled connections, and DROP DATABASE fails while any
-  # session is attached. This restores in place and is what a real recovery
+  # session is attached. This restores in place, which is what a real recovery
   # would do with services running.
+  #
+  # NOTE the ABSENCE of --no-owner, and it is deliberate. See the pg_dump call
+  # below for the full reason; the short version is that ownership is a
+  # security control here, not metadata.
   MSYS_NO_PATHCONV=1 "${DC[@]}" exec -T -e PGPASSWORD="${WAREHOUSE_ADMIN_PASSWORD}" warehouse-db \
-    pg_restore --clean --if-exists --no-owner --no-acl \
+    pg_restore --clean --if-exists \
                -U "$WH_ADMIN" -d "$WH_DB" < "$RESTORE_DIR/database.dump"
 
-  log "[3/3] re-applying the tracked DDL (roles, grants, RLS functions)"
-  # A dump carries objects, not role passwords or ALTER ROLE settings. Without
-  # this the restored warehouse has its tables and none of the privilege
-  # separation that makes RLS mean anything.
+  log "[3/4] reasserting ownership on the non-superuser role, then re-applying the tracked DDL"
+  # TWO THINGS A DUMP DOES NOT CARRY, both of which the warehouse needs.
+  #
+  # 1. OWNERSHIP OF ANYTHING THE DUMP DID NOT NAME AN OWNER FOR. pg_restore
+  #    assigns those to the RESTORING role, which here is warehouse_admin, a
+  #    SUPERUSER. A superuser bypasses row security unconditionally, so a
+  #    restore that leaves the marts owned by one has silently deleted the
+  #    tenant boundary - with nothing erroring and every query still returning
+  #    rows. This was not theoretical: an earlier version of this script passed
+  #    --no-owner and produced exactly that, all 41 tables and five schemas
+  #    owned by warehouse_admin, with `warehouse` getting "permission denied
+  #    for schema marts" on its own warehouse.
+  #
+  # 2. ROLE PASSWORDS AND ALTER ROLE SETTINGS. Without warehouse-apply.sh the
+  #    restored warehouse has its tables and none of the privilege separation
+  #    that makes RLS mean anything.
+  #
+  # Identity-linked sequences are skipped: they follow their table, and
+  # ALTER SEQUENCE OWNER on one errors with "is linked to table".
+  MSYS_NO_PATHCONV=1 "${DC[@]}" exec -T -e PGPASSWORD="${WAREHOUSE_ADMIN_PASSWORD}" warehouse-db \
+    psql -v ON_ERROR_STOP=1 -q -U "$WH_ADMIN" -d "$WH_DB" \
+         -v wh="${WAREHOUSE_DB_USER:-warehouse}" <<'OWNERSQL'
+-- psql substitutes :'wh' at the top level but NOT inside a dollar-quoted
+-- block, which is why the role name travels through set_config rather than
+-- being interpolated into the DO body.
+SELECT set_config('warehouse.reown_target', :'wh', false);
+DO $reown$
+DECLARE
+  r record;
+  owner text := current_setting('warehouse.reown_target');
+BEGIN
+  FOR r IN SELECT nspname FROM pg_namespace
+            WHERE nspname IN ('raw','staging','marts','warehouse','snapshots')
+               OR nspname LIKE 'src\_%' LOOP
+    EXECUTE format('ALTER SCHEMA %I OWNER TO %I', r.nspname, owner);
+  END LOOP;
+
+  FOR r IN SELECT n.nspname, c.relname, c.relkind FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE (n.nspname IN ('raw','staging','marts','warehouse','snapshots')
+                  OR n.nspname LIKE 'src\_%')
+             AND c.relkind IN ('r','v','m','S','p','f')
+             AND (c.relkind <> 'S' OR NOT EXISTS (
+                   SELECT 1 FROM pg_depend d
+                    WHERE d.objid = c.oid
+                      AND d.classid = 'pg_class'::regclass
+                      AND d.deptype IN ('a','i'))) LOOP
+    EXECUTE format('ALTER %s %I.%I OWNER TO %I',
+                   CASE r.relkind
+                     WHEN 'S' THEN 'SEQUENCE'
+                     WHEN 'v' THEN 'VIEW'
+                     WHEN 'm' THEN 'MATERIALIZED VIEW'
+                     WHEN 'f' THEN 'FOREIGN TABLE'
+                     ELSE 'TABLE' END,
+                   r.nspname, r.relname, owner);
+  END LOOP;
+
+  FOR r IN SELECT p.oid::regprocedure AS sig FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+           WHERE n.nspname IN ('raw','staging','marts','warehouse','snapshots') LOOP
+    EXECUTE format('ALTER FUNCTION %s OWNER TO %I', r.sig, owner);
+  END LOOP;
+
+  RAISE NOTICE 'ownership reasserted on %', owner;
+END
+$reown$;
+OWNERSQL
+
   bash analytics/warehouse/bin/warehouse-apply.sh >/dev/null
+
+  log "[4/4] asserting the tenant boundary survived the restore"
+  # A restore that looks like it worked and has quietly removed RLS is the
+  # worst outcome available here, so it is asserted rather than assumed.
+  MSYS_NO_PATHCONV=1 "${DC[@]}" exec -T -e PGPASSWORD="${WAREHOUSE_ADMIN_PASSWORD}" warehouse-db \
+    psql -v ON_ERROR_STOP=1 -U "$WH_ADMIN" -d "$WH_DB" <<'CHECKSQL'
+DO $chk$
+DECLARE bad int;
+BEGIN
+  SELECT count(*) INTO bad
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_roles ro ON ro.oid = c.relowner
+   WHERE n.nspname = 'marts' AND c.relkind = 'r'
+     AND (ro.rolsuper OR ro.rolbypassrls);
+  IF bad > 0 THEN
+    RAISE EXCEPTION
+      'RESTORE FAILED THE SECURITY CHECK: % mart(s) are owned by a role that bypasses row '
+      'security. The tenant boundary is gone.', bad;
+  END IF;
+
+  SELECT count(*) INTO bad
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'marts' AND c.relkind = 'r'
+     AND NOT (c.relrowsecurity AND c.relforcerowsecurity);
+  IF bad > 0 THEN
+    RAISE EXCEPTION 'RESTORE FAILED THE SECURITY CHECK: % mart(s) lack ENABLE+FORCE RLS.', bad;
+  END IF;
+
+  RAISE NOTICE 'restore security check PASSED: every mart is owned by a non-superuser and has FORCE RLS';
+END
+$chk$;
+CHECKSQL
+
   log "restore complete. Run 'make dbt-run' to rebuild derived models."
   exit 0
 fi
@@ -90,9 +193,16 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="$OUT_ROOT/$STAMP"
 mkdir -p "$DEST"
 
+# NOTE the deviation from scripts/tenant-backup.sh, which passes
+# --no-owner --no-acl. That is right for Odoo, where a restore may target a
+# database whose role names differ. It is WRONG here: this warehouse's roles
+# are created by tracked DDL under fixed names, and ownership is LOAD-BEARING
+# rather than metadata - `warehouse` must own the marts, because it is
+# NOSUPERUSER NOBYPASSRLS and that is the only reason FORCE ROW LEVEL
+# SECURITY means anything. Ownership therefore travels with the dump.
 log "[1/3] pg_dump (custom format, compress 9)"
 MSYS_NO_PATHCONV=1 "${DC[@]}" exec -T -e PGPASSWORD="${WAREHOUSE_ADMIN_PASSWORD}" warehouse-db \
-  pg_dump --format=custom --compress=9 --no-owner --no-acl \
+  pg_dump --format=custom --compress=9 \
           -U "$WH_ADMIN" -d "$WH_DB" > "$DEST/database.dump"
 [ -s "$DEST/database.dump" ] || { echo "pg_dump produced an empty file." >&2; exit 1; }
 

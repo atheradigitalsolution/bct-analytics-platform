@@ -284,4 +284,53 @@ COMMENT ON VIEW warehouse.mart_freshness IS
   'metric contract §3: the single source of meta.last_refreshed_at / meta.is_stale. '
   'A mart with no pipeline_state row reports is_stale = true, never "fresh".';
 
+
+-- ---------------------------------------------------------------------------
+-- CONSTRAINT CONVERGENCE.
+--
+-- CREATE TABLE IF NOT EXISTS is idempotent in the weak sense - it does not
+-- error - but it does NOT converge: if a table exists and has lost a
+-- constraint, the statement is a silent no-op and the table stays wrong.
+--
+-- That is not hypothetical. A pg_restore --clean that was interrupted part way
+-- through its drop phase left warehouse.mart_sla, warehouse.pipeline_state,
+-- warehouse.dbt_run_result and warehouse.tenant_registry with NO primary key,
+-- and re-running this file "successfully" repaired none of it. The first
+-- symptom was an ON CONFLICT failing with "there is no unique or exclusion
+-- constraint matching the ON CONFLICT specification" - and the CDC loader
+-- upserts pipeline_state through exactly that path, so the next thing to break
+-- would have been the pipeline.
+--
+-- So the primary keys are asserted separately from the table creation. This
+-- makes warehouse-apply.sh a genuine repair tool rather than only a
+-- first-boot one.
+-- ---------------------------------------------------------------------------
+DO $ensure_pk$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT * FROM (VALUES
+      ('column_policy',   'column_policy_pkey',   'source_table, source_column'),
+      ('pipeline_state',  'pipeline_state_pkey',  'tenant_id, source_table'),
+      ('tenant_registry', 'tenant_registry_pkey', 'tenant_id'),
+      ('mart_sla',        'mart_sla_pkey',        'mart_name'),
+      ('access_audit',    'access_audit_pkey',    'id'),
+      ('dbt_run_result',  'dbt_run_result_pkey',  'invocation_id, node_id')
+    ) AS t(tbl, con, cols)
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint c
+      JOIN pg_class    k ON k.oid = c.conrelid
+      JOIN pg_namespace n ON n.oid = k.relnamespace
+      WHERE n.nspname = 'warehouse' AND k.relname = r.tbl AND c.contype = 'p'
+    ) THEN
+      EXECUTE format('ALTER TABLE warehouse.%I ADD CONSTRAINT %I PRIMARY KEY (%s)',
+                     r.tbl, r.con, r.cols);
+      RAISE NOTICE 'restored missing primary key on warehouse.% ', r.tbl;
+    END IF;
+  END LOOP;
+END
+$ensure_pk$;
+
 RESET ROLE;
