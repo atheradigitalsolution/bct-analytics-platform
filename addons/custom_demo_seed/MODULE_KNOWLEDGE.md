@@ -117,6 +117,7 @@ equals the raw `select count(*) from stock_move`.
 | operating_units | 2 | 2 |
 | partners | 40 | 40 |
 | products | 12 | 12 |
+| uncosted_products | 1 | 1 |
 | billers | 6 | 6 |
 | sale_orders | 120 | 120 |
 | sale_order_lines | 311 | 311 |
@@ -142,13 +143,13 @@ With the defaults, on a database seeded 2026-08-30:
 |---|---|---|
 | `operating.unit` | 2 | `OU-DEMO-JKT`, `OU-DEMO-BDG` |
 | `res.partner` | 40 | `DEMO-C-0001` … `DEMO-C-0040` |
-| `product.template` | 12 | 9 storable + 3 service |
+| `product.template` | 13 | 9 storable + 3 service + **1 storable with no cost** (§3.1) |
 | `ppob.biller` | 6 | electricity ×2, water, telco, internet, insurance |
 | `sale.order` | 120 | `2025-09-02` → `2026-08-27`, **12 distinct months, 2 OUs** |
 | `sale.order.line` | 311 | 1–4 lines per order |
 | `account.move` (customer invoices) | 120 | all posted, **0 without an Operating Unit** |
 | `stock.picking` | 109 | all done, **0 without an Operating Unit** |
-| `stock.move` | 248 | 239 deliveries + 9 inventory adjustments |
+| `stock.move` | 248 | 238 deliveries + 10 inventory adjustments (9 catalogue + 1 no-cost) |
 | `pos.order` | 96 | 12 months, 2 OUs |
 | `ppob.transaction` | 360 | 328 success / 27 failed / 5 reversed |
 
@@ -160,6 +161,65 @@ Also created: **two internal users**, each entitled to exactly one Operating Uni
 cross-unit isolation of `custom_operating_unit` can be demonstrated by logging in rather than only
 by a unit test. **No password is set on either** — the accounts cannot be logged into until an
 administrator sets one, so a seeded database never ships a known credential.
+
+---
+
+### 3.1 `DEMO-P-NOC-001` — one storable product with no cost, on purpose
+
+Requested by the Data Warehouse agent. `mart_stock_position` carries `has_unit_cost`, and its
+**false branch had never executed**: DWH measured 27 position rows, 27 valued, 0 unvalued. The only
+two products in the database without a `standard_price` were **Tips** and **Down Payment**, created
+by `point_of_sale` and `sale`, and both are non-storable — so they produce no stock move and never
+reach a position row at all. DWH recorded that as NOT VERIFIED **inside `dim_product_cost.sql`**,
+not merely in a report.
+
+The correlation is structural rather than accidental: a product with no cost is usually a service.
+The one shape that breaks it is **storable, with stock moves, and no `standard_price`.**
+
+| property | value | why it is load-bearing |
+|---|---|---|
+| `is_storable` | `True` | a non-storable product produces no `stock.move`, so no position row |
+| `standard_price` | **absent from the create values** | writing `0.0` would materialise `{"1": 0.0}` in the `company_dependent` jsonb map, `dim_product_cost` would emit a row, the LEFT join would match and `has_unit_cost` would come back **true**. *Absent is not zero* — the distinction `mart_stock_position` documents |
+| `list_price` | `0.0` | a sales price on a deliberately unvalued item invites `coalesce(unit_cost, list_price)`, which is the "plausible column wrong by a large factor" `dim_product_cost` measured at 1.46×. It also leaves that measurement untouched whichever way the join is written |
+| `sale_ok`, `purchase_ok`, `available_in_pos` | `False` | it must reach a position row through the inventory adjustment **only**; a sale would change the revenue marts |
+| stock | one inventory adjustment, 250 units | the same flow `_ensure_stock` uses, so the move has the shape a real adjustment produces |
+
+**It is not governed by the `products` parameter and is not in `SHAPE_KEYS`.** It is not a shape
+choice a caller makes; it is part of what this fixture *is*. That is also what makes it appear on a
+**re-run of a dataset that already exists** — every dataset on this host was seeded by a release
+without it. Reusing `_ensure_stock`'s `stock_seeded` marker would have made "data already exists"
+mean "skip", which is precisely the defect the shape-authority mechanism was built for, so it
+carries its own `uncostedstockseeded` marker.
+
+Measured on `bct`, re-running `generate()` with the recorded shape:
+
+```
+BEFORE  products 12  uncosted_products 0  stock_moves 247  stock_moves_inventory  9
+AFTER   products 12  uncosted_products 1  stock_moves 248  stock_moves_inventory 10   (0.7 s)
+```
+
+`products` still equals the `products` **parameter** — the counter is narrowed to the catalogue
+xmlid family, and the no-cost product is reported separately as `uncosted_products`. A counter that
+silently absorbed it would make `summary()` disagree with the recorded shape.
+
+And, through the pipeline (CDC → dbt) on the same database:
+
+```
+marts.mart_stock_position   bct  28 rows | 27 valued | 1 UNVALUED
+                            the unvalued row: product 15 DEMO-P-NOC-001,
+                            net_qty 250, unit_cost NULL, stock_valuation NULL
+marts.dim_product_cost      0 rows for product 15 (24 total, unchanged)
+DWH's list-vs-cost figure   2 645 000 / 1 814 000 = 1.46x, UNCHANGED
+```
+
+**Self-repairing postcondition.** After creating the product the fixture reads the raw
+`product_product.standard_price` jsonb and, if a cost has been materialised for the company, removes
+that key and logs a warning. If a future Odoo release — or a product category configured for
+AVCO/automated valuation instead of this database's `standard` — ever writes a cost here, the branch
+silently stops being exercised while every count still looks right. That is the "check that cannot
+fail" shape, so it is checked rather than trusted;
+`test_a_materialised_cost_on_the_uncosted_product_is_repaired` establishes the broken condition and
+watches the repair fire.
 
 ---
 
@@ -206,7 +266,8 @@ Stated so nobody builds a conclusion on top of one of them.
   `payment_state` is uniformly `not_paid` and any DSO/ageing metric will look wrong.
 * **Stock is topped up once**, via a single inventory adjustment of 100 000 units per storable
   product, before any month is seeded. So `stock.move` contains one adjustment per storable product
-  (9 with the default parameters) plus the deliveries; it is not a realistic replenishment pattern.
+  (9 with the default parameters), one more for the no-cost product of §3.1 at 250 units, plus the
+  deliveries; it is not a realistic replenishment pattern.
 * **Everything is in one company** (`env.company`). Multi-company behaviour is exercised by the
   unit tests, not by the fixture.
 * **`date_order` is re-pinned after `action_confirm()`**, because confirmation moves it to "now" in

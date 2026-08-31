@@ -18,6 +18,7 @@ REQUIRED_MODELS = [
     "product.product",
     "sale.order",
     "sale.order.line",
+    "account.account",
     "account.move",
     "account.move.line",
     "stock.move",
@@ -41,6 +42,9 @@ SPOT_CHECKS = [
     ("res.company", "name", "public"),
     ("product.template", "name", "public"),
     ("sale.order", "amount_total", "internal"),
+    # The column fct_account_move_line is built on. `internal` on purpose: no transform,
+    # so it lands readable. If this ever moves to a hashing class the mart breaks silently.
+    ("account.account", "account_type", "internal"),
     ("stock.move", "product_qty", "internal"),
     ("ppob.transaction", "customer_ref", "sensitive"),
 ]
@@ -195,6 +199,57 @@ class TestPdpFieldClassification(TransactionCase):
             offenders,
             "company_dependent columns classified for hashing rather than NULL-drop: %s"
             % ", ".join("%s.%s (%s)" % (m, f, c) for m, f, c, _d in offenders),
+        )
+
+    def test_no_non_text_column_is_classified_for_hashing(self):
+        """The CDC loader's startup validation, mirrored on the producer side.
+
+        Contract 01: a column whose transform resolves to ``hmac_sha256`` and whose physical type
+        is not text makes the loader refuse to start. That check lives in the consumer, where it
+        fires hours later in someone else's terminal. Asserting the same invariant here makes the
+        registry itself incapable of shipping the ``res.partner.barcode`` defect.
+
+        Broader than ``test_company_dependent_columns_are_never_hashed`` on purpose: that test
+        catches a company-keyed jsonb map, this one catches EVERY non-text type, including the
+        language-keyed jsonb map a ``translate=True`` field is stored in (``account.account.name``,
+        ``account.account.description``) and any numeric column somebody classifies personal.
+
+        Note the second assertion. A query whose passing state is an empty result is
+        indistinguishable from a query that examined nothing (PLAN.md, instance 12), so the size of
+        the population actually inspected is asserted too, and printed on failure.
+        """
+        # udt_name spelling, matching bct_cdc.policy.TEXT_TYPES / warehouse_ctl.TEXTUAL_TYPES.
+        text_udts = ("text", "varchar", "bpchar", "char", "name", "citext")
+        self.env.cr.execute(
+            """
+            SELECT c.model_name, c.field_name, c.pdp_class, t.udt_name
+              FROM pdp_field_classification c
+              JOIN ir_model m ON m.model = c.model_name
+              JOIN information_schema.columns t
+                ON t.table_schema = 'public'
+               AND t.table_name = replace(c.model_name, '.', '_')
+               AND t.column_name = c.field_name
+             WHERE c.active
+               AND (c.pdp_class = 'personal'
+                    OR (c.pdp_class = 'sensitive' AND c.drop_to_null IS NOT TRUE))
+             ORDER BY c.model_name, c.field_name
+            """
+        )
+        hashed = self.env.cr.fetchall()
+        offenders = [row for row in hashed if row[3] not in text_udts]
+        self.assertTrue(
+            hashed,
+            "the population inspected was EMPTY - no classified column resolved to a hash and "
+            "matched a physical column, so this test proved nothing. Check the model_name -> "
+            "table_name derivation before believing a green result.",
+        )
+        self.assertFalse(
+            offenders,
+            "columns classified for hashing whose physical type is not text (%d inspected):\n%s"
+            % (
+                len(hashed),
+                "\n".join("  %s.%s: %s over %s" % r for r in offenders),
+            ),
         )
 
     # -- access ---------------------------------------------------------

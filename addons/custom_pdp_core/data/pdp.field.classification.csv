@@ -1,4 +1,20 @@
 id,model_name,field_name,pdp_class,legal_basis,notes,drop_to_null
+pdp_account_account__account_stock_expense_id,account.account,account_stock_expense_id,internal,Not personal data - business record,,False
+pdp_account_account__account_stock_variation_id,account.account,account_stock_variation_id,internal,Not personal data - business record,,False
+pdp_account_account__account_type,account.account,account_type,internal,Not personal data - business record,"Chart-of-accounts taxonomy (asset_receivable, income, expense, ...). Not personal data. `internal` carries no transform, so the value lands readable - which is what fct_account_move_line needs it for.",False
+pdp_account_account__active,account.account,active,internal,Not personal data - business record,,False
+pdp_account_account__code_store,account.account,code_store,internal,Not personal data - business record,"Security ruling 2026-08-31: company_dependent, so stored as a per-company jsonb map ({""1"": ""110100""}) - the res.partner.barcode shape. Contract 01 forbids HMAC-ing such a map as a whole; `internal` satisfies that BY CONSTRUCTION, because the internal transform is `none` and nothing is hashed. The ruling's remedy (drop_to_null) does not follow, because that remedy protects a DATA SUBJECT and a ledger account code has none: it identifies an account, not a person. The map lands as-is.",False
+pdp_account_account__create_date,account.account,create_date,internal,Not personal data - business record,,False
+pdp_account_account__create_uid,account.account,create_uid,internal,Not personal data - business record,,False
+pdp_account_account__currency_id,account.account,currency_id,internal,Not personal data - business record,,False
+pdp_account_account__description,account.account,description,internal,Not personal data - business record,"Translated jsonb map keyed by language code. Accountant-facing guidance shown against the account in the chart-of-accounts UI; account configuration, not personal data.",False
+pdp_account_account__id,account.account,id,internal,Not personal data - business record,,False
+pdp_account_account__name,account.account,name,internal,Not personal data - business record,"Translated column, so stored as a jsonb map keyed by language code - a map keyed by something other than a data subject, like code_store. `internal` means no transform, so contract 01's no-HMAC-over-a-map ruling is satisfied by construction. Chart-of-accounts labels are internal configuration; they are not published to counterparties, so `public` would overstate it.",False
+pdp_account_account__non_trade,account.account,non_trade,internal,Not personal data - business record,,False
+pdp_account_account__note,account.account,note,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"Security ruling 2026-08-31: Odoo labels this field 'Internal Notes'. It is free text on a financial account: an accountant may type anything there, including a beneficiary name or a bank account number, and contract 01 lists bank account under Art. 4(3). Treated like every other free-text column in this registry (res.partner.comment, account.move.narration, stock.picking.note, ...) and dropped to NULL. No metric in contract 03 references it.",True
+pdp_account_account__reconcile,account.account,reconcile,internal,Not personal data - business record,,False
+pdp_account_account__write_date,account.account,write_date,internal,Not personal data - business record,,False
+pdp_account_account__write_uid,account.account,write_uid,internal,Not personal data - business record,,False
 pdp_account_move__access_token,account.move,access_token,secret,UU 27/2022 Art. 35 - kewajiban pelindungan; credential material,Credential or key material; never named in the extraction SELECT list.,False
 pdp_account_move__always_tax_exigible,account.move,always_tax_exigible,internal,Not personal data - business record,,False
 pdp_account_move__amount_residual,account.move,amount_residual,internal,Not personal data - business record,,False

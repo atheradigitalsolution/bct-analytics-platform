@@ -46,6 +46,7 @@ MODELS = [
     ("product.product", "product_product"),
     ("sale.order", "sale_order"),
     ("sale.order.line", "sale_order_line"),
+    ("account.account", "account_account"),
     ("account.move", "account_move"),
     ("account.move.line", "account_move_line"),
     ("stock.move", "stock_move"),
@@ -174,6 +175,51 @@ OVERRIDES = {
     # ir_attachment. They are therefore not classifiable here. The CDC loader does not
     # extract ir_attachment at all; see MODULE_KNOWLEDGE.md, "Scope boundaries".
 
+    # ---------------- account.account : the chart of accounts ----------------
+    # Added on request of Data Warehouse, which needs `account_type` on
+    # fct_account_move_line. account.account is a CONFIGURATION table - a catalogue of ledger
+    # accounts authored by an accountant - not a record about a natural person. Every column is
+    # therefore `internal` (business record, no transform, lands verbatim) with exactly one
+    # exception, `note`.
+    #
+    # Two of the sixteen -- `code_store` and `note` -- required Security sign-off before the
+    # replicated set could change. Security ruled on 2026-08-31 and APPROVED both as written; the
+    # ruling is quoted in each row's notes. Security's boundary, worth keeping in front of the next
+    # reader: contract 01's barcode ruling has two limbs, and only the first reaches a chart of
+    # accounts. Limb A ("a map keyed by anything other than the data subject is never HMAC'd as a
+    # whole") is a TRANSFORM rule and it does govern code_store, satisfied here by `internal`
+    # carrying no transform. Limb B (the barcode REMEDY: sensitive + drop_to_null) does not follow,
+    # because that remedy protects a natural person and a GL account code has no data subject.
+    # It is not a type rule and not a storage-shape rule: company_dependent jsonb does NOT imply
+    # drop.
+    "account.account.account_type": ("internal", False, INTERNAL_BASIS,
+        "Chart-of-accounts taxonomy (asset_receivable, income, expense, ...). Not personal data. "
+        "`internal` carries no transform, so the value lands readable - which is what "
+        "fct_account_move_line needs it for."),
+    "account.account.code_store": ("internal", False, INTERNAL_BASIS,
+        "Security ruling 2026-08-31: company_dependent, so stored as a per-company jsonb map "
+        '({"1": "110100"}) - the res.partner.barcode shape. Contract 01 forbids HMAC-ing such a '
+        "map as a whole; `internal` satisfies that BY CONSTRUCTION, because the internal "
+        "transform is `none` and nothing is hashed. The ruling's remedy (drop_to_null) does not "
+        "follow, because that remedy protects a DATA SUBJECT and a ledger account code has none: "
+        "it identifies an account, not a person. The map lands as-is."),
+    "account.account.note": ("sensitive", True, ART_43,
+        "Security ruling 2026-08-31: Odoo labels this field 'Internal Notes'. It is free text on a "
+        "financial account: an accountant may type anything there, including a beneficiary name or "
+        "a bank account number, and contract 01 lists bank account under Art. 4(3). Treated like "
+        "every other free-text column in this registry (res.partner.comment, account.move."
+        "narration, stock.picking.note, ...) and dropped to NULL. No metric in contract 03 "
+        "references it."),
+    "account.account.name": ("internal", False, INTERNAL_BASIS,
+        "Translated column, so stored as a jsonb map keyed by language code - a map keyed by "
+        "something other than a data subject, like code_store. `internal` means no transform, so "
+        "contract 01's no-HMAC-over-a-map ruling is satisfied by construction. Chart-of-accounts "
+        "labels are internal configuration; they are not published to counterparties, so `public` "
+        "would overstate it."),
+    "account.account.description": ("internal", False, INTERNAL_BASIS,
+        "Translated jsonb map keyed by language code. Accountant-facing guidance shown against the "
+        "account in the chart-of-accounts UI; account configuration, not personal data."),
+
     # ---------------- account ----------------
     "account.move.access_token": SECRET,
     "account.move.inalterable_hash": SECRET,
@@ -237,6 +283,42 @@ COMPANY_DEPENDENT_NOTE = (
 )
 
 
+#: Physical types over which contract 01 permits a deterministic digest. Deliberately the exact
+#: set the CDC loader enforces at startup (``bct_cdc.policy.TEXT_TYPES`` / ``warehouse_ctl.
+#: TEXTUAL_TYPES``), expressed here in ``udt_name`` spelling. Contract 01: "Text types only - not
+#: anything castable to text." A bigint IS hashable if you cast it; the choice of canonical
+#: rendering is precisely the ambiguity that produced the res.partner.barcode defect.
+TEXTUAL_UDT = frozenset({"text", "varchar", "bpchar", "char", "name", "citext"})
+
+
+class UnhashableColumn(SystemExit):
+    """The seed would ask the loader to digest a non-text column."""
+
+
+def assert_hashable(model, column, udt, decision):
+    """Refuse to WRITE a seed that the loader would refuse to START on.
+
+    The loader already fails closed on this (contract 01's startup validation, added after
+    res.partner.barcode). Repeating the check in the producer is not redundancy for its own sake:
+    the loader's version fires in the warehouse, hours later, in another agent's terminal, while
+    this one fires in the hand of the person making the classification decision. A `personal` or
+    hashed-`sensitive` class on a jsonb column is a CONTRACT question - company_dependent map,
+    translated map, or a type that simply has no canonical text rendering - and it must be answered
+    deliberately, never by an implicit cast here.
+    """
+    pdp_class, drop, _basis, _notes = decision
+    hashed = pdp_class == "personal" or (pdp_class == "sensitive" and not drop)
+    if hashed and udt not in TEXTUAL_UDT:
+        raise UnhashableColumn(
+            "refusing to write the seed: %s.%s is classified %r (which contract 01 maps to "
+            "hmac_sha256) but its physical type is %r, not text. Contract 01 requires an explicit "
+            "decision here - the usual answer for a jsonb map (company_dependent or translated) is "
+            "sensitive + drop_to_null, because a digest of a map keyed by anything other than the "
+            "data subject is a pseudonym of nothing. Do not cast it to text."
+            % (model, column, pdp_class, udt)
+        )
+
+
 def enforce_company_dependent(model, column, decision, is_company_dependent):
     """Force a company_dependent personal/sensitive column to the NULL-drop transform."""
     pdp_class, drop, basis, notes = decision
@@ -275,7 +357,7 @@ def main():
     with psycopg2.connect(args.dsn) as conn, conn.cursor() as cur:
         for model, table in MODELS:
             cur.execute(
-                "SELECT c.column_name, COALESCE(f.company_dependent, false) "
+                "SELECT c.column_name, COALESCE(f.company_dependent, false), c.udt_name "
                 "FROM information_schema.columns c "
                 "LEFT JOIN ir_model_fields f "
                 "       ON f.model = %s AND f.name = c.column_name "
@@ -287,10 +369,12 @@ def main():
             if not columns:
                 print("ERROR: table %s not found - model %s" % (table, model), file=sys.stderr)
                 continue
-            for column, is_company_dependent in columns:
-                pdp_class, drop, basis, notes = enforce_company_dependent(
+            for column, is_company_dependent, udt in columns:
+                decision = enforce_company_dependent(
                     model, column, classify(model, column), is_company_dependent
                 )
+                assert_hashable(model, column, udt, decision)
+                pdp_class, drop, basis, notes = decision
                 rows.append((xmlid(model, column), model, column, pdp_class, basis, notes,
                              "True" if drop else "False"))
                 seen.add((model, column))

@@ -54,7 +54,10 @@ The CDC loader reads Postgres via logical decoding. What it sees is columns. So:
 
 The seed is machine-generated from `information_schema.columns` by
 `tools/generate_classification_seed.py`, with the *decisions* hand-written in that file's
-`OVERRIDES` map. Regenerate with:
+`OVERRIDES` map. That generator now **refuses to write** a seed in which a column classified for
+hashing has a non-text physical type (`assert_hashable`) - the producer-side mirror of the loader's
+startup validation, so the `res.partner.barcode` shape fails in the hand of the person making the
+decision instead of in the warehouse hours later. Regenerate with:
 
 ```
 python3 addons/custom_pdp_core/tools/generate_classification_seed.py \
@@ -156,14 +159,14 @@ Settings → Users → <user> → Personal Data (PDP) → Data Viewer
 
 ## 6. The seeded map
 
-723 rows, 16 models. Counts by class, from the installed database:
+740 rows, 17 models. Counts by class, from the installed database:
 
 | class | rows |
 |---|---|
 | `public` | 19 |
-| `internal` | 648 |
+| `internal` | 664 |
 | `personal` | 28 |
-| `sensitive` | 21 |
+| `sensitive` | 22 |
 | `secret` | 7 |
 
 `internal` dominates because it is the honest answer for the great majority of columns on a sales
@@ -211,6 +214,7 @@ by hand.
 | `pos.order.line.note` `[NULL]` | free text |
 | `pos.order.line.notice` `[NULL]` | free text |
 | `ppob.transaction.failure_reason` `[NULL]` | biller free text, may echo subscriber details |
+| `account.account.note` `[NULL]` | free text on a ledger account - see §6.1 |
 
 **`personal` — UU 27/2022 Art. 4(2), hashed so joins survive (28)**
 
@@ -233,6 +237,58 @@ by hand.
 · `product.product`: `default_code`, `barcode`
 · `ppob.biller`: `name`, `code`, `category`
 
+### 6.1 `account.account` — the chart of accounts, added for the warehouse
+
+Added on the Data Warehouse agent's request: `fct_account_move_line` needs `account_type`. Before
+these rows existed, `warehouse_ctl.py sync-policy` hard-failed **exit 2 on all 16 columns**, which
+is contract 01 working exactly as designed — unclassified is a hard failure, never a silent
+`public`.
+
+`account.account` is a **configuration** table: a catalogue of ledger accounts authored by an
+accountant. It is not a record about a natural person, so 15 of 16 columns are `internal`. Two
+required Security sign-off before the replicated set could change; **Security ruled on 2026-08-31
+and approved both as written.**
+
+| column | udt | class | why |
+|---|---|---|---|
+| `account_type` | varchar | `internal` | The column DWH needs. `internal` carries no transform, so it lands readable. |
+| `code_store` | **jsonb**, `company_dependent` | `internal` | See below. |
+| `note` | text | `sensitive` `[NULL]` | Odoo's "Internal Notes"; free text on a ledger account. |
+| `name`, `description` | **jsonb**, `translate` | `internal` | Language-keyed maps; account labels, not personal data. |
+| the other 11 | — | `internal` | booleans, m2o ids and the five magic columns. |
+
+**`code_store` is the `res.partner.barcode` shape and does NOT get the barcode remedy.** Security's
+ruling, worth restating because the generalised rule is easy to over-read: contract 01's barcode
+ruling has two limbs.
+
+* **Limb A — the rule.** *"A value that is a map keyed by anything other than the data subject is
+  never HMAC'd as a whole."* This is a **transform** rule and it **does** govern `code_store`, which
+  is a jsonb map keyed by company id. `internal` satisfies it *by construction*: the internal
+  transform is `none`, so nothing is hashed and the map lands verbatim.
+* **Limb B — the barcode *remedy*** (reclassify to `sensitive` + `drop_to_null`) **does not
+  follow.** That remedy protects a natural person whose identifier no metric needed. A GL account
+  code identifies a ledger account. There is no *subjek data*, neither Art. 4(2) nor Art. 4(3) is
+  engaged, and there is nothing to drop.
+
+The question that precedes both limbs is *"is this personal data at all?"*, and for a chart of
+accounts the answer is no. **`company_dependent` jsonb does not imply `drop`** — it is not a type
+rule and not a storage-shape rule.
+
+Forward constraint from the same ruling: because the transform is `none`, the raw map lands verbatim
+in `raw.account_account.code_store`. Any future model wanting "the account code" must extract per
+company key (`code_store ->> <company_id>`) and **never cast the blob to text** — limb A's positive
+form ("hashed per value, with the key preserved") applied to reading instead of masking.
+
+**`note` is `sensitive` + `drop_to_null`, and the class is doing real work.** Its physical type is
+`text`, so the loader's non-text guard would *not* have caught a `personal` classification: it would
+pass startup validation and land a clean 64-char digest of every note. That digest is a pseudonym of
+nothing — prose is not a join key — while looking exactly like working masking. Same false-precision
+failure as hashing the barcode blob, arriving through a type the automated guard cannot flag.
+`account.account.note` is the **sixth** member of the registry's free-text set
+(`res.partner.comment`, `account.move.narration`, `sale.order.note`, `stock.picking.note`,
+`pos.order.line.note`), not a new decision. 0 of 52 rows are populated today, which is exactly the
+barcode situation: nothing is broken either way right now, so no test would catch it being wrong.
+
 ### `company_dependent` columns are never hashed — an enforced invariant
 
 A `company_dependent` field is not a scalar. Odoo stores it as a **jsonb map keyed by company id**:
@@ -250,6 +306,33 @@ is harmless. `generate_classification_seed.py::enforce_company_dependent` applie
 `test_company_dependent_columns_are_never_hashed` asserts it **against the live database**, so a
 future Odoo release that makes another column `company_dependent` fails the build instead of
 silently shipping a meaningless digest.
+
+### The broader invariant — no NON-TEXT column is classified for hashing
+
+`company_dependent` is one way to get a jsonb column; `translate=True` is another
+(`account.account.name` and `.description` are language-keyed jsonb maps), and a numeric column
+classified `personal` would be a third. Contract 01's loader-side startup validation covers all of
+them: `transform = hmac_sha256` over a non-`text`/`varchar`/`bpchar`/`name` column is a refusal to
+start. Two mirrors of it now live on the producer side, so the defect cannot leave this module:
+
+* `generate_classification_seed.py::assert_hashable` — **refuses to write the CSV**;
+* `test_no_non_text_column_is_classified_for_hashing` — asserts it against the live database, over
+  every classified column and not only the `company_dependent` ones.
+
+That test asserts **two** things, because a query whose passing state is an empty result is
+indistinguishable from a query that examined nothing (PLAN.md instance 12): the offender list is
+empty, **and** the population it searched was not.
+
+The type check is a guard, not the decision. It cannot catch a `text` column that is wrongly
+classified `personal` — `account.account.note` is exactly that case, and only the class choice
+protects it. Verified by restoring the broken condition:
+
+```
+account.account.code_store -> personal   (jsonb)  ->  exit 3, UnhashableColumn
+account.account.name       -> personal   (jsonb)  ->  exit 3, UnhashableColumn
+account.account.note       -> personal   (text)   ->  exit 0, ACCEPTED, hashed
+```
+
 
 ### Judgement calls worth challenging at a gate
 

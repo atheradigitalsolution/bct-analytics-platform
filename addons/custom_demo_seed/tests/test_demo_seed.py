@@ -162,6 +162,131 @@ class TestDemoSeed(TransactionCase):
         ])
         self.assertEqual(summary["stock_moves_inventory"], len(storable))
 
+    # -- the no-cost storable product (DWH: mart_stock_position.has_unit_cost) --
+
+    def _uncosted_template(self):
+        return self.env["product.template"].search(
+            [("default_code", "=", "DEMO-%sP-NOC-001" % TAG)]
+        )
+
+    def _stored_cost_map(self, variant):
+        """The RAW company_dependent jsonb, not the ORM's resolved scalar.
+
+        Read at this level on purpose: ``variant.standard_price`` returns ``0.0`` both when the
+        map has no entry for this company AND when it holds an explicit zero. Those two states are
+        the entire point of this fixture and the ORM cannot tell them apart, so a test written
+        against the ORM value would pass in the exact case it exists to catch.
+        """
+        self.env.flush_all()
+        self.env.cr.execute(
+            "SELECT standard_price FROM product_product WHERE id = %s", (variant.id,)
+        )
+        return self.env.cr.fetchone()[0] or {}
+
+    def test_the_uncosted_product_is_storable_and_carries_no_cost(self):
+        """The one shape that reaches DWH's has_unit_cost = false branch.
+
+        DWH measured that branch at 27 position rows, 27 valued, 0 unvalued: every product in this
+        fixture without a standard_price was a SERVICE, so it produced no stock move and never
+        reached a position row at all. Both halves are asserted here because either one alone is
+        satisfied by products that already existed.
+        """
+        self.Generator.generate(**self.params)
+        template = self._uncosted_template()
+        self.assertTrue(template, "the no-cost demo product was not created")
+        self.assertTrue(template.is_storable, "a non-storable product reaches no position row")
+        variant = template.product_variant_id
+        self.assertNotIn(
+            str(self.env.company.id), self._stored_cost_map(variant),
+            "the no-cost product has a standard_price for this company, so dim_product_cost will "
+            "emit a row for it and has_unit_cost comes back TRUE - the branch is not exercised",
+        )
+
+    def test_the_uncosted_product_has_done_stock_moves(self):
+        """A product that exists but never reaches a position row is a non-fix.
+
+        mart_stock_position aggregates fct_stock_move WHERE state = 'done'. No done move, no row,
+        no branch - however correct the product record looks.
+        """
+        self.Generator.generate(**self.params)
+        variant = self._uncosted_template().product_variant_id
+        moves = self.env["stock.move"].search([
+            ("product_id", "=", variant.id), ("state", "=", "done"),
+        ])
+        self.assertTrue(moves, "no done stock move: this product reaches no position row")
+        self.assertTrue(
+            all(move.is_inventory for move in moves),
+            "the no-cost product must reach stock only through the inventory adjustment; a "
+            "delivery would mean it leaked into the sales documents and changed the revenue marts",
+        )
+        self.assertEqual(sum(moves.mapped("quantity")), 250.0)
+
+    def test_the_uncosted_product_is_added_to_a_dataset_that_predates_it(self):
+        """The re-run property, and the reason it is not gated on `stock_seeded`.
+
+        Every dataset on this host was seeded by a release without this record. Reusing
+        `_ensure_stock`'s marker would make "data already exists" mean "skip", which is exactly the
+        defect the shape-authority mechanism was built for. Reproduced by building the OLD state
+        with the same private steps a previous release ran, then calling only the new one.
+        """
+        env = self.env(su=True)
+        ds = self.Generator._dataset_context(DATASET)
+        company = self.env.company
+        self.Generator._ensure_chart_of_accounts(env, company)
+        self.Generator._ensure_operating_units(env, ds, company, 2)
+        products = self.Generator._ensure_products(env, ds, company, self.params["products"])
+        self.Generator._ensure_stock(env, ds, company, products)
+
+        # Precondition: this really is the pre-uncosted state, not an already-fixed one.
+        self.assertTrue(
+            self.Generator._exists(env, ds, "stock_seeded"),
+            "precondition not met: the catalogue top-up did not run, so this test would prove "
+            "nothing about a dataset that predates the no-cost product",
+        )
+        self.assertFalse(self.Generator._exists(env, ds, "uncostedproduct"))
+
+        self.Generator._ensure_uncosted_product(env, ds, company)
+        self.assertTrue(
+            self._uncosted_template(),
+            "an existing dataset did not gain the no-cost product on re-run",
+        )
+        self.assertTrue(self.Generator._exists(env, ds, "uncostedstockseeded"))
+
+    def test_a_materialised_cost_on_the_uncosted_product_is_repaired(self):
+        """Break the postcondition, watch the fixture put it back.
+
+        If Odoo (a release change, or a category configured for AVCO/automated valuation) ever
+        writes a cost for this product, dim_product_cost gains a row, the LEFT join matches,
+        has_unit_cost comes back TRUE, and the fixture silently stops exercising the branch while
+        every count still looks right. The repair exists for that; this test is the proof that the
+        repair fires, taken by restoring the broken condition rather than by trusting it.
+        """
+        self.Generator.generate(**self.params)
+        env = self.env(su=True)
+        ds = self.Generator._dataset_context(DATASET)
+        company = self.env.company
+        variant = self._uncosted_template().product_variant_id
+
+        variant.with_company(company).standard_price = 999.0
+        self.assertIn(
+            str(company.id), self._stored_cost_map(variant),
+            "the broken condition was not established, so a green result below proves nothing",
+        )
+
+        self.Generator._ensure_uncosted_product(env, ds, company)
+        self.assertNotIn(str(company.id), self._stored_cost_map(variant))
+
+    def test_the_uncosted_product_is_not_counted_as_a_catalogue_product(self):
+        """`products` must keep equalling the `products` PARAMETER.
+
+        A counter that silently absorbed an extra unconditional record would make summary()
+        disagree with the recorded shape - the same "author's view and consumer's view differ"
+        failure the shape authority exists to prevent.
+        """
+        summary = self.Generator.generate(**self.params)
+        self.assertEqual(summary["products"], self.params["products"])
+        self.assertEqual(summary["uncosted_products"], 1)
+
     def test_every_record_carries_an_external_id(self):
         self.Generator.generate(**self.params)
         data = self.env["ir.model.data"].search([

@@ -135,6 +135,40 @@ PRODUCTS = [
     ("P-CNS-001", "Konsultasi Jaringan Demo", 500000.0, 300000.0, True),
 ]
 
+#: A STORABLE product deliberately left with NO ``standard_price``.
+#:
+#: It exists to exercise exactly one branch: ``mart_stock_position.has_unit_cost = false``. DWH
+#: wrote and reviewed that branch, then measured that it had never executed - 27 position rows, 27
+#: valued, 0 unvalued - because the only two products in this database without a cost (Tips and
+#: Down Payment, created by point_of_sale and sale) are NON-storable, so they have no stock moves
+#: and never reach a position row at all. DWH recorded it as NOT VERIFIED inside the model file.
+#: That correlation is structural rather than accidental: a product with no cost is usually a
+#: service. The one shape that breaks it is a storable product, with stock moves, and no cost.
+#:
+#: Four properties are load-bearing and none of them is decoration:
+#:
+#: * ``is_storable`` - a non-storable product produces no stock move, so no position row;
+#: * NO ``standard_price`` key in the create values - a cost of 0.0 would be WRITTEN into the
+#:   company_dependent jsonb map as ``{"1": 0.0}``, ``dim_product_cost`` would emit a row, the LEFT
+#:   join would match and ``has_unit_cost`` would come back TRUE. Absent is not the same as zero,
+#:   and this is precisely the distinction ``mart_stock_position`` documents;
+#: * ``list_price`` 0.0 - not tidiness. A sales price on a deliberately unvalued item invites
+#:   ``coalesce(unit_cost, list_price)``, which is the "plausible column that is wrong by a large
+#:   factor" that ``dim_product_cost`` measured at 1.46x. It also leaves DWH's list-vs-cost
+#:   measurement untouched whichever way that join is written;
+#: * ``sale_ok`` / ``purchase_ok`` / ``available_in_pos`` all False - it must reach a position row
+#:   through the inventory adjustment ONLY, never through a sale, or the seeded revenue marts
+#:   would change shape.
+#:
+#: It is NOT governed by the ``products`` shape parameter and is NOT in ``SHAPE_KEYS``. It is not
+#: a shape choice a caller makes; it is part of what this fixture IS. That is also what makes it
+#: appear on a re-run of a dataset that already exists - a dataset seeded before this record
+#: existed gains it, rather than being silently skipped because "data already exists", which is the
+#: defect this module's shape-authority mechanism was built for.
+UNCOSTED_PRODUCT_CODE = "P-NOC-001"
+UNCOSTED_PRODUCT_NAME = "Barang Demo Tanpa Harga Pokok"
+UNCOSTED_PRODUCT_QTY = 250.0
+
 FAILURE_REASONS = [
     "Saldo deposit biller tidak mencukupi (demo)",
     "Nomor pelanggan tidak ditemukan di sistem biller (demo)",
@@ -349,6 +383,7 @@ class DemoSeedGenerator(models.TransientModel):
         biller_records = self._ensure_billers(env, ds, company)
         self._ensure_demo_users(env, ds, units)
         self._ensure_stock(env, ds, company, product_records)
+        self._ensure_uncosted_product(env, ds, company)
 
         pos_configs = self._ensure_pos_configs(env, ds, company, units) if with_pos else None
 
@@ -430,12 +465,20 @@ class DemoSeedGenerator(models.TransientModel):
     # ==================================================================
 
     @api.model
-    def _tracked(self, env, ds, model_name):
-        """Return the records of ``model_name`` belonging to this dataset."""
+    def _tracked(self, env, ds, model_name, xmlid_prefix=""):
+        """Return the records of ``model_name`` belonging to this dataset.
+
+        ``xmlid_prefix`` narrows to one family of records inside the dataset (``"product_"`` for
+        the catalogue, ``"uncostedproduct"`` for the single no-cost fixture). It exists so the
+        ``products`` counter keeps reporting the number the ``products`` PARAMETER asked for: a
+        counter that silently included an extra unconditional record would make ``summary()``
+        disagree with the recorded shape, which is the same "the author's view and the consumer's
+        view differ" failure the shape-authority mechanism exists to prevent.
+        """
         rows = env["ir.model.data"].search([
             ("module", "=", MODULE),
             ("model", "=", model_name),
-            ("name", "=like", ds["prefix"] + "%"),
+            ("name", "=like", ds["prefix"] + xmlid_prefix + "%"),
         ])
         return env[model_name].browse(rows.mapped("res_id")).exists()
 
@@ -458,7 +501,16 @@ class DemoSeedGenerator(models.TransientModel):
             "dataset": ds["name"],
             "operating_units": len(self._tracked(env, ds, "operating.unit")),
             "partners": len(self._tracked(env, ds, "res.partner")),
-            "products": len(self._tracked(env, ds, "product.template")),
+            # Narrowed to the catalogue so this stays equal to the `products` parameter. The
+            # no-cost fixture product is reported separately, below.
+            "products": len(self._tracked(env, ds, "product.template", "product_")),
+            # 1 once the dataset has been generated by a release that carries it, 0 for a dataset
+            # last touched by an older one. Reported rather than folded into `products` because
+            # its whole purpose is to be the ONE product with no standard_price, and a consumer
+            # checking that mart_stock_position has an unvalued row needs to know it is there.
+            "uncosted_products": len(
+                self._tracked(env, ds, "product.template", "uncostedproduct")
+            ),
             "billers": len(self._tracked(env, ds, "ppob.biller")),
             "sale_orders": len(orders),
             "sale_order_lines": env["sale.order.line"].search_count(
@@ -642,7 +694,10 @@ class DemoSeedGenerator(models.TransientModel):
             # Back-fill: a dataset seeded by the pre-dataset release has the marker but no tagged
             # moves, so `summary` would report stock_moves_inventory as 0 - a misleading number
             # rather than a missing one. Tag them once, from the products this dataset owns.
-            if not self._tracked(env, ds, "stock.move"):
+            # Narrowed to the catalogue top-up's own xmlid family. Unnarrowed, the presence of
+            # the uncosted product's single move would make this look "already tagged" and the
+            # legacy moves would stay untagged forever.
+            if not self._tracked(env, ds, "stock.move", "stockmove_"):
                 existing = env["stock.move"].search([
                     ("is_inventory", "=", True),
                     ("product_id", "in", products.ids),
@@ -680,6 +735,113 @@ class DemoSeedGenerator(models.TransientModel):
             "key": "custom_demo_seed.%s.stock_seeded" % ds["name"],
             "value": fields.Datetime.to_string(fields.Datetime.now()),
         })
+
+    def _ensure_uncosted_product(self, env, ds, company):
+        """Seed ONE storable product with stock and no cost, and prove it stayed uncosted.
+
+        Requested by the Data Warehouse agent. ``mart_stock_position`` carries a
+        ``has_unit_cost`` flag whose false branch had never executed against real data: every
+        product without a ``standard_price`` in this fixture was non-storable, so it produced no
+        stock move and never reached a position row. See ``UNCOSTED_PRODUCT_CODE`` above for why
+        each property of the record is load-bearing.
+
+        Deliberately NOT gated on the ``stock_seeded`` marker that ``_ensure_stock`` uses. That
+        marker means "the catalogue top-up has run", and reusing it would mean a dataset seeded
+        before this record existed - which is every dataset on this host - never gains it. A
+        record that exists in the author's tree and not in the consumer's database is the defect
+        this build has hit five times; a separate marker is what makes a re-run actually produce
+        the product instead of skipping it.
+        """
+        first_time = not self._exists(env, ds, "uncostedproduct")
+        template = self._ensure(env, ds, "uncostedproduct", "product.template", {
+            "name": UNCOSTED_PRODUCT_NAME,
+            "default_code": "DEMO-%s%s" % (ds["tag"], UNCOSTED_PRODUCT_CODE),
+            # NOT a rounding of a real price: this item is deliberately unvalued, and a sales
+            # price on it would invite coalesce(unit_cost, list_price) downstream.
+            "list_price": 0.0,
+            # standard_price is ABSENT on purpose. Writing 0.0 would materialise {"<company>": 0.0}
+            # in the company_dependent jsonb map and dim_product_cost would emit a row for it.
+            "type": "consu",
+            "is_storable": True,
+            "sale_ok": False,
+            "purchase_ok": False,
+            "available_in_pos": False,
+            "invoice_policy": "order",
+            "company_id": False,
+        })
+        variant = template.product_variant_id
+
+        # POSTCONDITION, checked rather than assumed. If a future Odoo release, or a product
+        # category configured for automated/AVCO valuation, materialises a cost for this product,
+        # dim_product_cost gains a row, the LEFT join matches, has_unit_cost comes back TRUE and
+        # this fixture silently stops exercising the branch - while every count still looks right.
+        # That is exactly the "check that cannot fail" shape, so it is checked, repaired and
+        # logged loudly rather than trusted.
+        env.flush_all()
+        env.cr.execute("SELECT standard_price FROM product_product WHERE id = %s", (variant.id,))
+        stored = env.cr.fetchone()[0] or {}
+        if str(company.id) in stored:
+            env.cr.execute(
+                "UPDATE product_product SET standard_price = standard_price - %s WHERE id = %s",
+                (str(company.id), variant.id),
+            )
+            env.invalidate_all()
+            _logger.warning(
+                "custom_demo_seed: %s had a standard_price of %s materialised for company %s and "
+                "it has been removed. This product must have NO cost or DWH's has_unit_cost=false "
+                "branch stops being exercised. Check the product category's cost method.",
+                template.default_code, stored.get(str(company.id)), company.id,
+            )
+
+        if self._exists(env, ds, "uncostedstockseeded"):
+            return template
+
+        warehouse = env["stock.warehouse"].search([("company_id", "=", company.id)], limit=1)
+        if not warehouse:
+            _logger.warning(
+                "custom_demo_seed: no stock.warehouse for %s, so %s has no stock move and DWH's "
+                "has_unit_cost=false branch is NOT exercised by this dataset.",
+                company.display_name, template.default_code,
+            )
+            return template
+
+        env.cr.execute("SELECT COALESCE(MAX(id), 0) FROM stock_move")
+        highest_before = env.cr.fetchone()[0]
+        quant = env["stock.quant"].with_context(inventory_mode=True).create({
+            "product_id": variant.id,
+            "location_id": warehouse.lot_stock_id.id,
+            "inventory_quantity": UNCOSTED_PRODUCT_QTY,
+        })
+        quant.action_apply_inventory()
+        env.cr.execute("SELECT id FROM stock_move WHERE id > %s ORDER BY id", (highest_before,))
+        move_ids = [row[0] for row in env.cr.fetchall()]
+        for position, move_id in enumerate(move_ids, start=1):
+            self._tag(env, ds, "uncostedstockmove_%03d" % position,
+                      env["stock.move"].browse(move_id))
+        if not move_ids:
+            # An inventory adjustment that produced no move means the branch is still unreachable.
+            # Say so; a silent zero here is indistinguishable from success.
+            raise UserError(_(
+                "The no-cost demo product %(code)s produced no stock move, so "
+                "mart_stock_position will never emit a has_unit_cost=false row for it. "
+                "Refusing to record the marker: a fixture that looks seeded but exercises "
+                "nothing is worse than one that failed.",
+                code=template.default_code,
+            ))
+        self._ensure(env, ds, "uncostedstockseeded", "ir.config_parameter", {
+            "key": "custom_demo_seed.%s.uncosted_stock_seeded" % ds["name"],
+            "value": fields.Datetime.to_string(fields.Datetime.now()),
+        })
+        # Instance 12's rule: a mechanism that reconciles two copies of state must report what it
+        # changed on an existing one, or "no output" is indistinguishable from "nothing diverged".
+        _logger.info(
+            "custom_demo_seed: %s the no-cost product %s (%s units, %d inventory move(s)) in "
+            "dataset '%s'. mart_stock_position should now report at least one row with "
+            "has_unit_cost = false.",
+            "seeded" if first_time else "ADDED TO THE PRE-EXISTING dataset:",
+            template.default_code, UNCOSTED_PRODUCT_QTY, len(move_ids), ds["name"],
+        )
+        return template
 
     def _ensure_pos_configs(self, env, ds, company, units):
         """One point of sale per Operating Unit, each with one long-lived open session.
