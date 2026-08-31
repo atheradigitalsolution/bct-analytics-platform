@@ -389,6 +389,22 @@ def test_dbt_builds_the_marts_from_a_cold_started_pipeline(foreign_before, evide
     )
     assert result.returncode == 0, "make dbt-run failed on a cold-started warehouse"
 
+    # `dbt-run` is `dbt build --exclude-resource-type test`, so its invocation of
+    # warehouse.dbt_run_result contains ZERO test rows -- and the exporter query scopes to the
+    # single most recent invocation. A cold start that stops at dbt-run therefore leaves four
+    # warehouse rules referencing metrics that have never had a sample, and `check-alerting`
+    # (correctly) fails on them. Measured in the first corrected run:
+    #   WarehouseReconciliationFailing / WarehouseDbtTestFailing / WarehouseBuildStale /
+    #   WarehouseTestsNotRunning -- "never seen; this rule can never fire, however green it looks"
+    # So `dbt-test` is part of the documented cold-start path, not an optional extra.
+    started = time.time()
+    tests = run(["make", "dbt-test"], timeout=2400)
+    evidence.add(
+        "make dbt-test (rc=%d, %.0fs)" % (tests.returncode, time.time() - started),
+        (tests.stdout + tests.stderr).strip()[-900:],
+    )
+    assert tests.returncode == 0, "make dbt-test failed on a cold-started warehouse"
+
     grid = db.grid(
         db.warehouse_admin(),
         "SELECT table_name, (xpath('/row/c/text()', query_to_xml("

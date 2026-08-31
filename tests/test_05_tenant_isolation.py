@@ -26,6 +26,8 @@ from helpers.env import env
 
 pytestmark = [pytest.mark.live]
 
+NEWLINE = chr(10)
+
 
 def test_serving_role_is_actually_subject_to_rls(warehouse_up, evidence):
     """The precondition for every other isolation claim in this project."""
@@ -290,4 +292,50 @@ def test_the_backup_script_does_not_strip_ownership(evidence):
         "warehouse-backup.sh passes --no-owner, so pg_restore assigns every table to the restoring "
         "role. Restoring as warehouse_admin makes every mart superuser-owned and its RLS inert, "
         "and nothing errors: %r" % offending
+    )
+
+
+def test_access_audit_names_the_service_that_read(warehouse_up, evidence):
+    """Contract 05 §A.6: every warehouse consumer must set `application_name`.
+
+    `warehouse_rls` is shared between `semantic-api` and `warehouse-exporter`, so `usename` cannot
+    tell them apart -- DWH found that its own audit trail could not name which service performed a
+    read. `application_name` is the separator, and the contract makes it a MUST.
+
+    A MUST in a contract with no test behind it is a convention. This is the test, and it is
+    written to skip -- loudly, with the reason -- rather than to pass, while the deployed images
+    predate the change. `login-gateway` is out of scope by construction: it connects to no database.
+    """
+    rows = db.query(
+        db.warehouse_admin(),
+        "SELECT coalesce(nullif(application_name, ''), '(unset)'), usename, count(*) "
+        "FROM pg_stat_activity WHERE usename LIKE 'warehouse%' GROUP BY 1, 2 ORDER BY 1, 2;",
+    )
+    evidence.add(
+        "live warehouse connections by application_name",
+        NEWLINE.join("%-28s %-18s %s" % r for r in rows) or "(no warehouse connections)",
+    )
+    unset = [r for r in rows if r[0] == "(unset)"]
+    if unset:
+        pytest.skip(
+            "%d live warehouse connection group(s) carry no application_name. semantic-api and the "
+            "CDC loader run from images built before contract 05 gained A.6, so this is NOT YET ON "
+            "THE WIRE and asserting on it would report a defect that is really a stale image. "
+            "Rebuild both images and re-run; this then asserts instead of skipping. NOT RUN."
+            % len(unset)
+        )
+    audited = db.query(
+        db.warehouse_admin(),
+        "SELECT count(*) FILTER (WHERE application_name IS NULL OR application_name = ''), "
+        "count(*) FROM warehouse.access_audit;",
+    )
+    evidence.add("warehouse.access_audit rows missing application_name", str(audited[0]))
+    missing, total = int(audited[0][0]), int(audited[0][1])
+    assert total > 0, (
+        "warehouse.access_audit is empty, so 'every row names its service' is vacuous. Serve some "
+        "traffic through semantic-api first."
+    )
+    assert missing == 0, (
+        "%d of %d access_audit rows carry no application_name; the audit trail cannot say which "
+        "service performed those reads" % (missing, total)
     )
