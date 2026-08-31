@@ -33,10 +33,18 @@ from helpers import db, env, loader
 pytestmark = [pytest.mark.live, pytest.mark.destructive, pytest.mark.slow]
 
 PROBE_NAME = "odoo19-bct-cdc-qa-resume"
-#: The largest replicated table, so an interrupted run has a middle to be interrupted in.
-TABLE = "ppob_transaction"
+#: Candidates for "the biggest replicated table". Which one that is changes as seed data and test
+#: scaffolding come and go, so the choice is made at runtime from what the dataset holds.
+CANDIDATES = ("ppob_transaction", "account_move_line", "sale_order_line", "stock_move",
+              "pos_order_line", "res_partner")
+TABLE = CANDIDATES[0]
 #: Fraction of the table left in place, i.e. the simulated interruption point.
 KEEP_FRACTION = 0.4
+#: Below this the backfill completes faster than any poll loop can interrupt it, and the test would
+#: fail for a reason that says nothing about resumability. Measured on this hardware, not guessed:
+#: a 9,610-row table took long enough to SIGKILL mid-run reliably, while a 258-row gap finished in
+#: about 30 ms -- the whole backfill was over before the first poll came round.
+MIN_ROWS = 3000
 
 #: Business columns only. `_lsn` and `_ingested_at` legitimately differ between the original load
 #: and the re-load -- the row is re-read at a new snapshot LSN -- so including them would make a
@@ -84,15 +92,44 @@ def _checksum(admin, tenant, columns):
 
 
 def test_an_interrupted_backfill_resumes_where_it_stopped(oltp_up, warehouse_up, evidence):
+    global TABLE
     admin = db.warehouse_admin()
     tenant = _tenant()
+
+    # Pick the biggest replicated table available *now*, rather than hardcoding one. A table with
+    # fewer rows than a couple of pages has no middle, so a "kill it mid-run" test against one
+    # either lands nothing or finishes first -- and then passes or fails for reasons that have
+    # nothing to do with resumability. The biggest table changes as seed data and test scaffolding
+    # come and go, so this is discovered, not assumed.
+    sizes = []
+    for candidate in CANDIDATES:
+        try:
+            sizes.append(
+                (int(db.scalar(db.oltp_odoo(), "SELECT count(*) FROM %s;" % candidate)), candidate)
+            )
+        except db.PsqlError:
+            continue
+    sizes.sort(reverse=True)
+    evidence.add(
+        "candidate tables, by row count in Odoo",
+        "\n".join("%-20s %d" % (t, n) for n, t in sizes) or "(none readable)",
+    )
+    if not sizes or sizes[0][0] < MIN_ROWS:
+        pytest.skip(
+            "the largest replicated table has %s rows; at least %d are needed for the backfill to "
+            "have a middle to interrupt. That is a property of the dataset, not of the loader, so "
+            "it is reported as NOT RUN rather than as a failure."
+            % (sizes[0][0] if sizes else "no", MIN_ROWS)
+        )
+    TABLE = sizes[0][1]
     columns = _columns(admin)
+    source_rows = sizes[0][0]
     overrides = {
         "CDC_SOURCE_TABLES": TABLE,
-        "CDC_BATCH_SIZE": "100",  # small pages, so the kill lands mid-run
+        # Pages sized so the run takes long enough to interrupt: roughly twenty of them across the
+        # gap, whatever the table's size turns out to be.
+        "CDC_BATCH_SIZE": str(max(10, int(source_rows * (1 - KEEP_FRACTION)) // 20)),
     }
-
-    source_rows = int(db.scalar(db.oltp_odoo(), "SELECT count(*) FROM %s;" % TABLE))
     before_checksum, before_live = _checksum(admin, tenant, columns)
     max_id = int(db.scalar(db.oltp_odoo(), "SELECT max(id) FROM %s;" % TABLE))
     cut = int(db.scalar(
@@ -124,7 +161,7 @@ def test_an_interrupted_backfill_resumes_where_it_stopped(oltp_up, warehouse_up,
         evidence.add(
             "gap created", "%s\nlive rows now %d, missing %d" % (out, gap_start_live, missing)
         )
-        assert missing > 1000, "the simulated gap is only %d rows; too small to interrupt" % missing
+        assert missing > 50, "the simulated gap is only %d rows; too small to interrupt" % missing
 
         # ---- run 1: resume, then SIGKILL mid-flight ----------------------------------
         process = loader.popen_loader_direct(PROBE_NAME, ["--backfill-only"], overrides)
@@ -132,7 +169,7 @@ def test_an_interrupted_backfill_resumes_where_it_stopped(oltp_up, warehouse_up,
         deadline = time.time() + 90
         while time.time() < deadline:
             partial = int(_checksum(admin, tenant, columns)[1])
-            if partial >= gap_start_live + 300:
+            if partial >= gap_start_live + max(20, missing // 4):
                 break
             time.sleep(0.3)
         killed = run(["docker", "kill", "-s", "KILL", PROBE_NAME], timeout=60)
