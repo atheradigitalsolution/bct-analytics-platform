@@ -286,13 +286,28 @@ def test_the_shared_index_holds_no_pending_mode_revert(evidence):
         for path in sorted(set(head) & set(index))
         if head[path] != index[path]
     ]
+    # DIRECTION MATTERS, and the first version of this test ignored it -- then fired on five files
+    # Security had legitimately staged mid-commit. That is PLAN.md's "unstable evidence during
+    # active waves": a red result that is another agent's in-flight work, not a regression.
+    #
+    #   HEAD 100644 -> index 100755 : someone is ADDING the bit. In-flight, fine, informational.
+    #   HEAD 100755 -> index 100644 : the bit EXISTS and the index would take it away. That is the
+    #                                 silent revert, and it is the only direction worth failing on.
+    reverting = [row for row in divergent if row[1] == "100755" and row[2] == "100644"]
+    adding = [row for row in divergent if row not in reverting]
+
     evidence.add(
         "index entries whose mode differs from HEAD",
         NEWLINE.join("%s  HEAD=%s  index=%s" % row for row in divergent) or "none",
     )
-    assert not divergent, (
-        "%d file(s) have a different mode in the shared index than in HEAD. The next ordinary "
-        "commit by ANY agent will silently revert them. Fix with "
-        "`git update-index --chmod=+x <path>` (or --chmod=-x): %r"
-        % (len(divergent), [(p, h, i) for p, h, i in divergent])
+    evidence.add(
+        "in flight (adding a bit HEAD lacks) -- reported, not failed",
+        NEWLINE.join("%s  %s -> %s" % row for row in adding) or "none",
+    )
+    assert not reverting, (
+        "%d file(s) are executable in HEAD but 100644 in the shared index. The next ordinary commit "
+        "by ANY agent will silently strip the bit, and nothing warns: `git status` shows them "
+        "unmodified because core.fileMode=false ignores the working tree's mode on both sides. "
+        "Fix with `git update-index --chmod=+x <path>`: %r"
+        % (len(reverting), [(path, h, i) for path, h, i in reverting])
     )
