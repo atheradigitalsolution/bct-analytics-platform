@@ -232,6 +232,12 @@ services:
       WAREHOUSE_MASK_SALT_BCT: ${WAREHOUSE_MASK_SALT_BCT:?WAREHOUSE_MASK_SALT_BCT is required}
       DBT_PROFILES_DIR: /dbt
       DBT_THREADS: ${DBT_THREADS:-4}
+      # Not used by dbt. Read by warehouse_ctl.py verify, whose connection
+      # budget check has to see the SAME value the semantic-api is actually
+      # running with. Reading it in a container that never receives it would
+      # be worse than a literal: it would LOOK live while always returning
+      # the default. Default matches Backend's own (contract 06 s9).
+      SEMANTIC_API_POOL_MAX: ${SEMANTIC_API_POOL_MAX:-16}
       TZ: ${TZ:-UTC}
     volumes:
       # Read-write: dbt writes target/ and logs/ into the project directory,

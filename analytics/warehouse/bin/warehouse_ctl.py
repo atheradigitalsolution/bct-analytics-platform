@@ -783,31 +783,60 @@ def cmd_verify(args) -> int:
     # this warehouse during a full dbt build was 10 concurrent (dbt 5 of them,
     # against the 8 Backend budgeted), so there is real slack today - the point
     # is to notice the day there is not.
-    consumers = {
-        "semantic-api pool (Backend)": 16,
-        "dbt (DBT_THREADS + 1)": int(os.environ.get("DBT_THREADS", "4")) + 1,
-        "CDC loader": 3,
-        "postgres_exporter": 3,
-        "ad-hoc psql headroom": 4,
-    }
+    # Each entry is (label, value, provenance). PROVENANCE IS PRINTED, because
+    # the first version of this check was asymmetric and did not look it: dbt
+    # was read from the environment and semantic-api was the literal 16. An
+    # operator raising SEMANTIC_API_POOL_MAX - which is a documented knob, and
+    # is exactly what Backend's own shed log tells them to raise when the pool
+    # saturates - would have left this reporting "OK, 6 spare" while the real
+    # claim was 47 against 37. Oversubscribed by 10, reported healthy, in the
+    # safe-looking direction. Found by Backend reading my code.
+    #
+    # The deeper half: reading an env var is only "live" if the process
+    # RECEIVES it. This runs in the dbt container, which did not have
+    # SEMANTIC_API_POOL_MAX at all, so reading it there would have looked live
+    # and returned the default forever - the same bug wearing a different hat.
+    # docker-compose.analytics.yml now passes it through, and the provenance
+    # column is what makes a regression of either kind visible instead of
+    # inferred.
+    def _env_int(name: str, default: int) -> tuple[int, str]:
+        raw = os.environ.get(name)
+        if raw is None:
+            return default, f"default {default} ({name} not set here)"
+        return int(raw), f"env {name}"
+
+    api_pool, api_src = _env_int("SEMANTIC_API_POOL_MAX", 16)
+    dbt_threads, dbt_src = _env_int("DBT_THREADS", 4)
+    consumers = [
+        ("semantic-api pool", api_pool, api_src),
+        ("dbt (threads + 1)", dbt_threads + 1, dbt_src),
+        # Literal on purpose: three connections opened at fixed points in
+        # Backend's runner (warehouse_conn, heartbeat, status_conn), none of
+        # them configurable. Confirmed with Backend rather than assumed.
+        ("CDC loader", 3, "literal - not configurable (runner.py 229/413/444)"),
+        ("postgres_exporter", 3, "literal - fixed in docker-compose.analytics.yml"),
+        ("ad-hoc psql headroom", 4, "literal - policy allowance, not a setting"),
+    ]
     with wh.cursor() as cur:
         cur.execute("SELECT current_setting('max_connections')::int, "
                     "current_setting('superuser_reserved_connections')::int")
         max_conn, reserved = cur.fetchone()
     usable = max_conn - reserved
-    claimed = sum(consumers.values())
+    claimed = sum(n for _, n, _ in consumers)
     if claimed > usable:
         ok = False
         print(f"CONNECTION BUDGET OVERSUBSCRIBED: {claimed} claimed vs {usable} usable "
               f"(max_connections {max_conn} - {reserved} reserved)", file=sys.stderr)
-        for name, n in consumers.items():
-            print(f"    {n:>3}  {name}", file=sys.stderr)
+        for label, n, src in consumers:
+            print(f"    {n:>3}  {label:<22} [{src}]", file=sys.stderr)
         print("  Raise max_connections in analytics/warehouse/postgresql.conf, or lower a pool. "
               "Exhaustion surfaces as a 503 from semantic-api and a failed dbt thread, "
               "neither of which names this as the cause.", file=sys.stderr)
     else:
         print(f"OK  connection budget: {claimed} claimed of {usable} usable "
               f"({usable - claimed} spare)")
+        for label, n, src in consumers:
+            print(f"      {n:>3}  {label:<22} [{src}]")
     return 0 if ok else 5
 
 
