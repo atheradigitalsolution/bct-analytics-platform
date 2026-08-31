@@ -101,18 +101,37 @@ def test_the_metrics_the_rules_depend_on_actually_exist(oltp_up, evidence):
     Checked against the postgres exporter if it is running; otherwise against the underlying
     `pg_replication_slots` view, which is what the exporter reads, so the test still says something.
     """
+    import json
+
     from helpers import web
 
-    exporter_up = env.container_running("odoo19-bct-postgres-exporter")
-    if exporter_up:
-        body = web.request("http://127.0.0.1:9187/metrics", timeout=10).body
-        names = [n for n in ("pg_replication_slots_pg_wal_lsn_diff",
-                             "pg_replication_slot_wal_status",
-                             "pg_replication_slots_active") if n in body]
-        evidence.add("series present on the exporter", "\n".join(names) or "(none)")
-        assert len(names) == 3, "missing series: %r" % (set(names) ^ {
-            "pg_replication_slots_pg_wal_lsn_diff", "pg_replication_slot_wal_status",
-            "pg_replication_slots_active"})
+    required = (
+        "pg_replication_slots_pg_wal_lsn_diff",
+        "pg_replication_slot_wal_status",
+        "pg_replication_slots_active",
+    )
+
+    # Asked of Prometheus rather than of the exporter directly. The exporter publishes no host port
+    # -- correctly, it is only reachable on the compose network -- and going through Prometheus
+    # proves the stronger thing anyway: the series exists *where the rules are evaluated*. An
+    # exporter that emits a series Prometheus never scrapes leaves the rule just as dead.
+    if web.service_up(web.prometheus_url("/-/ready")):
+        found, report = [], []
+        for name in required:
+            body = web.request(
+                web.prometheus_url("/api/v1/query?query=" + name), timeout=15
+            ).body
+            payload = json.loads(body)
+            samples = payload.get("data", {}).get("result", [])
+            report.append("%-42s %d series" % (name, len(samples)))
+            if samples:
+                found.append(name)
+        evidence.add("series Prometheus is actually scraping", "\n".join(report))
+        missing = [n for n in required if n not in found]
+        assert not missing, (
+            "Prometheus has no samples for %r. The alert rules key off these names, so a rule on a "
+            "series nobody emits fires exactly never and looks healthy for ever." % missing
+        )
         return
 
     grid = db.grid(
@@ -216,3 +235,107 @@ def test_alertmanager_receives_the_firing_alert(evidence):
     `/api/v2/alerts` -- which tests the delivery path without touching the real thresholds.
     """
     pytest.skip("observability overlay not running and thresholds unreachable safely. NOT RUN.")
+
+
+def test_no_loaded_alert_rule_depends_on_a_series_that_does_not_exist(evidence):
+    """Every metric named by a loaded rule must actually have samples in Prometheus.
+
+    This generalises the test above and catches the whole class. A rule whose expression references
+    a series nobody emits is not broken in any way Prometheus reports: it loads, its `health` reads
+    `ok`, it appears on the dashboard, and it fires exactly never. Every check that would notice
+    looks at the rule, and the rule is fine.
+
+    It is worse for a rule whose *guard* is the absent series. An alert shaped
+    `count(X) > 0 unless count(Y) > 0` -- written precisely because the absence of Y is the real
+    failure mode -- is disarmed when X is what goes missing, and disarmed silently.
+
+    A metric belonging to a scrape target that is currently **down** is reported but not failed:
+    that is `up == 0`'s job and a different alert. The distinction is printed either way, because
+    "the exporter is down" and "nothing has ever emitted this name" need different fixes.
+    """
+    import json
+    import re
+
+    from helpers import web
+
+    if not web.service_up(web.prometheus_url("/-/ready")):
+        pytest.skip("Prometheus is not running (NOT RUN)")
+
+    rules = json.loads(web.request(web.prometheus_url("/api/v1/rules"), timeout=20).body)
+
+    # SAMPLES, not names. `/api/v1/label/__name__/values` keeps a name that was seen once and has
+    # not been emitted since -- which is exactly the state a rule's dead dependency leaves behind,
+    # so checking name presence would report healthy on the failure this test exists to find.
+    _seen = {}
+
+    def has_samples(name):
+        if name not in _seen:
+            payload = json.loads(
+                web.request(web.prometheus_url("/api/v1/query?query=" + name), timeout=15).body
+            )
+            _seen[name] = bool(payload.get("data", {}).get("result"))
+        return _seen[name]
+
+    targets = json.loads(
+        web.request(web.prometheus_url("/api/v1/targets?state=active"), timeout=20).body
+    )
+    down_jobs = sorted({
+        t["labels"].get("job") for t in targets["data"]["activeTargets"] if t["health"] != "up"
+    })
+    #: Metric-name prefix -> the job that emits it, so a down exporter is attributed rather than
+    #: blamed on the rule's author.
+    OWNED = {"node_": "node", "bct_cdc_": "analytics-cdc",
+             "bct_warehouse_": "warehouse-exporter", "pg_": "postgres"}
+
+    FUNCTIONS = {
+        "sum", "min", "max", "avg", "count", "rate", "irate", "increase", "absent", "by", "on",
+        "without", "group_left", "group_right", "unless", "and", "or", "ignoring", "offset",
+        "count_values", "topk", "bottomk", "quantile", "stddev", "stdvar", "delta", "idelta",
+        "clamp_min", "clamp_max", "round", "abs", "ceil", "floor", "time", "vector", "scalar",
+        "changes", "resets", "predict_linear", "deriv", "histogram_quantile", "label_replace",
+        "label_join", "sort", "sort_desc", "bool", "absent_over_time", "last_over_time",
+        "avg_over_time", "max_over_time", "min_over_time", "sum_over_time", "count_over_time",
+        "present_over_time",
+    }
+
+    GROUPING = re.compile(r"\b(?:by|without|on|ignoring|group_left|group_right)\s*\([^)]*\)")
+    LABELS = re.compile(r"\{[^}]*\}")
+    STRINGS = re.compile(r"\"[^\"]*\"|'[^']*'")
+    IDENT = re.compile(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\b(?!\s*\()")
+
+    def metric_names(expression):
+        # Strip, in order: grouping clauses (which hold label names), label matchers (label names
+        # AND values), then any remaining quoted string. Whatever identifier survives is in
+        # metric-name position. Without this a label value like `bct_slot_.*` reads as a metric.
+        text = GROUPING.sub(" ", expression)
+        text = LABELS.sub(" ", text)
+        text = STRINGS.sub(" ", text)
+        return {n for n in IDENT.findall(text) if n not in FUNCTIONS and not n.isdigit()}
+
+    dead, report = [], []
+    for group in rules["data"]["groups"]:
+        for rule in group["rules"]:
+            if rule.get("type") != "alerting":
+                continue
+            missing = sorted(n for n in metric_names(rule["query"]) if not has_samples(n))
+            if not missing:
+                continue
+            blocked = [n for n in missing
+                       if any(n.startswith(p) and j in down_jobs for p, j in OWNED.items())]
+            genuine = [n for n in missing if n not in blocked]
+            if genuine:
+                dead.append((rule["name"], genuine))
+                report.append("NEVER SEEN   %-42s %s" % (rule["name"], ", ".join(genuine)))
+            if blocked:
+                report.append("target down  %-42s %s" % (rule["name"], ", ".join(blocked)))
+
+    evidence.add("scrape targets currently down", ", ".join(down_jobs) or "none")
+    evidence.add(
+        "alert rules referencing a series with no samples",
+        "\n".join(report) or "none -- every rule's metrics exist",
+    )
+    assert not dead, (
+        "%d loaded alert rule(s) reference a metric Prometheus has NEVER seen, so they cannot fire. "
+        "Prometheus reports their health as `ok`, which is exactly why this needs its own test:\n%s"
+        % (len(dead), "\n".join("  %-42s %s" % (n, ", ".join(m)) for n, m in dead))
+    )
