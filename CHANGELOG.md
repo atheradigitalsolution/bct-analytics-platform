@@ -126,29 +126,34 @@ Integration tests exercising the seams between components, runnable with `make t
 
 - **DSAR erasure is a manual runbook, not automated.** `docs/pdp-compliance.md` §5 states this
   explicitly and gives the procedure. Recorded as a gap against UU 27/2022 Pasal 8 and 16(1)(f),
-  not presented as a design choice.
-- **No `cd.yml`.** Deployment is the manual `docs/prod-deploy-checklist.md`. Rollback is documented
-  but **not demonstrated**, and the phase-5 criterion asks for a demonstration.
-- **Cold start FAILS.** Executed twice with operator approval. `ODOO_INIT_MODULES=base,web` in
-  `.env.example`, so `make up-dev` on a fresh clone installs none of the five addons and
-  `make up-analytics` then exits 2 on `relation "pdp_field_classification" does not exist`.
-- **A fresh stack accepts Odoo's default `admin`/`admin` password.** `BCT_DEV_USER_PASSWORD` was
-  applied by hand once and exists only in an untracked local `.env`; it is not declared in
-  `.env.example`, so a clone cannot learn it exists. Red test, deliberately.
-- **"Alerting is live after a cold start" is NOT PROVEN.** The observability overlay is not brought
-  up by `make up-dev` or `make up-analytics`, and the assertion that would prove it end to end has
-  not yet run inside a cold-start execution. `make check-alerting` itself is now fixed and verified
-  able to fail in both directions — it exits non-zero with Alertmanager stopped, 0 with it running,
-  and 77 on a skip. It reached that state through two versions that passed while proving nothing:
-  one JSON-decoded the plain-text `/-/healthy` and returned 0 on the resulting error, the other
-  reported `1 active` Alertmanager with Alertmanager stopped, because `static_configs` makes
-  `/api/v1/alertmanagers` report the configured target whether or not anything is listening.
-- **Demo data is not seeded by any `make` target.** `demo.seed.generator.generate()` must be called
-  explicitly, so a cold start yields an empty Odoo and nothing downstream can be verified until
-  someone runs it by hand.
-- **`allowed_ou: []` → UNASSIGNED not exercised.** No fact row carries `operating_unit_id = -1`, so
-  the corrected mapping is indistinguishable from the bug it replaced. Recorded as a *failing* test
-  that names what must be seeded, rather than a passing one that proves nothing.
+  not presented as a design choice. The most consequential entry here.
+- **`warehouse.access_audit.application_name` is NOT on the wire.** Contract 05 §A.6 makes it a
+  MUST, because `warehouse_rls` is shared between `semantic-api` and `warehouse-exporter` and
+  `usename` cannot say which service performed a read. Measured: three live `warehouse_rls`
+  connection groups carry no `application_name`.
+  `tests/test_05_tenant_isolation.py::test_access_audit_names_the_service_that_read` is written and
+  **skips with that reason**, becoming a real assertion the moment both images are rebuilt.
+- **Four warehouse alert rules are dark on any stack whose last dbt invocation excluded tests.**
+  `make dbt-run` is `dbt build --exclude-resource-type test` and the exporter scopes to the single
+  most recent invocation, so `WarehouseReconciliationFailing`, `WarehouseDbtTestFailing`,
+  `WarehouseBuildStale` and `WarehouseTestsNotRunning` have no samples until `make dbt-test` runs.
+  Measured in both directions: 0 series before, then 7 / 2 / 2 / 2 after. Whether the Makefile
+  should chain the two is Platform-Infra's call.
+- **`ARGS` leaks through `MAKEFLAGS` into every nested `make`.** `make test-coldstart ARGS="-s"`
+  passed `-s` down to `make seed-demo`, whose script refused it, and four tests then failed on the
+  empty database that left behind. Proven with a two-line makefile. This suite now passes an
+  explicit `ARGS=` to every nested call; the Makefile-side fix is Platform-Infra's.
+- **CD has never executed against a real remote**, because there is no git remote. Rollback is
+  demonstrated; the deploy path itself is the manual `docs/prod-deploy-checklist.md`.
+- **The warehouse backup/restore *green* round trip is NOT PROVEN.** The failure direction is
+  proven; the `--into` rehearsal is not implemented.
+- **The Grafana dashboard has never been opened in a browser.** Panels are provisioned and their
+  queries are exercised through the exporter, but no human or test has looked at a rendered page.
+- **The cold start has not been re-executed since its ordering was corrected.** Run 3 was 9/11 with
+  both failures traced to one ordering mistake in the test — `up-analytics` ran before `seed-demo`,
+  contradicting `docs/prod-deploy-checklist.md` §3 — and the fix is demonstrated in both directions
+  but not yet re-run end to end. Command:
+  `BCT_COLDSTART=i-understand-this-destroys-the-bct-oltp-data ASSUME_YES=1 make test-coldstart`
 - **Semantic audit cannot be made mandatory** inside Postgres: there is no `SELECT` trigger and
   `postgres:16-alpine` does not ship `pgaudit`. `log_statement='all'` on the serving role is the
-  compensating control.
+  compensating control, and it is applied by the server so a client cannot opt out.

@@ -275,3 +275,29 @@ Stated because a reader will otherwise assume the master prompt's world:
 | turning CI/CD on | `docs/cicd-activation.md` |
 | shipping to the VPS | `docs/prod-deploy-checklist.md` |
 | proof any of the above is true | `tests/`, and `bash tests/run.sh` |
+
+---
+
+## 10. §6 "Definition of done" — status, with the test that proves each item
+
+Every item maps to a **named test** or to an explicit **not covered, because**. Statuses are the
+result of the run described in the row, not a judgement. Anything unproven says **NOT PROVEN** in
+those words; a §6 item recorded as unverified is worth more than one marked done on an assertion
+that could not fail.
+
+| §6 item | Status | Evidence |
+|---|---|---|
+| Live sync, create → update → **delete**, with timestamps | **PASS** | `test_01::test_live_sync_create_update_delete`. As `warehouse_loader` (`rolsuper=f, rolbypassrls=f`): create 0.18 s, update 0.24 s, delete 0.21 s against a 60 s budget; history `I→U→U→U→D`; the `_op='I'` row survives the update; latest-non-deleted returns 0 rows |
+| …and the delete reaches the **mart** | **PASS** | `test_01::test_live_sync_delete_reaches_the_mart`. `dim_partner` row goes `is_current` `t`→`f` after `dbt build`; zero current rows, and no current row carries the digest |
+| Cross-tenant access returns **403** | **PASS** | `test_06`, body asserted character-for-character against contract 02, and byte-identical for a tenant that does not exist. Re-proven on the cold-started stack with `bct_t2` at 311 rows *asserted first* |
+| Reconciliation: warehouse totals == Odoo | **PASS** | `test_03`, 15/15 tables exact; debit = credit = 439,850,000.00 over 431 lines. dbt's own `assert_reconciliation_matches_odoo`: PASS=292, ERROR=0 |
+| Masking: personal unreadable, `secret` absent | **PASS** | `test_04`. Digest re-derived by hand from `MODULE_KNOWLEDGE.md` rather than imported from the loader; five `secret` columns absent as *columns* |
+| Tenant isolation enforced by the storage layer | **PASS** | `test_05`. 13,755 rows of `bct_t2` exist and none are visible to a `bct`-scoped `warehouse_rls` session; identity asserted before the isolation claim |
+| Freshness is pipeline metadata, not a clock | **PASS** | `test_08`. Advances in 2.3 s, **freezes** byte-identically for 35 s with the loader stopped, resumes in 2.3 s. The freeze is the half a clock would fail |
+| Idempotency | **PASS** | `test_02`. Second load over the same range: zero projection difference, zero rows appended |
+| Slot-lag alert fires at the ADR thresholds | **PARTIAL** | `test_09` + `tests/prometheus/slot_lag_alerts_test.yml` via `promtool`, including the below-threshold negatives. Live firing **not** induced: it needs 512 MiB of retained WAL on a host carrying three other live stacks |
+| Backfill resumability | **PASS**, not re-run | Killed at 5,545 rows, resumed from `id > 6706`, landed exactly 4,065, byte-identical checksum. Now **NOT RUN** on the current dataset: the largest table is 431 rows and has no middle to interrupt |
+| Cold start from removed volumes | **PASS**, 9/11 | Volumes genuinely removed; `up-dev` → modules → credential → `up-analytics` → `seed-demo` → `up-gateway` → `up-semantic` → `cdc-start` → `dbt` → `up-obs` all green. Two failures traced to one ordering mistake **in the test**, fixed and demonstrated in both directions, **NOT PROVEN** end-to-end since the correction |
+| Alerting live after a cold start | **PASS** | `test_11::test_the_observability_overlay_comes_back_and_alerting_is_live`, requiring exit 0 **and** no `SKIP`. `check-alerting: OK — 5/5 targets up, Alertmanager answering, 20/21 metrics with current samples` |
+| Five dashboard views render | **not covered, because** the Grafana dashboard has never been opened in a browser and `insight-portal` view rendering is Frontend's to demonstrate. Panels are provisioned and their queries run |
+| CD rollback demonstrated | **not covered by QA** — Security's, and demonstrated by them. CD has never executed against a real remote because there is no git remote |
