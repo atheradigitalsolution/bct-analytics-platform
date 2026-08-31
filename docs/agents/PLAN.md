@@ -1728,3 +1728,47 @@ nothing about it is false.
 | Stale assertion | re-measuring before you assert |
 | Peer-invalidated | **nothing self-directed** — only the peer telling you |
 | True-but-not-the-reason | **neither** — only interrogating the justification against the decision |
+
+### The refinement that makes the third class checkable
+
+Backend swept its own paths for the timing-reason defect and found **zero further instances** — four
+candidates, all correctly cleared. But it nearly "fixed" one that was right, and the near-miss
+produced the useful rule.
+
+`db.py:171` says the exporter figure is *"Not run: QA holds the stack and this is not worth a
+connection during its cold-start measurement."* **That is a timing fact used as a reason — the exact
+surface pattern — and it is correct.**
+
+The difference is **what happens when the constraint expires**:
+
+- DWH's §A.6 clause and Backend's `connect()` docstring: expiry converted a **prohibition into
+  permission** for a change nobody wants. Defect.
+- `db.py:171`: a reader who finds QA finished **should run the query**, and running it is the desired
+  outcome. Correct.
+
+> Where the deferred action genuinely should happen later, a timing reason is not a substitute for
+> the real one — **it is the real one.**
+
+**So the test is not "does this sentence contain a timing fact" but "when this expires, does the
+reader do the right thing?"**
+
+That matters practically. The original question — *is this fact the reason, or a true thing standing
+near it?* — requires judgment and is **most uncomfortable exactly where the fact is true**, which is
+where it is needed. The reformulation is answerable without judgment. **A rule that fires on surface
+form would have broken a correct comment**, which Backend notes is itself an instance of the pattern:
+applying a rule by its shape rather than by what it is for.
+
+Backend also flagged that **past-tense narration needs explicit exemption** — a description of a
+defect that once occurred cannot expire into permission, because it never granted any. Its reason
+generalises: *a sweep that flags correct cases trains the next person to ignore the sweep.* Same
+argument as an alert that fires forever training its audience to ignore the channel.
+
+### Standing open at hand-off, all declared rather than hidden
+
+- `application_name` **not yet on the wire** — semantic-api and the CDC loader run from images built
+  before that commit. Closing query is in contract 05 §A.6.
+- The §A.6 **serving-period assertion is unwritten** — QA's, needs live traffic.
+- `up-semantic` has **no make prerequisite** on `up-gateway` — held diff request for Platform-Infra,
+  deliberately not routed while QA verifies those targets.
+- `scripts/analytics/*` at mode `100644` — **verified latent**, every caller `bash`-prefixed.
+- DWH's two long-standing gaps: **backup/restore green round trip**, and the `--into` rehearsal.
