@@ -352,6 +352,65 @@ staleness and row count. A spreadsheet outlives the screen it came from.
 
 ---
 
+## Security
+
+`npm audit --audit-level=high` - the exact command `sca-node` runs - reports **0 vulnerabilities**.
+
+Getting there did not require Next 16. `package.json` carries:
+
+```json
+"overrides": { "postcss": "^8.5.18", "sharp": "^0.35.0" }
+```
+
+which resolves `next` **15.5.21 unchanged**, `postcss` 8.5.26 and `sharp` 0.35.4. The nested
+`postcss` 8.4.31 that used to ship inside `next/node_modules` is flattened away, so it is gone from
+the image too. npm's own "will install next@16.3.3, which is a breaking change" is its remediation
+heuristic, not a statement that no other remedy exists.
+
+**The runtime stage removes npm, yarn and corepack.** This is the more important half and it is not
+a version chase. Those are not application dependencies and are not in the lockfile - they arrive
+inside the base image carrying their own vendored trees (`tar`, `pacote`, `sigstore`, `ip-address`,
+`brace-expansion`, `picomatch`), which is where a CRITICAL and twelve HIGHs came from. `npm audit`
+cannot see any of them, because it reads the declared tree and these are not declared. A Next
+standalone runtime needs `node`; a package manager beside the application in production is also an
+arbitrary-code-download tool beside the application in production.
+
+Verified in the built image: `npm`, `npx`, `yarn`, `yarnpkg` and `corepack` all absent,
+`/usr/local/lib/node_modules` and `/opt` both empty, `node v22.23.2` still works, and the container
+reports **healthy** - the healthcheck is `node -e fetch(/healthz)` running inside it.
+
+`sharp` and `@img` are still deleted from the runtime stage, but that is now plain surface reduction
+rather than a CVE mitigation: at 0.35.4 the libvips CVEs are fixed at source, the image optimizer is
+off in `next.config.ts`, and nothing imports `next/image`.
+
+### The lockfile must be generated on Linux
+
+`npm install` on Windows prunes platform-specific optional dependencies and writes a lockfile with
+only the win32 variants of `sharp`. The host install succeeds and `npm audit` is clean - and then
+`npm ci` inside Alpine fails with `Missing: @emnapi/runtime from lock file`, so **a fresh clone
+cannot build the image**. The working tree looks healthy throughout, which is the same shape as the
+`.gitignore` exclusion earlier in this build.
+
+The lockfile here is generated inside the pinned base image and carries all 31 platform variants:
+
+```
+docker run --rm -v "$PWD:/app" -w /app \
+  node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 \
+  npm install --package-lock-only
+```
+
+Verified both ways afterwards: `npm ci` on the Windows host, and the image build in Alpine.
+
+### Three gates, three questions
+
+`npm audit` and `trivy-fs` read the **declared** tree; `container-scan` reads **what ships**. A
+mitigation that deletes a package from the runtime stage is invisible to the first two, and a
+package manager smuggled in by the base image is invisible to them as well - the container scan is
+the only gate that found the CRITICAL. Keeping all three is the point, not a duplication to
+reconcile.
+
+---
+
 ## Testing
 
 ```
