@@ -8,6 +8,16 @@ Three properties this file exists to guarantee, all of them testable:
 * **Feedback follows durability, never leads it.** ``send_feedback`` is only called after the
   warehouse transaction holding those rows has committed. Confirming an LSN the warehouse has not
   stored tells Postgres it may discard that WAL, and the rows are then gone from both ends.
+* **Freshness is a heartbeat, not a side effect of traffic.** ``last_success_at`` is advanced by a
+  timer in :func:`bct_cdc.runner.heartbeat_loop`, NOT from this callback. That distinction is the
+  whole point and it was a real bug here first: psycopg2 invokes this object once per decoded
+  message, so a heartbeat placed inside it stops running exactly when the pipeline goes quiet --
+  and ``keepalive_interval`` sends WAL keepalives to the *server*, it does not call back into
+  Python. A healthy but idle loader therefore looked dead: measured 76 s stale and still ageing.
+  Since ``pipeline_state.last_success_at`` is the sole source of ``meta.is_stale`` and PPOB's SLA is
+  60 s, one quiet minute made every PPOB mart report itself stale. An indicator that cries wolf is
+  worse than none, because people learn to ignore it.
+
 * **An invalidated slot stops the world.** Security finding T-2: past the 2 GB cap Postgres discards
   WAL this consumer never read. Reconnecting produces a mart with a hole and no error, so the
   consumer refuses to reconnect and says why.
@@ -42,7 +52,6 @@ class StreamConsumer:
         self.pending_lsn = None
         self.on_flush = on_flush
         self.counts = {}
-        self._last_heartbeat = 0.0
 
     # -- unchanged TOAST values ------------------------------------------------------
 
@@ -103,8 +112,6 @@ class StreamConsumer:
         elif sum(len(v) for v in self.buffer.values()) >= 5000:
             self.flush(None)
 
-        self._heartbeat()
-
     def _buffer(self, change, table: str, plan) -> None:
         columns = plan.select_columns
         pk = change.key.get("id") or change.values.get("id")
@@ -164,23 +171,3 @@ class StreamConsumer:
         # Only now, with the rows durable in the warehouse, may Postgres be told it can drop the WAL.
         if msg is not None and self.pending_lsn is not None:
             msg.cursor.send_feedback(flush_lsn=self.pending_lsn)
-
-    def _heartbeat(self) -> None:
-        """Advance ``last_success`` on every cycle, including cycles that moved zero rows.
-
-        An idle pipeline and a dead pipeline look identical if this metric only moves when rows
-        flow -- and it backs ``meta.is_stale``, so that confusion would make the dashboard claim
-        fresh data is stale, or worse, the reverse.
-        """
-        now = time.time()
-        if now - self._last_heartbeat < 5.0:
-            return
-        self._last_heartbeat = now
-        for table in self.plans:
-            m.LAST_SUCCESS.labels(tenant=self.tenant, source_table=table).set(now)
-        with self.status_conn, self.status_conn.cursor() as cur:
-            cur.execute(
-                "UPDATE warehouse.pipeline_state SET last_success_at = now() "
-                "WHERE tenant_id = %s AND source_table = ANY(%s)",
-                (self.tenant, list(self.plans)),
-            )

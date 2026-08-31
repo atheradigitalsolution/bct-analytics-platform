@@ -1,0 +1,131 @@
+# Metric definitions — frozen contract 03. Validated against metric.schema.json at startup and in CI.
+#
+# BINDING STATUS, stated because it matters for review:
+#
+#   * `source_model` and `refresh_sla_seconds` are bound to DWH's own `warehouse.mart_sla` table,
+#     which is authoritative data rather than an assumption. Verified against the live warehouse.
+#   * `revenue_net` is transcribed from frozen contract 03's own worked example, including its
+#     dimensions and filters.
+#   * The remaining column-level bindings (`measure`, and dimension column names) are PROVISIONAL
+#     until DWH publishes the mart list *with grain* in contract 05 section C. They are exercised
+#     against a fixture in tests/ that reproduces the declared shape; they have NOT been executed
+#     against a built mart, because `marts` is still empty. Do not read a passing test suite as
+#     proof that these column names exist.
+#
+# Contract 03 rule 1 is enforced in code, not here: tenant_id is in every grain, and registry.py
+# refuses to load a metric without it.
+
+- name: revenue_net
+  label: "Pendapatan Neto"
+  description: >-
+    Invoiced revenue excluding tax, with credit notes netted off. Transcribed from frozen
+    contract 03's worked example.
+  grain: [date_day, tenant_id, operating_unit_id]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - partner_key
+    - product_key
+    - company_id
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    product_key: {type: "string[]", required: false}
+  type: decimal
+  unit: IDR
+  aggregation: sum
+  source_model: mart_revenue_daily
+  measure: revenue_net
+  refresh_sla_seconds: 900
+  pdp_class: internal
+
+- name: sales_total
+  label: "Total Penjualan"
+  description: "Gross sales order value, before invoicing."
+  grain: [date_day, tenant_id, operating_unit_id]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - partner_key
+    - product_key
+    - company_id
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+  type: decimal
+  unit: IDR
+  aggregation: sum
+  source_model: mart_sales_daily
+  measure: sales_total
+  refresh_sla_seconds: 300
+  pdp_class: internal
+
+- name: ppob_transaction_count
+  label: "Jumlah Transaksi PPOB"
+  description: >-
+    Count of PPOB transactions. The 60-second SLA is the tightest in the platform because PPOB is
+    operational: an SLA breach is the point of the view, not an inconvenience (ADR 0001).
+  grain: [date_day, tenant_id, operating_unit_id]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - biller_key
+    - state
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    state: {type: "string[]", required: false}
+  type: count
+  aggregation: count
+  source_model: mart_ppob_transaction
+  measure: transaction_id
+  refresh_sla_seconds: 60
+  pdp_class: internal
+
+- name: ppob_sla_breach_count
+  label: "Pelanggaran SLA PPOB"
+  description: "PPOB transactions that breached their biller SLA."
+  grain: [date_day, tenant_id, operating_unit_id]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - biller_key
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+  type: count
+  aggregation: sum
+  source_model: mart_ppob_transaction
+  measure: sla_breached_count
+  refresh_sla_seconds: 60
+  pdp_class: internal
+
+- name: stock_on_hand
+  label: "Posisi Stok"
+  description: "Quantity on hand by product and operating unit."
+  grain: [date_day, tenant_id, operating_unit_id]
+  dimensions:
+    - date_day
+    - tenant_id
+    - operating_unit_id
+    - product_key
+    - company_id
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    product_key: {type: "string[]", required: false}
+  type: decimal
+  unit: unit
+  aggregation: sum
+  source_model: mart_stock_position
+  measure: quantity_on_hand
+  refresh_sla_seconds: 300
+  pdp_class: internal

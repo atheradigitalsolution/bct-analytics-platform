@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.7
 # ---------------------------------------------------------------------------
-# CDC loader — Odoo WAL -> warehouse landing zone.
+# Semantic API — the single place each metric is defined. Read-only.
 #
 # Base image pinned by digest, per the Backend brief. A digest is a security
 # control, not a tunable.
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217
 
-# Everything below runs as root; the final USER instruction drops to uid 10001.
+# Everything below runs as root; the final USER instruction drops to uid 10003.
 USER root
 
 SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
@@ -57,13 +57,15 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY bct_cdc /app/bct_cdc
+COPY app /app/app
+COPY asgi.py /app/asgi.py
+COPY metrics /app/metrics
 
 # Non-root, numeric. The loader needs no filesystem writes at all: its state
-# lives in warehouse.pipeline_state and the landing zone itself, so this
+# holds no local state at all, so this
 # image runs happily with a read-only root filesystem.
-RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin cdc
-USER 10001
+RUN useradd --system --uid 10003 --no-create-home --shell /usr/sbin/nologin semantic
+USER 10003
 
-EXPOSE 9108
-ENTRYPOINT ["python", "-m", "bct_cdc"]
+EXPOSE 8080
+ENTRYPOINT ["uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "8080", "--no-server-header"]

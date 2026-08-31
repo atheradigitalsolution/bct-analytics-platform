@@ -74,3 +74,22 @@ UP = Gauge(
 
 def serve(port: int) -> None:
     start_http_server(port)
+
+
+LANDING_AMPLIFICATION = Gauge(
+    "bct_cdc_landing_row_amplification",
+    "raw rows divided by distinct primary keys, per landing table. Append-only versioning means "
+    "this is legitimately above 1 -- one row per change -- but a value climbing on a table nobody "
+    "is bulk-editing is the signature of a backfill that re-ran as a NEW epoch and re-landed every "
+    "row. Published because the only reason anyone noticed the last such episode is that QA went "
+    "looking; a number on a dashboard is cheaper than an audit.",
+    ["tenant", "source_table"],
+)
+
+LANDING_DUPLICATE_CHANGES = Gauge(
+    "bct_cdc_landing_duplicate_changes",
+    "Landing rows that share (id, _op, _lsn) with another row, per table. Unlike amplification "
+    "this has no legitimate cause: a change is identified by its WAL position, so two rows with "
+    "the same change key are the same change landed twice. Should be 0.",
+    ["tenant", "source_table"],
+)

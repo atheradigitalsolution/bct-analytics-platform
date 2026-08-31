@@ -40,6 +40,29 @@ _logger = logging.getLogger(__name__)
 #: validated one -- ``opener.open("file:///etc/passwd")`` raises ``URLError: unknown url type``.
 #: The scheme assertion at construction stays as well, because it turns a misconfiguration into a
 #: clear startup error instead of a runtime URLError.
+class _JsonContentTypeHandler(urllib.request.BaseHandler):
+    """Set ``Content-Type: application/json`` on every outgoing request.
+
+    Needed because this opener deliberately does not build a ``urllib.request.Request`` to carry
+    headers. ``OpenerDirector.addheaders`` cannot do the job: ``AbstractHTTPHandler.do_request_``
+    applies the default ``application/x-www-form-urlencoded`` *before* it consults ``addheaders``,
+    and only fills a header that is not already present -- so the default always wins and Odoo
+    answers ``415 UNSUPPORTED MEDIA TYPE``. Found by running it, not by reading the source.
+
+    ``handler_order`` below 500 puts this ahead of ``AbstractHTTPHandler`` in the request-processing
+    chain, so the correct type is already set by the time the default would be applied.
+    """
+
+    handler_order = 100
+
+    def http_request(self, request):
+        if request.data is not None and not request.has_header("Content-type"):
+            request.add_unredirected_header("Content-type", "application/json")
+        return request
+
+    https_request = http_request
+
+
 def _build_http_only_opener():
     """Build an opener that physically cannot speak anything but HTTP(S).
 
@@ -63,6 +86,7 @@ def _build_http_only_opener():
         urllib.request.HTTPDefaultErrorHandler,
         urllib.request.HTTPErrorProcessor,
         urllib.request.UnknownHandler,
+        _JsonContentTypeHandler,
     ):
         opener.add_handler(handler())
     return opener

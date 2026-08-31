@@ -7,7 +7,7 @@
 # Hardening flags are here rather than only in a compose file so that an ad-hoc run has the same
 # posture as a managed one: non-root (baked into the image), no-new-privileges, all capabilities
 # dropped, read-only root filesystem. The loader writes nothing to disk -- its state lives in
-# warehouse.cdc_backfill_state and warehouse.pipeline_state.
+# warehouse.pipeline_state and the landing zone itself.
 #
 # Usage: scripts/analytics/cdc-run.sh [--name NAME] [--detach] [-- ARGS...]
 set -euo pipefail

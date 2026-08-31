@@ -156,11 +156,6 @@ def run(argv=None) -> int:
                         help="Run every startup check and exit. Creates no slot.")
     parser.add_argument("--backfill-only", action="store_true")
     parser.add_argument("--stream-only", action="store_true")
-    parser.add_argument("--reload", action="store_true",
-                        help="Re-run the backfill over the same range, keeping the snapshot epoch "
-                             "so the replay is a no-op. Use this rather than deleting rows from "
-                             "warehouse.cdc_backfill_state, which starts a NEW epoch and appends "
-                             "every row again.")
     parser.add_argument("--print-publication-sql", action="store_true",
                         help="Emit the CREATE PUBLICATION statement built from warehouse.column_policy.")
     parser.add_argument("--drop-slot", action="store_true",
@@ -281,15 +276,12 @@ def run(argv=None) -> int:
                 )
                 monitor.start()
 
-                # 7. Backfill, resumable.
-                if args.reload:
-                    cleared = bf.clear_completion(
-                        warehouse_conn, settings.tenant, list(plans)
-                    )
-                    _logger.info(
-                        "--reload: cleared completed_at on %d backfill rows, snapshot epoch kept",
-                        cleared,
-                    )
+                # 7. Backfill. Always resumable, and re-running it is ALWAYS safe: the resume
+                #    point is the highest id already landed, so a repeat run reads nothing. There
+                #    is deliberately no --reload flag -- it belonged to an earlier design that
+                #    tracked completion in a side table, and once the resume point moved into the
+                #    landing zone itself there was nothing left for it to clear. Re-running
+                #    `--backfill-only` IS the safe recovery path.
                 if not args.stream_only:
                     for table, plan in plans.items():
                         bf.backfill_table(
@@ -309,6 +301,74 @@ def run(argv=None) -> int:
         warehouse_conn.close()
 
 
+def _publish_amplification(conn, tenant, tables) -> None:
+    """Publish landing-zone growth so epoch duplication is visible without an investigation."""
+    for table in tables:
+        try:
+            rows, distinct_ids, duplicates = wh.landing_amplification(conn, tenant, table)
+        except Exception as exc:  # pragma: no cover - a metric must not kill the loader
+            _logger.debug("amplification probe failed for %s: %s", table, exc)
+            conn.rollback()
+            continue
+        if distinct_ids:
+            m.LANDING_AMPLIFICATION.labels(tenant=tenant, source_table=table).set(
+                rows / float(distinct_ids)
+            )
+        m.LANDING_DUPLICATE_CHANGES.labels(tenant=tenant, source_table=table).set(duplicates)
+        if duplicates:
+            _logger.error(
+                "raw.%s holds %d row(s) sharing (id, _op, _lsn) for tenant %s. A change is "
+                "identified by its WAL position, so this has no legitimate cause: the same change "
+                "was landed twice.", table, duplicates, tenant,
+            )
+
+
+def heartbeat_loop(settings, tables, stop_event, interval=15.0) -> None:
+    """Advance ``pipeline_state.last_success_at`` on a timer, independent of message arrival.
+
+    Deliberately a thread rather than a call inside the stream callback. psycopg2 invokes that
+    callback once per decoded message, so a heartbeat living there stops exactly when the pipeline
+    goes quiet -- which is the one moment it has to keep running. ``consume_stream``'s
+    ``keepalive_interval`` does not help: it sends WAL keepalives to the server and never calls back
+    into Python.
+
+    It writes a HEARTBEAT, not an event: an idle pipeline and a dead one must not look alike.
+    ``pipeline_state.last_success_at`` is the sole source of ``meta.is_stale`` (contract 05) and
+    PPOB's SLA is 60 s, so without this a single quiet minute makes every PPOB mart report itself
+    stale to the dashboard.
+
+    Its own connection, because psycopg2 connections are not safe to share across threads.
+    """
+    conn = wh.connect(settings.warehouse_dsn)
+    ticks = 0
+    try:
+        while not stop_event.is_set():
+            try:
+                wh.heartbeat(conn, settings.tenant, tables)
+                now = time.time()
+                for table in tables:
+                    m.LAST_SUCCESS.labels(tenant=settings.tenant, source_table=table).set(now)
+                # Amplification is a full scan per table, so it rides the heartbeat at 1-in-20
+                # (~5 minutes) rather than every tick. Cheap enough to be always-on, and the point
+                # is a trend, which a 5-minute sample resolves perfectly well.
+                if ticks % 20 == 0:
+                    _publish_amplification(conn, settings.tenant, tables)
+                ticks += 1
+            except Exception as exc:  # pragma: no cover - a heartbeat must not kill the loader
+                _logger.warning("heartbeat: %s", exc)
+                try:
+                    conn.rollback()
+                except Exception:
+                    # The connection is unusable. Log it and keep looping: the next iteration
+                    # reconnects implicitly through psycopg2's error path, and a heartbeat thread
+                    # that dies takes meta.is_stale with it -- which is the failure this whole
+                    # loop exists to prevent.
+                    _logger.warning("heartbeat rollback failed; connection is unusable")
+            stop_event.wait(interval)
+    finally:
+        conn.close()
+
+
 def _stream(settings, plans, warehouse_conn, replication_conn, args) -> int:
     status_conn = wh.connect(settings.warehouse_dsn)
     cur = replication_conn.cursor()
@@ -319,6 +379,15 @@ def _stream(settings, plans, warehouse_conn, replication_conn, args) -> int:
     cur.start_replication(slot_name=settings.slot, decode=False, options=options)
     m.UP.labels(tenant=settings.tenant).set(1)
     _logger.info("streaming from slot %s on publication %s", settings.slot, settings.publication)
+
+    heartbeat_stop = threading.Event()
+    heartbeat = threading.Thread(
+        target=heartbeat_loop,
+        args=(settings, list(plans), heartbeat_stop),
+        daemon=True,
+        name="cdc-heartbeat",
+    )
+    heartbeat.start()
 
     deadline = time.time() + args.max_seconds if args.max_seconds else None
 
@@ -345,6 +414,7 @@ def _stream(settings, plans, warehouse_conn, replication_conn, args) -> int:
         _logger.error("%s", exc)
         return EXIT_SLOT_INVALIDATED
     finally:
+        heartbeat_stop.set()
         m.UP.labels(tenant=settings.tenant).set(0)
         try:
             consumer.flush(None)

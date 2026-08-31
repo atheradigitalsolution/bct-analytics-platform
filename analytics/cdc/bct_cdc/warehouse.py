@@ -281,3 +281,30 @@ def insert_rows(conn, table: str, columns: list, rows: list) -> int:
 
 def utcnow() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
+
+
+def landing_amplification(conn, tenant: str, table: str) -> tuple:
+    """Return ``(rows, distinct_ids, duplicate_change_rows)`` for one landing table.
+
+    Two different numbers, because they mean different things and conflating them is what made the
+    last investigation slow:
+
+    * ``rows / distinct_ids`` is **amplification**. Append-only versioning makes it legitimately
+      greater than 1 -- an insert plus three computed-field updates is four rows for one id -- and
+      the deliberate backfill/stream overlap adds one more. It is a trend to watch, not a fault.
+    * ``duplicate_change_rows`` counts rows sharing ``(id, _op, _lsn)``. A change is identified by
+      its WAL position, so this has **no legitimate cause** and should be exactly 0. This is the
+      number that distinguishes "the table is growing because the data changed" from "the loader
+      landed the same change twice".
+    """
+    ident = sql.Identifier("raw", table)
+    with conn.cursor() as cur:
+        cur.execute(
+            sql.SQL(
+                "SELECT count(*), count(DISTINCT id), count(*) - count(DISTINCT (id, _op, _lsn)) "
+                "FROM {} WHERE _tenant_id = %s"
+            ).format(ident),
+            (tenant,),
+        )
+        row = cur.fetchone()
+    return int(row[0]), int(row[1]), int(row[2])
