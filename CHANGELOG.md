@@ -129,8 +129,19 @@ Integration tests exercising the seams between components, runnable with `make t
   not presented as a design choice.
 - **No `cd.yml`.** Deployment is the manual `docs/prod-deploy-checklist.md`. Rollback is documented
   but **not demonstrated**, and the phase-5 criterion asks for a demonstration.
-- **Cold start not executed.** `tests/test_11_cold_start.py` is written, gated and collects, but
-  running it requires an operator decision this session was not granted.
+- **Cold start FAILS.** Executed twice with operator approval. `ODOO_INIT_MODULES=base,web` in
+  `.env.example`, so `make up-dev` on a fresh clone installs none of the five addons and
+  `make up-analytics` then exits 2 on `relation "pdp_field_classification" does not exist`.
+- **A fresh stack accepts Odoo's default `admin`/`admin` password.** `BCT_DEV_USER_PASSWORD` was
+  applied by hand once and exists only in an untracked local `.env`; it is not declared in
+  `.env.example`, so a clone cannot learn it exists. Red test, deliberately.
+- **`make check-alerting` can never pass.** It probes `/-/healthy`, which returns plain text, then
+  JSON-decodes it; the resulting `JSONDecodeError` is reported as "Prometheus not reachable" and the
+  script returns **0**. Every check it performs is unreachable code, and every consumer that reads
+  exit codes sees a pass. Consequently **"alerting is live after a cold start" is not proven.**
+- **Demo data is not seeded by any `make` target.** `demo.seed.generator.generate()` must be called
+  explicitly, so a cold start yields an empty Odoo and nothing downstream can be verified until
+  someone runs it by hand.
 - **`allowed_ou: []` → UNASSIGNED not exercised.** No fact row carries `operating_unit_id = -1`, so
   the corrected mapping is indistinguishable from the bug it replaced. Recorded as a *failing* test
   that names what must be seeded, rather than a passing one that proves nothing.
