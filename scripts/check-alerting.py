@@ -74,6 +74,12 @@ import urllib.parse
 import urllib.request
 
 PROM = os.environ.get("PROMETHEUS_URL", "http://127.0.0.1:39090")
+# Alertmanager is probed DIRECTLY, because asking Prometheus is not enough - see
+# alertmanager_is_alive(). Default matches ALERTMANAGER_HOST_PORT in .env.example.
+ALERTMANAGER = os.environ.get(
+    "ALERTMANAGER_URL",
+    "http://127.0.0.1:%s" % os.environ.get("ALERTMANAGER_HOST_PORT", "39093"),
+)
 TIMEOUT = 10
 ALLOW_SKIP = os.environ.get("ALLOW_SKIP", "") not in ("", "0", "false", "no")
 
@@ -249,6 +255,44 @@ def metric_names_in(expr: str) -> set[str]:
     return names
 
 
+def alertmanager_is_alive(url: str) -> tuple[bool, str]:
+    """Is Alertmanager actually answering? Returns (alive, detail).
+
+    WHY THIS EXISTS, and it is the whole point.
+
+    "Prometheus has an active Alertmanager" was checked with
+    /api/v1/alertmanagers alone. Under `static_configs` - which is what
+    observability/prometheus/prometheus.yml uses - that endpoint reports the
+    CONFIGURED target, not a reachable one. Measured: with
+    odoo19-bct-alertmanager stopped, Prometheus reported active=1, dropped=0
+    continuously for 90 seconds, and the gate printed
+    "Alertmanager reachable" while nothing was listening. It could only ever
+    have caught an Alertmanager that was never configured.
+
+    That was found by doing what PLAN.md's standing rule requires - trying to
+    make a green check go red - and not by reading it. Alertmanager is also not
+    a scrape target here, so check 1 does not cover it either; a firing alert
+    would have gone nowhere with every gate green.
+
+    A direct probe is the only honest answer. If Alertmanager is not published
+    on ALERTMANAGER_URL in some deployment, this reports a failure naming the
+    variable rather than passing quietly - unreachable must never be silent.
+    """
+    ready = url.rstrip("/") + "/-/ready"
+    parsed = urllib.parse.urlparse(ready)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False, f"ALERTMANAGER_URL is not a usable http(s) URL: {url!r}"
+    try:
+        with urllib.request.urlopen(ready, timeout=TIMEOUT) as response:  # noqa: S310 - checked
+            response.read(256)
+        return True, ready
+    except urllib.error.HTTPError as exc:
+        return False, f"{ready} returned HTTP {exc.code} {exc.reason}"
+    except CONNECTION_ERRORS as exc:
+        detail = f"{exc.__class__.__name__}: {getattr(exc, 'reason', exc)}"
+        return False, f"{ready} unreachable ({detail})"
+
+
 def probe() -> str | None:
     """None if Prometheus answers; a reason string if it is NOT RUNNING.
 
@@ -358,7 +402,20 @@ def run_checks() -> tuple[list[str], list[str], list[str]]:
         failures.append(
             "Prometheus has NO active Alertmanager - every alert would fire into nothing. "
             f"dropped={[a['url'] for a in alertmanagers.get('droppedAlertmanagers', [])]}")
-    summary.append(f"  alertmanagers: {len(active)} active")
+        summary.append("  alertmanagers: 0 active")
+    else:
+        # Configured is not the same as alive. See alertmanager_is_alive().
+        alive, detail = alertmanager_is_alive(ALERTMANAGER)
+        if alive:
+            summary.append(f"  alertmanagers: {len(active)} configured, {detail} answering")
+        else:
+            failures.append(
+                f"Prometheus lists {len(active)} active Alertmanager ({active[0]}), but it is NOT "
+                f"answering: {detail}. Under static_configs that listing reports the CONFIGURED "
+                "target forever, alive or not, so this is the only check that notices. Every "
+                "alert would fire into nothing. If Alertmanager is deliberately not published "
+                "there, set ALERTMANAGER_URL.")
+            summary.append(f"  alertmanagers: {len(active)} configured, NONE answering")
 
     # 3. every metric an alert rule references must resolve to CURRENT SAMPLES
     groups = get_json("/api/v1/rules")["data"]["groups"]
