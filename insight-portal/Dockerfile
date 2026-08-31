@@ -32,6 +32,33 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 
+# OS crypto, pinned exactly. Same shape as odoo/Dockerfile: an exact version, upgrade-only, with the
+# command for re-deriving it written down so the next person does not have to guess. Alpine, so apk
+# rather than apt, but the properties that matter carry over unchanged.
+#
+# Pinned rather than a bare `apk upgrade` for the reason Backend pinned ==9.0.3 over >=: a floating
+# upgrade makes the scan's verdict depend on whatever the mirror happens to serve that day, and a
+# green run that cannot be reproduced tomorrow is not evidence. If a pin stops resolving the build
+# MUST fail loudly, so moving it becomes a reviewed change rather than silent drift. `apk add` with
+# an exact constraint IS that assertion - an unsatisfiable pin fails the build with "unable to
+# select packages" - so no separate verification step is needed here. The installed version is
+# checked in the built image instead, which is the artefact that ships.
+#
+# Re-check with:
+#   docker run --rm -u 0 --entrypoint sh <image> \
+#     -c 'apk update >/dev/null && apk policy libcrypto3 libssl3'
+#
+# Closes CVE-2026-14456 (openssl: denial of service via unbounded memory), the last two findings in
+# container-scan. Applied to the RUNTIME stage only: the deps and build stages never ship, so
+# upgrading them would cost a layer and prove nothing.
+ARG LIBCRYPTO3_VERSION=3.5.8-r0
+ARG LIBSSL3_VERSION=3.5.8-r0
+
+RUN set -eux; \
+    apk add --no-cache --upgrade \
+        "libcrypto3=${LIBCRYPTO3_VERSION}" \
+        "libssl3=${LIBSSL3_VERSION}"
+
 # A dedicated uid, distinct from the gateway's 10002 and the semantic API's 10003, so a process
 # listing and an audit log can tell the three apart.
 RUN addgroup -g 10004 -S portal && adduser -u 10004 -S -G portal portal

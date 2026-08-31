@@ -383,6 +383,28 @@ reports **healthy** - the healthcheck is `node -e fetch(/healthz)` running insid
 rather than a CVE mitigation: at 0.35.4 the libvips CVEs are fixed at source, the image optimizer is
 off in `next.config.ts`, and nothing imports `next/image`.
 
+### OS packages
+
+`libcrypto3` and `libssl3` are pinned to an exact version and upgraded in the runtime stage,
+following the shape already used in `odoo/Dockerfile` — exact version, upgrade only, and the command
+for re-deriving it written above the pin:
+
+```
+docker run --rm -u 0 --entrypoint sh <image> \
+  -c 'apk update >/dev/null && apk policy libcrypto3 libssl3'
+```
+
+Pinned rather than a bare `apk upgrade`, for the same reason a `==` beats a `>=`: a floating upgrade
+makes the scan's verdict depend on whatever the mirror serves that day, and a green run nobody can
+reproduce tomorrow is not evidence. An unsatisfiable pin fails the build with "unable to select
+packages", which is the point — moving it becomes a reviewed change rather than silent drift.
+
+This closes CVE-2026-14456 (openssl, denial of service via unbounded memory). Verified in the
+shipped image: `libcrypto3-3.5.8-r0`, `libssl3-3.5.8-r0`.
+
+Applied to the runtime stage only. The deps and build stages never ship, so upgrading them would
+cost a layer and prove nothing.
+
 ### The lockfile must be generated on Linux
 
 `npm install` on Windows prunes platform-specific optional dependencies and writes a lockfile with
