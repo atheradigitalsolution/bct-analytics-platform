@@ -822,11 +822,17 @@ def cmd_verify(args) -> int:
         # a structural constant was the same overstatement this column exists to
         # expose - in the column itself.
         #
-        # Not measurable from here either: the exporter connects as
-        # warehouse_rls, the same role the semantic-api uses, so
-        # pg_stat_activity cannot separate them by usename. Isolating it needs a
-        # distinct application_name or its own role.
-        ("postgres_exporter", 3, "UNVERIFIED allowance - not pinned anywhere; shares warehouse_rls"),
+        # It shares the warehouse_rls role with the semantic-api, so usename
+        # cannot separate them - which is why an earlier `warehouse_rls = 2`
+        # reading in this build was not attributable to either consumer. The
+        # exporter now sets application_name=warehouse-exporter in its DSN
+        # (docker-compose.analytics.yml), so the NEXT measurement can attribute
+        # it. It is still UNVERIFIED because nobody has taken that measurement,
+        # and the label changes when someone does, not when the means to do it
+        # exists. To close it:
+        #   SELECT application_name, count(*) FROM pg_stat_activity
+        #    WHERE datname = 'warehouse' GROUP BY 1;
+        ("postgres_exporter", 3, "UNVERIFIED allowance - measurable via application_name, not yet measured"),
         ("ad-hoc psql headroom", 4, "literal - policy allowance, not a setting"),
     ]
     with wh.cursor() as cur:
