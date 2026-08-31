@@ -203,6 +203,12 @@ rather than decorative:
 | `ReplicationSlotInvalidated` | `wal_status="lost"` | 1m |
 | `ReplicationSlotInactive` | no consumer | 15m |
 
+**Unverified, and recorded as such:** that this alerting is live after a cold start. The overlay is
+not brought up by `make up-dev` or `make up-analytics`, and the check that would confirm it
+(`make check-alerting`) exits 0 without running any of its checks. See
+`docs/runbooks/analytics-pipeline.md` §3.4 for the manual verification and for the command that will
+prove it once the fix lands.
+
 The loader treats an invalidation as **fatal** and exits non-zero rather than reconnecting.
 Reconnecting would resume from a later position and leave a hole in the mart with no error anywhere:
 the failure mode that looks like success.

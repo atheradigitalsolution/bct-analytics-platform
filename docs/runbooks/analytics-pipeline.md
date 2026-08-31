@@ -205,6 +205,32 @@ Their behaviour at exactly those thresholds — including that they do **not** f
 is proved by `tests/prometheus/slot_lag_alerts_test.yml`, run by
 `bash tests/run.sh -k slot_alerts_fire`.
 
+> **NOT PROVEN: that alerting is live after a cold start.** Stated here rather than left to be
+> assumed, because this section is where an operator comes to satisfy themselves that the safety net
+> is up.
+>
+> `make up-dev` and `make up-analytics` do not touch the observability overlay, so a teardown leaves
+> Prometheus, Alertmanager, Loki, promtail and node-exporter down — and every rule above then fires
+> into nothing while `make verify` still passes. The cold-start suite now brings the overlay back
+> and asserts `make check-alerting`, but **that assertion has never actually run its checks**:
+> `scripts/check-alerting.py` probes `/-/healthy`, which returns plain text, JSON-decodes it, catches
+> the resulting `JSONDecodeError` as "Prometheus not reachable", and returns **0**. It prints
+> "NOT a pass" and exits successfully, so every consumer that reads an exit code sees a pass.
+>
+> Until that is fixed (owner: Platform-Infra), verify by hand:
+> ```bash
+> curl -s http://127.0.0.1:39090/api/v1/targets?state=active   # every target "health":"up"
+> curl -s http://127.0.0.1:39090/api/v1/alertmanagers          # activeAlertmanagers must be non-empty
+> curl -s 'http://127.0.0.1:39090/api/v1/query?query=pg_replication_slots_pg_wal_lsn_diff'
+> ```
+> The last one must return a non-empty `result` **while a replication slot exists** — these are
+> per-slot series, and with no slot their absence means nothing.
+>
+> The command that will prove it end to end, once the fix lands:
+> ```bash
+> BCT_COLDSTART=i-understand-this-destroys-the-bct-oltp-data make test-coldstart
+> ```
+
 ### 3.5 A DIFFERENT and nastier case: the source database was restored or recreated
 
 §3 assumes Odoo's database is the same database, further along. **If the OLTP database was restored
