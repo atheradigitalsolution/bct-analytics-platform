@@ -258,3 +258,53 @@ def test_healthz_distinguishes_saturated_from_down(warehouse):
         release.set()
         for t in holders:
             t.join()
+
+
+# ----------------------------------------------------------------------------------------------
+# Contract 05 §A.6 — application_name. Found by DWH writing the clause down, not by a test failing.
+# ----------------------------------------------------------------------------------------------
+
+
+def test_the_pool_names_itself_to_postgres(monkeypatch):
+    """The connection must carry application_name=semantic-api.
+
+    Not cosmetic. warehouse.access_audit.application_name reads
+    current_setting('application_name'), and log_line_prefix's %a is the fallback that keeps a read
+    attributable when nothing calls log_access(). Unset, an audit row records NULL for the one
+    column saying WHICH service read the data — and because warehouse_rls is deliberately SHARED
+    with warehouse-exporter, usename cannot separate us. This string is the only thing that can.
+
+    Nothing FAILS while it is unset, which is why it survived: the column exists, the function runs,
+    and the audit quietly records nothing. This test is the regression guard, and it deliberately
+    asserts the exact contract value rather than "some non-empty string" — a variant spelling would
+    satisfy a truthiness check and still break the join a reader does against §A.6's table.
+    """
+    captured = {}
+
+    class _CapturingPool(_FakePool):
+        def __init__(self, minconn, maxconn, dsn, **kwargs):
+            captured["dsn"] = dsn
+            captured["kwargs"] = kwargs
+            super().__init__()
+
+    monkeypatch.setattr("app.db.pg_pool.ThreadedConnectionPool", _CapturingPool)
+    Warehouse("host=x dbname=y")
+
+    assert captured["kwargs"].get("application_name") == "semantic-api", (
+        "connections would reach the warehouse anonymous; access_audit.application_name records "
+        "NULL and log_line_prefix %%a is empty. Contract 05 §A.6. Got: %r"
+        % captured["kwargs"].get("application_name")
+    )
+
+
+def test_the_application_name_is_not_settable_from_the_environment(monkeypatch):
+    """It is a contract value, not a tunable.
+
+    An env override would let a deployment silently opt out of attributability — the same failure
+    the clause was written to close, reintroduced as configuration.
+    """
+    monkeypatch.setenv("SEMANTIC_API_APPLICATION_NAME", "something-else")
+    monkeypatch.setattr("app.db.pg_pool.ThreadedConnectionPool", _FakePool)
+    from app import db as db_module
+
+    assert db_module.APPLICATION_NAME == "semantic-api"

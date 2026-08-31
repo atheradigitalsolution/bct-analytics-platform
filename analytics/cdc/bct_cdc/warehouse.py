@@ -28,6 +28,9 @@ from psycopg2 import sql
 from .pgoutput import format_lsn, parse_lsn
 from .policy import ColumnPolicy
 
+#: Contract 05 SA.6 -- the value DWH published for this consumer. Do not invent a variant.
+APPLICATION_NAME = "cdc-loader"
+
 _logger = logging.getLogger(__name__)
 
 #: The four bookkeeping columns of contract 05.
@@ -54,7 +57,21 @@ psycopg2.extras.register_default_jsonb(loads=lambda value: value)
 
 
 def connect(dsn: str, autocommit: bool = False):
-    conn = psycopg2.connect(dsn)
+    """Open a connection that NAMES ITSELF, per contract 05 SA.6.
+
+    ``application_name`` is not decoration. ``warehouse.access_audit.application_name`` reads
+    ``current_setting('application_name')``, and ``log_line_prefix``'s ``%a`` is the fallback that
+    keeps a warehouse read attributable when nothing calls ``log_access()``. Unset, an audit row
+    records NULL for the one column saying WHICH service read the data.
+
+    Applied to every connection this helper opens, warehouse and Odoo-source alike: naming the
+    source connections costs nothing and makes the loader visible in Odoo's ``pg_stat_activity``
+    too. The ONE connection it does not cover is the logical-replication connection in
+    ``runner.py``, which psycopg2 opens directly with a ``connection_factory``; that is a
+    source-side connection and contract 05 SA.6 governs warehouse consumers, so it is left alone
+    rather than changed speculatively while QA holds the stack.
+    """
+    conn = psycopg2.connect(dsn, application_name=APPLICATION_NAME)
     conn.autocommit = autocommit
     return conn
 

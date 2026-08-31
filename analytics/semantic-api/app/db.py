@@ -60,6 +60,18 @@ _logger = logging.getLogger(__name__)
 #: The RLS session variable of contract 05. Both agents use exactly this name.
 TENANT_SETTING = "app.tenant_id"
 
+#: Contract 05 SA.6. NOT cosmetic: ``warehouse.access_audit.application_name`` is populated from
+#: ``current_setting('application_name')``, and ``log_line_prefix``'s ``%a`` is the fallback layer
+#: that keeps a read attributable when the caller never calls ``log_access()``. Unset, both record
+#: nothing -- and because ``warehouse_rls`` is deliberately SHARED with warehouse-exporter,
+#: ``usename`` cannot tell us apart. This string is the only thing that can.
+#:
+#: Set HERE rather than in scripts/analytics/semantic-run.sh because the DSN reaches this service by
+#: two routes -- that script and docker-compose.analytics.yml -- and a value set in one of them is
+#: absent from the other. Passed as a psycopg2 keyword, which make_dsn merges into the DSN, so it
+#: holds whatever the DSN string itself contains.
+APPLICATION_NAME = "semantic-api"
+
 
 class TenantScopeError(RuntimeError):
     """A query was attempted with no tenant scope."""
@@ -189,7 +201,9 @@ class Warehouse:
             )
         self.maxconn = maxconn
         self.acquire_timeout_s = acquire_timeout_s
-        self._pool = pg_pool.ThreadedConnectionPool(minconn, maxconn, dsn)
+        self._pool = pg_pool.ThreadedConnectionPool(
+            minconn, maxconn, dsn, application_name=APPLICATION_NAME
+        )
         self._statement_timeout_ms = statement_timeout_ms
         self._lock = threading.Lock()
         self.guard_trips = 0
