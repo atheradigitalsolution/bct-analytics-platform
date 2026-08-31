@@ -40,7 +40,8 @@ models:
       - name: company_id
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, company_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, company_id]}
 
   - name: dim_operating_unit
     description: >-
@@ -61,7 +62,8 @@ models:
         description: Derived from Odoo's materialised parent_path; no recursive CTE needed.
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, operating_unit_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, operating_unit_id]}
 
   - name: dim_biller
     description: PPOB billers. sla_target_seconds here is the CURRENT target.
@@ -74,9 +76,11 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: [electricity, water, telco, internet, insurance, multifinance, tax, other]
+              arguments:
+                  values: [electricity, water, telco, internet, insurance, multifinance, tax, other]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, biller_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, biller_id]}
 
   - name: dim_date
     description: >-
@@ -96,7 +100,8 @@ models:
       - name: fiscal_quarter
         data_tests:
           - not_null
-          - accepted_values: {values: [1, 2, 3, 4], quote: false}
+          - accepted_values:
+              arguments: {values: [1, 2, 3, 4], quote: false}
       - name: is_national_holiday
         data_tests: [not_null]
       - name: is_business_day
@@ -110,9 +115,11 @@ models:
       - name: day_name_id
         data_tests:
           - not_null
-          - accepted_values: {values: [Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu]}
+          - accepted_values:
+              arguments: {values: [Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu]}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, date_day]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, date_day]}
 
   - name: dim_partner
     description: >-
@@ -135,7 +142,8 @@ models:
       # Exactly one current version per partner. This is the test that catches a
       # broken SCD2 close-out, which otherwise shows up as double-counting in
       # every report that joins the dimension without an as-of predicate.
-      - unique_combination: {combination_of_columns: [tenant_id, partner_key, is_current]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, partner_key, is_current]}
 
   - name: dim_product
     description: SCD Type 2 product dimension at the variant grain.
@@ -153,7 +161,8 @@ models:
       - name: is_current
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, product_key, is_current]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, product_key, is_current]}
 
   # --------------------------------------------------------------------- facts
   - name: fct_sale_order_line
@@ -168,27 +177,33 @@ models:
       - name: partner_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_partner'), field: partner_key}
+          - relationships:
+              arguments: {to: ref('dim_partner'), field: partner_key}
       - name: product_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_product'), field: product_key}
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
       - name: company_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_company'), field: company_key}
+          - relationships:
+              arguments: {to: ref('dim_company'), field: company_key}
       - name: operating_unit_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_operating_unit'), field: operating_unit_key}
+          - relationships:
+              arguments: {to: ref('dim_operating_unit'), field: operating_unit_key}
       - name: date_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_date'), field: date_key}
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
       - name: order_state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, sent, sale, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, sent, sale, cancel]}
       - name: price_subtotal
         data_tests: [not_null]
 
@@ -206,32 +221,39 @@ models:
       - name: partner_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_partner'), field: partner_key}
+          - relationships:
+              arguments: {to: ref('dim_partner'), field: partner_key}
       - name: product_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_product'), field: product_key}
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
       - name: company_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_company'), field: company_key}
+          - relationships:
+              arguments: {to: ref('dim_company'), field: company_key}
       - name: operating_unit_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_operating_unit'), field: operating_unit_key}
+          - relationships:
+              arguments: {to: ref('dim_operating_unit'), field: operating_unit_key}
       - name: date_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_date'), field: date_key}
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
       - name: parent_state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, posted, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, posted, cancel]}
       - name: move_type
         data_tests:
           - not_null
           - accepted_values:
-              values: [entry, out_invoice, out_refund, in_invoice, in_refund, out_receipt, in_receipt]
+              arguments:
+                  values: [entry, out_invoice, out_refund, in_invoice, in_refund, out_receipt, in_receipt]
       - name: debit
         data_tests: [not_null]
       - name: credit
@@ -249,23 +271,28 @@ models:
       - name: product_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_product'), field: product_key}
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
       - name: company_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_company'), field: company_key}
+          - relationships:
+              arguments: {to: ref('dim_company'), field: company_key}
       - name: operating_unit_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_operating_unit'), field: operating_unit_key}
+          - relationships:
+              arguments: {to: ref('dim_operating_unit'), field: operating_unit_key}
       - name: date_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_date'), field: date_key}
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
       - name: state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, waiting, confirmed, partially_available, assigned, done, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, waiting, confirmed, partially_available, assigned, done, cancel]}
       - name: operating_unit_unassigned
         description: >-
           True for a move with no picking - an inventory adjustment, a scrap, or
@@ -285,23 +312,28 @@ models:
       - name: partner_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_partner'), field: partner_key}
+          - relationships:
+              arguments: {to: ref('dim_partner'), field: partner_key}
       - name: product_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_product'), field: product_key}
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
       - name: operating_unit_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_operating_unit'), field: operating_unit_key}
+          - relationships:
+              arguments: {to: ref('dim_operating_unit'), field: operating_unit_key}
       - name: date_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_date'), field: date_key}
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
       - name: order_state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, cancel, paid, done, invoiced]}
+          - accepted_values:
+              arguments: {values: [draft, cancel, paid, done, invoiced]}
 
   - name: fct_ppob_transaction
     description: >-
@@ -318,27 +350,33 @@ models:
         description: custom_ppob's five-state machine; illegal transitions are refused in write().
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, pending, success, failed, reversed]}
+          - accepted_values:
+              arguments: {values: [draft, pending, success, failed, reversed]}
       - name: biller_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_biller'), field: biller_key}
+          - relationships:
+              arguments: {to: ref('dim_biller'), field: biller_key}
       - name: partner_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_partner'), field: partner_key}
+          - relationships:
+              arguments: {to: ref('dim_partner'), field: partner_key}
       - name: product_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_product'), field: product_key}
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
       - name: operating_unit_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_operating_unit'), field: operating_unit_key}
+          - relationships:
+              arguments: {to: ref('dim_operating_unit'), field: operating_unit_key}
       - name: date_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_date'), field: date_key}
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
       - name: commission_revenue
         description: The revenue of a PPOB row. Not `amount`, which is pass-through.
         data_tests: [not_null]
@@ -358,8 +396,9 @@ models:
         data_tests: [not_null]
     data_tests:
       - unique_combination:
-          combination_of_columns:
-            [tenant_id, date_day, operating_unit_id, company_id, partner_key, product_key]
+          arguments:
+              combination_of_columns:
+                [tenant_id, date_day, operating_unit_id, company_id, partner_key, product_key]
 
   - name: mart_revenue_daily
     description: >-
@@ -375,14 +414,16 @@ models:
       - name: revenue_channel
         data_tests:
           - not_null
-          - accepted_values: {values: [invoice, pos, ppob_commission]}
+          - accepted_values:
+              arguments: {values: [invoice, pos, ppob_commission]}
       - name: revenue_net
         data_tests: [not_null]
     data_tests:
       - unique_combination:
-          combination_of_columns:
-            [tenant_id, date_day, operating_unit_id, company_id, revenue_channel,
-             partner_key, product_key]
+          arguments:
+              combination_of_columns:
+                [tenant_id, date_day, operating_unit_id, company_id, revenue_channel,
+                 partner_key, product_key]
 
   - name: mart_stock_position
     description: >-
@@ -395,12 +436,14 @@ models:
       - name: product_key
         data_tests:
           - not_null
-          - relationships: {to: ref('dim_product'), field: product_key}
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
       - name: net_qty
         data_tests: [not_null]
     data_tests:
       - unique_combination:
-          combination_of_columns: [tenant_id, product_key, company_id, operating_unit_id]
+          arguments:
+              combination_of_columns: [tenant_id, product_key, company_id, operating_unit_id]
 
   - name: mart_ppob_transaction
     description: >-
@@ -415,12 +458,14 @@ models:
       - name: state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, pending, success, failed, reversed]}
+          - accepted_values:
+              arguments: {values: [draft, pending, success, failed, reversed]}
       - name: commission_revenue
         data_tests: [not_null]
     data_tests:
       - unique_combination:
-          combination_of_columns: [tenant_id, date_day, operating_unit_id, biller_key, state]
+          arguments:
+              combination_of_columns: [tenant_id, date_day, operating_unit_id, biller_key, state]
 
   - name: recon_daily
     description: >-
@@ -436,10 +481,12 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values:
-                [sale_line_subtotal, journal_debit, journal_credit, journal_balance,
-                 stock_quantity, pos_line_subtotal, ppob_commission]
+              arguments:
+                  values:
+                    [sale_line_subtotal, journal_debit, journal_credit, journal_balance,
+                     stock_quantity, pos_line_subtotal, ppob_commission]
       - name: passed
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, date_day, check_name]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, date_day, check_name]}

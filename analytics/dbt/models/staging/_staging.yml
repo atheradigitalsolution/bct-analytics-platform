@@ -22,7 +22,8 @@ models:
       - name: company_id
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, company_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, company_id]}
 
   - name: stg_res_partner
     description: >-
@@ -35,7 +36,8 @@ models:
       - name: partner_id
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, partner_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, partner_id]}
 
   - name: stg_product_template
     columns:
@@ -46,9 +48,11 @@ models:
       - name: product_type
         description: Odoo 19 product type.
         data_tests:
-          - accepted_values: {values: [consu, service, combo]}
+          - accepted_values:
+              arguments: {values: [consu, service, combo]}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, product_tmpl_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, product_tmpl_id]}
 
   - name: stg_product_product
     columns:
@@ -60,10 +64,12 @@ models:
         data_tests:
           - not_null
           - relationships:
-              to: ref('stg_product_template')
-              field: product_tmpl_id
+              arguments:
+                  to: ref('stg_product_template')
+                  field: product_tmpl_id
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, product_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, product_id]}
 
   - name: stg_operating_unit
     description: >-
@@ -79,13 +85,16 @@ models:
       - name: company_id
         data_tests:
           - not_null
-          - relationships: {to: ref('stg_res_company'), field: company_id}
+          - relationships:
+              arguments: {to: ref('stg_res_company'), field: company_id}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, operating_unit_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, operating_unit_id]}
       # The module's own SQL constraint, restated where the warehouse can see
       # it: a recycled code would silently re-point history.
       - unique_combination:
-          combination_of_columns: [tenant_id, company_id, operating_unit_code]
+          arguments:
+              combination_of_columns: [tenant_id, company_id, operating_unit_code]
 
   - name: stg_sale_order
     columns:
@@ -96,12 +105,15 @@ models:
       - name: state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, sent, sale, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, sent, sale, cancel]}
       - name: invoice_status
         data_tests:
-          - accepted_values: {values: ['upselling', 'invoiced', 'to invoice', 'no']}
+          - accepted_values:
+              arguments: {values: ['upselling', 'invoiced', 'to invoice', 'no']}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, sale_order_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, sale_order_id]}
 
   - name: stg_sale_order_line
     columns:
@@ -112,18 +124,22 @@ models:
       - name: sale_order_id
         data_tests:
           - not_null
-          - relationships: {to: ref('stg_sale_order'), field: sale_order_id}
+          - relationships:
+              arguments: {to: ref('stg_sale_order'), field: sale_order_id}
       - name: state
         data_tests:
-          - accepted_values: {values: [draft, sent, sale, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, sent, sale, cancel]}
       - name: display_type
         description: >-
           NULL for a real product line; a section or note line otherwise. The
           fact filters on it, which is why it is asserted here.
         data_tests:
-          - accepted_values: {values: [line_section, line_note]}
+          - accepted_values:
+              arguments: {values: [line_section, line_note]}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, sale_order_line_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, sale_order_line_id]}
 
   - name: stg_account_move
     columns:
@@ -134,18 +150,22 @@ models:
       - name: state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, posted, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, posted, cancel]}
       - name: move_type
         data_tests:
           - not_null
           - accepted_values:
-              values: [entry, out_invoice, out_refund, in_invoice, in_refund, out_receipt, in_receipt]
+              arguments:
+                  values: [entry, out_invoice, out_refund, in_invoice, in_refund, out_receipt, in_receipt]
       - name: payment_state
         data_tests:
           - accepted_values:
-              values: [not_paid, in_payment, paid, partial, reversed, blocked, invoicing_legacy]
+              arguments:
+                  values: [not_paid, in_payment, paid, partial, reversed, blocked, invoicing_legacy]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, account_move_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, account_move_id]}
 
   - name: stg_account_move_line
     columns:
@@ -156,21 +176,25 @@ models:
       - name: account_move_id
         data_tests:
           - not_null
-          - relationships: {to: ref('stg_account_move'), field: account_move_id}
+          - relationships:
+              arguments: {to: ref('stg_account_move'), field: account_move_id}
       - name: parent_state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, posted, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, posted, cancel]}
       - name: display_type
         data_tests:
           - accepted_values:
-              values: [product, cogs, tax, discount, rounding, payment_term, line_section, line_note, epd]
+              arguments:
+                  values: [product, cogs, tax, discount, rounding, payment_term, line_section, line_note, epd]
       - name: debit
         data_tests: [not_null]
       - name: credit
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, account_move_line_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, account_move_line_id]}
 
   - name: stg_stock_picking
     columns:
@@ -181,9 +205,11 @@ models:
       - name: state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, waiting, confirmed, assigned, done, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, waiting, confirmed, assigned, done, cancel]}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, stock_picking_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, stock_picking_id]}
 
   - name: stg_stock_move
     columns:
@@ -194,13 +220,16 @@ models:
       - name: state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, waiting, confirmed, partially_available, assigned, done, cancel]}
+          - accepted_values:
+              arguments: {values: [draft, waiting, confirmed, partially_available, assigned, done, cancel]}
       - name: product_id
         data_tests:
           - not_null
-          - relationships: {to: ref('stg_product_product'), field: product_id}
+          - relationships:
+              arguments: {to: ref('stg_product_product'), field: product_id}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, stock_move_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, stock_move_id]}
 
   - name: stg_pos_order
     columns:
@@ -211,9 +240,11 @@ models:
       - name: state
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, cancel, paid, done, invoiced]}
+          - accepted_values:
+              arguments: {values: [draft, cancel, paid, done, invoiced]}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, pos_order_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, pos_order_id]}
 
   - name: stg_pos_order_line
     columns:
@@ -224,9 +255,11 @@ models:
       - name: pos_order_id
         data_tests:
           - not_null
-          - relationships: {to: ref('stg_pos_order'), field: pos_order_id}
+          - relationships:
+              arguments: {to: ref('stg_pos_order'), field: pos_order_id}
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, pos_order_line_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, pos_order_line_id]}
 
   - name: stg_ppob_biller
     columns:
@@ -241,13 +274,16 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: [electricity, water, telco, internet, insurance, multifinance, tax, other]
+              arguments:
+                  values: [electricity, water, telco, internet, insurance, multifinance, tax, other]
       - name: sla_target_seconds
         description: The denominator of every PPOB SLA metric; the module CHECKs it is positive.
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, biller_id]}
-      - unique_combination: {combination_of_columns: [tenant_id, biller_code]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, biller_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, biller_code]}
 
   - name: stg_ppob_transaction
     description: >-
@@ -267,16 +303,20 @@ models:
           the warehouse trust this column (custom_ppob §3).
         data_tests:
           - not_null
-          - accepted_values: {values: [draft, pending, success, failed, reversed]}
+          - accepted_values:
+              arguments: {values: [draft, pending, success, failed, reversed]}
       - name: biller_id
         data_tests:
           - not_null
-          - relationships: {to: ref('stg_ppob_biller'), field: biller_id}
+          - relationships:
+              arguments: {to: ref('stg_ppob_biller'), field: biller_id}
       - name: requested_at
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, ppob_transaction_id]}
-      - unique_combination: {combination_of_columns: [tenant_id, transaction_name]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, ppob_transaction_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, transaction_name]}
 
   - name: int_product
     description: One row per product variant, carrying its template's attributes.
@@ -286,7 +326,8 @@ models:
       - name: product_id
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, product_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, product_id]}
 
   - name: int_stock_move_operating_unit
     description: >-
@@ -303,4 +344,5 @@ models:
       - name: operating_unit_unassigned
         data_tests: [not_null]
     data_tests:
-      - unique_combination: {combination_of_columns: [tenant_id, stock_move_id]}
+      - unique_combination:
+          arguments: {combination_of_columns: [tenant_id, stock_move_id]}

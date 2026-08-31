@@ -14,7 +14,7 @@ with latest as (
 select
     _tenant_id as tenant_id,
     id as company_id,
-    name,
+    name as company_name,
     currency_id,
     parent_id,
     active,

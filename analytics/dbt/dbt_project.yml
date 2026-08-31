@@ -63,7 +63,21 @@ models:
 
 seeds:
   bct_warehouse:
-    +schema: marts
+    # STAGING, not marts, and the two structural tests are why.
+    #
+    # A seed in `marts` is a table in `marts`, and every table in `marts` must
+    # carry tenant_id and must have RLS forced on it - those are asserted by
+    # assert_every_mart_carries_tenant_id and assert_rls_forced_on_every_mart,
+    # and both of them failed on this seed before it moved. That was the tests
+    # working, not the tests being wrong: a public holiday list is reference
+    # data that is identical for every tenant, it has no tenant_id to key a
+    # policy on, and inventing one would be fabricating a tenant boundary that
+    # does not exist.
+    #
+    # In `staging` it is invisible to warehouse_rls (which holds no privilege
+    # on that schema at all), and its tenant-scoped published form is dim_date,
+    # which does carry tenant_id and is protected like every other dimension.
+    +schema: staging
     id_public_holiday:
       +column_types:
         holiday_date: date

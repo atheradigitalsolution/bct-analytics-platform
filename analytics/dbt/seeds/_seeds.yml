@@ -37,7 +37,8 @@ seeds:
         data_tests:
           - not_null
           - accepted_values:
-              values: [fixed, islamic, christian, chinese, hindu, buddhist]
+              arguments:
+                  values: [fixed, islamic, christian, chinese, hindu, buddhist]
       - name: is_estimated
         description: >-
           True when the Gregorian date is derived rather than fixed by statute.

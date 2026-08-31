@@ -44,11 +44,22 @@ select
     t.customer_name,     -- `personal`:  already an HMAC digest
     t.biller_reference,
 
-    t.amount as pass_through_amount,
-    t.admin_fee,
-    t.commission as commission_revenue,
-    t.total_amount as customer_paid_amount,
-    (t.admin_fee - t.commission) as channel_share,
+    -- COALESCED TO ZERO, and this is a correction made against real data
+    -- rather than a defensive habit. Odoo's Monetary columns are plain
+    -- `numeric` with no NOT NULL: 9 250 of the 9 610 ppob_transaction rows in
+    -- the seeded database carry NULL admin_fee and NULL commission. A NULL
+    -- there means "no fee was charged", which is zero revenue - so summing it
+    -- as NULL would make a day's commission vanish rather than read as 0, and
+    -- `sum()` skipping NULLs hides it completely.
+    --
+    -- The not_null test on commission_revenue stays. It is now testing
+    -- something real: that this coalesce is present and that no other NULL
+    -- path exists.
+    coalesce(t.amount, 0) as pass_through_amount,
+    coalesce(t.admin_fee, 0) as admin_fee,
+    coalesce(t.commission, 0) as commission_revenue,
+    coalesce(t.total_amount, 0) as customer_paid_amount,
+    (coalesce(t.admin_fee, 0) - coalesce(t.commission, 0)) as channel_share,
 
     t.sla_seconds,
     t.sla_breached,
