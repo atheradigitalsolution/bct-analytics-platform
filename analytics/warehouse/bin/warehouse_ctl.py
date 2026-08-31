@@ -43,9 +43,7 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
-from typing import Iterable
 
 import psycopg2
 import psycopg2.extras
@@ -293,8 +291,8 @@ def classification_map(odoo) -> dict[tuple[str, str], dict]:
         )
         print(f"            {why}")
         print(
-            f"            The addon seed (addons/custom_pdp_core/data/pdp.field.classification.csv) "
-            f"has NOT caught up. Platform-Addons must regenerate it."
+            "            The addon seed (addons/custom_pdp_core/data/pdp.field.classification.csv) "
+            "has NOT caught up. Platform-Addons must regenerate it."
         )
         out[(model, field)] = {
             "model_name": model,
@@ -333,13 +331,16 @@ def resolve_policy(odoo) -> tuple[list[tuple], list[str]]:
             # physical type is jsonb and the pinned HMAC construction takes
             # str or None and nothing else. A digest transform pointed at a
             # non-text column is a contract error, not a loader bug.
-            if transform.startswith("hmac") and not mask_null:
-                if col["udt_name"] not in TEXTUAL_TYPES:
-                    type_violations.append(
-                        f"{model}.{col['column_name']}: class={klass} -> {transform}, "
-                        f"but the physical type is {col['col_type']} ({col['udt_name']}), not text"
-                    )
-                    continue
+            if (
+                transform.startswith("hmac")
+                and not mask_null
+                and col["udt_name"] not in TEXTUAL_TYPES
+            ):
+                type_violations.append(
+                    f"{model}.{col['column_name']}: class={klass} -> {transform}, "
+                    f"but the physical type is {col['col_type']} ({col['udt_name']}), not text"
+                )
+                continue
             rows.append((table, col["column_name"], klass, transform, mask_null))
 
     if type_violations:
@@ -391,11 +392,15 @@ def cmd_sync_policy(args) -> int:
         # Remove rows for columns that no longer exist upstream. A stale policy
         # row is not harmless: it makes a dropped column look classified and
         # hides the schema change that ADR 0001 says must be loud.
+        # Fully parameterised row comparison rather than a VALUES list built by
+        # string interpolation. The interpolated version used cur.mogrify() and
+        # was safe, but a security-reviewed file should not contain a SQL
+        # statement assembled with % at all - the next person to edit it may not
+        # keep the mogrify.
         cur.execute(
             "DELETE FROM warehouse.column_policy p "
-            "WHERE NOT EXISTS (SELECT 1 FROM (VALUES %s) AS v(t, c) "
-            "                  WHERE v.t = p.source_table AND v.c = p.source_column)"
-            % ",".join(cur.mogrify("(%s,%s)", (r[0], r[1])).decode() for r in rows)
+            "WHERE (p.source_table, p.source_column) NOT IN %s",
+            (tuple((r[0], r[1]) for r in rows),),
         )
         removed = cur.rowcount
     wh.commit()
