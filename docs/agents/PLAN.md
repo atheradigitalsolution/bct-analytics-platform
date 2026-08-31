@@ -585,3 +585,66 @@ the commit. Both agents hit it; QA correctly backed out rather than pressing on.
 - **An `alertmanager` scrape job** would let check 1 cover its liveness for free. Deferred by the
   Lead, not forgotten: it edits `observability/prometheus/scrape.d` and needs a reload while three
   agents hold the stack. The direct probe already closes the hole.
+
+### Instance 15 — a CI step that created nothing and reported success
+
+Found by Security while auditing guards of the `-x` shape, and it is worse than the guard it was
+sent to fix. `dbt-ci`'s "Create the warehouse role and schemas" step ran the real init SQL from
+`analytics/warehouse/init/sql` **without the six psql `-v` variables** that `warehouse-apply.sh`
+supplies, and ended in a trailing `|| true`. Measured on a throwaway `postgres:16-alpine`:
+
+```
+without the six -v vars:  5 of 6 files ERROR "syntax error at or near \":\""  -> swallowed -> step GREEN
+with them:                6 of 6 OK, 5 schemas, 3 NOSUPERUSER NOBYPASSRLS roles
+```
+
+**`raw`, `staging`, `marts` and `snapshots` were never created in CI.** Every dbt job downstream was
+running against a database that did not have the schemas the step claimed to have made.
+
+The aggravating detail: the step's own comment asserted it used *"the same init SQL the real
+warehouse uses, so CI exercises the real roles"*. It exercised none of it. Security also deleted a
+hand-rolled `CREATE ROLE` that did `GRANT ALL ON DATABASE`, which `40-grants.sql` does not — **CI
+was testing a role production never has.**
+
+Verified by the Lead: `ci.yml:836-838` now passes `wh_user`/`wh_password`, `loader_user`/
+`loader_password`, `rls_user`/`rls_password`.
+
+**`|| true` on a step whose failure is the thing you are testing is the compact form of this whole
+catalogue.** Three more of the same family in the same audit: `sca-python` exited 0 on an empty
+`project-reqs.txt` with the stale reason "no project requirements files yet" (`git ls-files` finds
+7); `hadolint` exited 0 on zero Dockerfiles, calling it "reported rather than passed quietly" — but
+exit 0 *is* a pass to every consumer; and `scan_targets.py` concluded every "unregistered" check
+from an empty difference with no non-empty subject assertion. `cd.yml`: none, both its guards are
+the correct shape.
+
+### The `-x` guard, fixed and proven where the defect can exist
+
+This host **cannot represent the broken state** — `chmod 644` does not stick on Windows, which is
+precisely why the defect was invisible locally. Security extracted both guards verbatim from the
+YAML (old from `HEAD`, new from the tree) and ran them in a Linux container:
+
+| filesystem state | OLD guard | NEW guard |
+|---|---|---|
+| fixture absent | skip, exit 0 | skip, exit 0 (unchanged) |
+| **present, mode 644** | **SKIP, "does not exist", exit 0, dbt never ran** | **RUNS** |
+| present, mode 755 | runs | runs (unchanged) |
+| path is a directory | exit 126, **empty summary** | exit 1, names the reason |
+
+Note the method: **when the local environment cannot express the failure, move the test to one that
+can** — rather than reasoning about it, which is what let the condition survive this long.
+
+### A Lead error, corrected by Security
+
+My Phase 5 brief instructed Security to extend `sca-node` to cover **`login-gateway`**.
+`login-gateway/` contains `requirements.txt` and no `package.json` — it is FastAPI/Python. Security
+declined the instruction, covered it under `sca-python`, and said so plainly instead of either
+following a wrong brief or silently skipping it. Verified by the Lead. **An agent correcting the
+Lead's brief with evidence is the behaviour this roster is supposed to produce.**
+
+### Security's near-miss — instance 7's shape, caught in time
+
+Its first `cosign` download failed the published checksum and it was one step from reporting a
+supply-chain compromise. The precondition check — file size and type — showed a **truncated
+transfer**, 97 MB against 199 MB; the re-download matched exactly. **A checksum mismatch means
+"these bytes differ", never "upstream was compromised"**, and the two coincide only once you have
+established the transfer completed. Same error as the Lead's `grep -c` returning 0.
