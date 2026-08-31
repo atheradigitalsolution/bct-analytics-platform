@@ -49,8 +49,10 @@ This is the section the Lead asked for. Read it before trusting any criterion be
 | 9 — re-runnable | Re-deployed the running digest | exit 0, "already running" |
 | 4 — real signing | `cosign sign` + `cosign verify` against a real local registry | verify passes on signed, **fails on unsigned** |
 | 4 — attestation | `cosign attest --type slsaprovenance` + `verify-attestation` | round-trips; and **fails when only a signature exists**, so the two checks are provably not interchangeable |
-| 1, 10 — pinning and YAML | `grep` + `yaml.safe_load` over both workflows | 12 actions, all 40-char SHAs; both files parse |
-| 3 — scan matrix covers every image | `scan_targets.py --check` against `find . -name Dockerfile` | 5 of 5 registered; unregistered artefact fails the build |
+| 10 — YAML parses | `yaml.safe_load` over both workflows | both parse |
+| 1 — every pin is a REAL, resolvable SHA | Fed the checker an invented SHA (`000…0`) and, separately, a real SHA with a **wrong** version comment | Both **REJECTED**. All 12 unique pins then resolved against the live GitHub API: the commit exists **and** the tag in the trailing comment dereferences to exactly that SHA. 0 bad. "An invented SHA is worse than an unpinned action" is now tested, not asserted — a 40-character hex string is only *shaped* like a commit |
+| 3 — scan matrix covers every image | Diffed the generated matrix against the Dockerfiles a **clone** contains, asserting both sets non-empty first | **6 of 6**, symmetric difference empty. `sca-node` likewise covers the one Node service that exists (`insight-portal`); `login-gateway` is FastAPI/Python and is covered by `sca-python`, not `sca-node` |
+| 3 — the coverage gate can itself fail | Emptied the swept population, and separately registered a fixture `present` that is not on disk | Both **FAIL**. Until 2026-08-31 the gate concluded "nothing unregistered" from an empty difference, which is also what a broken sweep returns |
 
 Reproduce all of it:
 
