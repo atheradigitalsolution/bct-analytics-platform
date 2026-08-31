@@ -143,6 +143,9 @@ const DIMENSION_LABELS: Record<string, string> = {
   move_type: "Jenis Jurnal",
   payment_state: "Status Pembayaran",
   is_revenue_line: "Baris Pendapatan",
+  has_unit_cost: "Punya Harga Pokok",
+  account_type: "Jenis Akun",
+  is_profit_and_loss: "Laba Rugi",
   value: "Nilai",
 };
 
@@ -183,6 +186,13 @@ export function formatDimension(
   dimension: string,
   value: string | number | boolean | null,
 ): string {
+  /**
+   * NULL on `is_profit_and_loss` means "neither profit-and-loss nor balance sheet" - section and
+   * note lines carry no account - and emphatically not `false`. It is labelled rather than shown
+   * as an em dash so nobody reads the group as a rendering gap. This seed happens to contain zero
+   * such rows, which is not evidence that they cannot occur.
+   */
+  if (dimension === "is_profit_and_loss" && value === null) return "Bukan keduanya (NULL)";
   if (value === null) return "—";
   if (dimension === "operating_unit_id" && value === -1) return "Tanpa Operating Unit";
   if (dimension === "date_month" && typeof value === "string") return formatMonth(value);
@@ -193,7 +203,11 @@ export function formatDimension(
   if (dimension === "payment_state" && typeof value === "string") {
     return PAYMENT_STATES[value] ?? value;
   }
-  if (dimension === "is_revenue_line") {
+  if (
+    dimension === "is_revenue_line" ||
+    dimension === "has_unit_cost" ||
+    dimension === "is_profit_and_loss"
+  ) {
     if (value === true || value === "true" || value === 1) return "Ya";
     if (value === false || value === "false" || value === 0) return "Tidak";
   }

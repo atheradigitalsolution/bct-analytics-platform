@@ -77,13 +77,6 @@ export const GAPS: Record<string, MetricGap[]> = {
   ],
   inventory: [
     {
-      panel: "Nilai persediaan",
-      requires: "stock_valuation",
-      reason: "no_metric",
-      detail:
-        "stock_net_quantity adalah kuantitas dalam satuan. Mengalikannya dengan harga yang diambil dari tempat lain adalah penilaian persediaan yang ditulis ulang di dalam komponen React.",
-    },
-    {
       panel: "Umur persediaan",
       requires: "stock_ageing_bucket_qty",
       reason: "no_metric",
@@ -100,13 +93,6 @@ export const GAPS: Record<string, MetricGap[]> = {
   ],
   finance: [
     {
-      panel: "Pemisahan Laba Rugi dan Neraca",
-      requires: "dim_account (jenis akun), lalu pnl_account_balance / balance_sheet_account_balance",
-      reason: "no_metric",
-      detail:
-        "account_balance memberikan saldo buku besar per akun dan ditampilkan di bawah. Yang belum ada adalah JENIS akun: fct_account_move_line memuat account_id tetapi tidak memuat tipe akun, dan tidak ada dim_account, sehingga tidak ada yang membedakan akun pendapatan dari akun aset. Membagi dua laporan hanya berdasarkan nama akan menghasilkan dua judul dengan angka yang sama persis.",
-    },
-    {
       panel: "Ringkasan PPN dan PPh",
       requires: "ppn_output_tax, pph_withheld",
       reason: "not_in_build",
@@ -122,11 +108,12 @@ export function gapsFor(view: string): MetricGap[] {
 }
 
 /**
- * Every metric this application queries, for the Lead to check against contract 03.
- * All ten are declared in the live registry; the portal queries no figure that is not on this list.
+ * Every metric this application queries, for the Lead to check against contract 03. All eleven are
+ * declared in the live registry; the portal queries no figure that is not on this list.
  */
 export const METRICS_CONSUMED: ReadonlyArray<string> = [
   "revenue_net",
+  "stock_valuation",
   "revenue_mom_growth",
   "sales_total",
   "sales_untaxed",

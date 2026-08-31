@@ -44,7 +44,7 @@ export default async function InventoryPage({
       session={session}
       active="inventory"
       title="Persediaan"
-      intro="Posisi stok bersih per produk dan Operating Unit. Filter tanggal tidak berlaku di sini: mart_stock_position adalah posisi, bukan deret harian, sehingga metrik ini tidak mendeklarasikan filter rentang tanggal."
+      intro="Posisi dan nilai stok per produk dan Operating Unit. Filter tanggal tidak berlaku di sini: mart_stock_position adalah posisi, bukan deret harian, sehingga metrik ini tidak mendeklarasikan filter rentang tanggal."
       filters={filters}
       ouOptions={ouOptions}
     >
@@ -61,6 +61,20 @@ async function InventoryBody({ filters, tenant }: { filters: PortalFilters; tena
   const scope = toQueryFilters(filters, { dateRange: false });
   const specs = {
     total: { metric: "stock_net_quantity", dimensions: [], filters: scope },
+    valuationTotal: { metric: "stock_valuation", dimensions: [], filters: scope },
+    valuationByCoverage: {
+      metric: "stock_valuation",
+      dimensions: ["has_unit_cost"],
+      filters: scope,
+      order_by: "-value",
+    },
+    valuationByProduct: {
+      metric: "stock_valuation",
+      dimensions: ["product_key"],
+      filters: scope,
+      order_by: "-value",
+      limit: 12,
+    },
     topProducts: {
       metric: "stock_net_quantity",
       dimensions: ["product_key"],
@@ -97,9 +111,33 @@ async function InventoryBody({ filters, tenant }: { filters: PortalFilters; tena
           result={results.total}
           hint="Masuk dikurangi keluar, dalam satuan - bukan nilai rupiah"
         />
+        <Kpi
+          label="Nilai persediaan"
+          result={results.valuationTotal}
+          hint="SUBTOTAL - produk tanpa harga pokok bernilai NULL dan tidak ikut dijumlahkan. Lihat panel Punya Harga Pokok."
+        />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
+        <MetricSection
+          id="stock-valuation-coverage"
+          title="Cakupan harga pokok"
+          description="Baca panel ini SEBELUM membaca total nilai persediaan. Produk tanpa harga pokok memiliki stock_valuation NULL, dan SUM di SQL melewati NULL tanpa berkomentar - sehingga total tampak final padahal subtotal. Baris dengan Punya Harga Pokok = Tidak adalah stok nyata yang berada di luar total itu."
+          result={results.valuationByCoverage}
+          chart="category"
+          query={specs.valuationByCoverage}
+          filename="stok-cakupan-harga-pokok"
+        />
+        <MetricSection
+          id="stock-valuation-product"
+          title="12 produk dengan nilai persediaan tertinggi"
+          description="Dinilai pada harga pokok (standard_price), bukan harga jual. Menggunakan list_price akan melebihkan nilai persediaan sebesar seluruh marjin."
+          result={results.valuationByProduct}
+          chart="category"
+          query={specs.valuationByProduct}
+          filename="nilai-persediaan-per-produk"
+          drillHref={drillBase + "?metric=stock_valuation&by=product_key,has_unit_cost&order=-value&limit=500"}
+        />
         <MetricSection
           id="stock-top"
           title="12 produk dengan pergerakan bersih tertinggi"
@@ -133,7 +171,7 @@ async function InventoryBody({ filters, tenant }: { filters: PortalFilters; tena
       <Card
         id="inventory-gaps"
         title="Belum tersedia pada tampilan ini"
-        subtitle="Nilai, umur dan perputaran persediaan tidak memiliki metrik. Tidak ada satu pun yang diperkirakan di sini."
+        subtitle="Umur dan perputaran persediaan tidak memiliki metrik. Tidak ada satu pun yang diperkirakan di sini."
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {gapsFor("inventory").map((gap) => (

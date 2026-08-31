@@ -24,10 +24,10 @@ export const dynamic = "force-dynamic";
  *
  * Two things this view deliberately does NOT do:
  *
- *  1. It does not split the ledger into a profit-and-loss statement and a balance sheet.
- *     `fct_account_move_line` carries `account_id` but no account TYPE, and there is no
- *     `dim_account`, so nothing in the warehouse distinguishes an income account from an asset one.
- *     Two headings over identical numbers would be worse than one honest one.
+ *  1. It does not invent two metric names for the split. `account_type` and `is_profit_and_loss`
+ *     are dimensions of `account_balance`, so the profit-and-loss and balance-sheet views are a
+ *     group-by on one measure. Two metric names over the same measure filtered differently would
+ *     be a view wearing a metric's clothes, and Backend declined to declare them for that reason.
  *  2. It does not show a PPN/PPh summary. The operator chose a four-addon set, so there are no
  *     Coretax/e-Faktur or PPh withholding modules and no tax data exists in this build. The panel
  *     states that. It is not computed, not estimated, and not derived from anything nearby.
@@ -44,7 +44,7 @@ export default async function FinancePage({ params }: { params: Promise<{ tenant
       session={session}
       active="finance"
       title="Keuangan"
-      intro="Saldo buku besar dari fct_account_move_line: debit dikurangi kredit pada baris jurnal yang sudah diposting. SLA kesegaran 60 menit, paling longgar di platform ini."
+      intro="Saldo buku besar dari fct_account_move_line: debit dikurangi kredit pada baris jurnal yang sudah diposting, dipecah menurut jenis akun. SLA kesegaran 60 menit, paling longgar di platform ini."
       filters={filters}
       ouOptions={ouOptions}
     >
@@ -58,6 +58,18 @@ export default async function FinancePage({ params }: { params: Promise<{ tenant
 async function FinanceBody({ filters, tenant }: { filters: PortalFilters; tenant: string }) {
   const range = toQueryFilters(filters);
   const specs = {
+    byType: {
+      metric: "account_balance",
+      dimensions: ["account_type"],
+      filters: range,
+      order_by: "-value",
+    },
+    bySplit: {
+      metric: "account_balance",
+      dimensions: ["is_profit_and_loss", "account_type"],
+      filters: range,
+      order_by: "-value",
+    },
     byAccount: {
       metric: "account_balance",
       dimensions: ["account_id"],
@@ -100,6 +112,26 @@ async function FinanceBody({ filters, tenant }: { filters: PortalFilters; tenant
       <FreshnessSummary metas={metas} />
 
       <div className="grid gap-3 lg:grid-cols-2">
+        <MetricSection
+          id="gl-account-type"
+          title="Saldo per jenis akun"
+          description="Dimensi account_type. Inilah pemisahan laba rugi dan neraca: sebuah group-by pada account_balance, bukan dua metrik dengan nama berbeda untuk ukuran yang sama."
+          result={results.byType}
+          chart="category"
+          query={specs.byType}
+          filename="saldo-per-jenis-akun"
+          drillHref={drillBase + "?metric=account_balance&by=account_type,account_id&order=-value&limit=500"}
+        />
+        <MetricSection
+          id="gl-split"
+          title="Laba rugi dan neraca"
+          description="is_profit_and_loss dapat bernilai NULL: baris seksi dan catatan tidak memiliki akun, dan NULL berarti bukan keduanya - bukan false. Seed ini kebetulan tidak memuat baris seperti itu, dan itu bukan bukti bahwa baris seperti itu tidak mungkin ada, sehingga kelompoknya tetap dirender."
+          result={results.bySplit}
+          chart="category"
+          query={specs.bySplit}
+          filename="laba-rugi-dan-neraca"
+          drillHref={drillBase + "?metric=account_balance&by=is_profit_and_loss,account_type,account_id&order=-value&limit=500"}
+        />
         <MetricSection
           id="gl-account"
           title="Saldo per akun"
