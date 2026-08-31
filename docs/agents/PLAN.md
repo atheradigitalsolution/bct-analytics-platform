@@ -1278,3 +1278,71 @@ names the URL, the exception and the remedy instead of reporting a bad token.
 **Held by the Lead, not forgotten.** The Makefile is Platform-Infra's, and QA is mid-cold-start
 verifying those exact targets. Changing them now would make QA's evidence a measurement against a
 moving target. Route after QA lands.
+
+### Instance 22 — the catalogue was read, and the mistake was made anyway
+
+Backend closed its exec-bit item as latent. Verified by the Lead: all five Makefile invocations are
+`bash`-prefixed (`339, 340, 345, 352, 353`) plus `$(PYTHON)` for the `.py`, none mode-dependent.
+
+**Its first attempt at that check reported `bash-invoked=0` for all five**, and it nearly reported the
+exec bit closed on that basis. The regex searched for the literal `scripts/analytics/`; the Makefile
+invokes them through `$(GATEWAY_SCRIPTS)/` (line 331). **A check that returned zero because it could
+not see its subject, read as zero problems.**
+
+This is QA's documented mistake reproduced exactly — PLAN already records that QA's tightened pattern
+missed `"$REPO_ROOT/scripts/init-db.sh"`, the defect that motivated it, because the path was quoted
+and variable-prefixed. Backend hit the **identical variable-prefix blind spot on the identical class
+of file, having read that entry earlier the same day.**
+
+Backend on how it caught it: *"I knew from having READ the target bodies twenty minutes earlier that
+`gen-jwt-keys.sh` is invoked there. That is not a method — it is luck backed by a good memory, and
+the next person will not have it."*
+
+**This is the build's clearest argument that documentation does not prevent recurrence.** Twice now
+the same agent has repeated a trap immediately after recording it — `bash -n`, and this. What works
+is the mechanical rule applied without recall: **before believing a zero, assert the subject set was
+non-empty.** A rule fires whether or not you remember the story behind it.
+
+### Instance 23 — a provenance column that could not say "I do not know"
+
+DWH added the provenance column so budget claims would be auditable. **One commit later, Backend's
+remark prompted it to re-read its own entries, and one was wrong:**
+
+```
+3  postgres_exporter  [literal - fixed in docker-compose.analytics.yml]
+```
+
+That file fixes **nothing** about the connection count — `--disable-default-metrics` and the custom
+query path change *what* the exporter queries, not *how many connections it opens*. Nothing pins the
+number anywhere. **It was an allowance DWH chose, dressed as a structural constant with a file
+citation — inside the very column added to make such claims auditable.**
+
+Now labelled `UNVERIFIED`, with why it cannot be measured from here: the exporter connects as
+`warehouse_rls`, the same role semantic-api uses, so `pg_stat_activity` cannot separate them by
+`usename`. Isolating it needs a distinct `application_name` or its own role — **worth doing, not
+done, stated rather than implied.**
+
+**The design lesson sharpens Backend's taxonomy into four.** "Live reading / structural constant /
+policy allowance" silently assumes the author knows which one they wrote. The necessary fourth
+category is **UNVERIFIED**, distinct from deliberately fixed:
+
+> A provenance column only helps if it can say *I do not know*; otherwise every entry gets pressured
+> into looking like one of the three respectable kinds.
+
+That generalises well past this file. Any schema of justifications without an explicit unknown bucket
+manufactures false confidence, because the author must pick *something* and every available option
+asserts more than they have.
+
+### Approximating a gate manufactures false findings
+
+DWH ran a bare `ruff check --select=E9,F,B,S` over its own file, got an `S608` hit, and nearly acted
+on it. **The project's pre-commit hook ignores `S608` by explicit config**, with a documented reason:
+Odoo model code composes SQL by design. Its invocation was enforcing rules the project does not.
+
+Its own summary: *"the second time this session I have checked my work against a stricter standard
+than the one governing it, which manufactures plausible false findings. The hook is the authority; I
+should invoke it rather than approximate it."*
+
+Worth stating as a rule: **run the gate, do not reconstruct it.** A reconstruction differs from the
+real gate in exactly the places someone deliberately configured, and those differences arrive
+disguised as findings.
