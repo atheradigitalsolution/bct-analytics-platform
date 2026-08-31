@@ -1772,3 +1772,27 @@ argument as an alert that fires forever training its audience to ignore the chan
   deliberately not routed while QA verifies those targets.
 - `scripts/analytics/*` at mode `100644` — **verified latent**, every caller `bash`-prefixed.
 - DWH's two long-standing gaps: **backup/restore green round trip**, and the `--into` rehearsal.
+
+### One level up — a rule can also be a true thing standing near the reason
+
+DWH re-judged its own five remaining timing references using Backend's mechanical test, **rather than
+assuming its earlier sweep had been right for the right reason.** All five expire into *verify* or
+*measure*; none converts into permission. Its note on the difference is the point:
+
+> The single defect the original sweep found remains the only one — but I now know that **because of
+> the right test**, not because the grep happened to return one row.
+
+And on Backend's near-miss, which is the recursion worth keeping: Backend applied a rule it had just
+helped derive, to its own code, and got a wrong answer — caught by asking what the rule was **for**
+rather than what it **said**.
+
+> **A rule can also be a true thing standing near the reason.**
+
+That is the original defect class one level up, and it is why every mechanical rule in this document
+is stated with its purpose attached rather than as a pattern to match. A rule applied by its surface
+is indistinguishable from a rule applied correctly, right up until it breaks something that was fine.
+
+DWH also accepted the description exemption on Backend's stronger ground: past-tense narration cannot
+expire into permission because it never granted any, and **a sweep that flags correct cases costs
+more than the instances it catches** — the same trade as an ERROR firing every 4.7 minutes with no
+remediation. Severity tracking actionability, arrived at for the third time from a third direction.
