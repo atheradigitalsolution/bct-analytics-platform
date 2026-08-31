@@ -171,6 +171,43 @@ def test_make_up_analytics_brings_the_warehouse_up_from_nothing(foreign_before, 
         assert identity.rls_applies, "%s came back as a superuser after a cold start" % role
 
 
+def test_the_observability_overlay_comes_back_and_alerting_is_live(foreign_before, evidence):
+    """A cold start that leaves alerting down is a cold start that has broken the safety net.
+
+    `make up-dev` and `make up-analytics` do not touch the observability overlay, so a teardown that
+    removed it leaves Prometheus, Alertmanager, Loki, promtail and node-exporter down. Every alert
+    rule then fires into nothing -- and `make verify` keeps passing, because nothing it checks looks
+    at alerting. That is the same "a check that cannot fail" shape as a rule on a series nobody
+    emits; it simply arrives through a different door.
+
+    **This widens the cold start's footprint**, and that is worth saying rather than doing quietly:
+    before this test the overlay stayed down after a run, so the measured bring-up cost excluded it.
+    It now includes Prometheus, Grafana, Loki, promtail, Alertmanager and both exporters.
+    """
+    started = time.time()
+    result = run(["make", "up-obs"], timeout=900)
+    evidence.add(
+        "make up-obs (rc=%d, %.0fs)" % (result.returncode, time.time() - started),
+        (result.stdout + result.stderr).strip()[-1500:],
+    )
+    assert result.returncode == 0, "make up-obs failed after a cold start"
+
+    # `check-alerting` hard-fails on a down scrape target and on Prometheus having no active
+    # Alertmanager, and treats a skip as not-a-pass. Give the targets a scrape interval or two.
+    ok, seconds = wait_for(
+        lambda: run(["make", "check-alerting"], timeout=300).returncode == 0, 240, 15.0
+    )
+    final = run(["make", "check-alerting"], timeout=300)
+    evidence.add(
+        "make check-alerting (rc=%d, settled after %.0fs)" % (final.returncode, seconds),
+        (final.stdout + final.stderr).strip()[-2500:],
+    )
+    assert ok and final.returncode == 0, (
+        "alerting is not live after the cold start. Every rule in the project is currently firing "
+        "into nothing, and no other check in this project would notice."
+    )
+
+
 def test_the_other_stacks_on_this_host_are_still_there(foreign_before, evidence):
     """The tripwire. Runs last, and is the assertion this whole file is gated for."""
     before_volumes, before_containers = foreign_before

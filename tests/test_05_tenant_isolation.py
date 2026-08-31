@@ -21,6 +21,7 @@ from __future__ import annotations
 import pytest
 
 from helpers import db
+from helpers import env as env_helper
 from helpers.env import env
 
 pytestmark = [pytest.mark.live]
@@ -230,4 +231,63 @@ def test_a_tenant_scoped_session_sees_only_its_own_rows(marts_exist, evidence):
         "%d rows belonging to tenant %s exist across the marts and NONE were visible to a session "
         "scoped to tenant %s, running as warehouse_rls (rolsuper=f, rolbypassrls=f)."
         % (hidden, b, a),
+    )
+
+
+# ---------------------------------------------------------------------------------------------
+# After a restore. RLS survives a `--full-refresh`; it does NOT automatically survive pg_restore.
+# ---------------------------------------------------------------------------------------------
+
+
+def test_no_mart_is_owned_by_a_superuser(marts_exist, evidence):
+    """Ownership is half of what makes FORCE ROW LEVEL SECURITY mean anything.
+
+    `FORCE` subjects a table's owner to its own policies -- but a **superuser** bypasses row
+    security unconditionally, and no policy and no `FORCE` can stop it. So a mart owned by a
+    superuser has RLS that is present, enabled, forced, and inert.
+
+    This is not hypothetical. `warehouse-backup.sh` passed `--no-owner` to `pg_restore`, which
+    assigns ownership to the *restoring* role -- `warehouse_admin`. A restored warehouse therefore
+    came back with all 41 tables superuser-owned and every mart returning rows to anyone, **with
+    nothing erroring anywhere**. Every RLS test in this file passed on that database: the flags were
+    all still set, and the boundary was gone.
+    """
+    rows = db.query(
+        db.warehouse_admin(),
+        "SELECT c.relname, pg_get_userbyid(c.relowner), r.rolsuper "
+        "FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "JOIN pg_roles r ON r.oid = c.relowner "
+        "WHERE n.nspname = 'marts' AND c.relkind = 'r' ORDER BY 1;",
+    )
+    evidence.add(
+        "mart ownership",
+        "\n".join("%-28s owner=%-18s rolsuper=%s" % r for r in rows),
+    )
+    assert rows, "no tables in schema marts"
+    superuser_owned = [(name, owner) for name, owner, is_super in rows if is_super == "t"]
+    assert not superuser_owned, (
+        "these marts are owned by a SUPERUSER, which bypasses row security unconditionally. Their "
+        "RLS is enabled, forced and inert: %r" % superuser_owned
+    )
+
+
+def test_the_backup_script_does_not_strip_ownership(evidence):
+    """The one-flag version of the test above, so the regression is caught before a restore happens.
+
+    A structural check on the script is worth having next to the state check on the database: the
+    state check only fails *after* someone has restored into production.
+    """
+    script = env_helper.repo_root() / "analytics" / "warehouse" / "bin" / "warehouse-backup.sh"
+    if not script.exists():
+        pytest.skip("analytics/warehouse/bin/warehouse-backup.sh does not exist (NOT RUN)")
+    text = script.read_text(encoding="utf-8")
+    offending = [
+        line.strip() for line in text.splitlines()
+        if "--no-owner" in line and not line.strip().startswith("#")
+    ]
+    evidence.add("uncommented --no-owner occurrences", "\n".join(offending) or "none")
+    assert not offending, (
+        "warehouse-backup.sh passes --no-owner, so pg_restore assigns every table to the restoring "
+        "role. Restoring as warehouse_admin makes every mart superuser-owned and its RLS inert, "
+        "and nothing errors: %r" % offending
     )

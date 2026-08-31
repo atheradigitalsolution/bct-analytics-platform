@@ -111,6 +111,21 @@ def test_the_metrics_the_rules_depend_on_actually_exist(oltp_up, evidence):
         "pg_replication_slots_active",
     )
 
+    # PRECONDITION FIRST. These are per-slot series: they exist only while a replication slot
+    # exists. Sampling them with zero slots returns zero results and looks exactly like an exporter
+    # that never emits them -- which is a false positive this test has already produced once, during
+    # a window when a cold start had destroyed every slot. Establish the precondition, or say the
+    # test could not run. "No samples" only means something when there was something to sample.
+    slots = db.query(db.oltp_odoo(), "SELECT slot_name FROM pg_replication_slots;")
+    evidence.add("replication slots that exist right now",
+                 ", ".join(r[0] for r in slots) or "(none)")
+    if not slots:
+        pytest.skip(
+            "no replication slot exists, so the per-slot series cannot have samples and their "
+            "absence proves nothing about the exporter. Provision a slot "
+            "(scripts/analytics/cdc-provision.sh) and re-run. NOT RUN."
+        )
+
     # Asked of Prometheus rather than of the exporter directly. The exporter publishes no host port
     # -- correctly, it is only reachable on the compose network -- and going through Prometheus
     # proves the stronger thing anyway: the series exists *where the rules are evaluated*. An
@@ -287,6 +302,15 @@ def test_no_loaded_alert_rule_depends_on_a_series_that_does_not_exist(evidence):
     OWNED = {"node_": "node", "bct_cdc_": "analytics-cdc",
              "bct_warehouse_": "warehouse-exporter", "pg_": "postgres"}
 
+    #: Series that exist only while their subject does. Absent with no subject present, they are
+    #: reported and not failed -- otherwise this test manufactures a false positive every time a
+    #: slot is legitimately absent, which is precisely the error it once produced.
+    conditional = set()
+    if not db.query(db.oltp_odoo(), "SELECT 1 FROM pg_replication_slots LIMIT 1;"):
+        conditional |= {"pg_replication_slots_pg_wal_lsn_diff",
+                        "pg_replication_slot_wal_status",
+                        "pg_replication_slots_active"}
+
     FUNCTIONS = {
         "sum", "min", "max", "avg", "count", "rate", "irate", "increase", "absent", "by", "on",
         "without", "group_left", "group_right", "unless", "and", "or", "ignoring", "offset",
@@ -321,13 +345,14 @@ def test_no_loaded_alert_rule_depends_on_a_series_that_does_not_exist(evidence):
             if not missing:
                 continue
             blocked = [n for n in missing
-                       if any(n.startswith(p) and j in down_jobs for p, j in OWNED.items())]
+                       if n in conditional
+                       or any(n.startswith(p) and j in down_jobs for p, j in OWNED.items())]
             genuine = [n for n in missing if n not in blocked]
             if genuine:
                 dead.append((rule["name"], genuine))
                 report.append("NEVER SEEN   %-42s %s" % (rule["name"], ", ".join(genuine)))
             if blocked:
-                report.append("target down  %-42s %s" % (rule["name"], ", ".join(blocked)))
+                report.append("precondition %-41s %s" % (rule["name"], ", ".join(blocked)))
 
     evidence.add("scrape targets currently down", ", ".join(down_jobs) or "none")
     evidence.add(
