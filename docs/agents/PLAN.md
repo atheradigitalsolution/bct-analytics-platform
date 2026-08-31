@@ -434,3 +434,35 @@ merge does not mean "nothing diverged".
 
 Consequence for the deferred third cold start: on this host it reproduces Finding 5 regardless of
 what `.env.example` says, until either a repair path lands or the operator edits one line.
+
+## PAUSED BY THE OPERATOR — resume point, 2026-08-31
+
+Work halted at the operator's request. Two agents were stopped mid-task; nothing committed was lost.
+
+**Committed and safe.** Platform-Infra landed `efa6f65` ("make the dev credential, the module set
+and the alerting gate real"). QA and Data Warehouse both finished and committed everything they own.
+
+**Uncommitted, on disk only — Frontend.** 31 paths under `insight-portal/` (12 modified, 19
+untracked, including `Dockerfile`, `docker-compose.portal.yml`, `src/app/api/`, `src/app/t/`,
+`scripts/`, `public/`). The work is in the working tree and intact. It is NOT committed, and the
+Lead deliberately did not commit it — it is Frontend's path and the Lead has not reviewed it.
+**Resuming Frontend is therefore the first thing to do, before any command that touches the tree.**
+
+**Open, with owners:**
+
+| Item | Owner | State |
+|---|---|---|
+| Instance 12 — `.env` drift is silent; `dev-bootstrap` preserves `ODOO_INIT_MODULES=base,web` | Platform-Infra | routed, not started |
+| Instance 11 — `check-alerting` fixed in `efa6f65`; the fix has NOT been observed to fail | Platform-Infra | needs the red proof |
+| Script file modes landed 100644 — Platform-Infra was checking whether that breaks a Linux clone | Platform-Infra | mid-investigation, unresolved |
+| Five views render from real data; p95; 403; 375px evidence | Frontend | portal builds; live evidence not taken |
+| `account.account` classification + a storable product with no `standard_price` | Platform-Addons | never dispatched |
+| Phase 5 SBOM / signing verification | Security | never resumed |
+| Third cold start (proves Finding 5, alerting, credential together) | QA | deliberately deferred by the Lead; awaits the three fixes |
+
+**Operator action outstanding:** this host's `.env:122` still reads `ODOO_INIT_MODULES=base,web`.
+Until instance 12's repair path lands, a cold start here reproduces Finding 5 regardless of
+`.env.example`. One line, or wait for the repair target.
+
+**Do not** mark any deferred item green on resume without re-running its evidence. Twelve instances
+in this build say the green would be for the wrong reason.
