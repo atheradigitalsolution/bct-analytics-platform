@@ -290,12 +290,84 @@ warehouse-restore: ## Restore a warehouse backup: make warehouse-restore FROM=ba
 	@test -n "$(FROM)" || { echo "FROM=<backup dir> is required"; exit 2; }
 	@bash analytics/warehouse/bin/warehouse-backup.sh --restore $(FROM)
 
+# ==== Backend service tier (login-gateway, semantic-api, CDC)
+#
+# These four names were RESERVED in the block below and never defined, so the
+# whole Backend tier existed only as scripts a human had to know to invoke, in
+# an order recorded nowhere. Backend ran cdc-provision.sh by hand; a fresh clone
+# did not, and no target would have. A comment naming four targets that do not
+# exist is worse than no comment - it reads as documentation of something that
+# works, which is exactly how BCT_DEV_USER_PASSWORD came to look implemented.
+#
+# THE ORDER, which is the artefact that was actually missing. Taken from the
+# scripts, not from prose:
+#
+#   make up-dev          Odoo + Postgres must be up; cdc-provision reads them.
+#   make up-analytics    the warehouse must exist; the loader lands into it and
+#                        cdc-provision builds its column list from
+#                        warehouse.column_policy.
+#   make up-gateway      BEFORE up-semantic. The API fetches JWKS from the
+#                        gateway at SEMANTIC_API_JWKS_URL; started the other way
+#                        round it cannot verify a token and returns 401 on every
+#                        VALID login, which reads as a client-side auth failure.
+#   make up-semantic
+#   make cdc-start       runs cdc-provision.sh FIRST, then cdc-run.sh. That
+#                        order is load-bearing and is enforced in the recipe:
+#                        publication first, slot second. WAL retention starts
+#                        the instant a slot exists and the 2 GB cap
+#                        (ADR 0001) starts counting immediately, so a slot
+#                        created before its consumer is ready is the exact
+#                        failure the cap exists to bound.
+#
+# Every recipe invokes "bash scripts/analytics/x.sh", never "./x.sh". That is a
+# deliberate answer to the exec-bit question: those six files are mode 100644,
+# and this repository has already proven it cannot reliably RECORD that bit -
+# core.fileMode=false means a mode change survives neither "git commit -- path"
+# nor "-c core.fileMode=true", and the plumbing route leaves a pending revert in
+# an index three agents share. Depending on a bit we cannot record would make a
+# latent problem load-bearing on Linux. "bash" costs nothing and cannot rot.
+# scripts/analytics/ is Backend's path and is not touched here.
+
+GATEWAY_SCRIPTS := scripts/analytics
+
+.PHONY: up-gateway
+up-gateway: ## Start the login gateway (generates its RS256 keys on first run)
+	@# gen-jwt-keys.sh REFUSES to overwrite an existing key (--force to replace),
+	@# so this is safe on every run and removes the one manual step that stood
+	@# between a fresh clone and a working gateway. Rotating keys behind live
+	@# tokens is the failure it protects against; it is not this target's job.
+	@bash $(GATEWAY_SCRIPTS)/gen-jwt-keys.sh
+	@bash $(GATEWAY_SCRIPTS)/gateway-run.sh --detach
+	@echo "login-gateway  http://127.0.0.1:$${LOGIN_GATEWAY_HOST_PORT:-38120}   jwks: /.well-known/jwks.json"
+
+.PHONY: up-semantic
+up-semantic: ## Start the semantic API (run up-gateway FIRST - it fetches JWKS from it)
+	@bash $(GATEWAY_SCRIPTS)/semantic-run.sh --detach
+	@echo "semantic-api   http://127.0.0.1:$${SEMANTIC_API_HOST_PORT:-38200}"
+
+.PHONY: cdc-start
+cdc-start: ## Provision the publication, then start the CDC loader (TENANT=<slug>)
+	@# Publication FIRST, then the consumer, which creates the slot at the end of
+	@# its own startup checks. Never the reverse - see the ordering note above.
+	@bash $(GATEWAY_SCRIPTS)/cdc-provision.sh --slug $(if $(TENANT),$(TENANT),$${ODOO_DB_NAME:-bct})
+	@bash $(GATEWAY_SCRIPTS)/cdc-run.sh --detach
+
+.PHONY: cdc-status
+cdc-status: ## Show the CDC loader, its replication slot and its last success
+	@# Reports; never fails. A status command that exits non-zero because the
+	@# thing is down is a status command people stop running.
+	@echo "container:"
+	@docker ps --format '  {{.Names}}	{{.Status}}' --filter name=odoo19-bct-cdc 2>/dev/null | grep . || echo "  odoo19-bct-cdc is NOT running  (make cdc-start)"
+	@echo "replication slot:"
+	@$(DC) exec -T postgres psql -U $${POSTGRES_USER:-odoo} -d $${ODOO_DB_NAME:-bct} -tAc 	    "SELECT '  ' || slot_name || '  active=' || active || '  wal_status=' || COALESCE(wal_status,'?') || '  retained=' || pg_size_pretty(COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn), 0)) FROM pg_replication_slots" 2>/dev/null | grep . || echo "  no replication slot exists  (make cdc-start)"
+	@echo "note: bct_cdc_up and slot-lag alerting are covered by 'make check-alerting'"
+
 # ===========================================================================
 # RESERVED — do not define these here.
 #
 # Namespace claimed by later agents (docs/agents/contracts/04-platform.md):
 #   Data Warehouse : CLAIMED above, in the "Analytics warehouse" section.
-#   Backend        : up-gateway  up-semantic  cdc-start  cdc-status
+#   Backend        : DEFINED above, in "Backend service tier". All four.
 #   Frontend       : up-portal  portal-build
 #
 # Claimed since publication, on request via the Lead:
