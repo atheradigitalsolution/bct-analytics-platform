@@ -211,6 +211,39 @@ retention period?
 | 5 | `exp` 3600 s; refresh cookie httpOnly + Secure + SameSite=Strict | contract 02 | semgrep `bct-ts-cookie-missing-httponly` |
 | 6 | No token ever reaches the browser | master prompt §4 | semgrep `bct-ts-next-server-secret-to-client` |
 
+**OPEN, RELEASE-BLOCKING (raised 2026-08-31): `login-gateway` and `semantic-api` ship a
+PyJWT with an authentication-bypass CVE.** Found by scanning the images at registration
+rather than by reading their Dockerfiles:
+
+| CVE | Package | Installed | Fixed in |
+|---|---|---|---|
+| **CVE-2026-48526** | **PyJWT** | 2.10.1 | **2.13.0** — *authentication bypass due to forged JWTs* |
+| CVE-2026-32597 | PyJWT | 2.10.1 | 2.12.0 — accepts unknown `crit` header extensions (RFC 7515 §4.1.11 MUST violation) |
+| GHSA-537c-gmf6-5ccf | cryptography | 44.0.0 | 48.0.1 — vulnerable OpenSSL bundled in the wheels |
+| CVE-2026-26007 / -69247 / -69249 | cryptography | 44.0.0 | 46.0.5 / 50.0.0 / 49.0.0 |
+| CVE-2026-48818 / -54283 / CVE-2025-62727 | starlette | 0.41.3 | 1.1.0 / 1.3.1 / 0.49.1 |
+
+Nine HIGH, every one with a fix available, in the two services that *are* the trust
+boundary — one issues the tokens, the other verifies them. A forgery bypass in the JWT
+library is T-4 reached by a route none of our own controls can close: pinning RS256
+correctly, checking `iss`/`aud`, and holding only the public key all remain true and none
+of them help if the library itself can be induced to accept a token the gateway never
+signed.
+
+**Two OpenSSLs, and the patched one is not the one doing the crypto.** The images
+correctly `apt-get --only-upgrade` the OS openssl to 3.5.7 — so `python3 -c "import ssl"`
+reports 3.5.7 and the claim "openssl verified in the built layers" is true. But
+`cryptography`'s wheels statically bundle their own, and that one is **OpenSSL 3.4.0 (22
+Oct 2024)**, verified in the built image via
+`cryptography.hazmat.backends.openssl.backend.openssl_version_text()`. It is the bundled
+copy that performs RS256 verification. Patching the OS layer says nothing about it.
+
+Generalised for the gate checklist: **an image can contain more than one copy of a
+security-critical library, and the OS package manager only knows about one of them.**
+
+Caught independently by two CI jobs, which is the point of having both: `container-scan`
+(Trivy, 9 HIGH) and `sca-python` (pip-audit, 29 advisories across 3 packages).
+
 **Residual risk.** There is no key rotation story yet. JWKS supports `kid`-based rotation;
 nothing in Phase 1–4 exercises it, and a gateway that cannot rotate its key has no
 recovery path from variant 4 short of a full redeploy. **Security raises this at GATE 3
@@ -265,6 +298,9 @@ veto and the Lead does not override it):
 - [ ] Does a new column reach the warehouse without a classification? (T-3)
 - [ ] Does a new read path bypass the mask? `read()` is not the only funnel — `export_data`
       already does. Check exports, reports, QWeb templates and any new controller. (T-3)
+- [ ] Does the image contain a SECOND copy of a security-critical library that the OS
+      package manager does not see? `cryptography` wheels bundle their own OpenSSL; an
+      `apt --only-upgrade openssl` says nothing about it. (T-4, T-5)
 - [ ] Is every column whose transform is `hmac_sha256` actually of a **text** type? A
       column can be correctly classified and still be unhashable - contract 01's
       "hard-fail on unclassified" does not catch it, so it surfaces as a silent wrong
