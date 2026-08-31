@@ -130,6 +130,18 @@ install-modules: ## Install/upgrade modules: make install-modules MODULES=custom
 	@test -n "$(MODULES)" || { echo "MODULES is required, e.g. MODULES=custom_pdp_core,custom_ppob"; exit 1; }
 	@bash scripts/init-db.sh --modules "$(MODULES)" --force
 
+.PHONY: set-dev-passwords
+set-dev-passwords: ## Apply $$BCT_DEV_USER_PASSWORD to admin + the demo users (idempotent)
+	@bash scripts/set-dev-passwords.sh $(if $(TENANT),--db $(TENANT),)
+
+.PHONY: check-dev-passwords
+check-dev-passwords: ## Assert the dev password logs in AND that Odoo's default 'admin' is refused
+	@bash scripts/set-dev-passwords.sh --check $(if $(TENANT),--db $(TENANT),)
+
+.PHONY: seed-demo
+seed-demo: ## Generate the demo volume (custom_demo_seed) and password its users; idempotent
+	@bash scripts/seed-demo.sh $(if $(TENANT),--db $(TENANT),) $(ARGS)
+
 .PHONY: psql
 psql: ## Open a psql shell as the odoo superuser (TENANT=<slug> for another database)
 	@$(DC) exec postgres psql -U odoo -d $(if $(TENANT),$(TENANT),$${ODOO_DB_NAME:-bct})

@@ -110,6 +110,15 @@ check "gitignore guard" python3 "$REPO_ROOT/scripts/check-gitignore.py"
 step "13. the alerting path is armed, not merely syntactically valid"
 check "alerting armed" python3 "$REPO_ROOT/scripts/check-alerting.py"
 
+# 14 ------------------------------------------------------------------------
+step "14. the dev login credential is applied, and Odoo's default is refused"
+# PLAN.md instance 10. The half of this that matters is the NEGATIVE: a check
+# that only asserts "$BCT_DEV_USER_PASSWORD logs in" is green on a stack that
+# accepts BOTH passwords, which is precisely the defective state. So
+# --check requires authenticate('bct','admin','admin') to be False.
+check "dev password applied, default rejected" \
+    bash "$REPO_ROOT/scripts/set-dev-passwords.sh" --check
+
 # base-stack footprint ------------------------------------------------------
 step "base stack memory (constraint: idle under 4 GiB)"
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' \
