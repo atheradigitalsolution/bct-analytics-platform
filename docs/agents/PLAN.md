@@ -321,3 +321,66 @@ Item 2 of DWH's declaration is a finding in its own right, of the instance-10 fa
 the *ordering* relative to Backend's backfill exists only in this conversation. A fresh clone cannot
 reproduce it. Owner: Platform-Infra (Makefile), after the credential work. Recorded so it does not
 evaporate when this session ends — which is precisely how instance 10 came to exist.
+
+### Instance 11 — the alerting gate had never run a single one of its own checks
+
+Found by QA, reproduced by the Lead against a **healthy** Prometheus:
+
+```
+$ curl -s http://127.0.0.1:39090/-/healthy
+Prometheus Server is Healthy.            <- text/plain; charset=utf-8, by design
+$ make check-alerting
+check-alerting: SKIP - Prometheus not reachable at ... (JSONDecodeError).
+  NOT a pass: slot-lag alerting is unverified while it is down.
+RC=0
+```
+
+`scripts/check-alerting.py:85` probes `get("/-/healthy")`; `get()` JSON-decodes every response;
+`/-/healthy` is plain text; the bare `except Exception` at line 86 catches the `JSONDecodeError`;
+line 90 returns 0. **Every check below line 85 is unreachable code** — scrape targets up, an active
+Alertmanager, alert rules resolving to series. None has ever executed.
+
+Two properties make this worse than a broken script, and both generalise:
+
+1. **It exits 0 while printing "NOT a pass".** Every automated consumer — CI, `make`, QA's own test
+   — reads success; only a human reading stdout reads failure. A gate whose failure mode is
+   invisible to everything that consumes it is not a gate. **Rule: a skip must never share an exit
+   code with a pass.**
+2. **It defeated the test written to catch instance 5.** QA's cold-start test asserted
+   `check-alerting` returned 0. It did, having verified nothing, so the test went green — and its
+   `wait_for` never waited, because the first call already "passed". Fixed in `8b7285a` to require
+   exit 0 **and** the absence of `SKIP`. QA found and reported this against its own work.
+
+Line 113 carries a second instance of the residue problem: `/api/v1/label/__name__/values` returns
+names Prometheus has **ever** seen, not names with current samples, so a series that stopped being
+emitted still reads as present. This is the same endpoint semantics behind the Lead's instance 7 and
+QA's retracted Finding 4. **Three separate agents have now been fooled by it.** Assert on samples,
+never on name presence.
+
+### Gate status after QA's final report — recorded honestly, not aspirationally
+
+PASS, with evidence re-run: live sync incl. delete (create 0.18s / update 0.24s / delete 0.21s
+against a 60s budget, reaching `dim_partner` as `is_current` t->f) · cross-tenant 403 byte-identical
+incl. for a non-existent tenant · reconciliation 15/15 tables, debit=credit 439,850,000.00 over 431
+lines · masking, digest re-derived by hand and 5 `secret` columns absent as columns · RLS, 359
+`bct_t2` rows invisible to a `bct`-scoped session · freshness 2.3s -> frozen 35s -> 2.3s ·
+idempotency zero difference.
+
+**Not done, with named owners — no item marked green on an assertion that could not fail:**
+
+| Item | Status | Owner |
+|---|---|---|
+| Cold start from a fresh clone | **FAIL twice** — Finding 5, `ODOO_INIT_MODULES=base,web` | Platform-Infra |
+| Alerting live after cold start | **NOT PROVEN** — instance 11 | Platform-Infra |
+| Dev credential | **RED by design** — instance 10 | Platform-Infra |
+| Slot-lag alert fires live | **PARTIAL** — `promtool` green incl. negatives; live firing not induced (512 MiB WAL, shared host) | accepted as declared |
+| Five views render | **not covered** — portal not yet live | Frontend |
+| CD rollback demonstrated | **not covered** — no git remote | Security |
+
+**Lead ruling on the third cold start: deferred, deliberately.** Running it now would burn the
+seeded stack to re-prove three findings already known red. Order: Platform-Infra lands the three
+fixes -> Frontend takes its live evidence on the seeded stack -> one final cold start proves all of
+it at once. Recorded here so the deferral is a decision with a reason, not an omission.
+
+**DSAR erasure propagation into the warehouse is NOT automated. It is a manual runbook.** Stated
+plainly in `docs/pdp-compliance.md` as §3.2 requires, rather than implied.
