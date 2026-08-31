@@ -34,6 +34,16 @@ from helpers import db, env, web
 
 pytestmark = [pytest.mark.coldstart, pytest.mark.destructive, pytest.mark.slow]
 
+#: Every `make` call below passes an explicit empty `ARGS=`, and it is not decoration.
+#: A command-line variable is exported through MAKEFLAGS to EVERY nested make, including one
+#: spawned as a separate process by a test. Proven:
+#:     $ make -f leak.mk outer ARGS="-s -ra"
+#:     outer ARGS=[-s -ra] MAKEFLAGS=[ -- ARGS=-s\ -ra]
+#:     inner ARGS=[-s -ra]          <- a wholly separate `make` process
+#: So `make test-coldstart ARGS="-s"` -- the documented way to get verbose output -- leaked `-s`
+#: into `make seed-demo`, whose script rejected it with `unknown argument: -s`. The seed never ran,
+#: and three later tests failed on the empty database that left behind. An explicit assignment on
+#: the child's own command line beats MAKEFLAGS and is the fix.
 PROJECT = "odoo19-bct"
 NEWLINE = chr(10)
 
@@ -99,7 +109,7 @@ def test_project_volumes_are_genuinely_removed(foreign_before, evidence):
 
 def test_make_up_dev_brings_the_stack_up_from_nothing(foreign_before, evidence):
     started = time.time()
-    result = run(["make", "up-dev"], timeout=1800)
+    result = run(["make", "up-dev", "ARGS="], timeout=1800)
     evidence.add(
         "make up-dev (rc=%d, %.0fs)" % (result.returncode, time.time() - started),
         (result.stdout + result.stderr).strip()[-3000:],
@@ -201,7 +211,7 @@ def test_the_documented_credential_works_and_the_default_one_does_not(foreign_be
 
 def test_make_up_analytics_brings_the_warehouse_up_from_nothing(foreign_before, evidence):
     started = time.time()
-    result = run(["make", "up-analytics"], timeout=1800)
+    result = run(["make", "up-analytics", "ARGS="], timeout=1800)
     evidence.add(
         "make up-analytics (rc=%d, %.0fs)" % (result.returncode, time.time() - started),
         (result.stdout + result.stderr).strip()[-3000:],
@@ -246,7 +256,7 @@ def test_seed_demo_populates_a_cold_started_odoo(foreign_before, evidence):
     """
     before = int(db.scalar(db.oltp_odoo(), "SELECT count(*) FROM res_partner;"))
     started = time.time()
-    result = run(["make", "seed-demo"], timeout=2400)
+    result = run(["make", "seed-demo", "ARGS="], timeout=2400)
     evidence.add(
         "make seed-demo (rc=%d, %.0fs)" % (result.returncode, time.time() - started),
         (result.stdout + result.stderr).strip()[-1500:],
@@ -320,7 +330,7 @@ def test_the_documented_pipeline_targets_bring_the_rest_of_the_stack_up(
         ("cdc-start", None),
     ):
         started = time.time()
-        result = run(["make", target], timeout=1800)
+        result = run(["make", target, "ARGS="], timeout=1800)
         evidence.add(
             "make %s (rc=%d, %.0fs)" % (target, result.returncode, time.time() - started),
             (result.stdout + result.stderr).strip()[-1200:],
@@ -331,7 +341,7 @@ def test_the_documented_pipeline_targets_bring_the_rest_of_the_stack_up(
             evidence.add("%s answers /healthz" % target, "after %.0fs: %s" % (seconds, bool(ok)))
             assert ok, "make %s returned 0 but the service never answered /healthz" % target
 
-    status = run(["make", "cdc-status"], timeout=300)
+    status = run(["make", "cdc-status", "ARGS="], timeout=300)
     evidence.add("make cdc-status", (status.stdout + status.stderr).strip()[-1500:])
 
     # The loader must actually be streaming, not merely started. A slot with a consumer is the
@@ -382,7 +392,7 @@ def test_dbt_builds_the_marts_from_a_cold_started_pipeline(foreign_before, evide
     assert landed, "CDC landed no ppob_transaction rows in 300s after a cold start"
 
     started = time.time()
-    result = run(["make", "dbt-run"], timeout=2400)
+    result = run(["make", "dbt-run", "ARGS="], timeout=2400)
     evidence.add(
         "make dbt-run (rc=%d, %.0fs)" % (result.returncode, time.time() - started),
         (result.stdout + result.stderr).strip()[-900:],
@@ -398,7 +408,7 @@ def test_dbt_builds_the_marts_from_a_cold_started_pipeline(foreign_before, evide
     #   WarehouseTestsNotRunning -- "never seen; this rule can never fire, however green it looks"
     # So `dbt-test` is part of the documented cold-start path, not an optional extra.
     started = time.time()
-    tests = run(["make", "dbt-test"], timeout=2400)
+    tests = run(["make", "dbt-test", "ARGS="], timeout=2400)
     evidence.add(
         "make dbt-test (rc=%d, %.0fs)" % (tests.returncode, time.time() - started),
         (tests.stdout + tests.stderr).strip()[-900:],
@@ -439,7 +449,7 @@ def test_the_observability_overlay_comes_back_and_alerting_is_live(foreign_befor
     It now includes Prometheus, Grafana, Loki, promtail, Alertmanager and both exporters.
     """
     started = time.time()
-    result = run(["make", "up-obs"], timeout=900)
+    result = run(["make", "up-obs", "ARGS="], timeout=900)
     evidence.add(
         "make up-obs (rc=%d, %.0fs)" % (result.returncode, time.time() - started),
         (result.stdout + result.stderr).strip()[-1500:],
@@ -452,12 +462,12 @@ def test_the_observability_overlay_comes_back_and_alerting_is_live(foreign_befor
     # first run: Prometheus was still starting, the script skipped, rc was 0, and the assertion
     # went green. Exit code AND output, therefore.
     def verdict():
-        out = run(["make", "check-alerting"], timeout=300)
+        out = run(["make", "check-alerting", "ARGS="], timeout=300)
         text = (out.stdout + out.stderr)
         return out.returncode == 0 and "SKIP" not in text, text
 
     ok, seconds = wait_for(lambda: verdict()[0], 300, 15.0)
-    final = run(["make", "check-alerting"], timeout=300)
+    final = run(["make", "check-alerting", "ARGS="], timeout=300)
     text = (final.stdout + final.stderr).strip()
     evidence.add(
         "make check-alerting (rc=%d, settled after %.0fs)" % (final.returncode, seconds), text[-2500:]
