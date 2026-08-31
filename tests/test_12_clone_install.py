@@ -242,3 +242,57 @@ def test_every_directly_invoked_script_is_executable_in_the_clone(clone, evidenc
         "%d script(s) are invoked as a command yet are not executable in a fresh clone, so they "
         "would be 'Permission denied' on Linux: %r" % (len(broken), sorted(broken))
     )
+
+
+def test_the_shared_index_holds_no_pending_mode_revert(evidence):
+    """An index entry whose mode differs from HEAD is a REVERT waiting for the next commit.
+
+    This is a shared-index hazard of the same family as the ones in PLAN.md, and it was found the
+    hard way. A mode-only change committed via the plumbing route -- private index, `write-tree`,
+    `commit-tree`, `update-ref` -- deliberately never touches the shared index, which is what makes
+    it safe on a tree several agents are writing to. The consequence is that afterwards HEAD says
+    100755 while the shared index still says 100644, and **the next ordinary commit by anyone
+    silently reverts the mode**. Nothing warns: `git status` shows the file as unmodified, because
+    on Windows `core.fileMode=false` means the working tree's mode is ignored on both sides.
+
+    The follow-up that closes it is `git update-index --chmod=+x <path>`, which syncs the one entry.
+    This test is the tripwire that says whether it was done.
+
+    Deliberately NOT run against the clone fixture: a clone has a fresh index built from HEAD, so it
+    can never exhibit this. The subject is *this* working repository's index, which is the shared one.
+    """
+    import subprocess
+
+    from helpers import env
+
+    root = str(env.repo_root())
+    index = {}
+    for row in subprocess.run(
+        ["git", "ls-files", "-s"], capture_output=True, text=True, cwd=root
+    ).stdout.splitlines():
+        mode, _, _, path = row.split(maxsplit=3)
+        index[path] = mode
+
+    head = {}
+    for row in subprocess.run(
+        ["git", "ls-tree", "-r", "HEAD"], capture_output=True, text=True, cwd=root
+    ).stdout.splitlines():
+        meta, path = row.split("\t", 1)
+        mode, _, _ = meta.split(maxsplit=2)
+        head[path] = mode
+
+    divergent = [
+        (path, head[path], index[path])
+        for path in sorted(set(head) & set(index))
+        if head[path] != index[path]
+    ]
+    evidence.add(
+        "index entries whose mode differs from HEAD",
+        NEWLINE.join("%s  HEAD=%s  index=%s" % row for row in divergent) or "none",
+    )
+    assert not divergent, (
+        "%d file(s) have a different mode in the shared index than in HEAD. The next ordinary "
+        "commit by ANY agent will silently revert them. Fix with "
+        "`git update-index --chmod=+x <path>` (or --chmod=-x): %r"
+        % (len(divergent), [(p, h, i) for p, h, i in divergent])
+    )
