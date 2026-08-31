@@ -885,3 +885,51 @@ Platform-Infra's instrument choice is the rule again: **verify with `docker insp
 Platform-Infra held ~6 minutes at Frontend's request rather than restarting a service mid-p95-run: a
 restart poisons all 300 samples, between runs it costs nothing. Two agents sequencing their own work
 through a shared resource without the Lead arbitrating is the roster working as intended.
+
+### Instance 18 — false prose is a defect, and a permanently-firing error is worse than none
+
+Backend traced DWH's duplicate `res_partner` rows to its own loader and fixed it (`f413537`). The
+mechanism is a design decision working correctly with a gap the loader should have closed: `flush()`
+commits the warehouse transaction and only **then** sends feedback — deliberately, because confirming
+an LSN the warehouse has not stored lets Postgres drop that WAL and the rows are lost from both ends.
+The unavoidable price is a window: die between the commit and the feedback and Postgres redelivers
+changes already landed. **Logical replication is at-least-once; exactly-once *landing* was the
+loader's job and it was not doing it.**
+
+The stream now floors itself at `landed_max_lsn()`, read back out of **the data** rather than from
+`pipeline_state` — following the rule the loader already stated elsewhere: *a progress table can
+disagree with the rows it describes; the data cannot disagree with itself.*
+
+**Made red by recreating DWH's incident rather than reasoning about it** — six writes,
+`docker kill --signal=KILL` mid-stream, restart. Caught first attempt, with the skipped change named
+and its LSN printed. Its guard tests are the empty-result rule applied to its own fix:
+`test_the_floor_is_zero_for_an_empty_landing_zone` exists because **a floor that dropped everything
+would satisfy every redelivery test perfectly while silently emptying the pipeline.**
+
+**But the expensive half was the prose, and Backend says so plainly.** Three places in its code
+asserted this duplicate had *"no legitimate cause."* It has a well-understood one. That sentence is
+why DWH had to go hunting for a fixture artefact in its own snapshots before it could rule itself out
+— **a false comment consumed another agent's time**. And the condition logged `ERROR` every 4.7
+minutes forever with no remediation, **which is how people learn to ignore errors.**
+`insert_rows`' docstring claimed idempotency came from "never re-reading a range": true of the
+backfill, false of the stream — the path that actually produced the rows.
+
+All three sites now name the mechanism, say why the marts are unaffected (same WAL record ->
+identical payload -> `raw_latest` rank 1 absorbs it), and state that the figure **does not
+self-clear**: a constant value is history, only growth after a stable restart is a fault.
+
+**Two rules from this, both binding:**
+
+1. **A comment asserting that a condition cannot legitimately occur is a load-bearing claim.** When
+   it is wrong it does not merely mislead — it sends the next agent to search their own work for a
+   cause that was never there. Prose is not free.
+2. **An alert that fires forever with no remediation is worse than no alert**, because it trains its
+   audience to ignore the channel. If a condition is expected, say so and say what growth would mean.
+
+Backend left DWH's two rows in place: *"deleting them would be a write into another agent's data to
+make a number look nicer."* Correct.
+
+**New gap, routed to DWH and deliberately deferred:** there is still no unique index on
+`(_tenant_id, id, _op, _lsn)`, so exactly-once landing rests on the loader rather than the storage
+layer. `raw` DDL is DWH's. **Held until Frontend finishes measuring** — the two agents currently in
+the tree have both sequenced around that run, and the Lead will not be the one to break it.
