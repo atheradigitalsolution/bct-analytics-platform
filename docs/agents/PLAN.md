@@ -2054,3 +2054,42 @@ in the runtime image**. A Next standalone runtime needs `node`, not a package ma
 **And Security refused the dated exception on principle:** that instrument is for findings with **no
 fix**. All of these have one. *"Using the exception mechanism here would spend the one control that
 makes genuine exceptions credible, on three findings that are simply fixable."*
+
+### CI after Security's fixes — 8/6 becomes 10/4, verified by the Lead
+
+```
+FIXED   dbt-ci · sast (semgrep)
+REMAIN  sca-python (Backend) · fs-scan · sca-node · container-scan insight-portal (Frontend)
+        ci-gate correctly red
+```
+
+Both of Security's passed **for the right reasons**, checked per-step rather than by conclusion:
+
+- **`dbt-ci` reached tiers 2 and 3 for the first time in this build.** Tier 2 ran `dbt compile`
+  against real Postgres as the **NOSUPERUSER `warehouse` role** and reported
+  `Found 36 models, 2 snapshots, 291 data tests, 1 seed, 19 sources, 482 macros`. That gate had never
+  executed — it was unreachable behind the doubled path, and before *that* it would have compiled
+  against schemas the init-SQL step was silently failing to create. Two defects stacked, the outer
+  one hiding the inner.
+- Tier 3 took the **honest declared-skip** path: the fixture genuinely does not exist and
+  `ci_fixtures` is `pending`, so `discover` agrees and stays green. The registry backstop is now
+  armed in CI — when the fixture lands `discover` warns to flip it, and if it later disappears while
+  marked `present`, that is a hard failure.
+
+### Fail-fast is a mild member of the same family
+
+Security's fail-fast repair to `sca-python` earned its keep on its first run. The old gate aborted at
+manifest 1 of 6 and reported **one** vulnerable file; auditing all six found **two** — the same
+advisory in `analytics/cdc/requirements-dev.txt` **and** `analytics/semantic-api/requirements-dev.txt`.
+
+Under the old gate Backend would have fixed `cdc`, pushed, waited, and discovered `semantic-api` a
+run later.
+
+> **A gate that stops at the first finding is a mild form of the same family**, because the passing
+> state of every remaining check is *"never evaluated"* — which is indistinguishable from *"clean"*
+> to anyone reading the output.
+
+Fail-fast is a reasonable default for a build step and a poor one for an audit: a build has one
+answer, an audit has a **blast radius**, and stopping early makes that radius unknowable from any
+single run. The Lead's original diff request to Backend named one file because that is all the
+previous run could see; corrected to two.
