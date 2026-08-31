@@ -145,3 +145,39 @@ gathered from the artefact a user would actually get.
    as an ordinary git diff and never deletes it, so a lost edit is recoverable with `git apply`.
 3. **Unstable evidence during active waves** — a red result may be a genuine finding in a sibling's
    in-flight work rather than a regression. Re-check before asserting it.
+
+## The dominant defect pattern in this build — a check that cannot fail
+
+Six independent instances, found by five different agents. None was a coding error in the usual
+sense; every one was a **verification that returned the right-looking answer for the wrong reason**,
+and in every case the surrounding work was correct. This is the pattern to design against.
+
+| # | The check | Why it could not fail | Found by |
+|---|---|---|---|
+| 1 | Addon "installs cleanly" evidence | Run against a working tree where `.gitignore` had silently excluded three manifest-declared files; a fresh clone could not install at all | Platform-Addons |
+| 2 | Contract 01's barcode amendment | Written into the contract while the producer CSV and the live table still said `personal`; the loader reads the table | Security |
+| 3 | `git check-ignore` exit code | Exits 0 on a **negation** match too, so a guard asserting "`.env` is ignored" passes even when a negation made it committable | Backend → Security |
+| 4 | `rolsuper` compared as `'f'` | Through `\|\|` a boolean renders `true`/`false`, never psql's `t`/`f`, so the comparison never matched and passed forever | Platform-Infra |
+| 5 | `promtool` + Prometheus `health: ok` on six alert rules | Both validate syntax and loading; neither says the selector matches **any series**. `postgres-exporter` emitted zero `pg_replication_slot*`, so four load-bearing ADR alerts were permanently inactive | QA |
+| 6 | `make install-modules` / `make up-dev` | Reported success while all five modules stayed `uninstalled`; and `.env.example` shipped `ODOO_INIT_MODULES=base,web`, so a fresh clone gets no domain model and `up-analytics` fails hard | Platform-Infra, QA |
+
+### What actually catches this class
+
+Not more tests. **Restoring the broken condition and confirming the check goes red**, before trusting
+that it is green for the right reason:
+
+- DWH's reconciliation **perturbation proof** — corrupt a figure, watch the pipeline fail with a
+  non-zero exit and a named row, restore, watch it pass.
+- Backend's **mutation test** on T-1 — flip `is_local` true→false, watch three tests fail, revert.
+- QA's third alert test asserting **samples, not names** — `/api/v1/label/__name__/values` still
+  lists names from an earlier window, so a name-presence check reports healthy on exactly this bug.
+- QA leaving `test_the_unassigned_ou_branch_is_actually_exercised` **RED as "not covered"** rather
+  than filing a note. A red test outlives a paragraph in a report.
+- Security's identity-first assertion: every isolation test states `rolsuper=f, rolbypassrls=f` for
+  the role under test, because pointed at a superuser it would pass while proving nothing.
+
+### Standing rule
+
+**A check that has never been observed to fail is not yet known to work.** Before any gate accepts a
+green result, the author states how they made it go red. If they cannot, the criterion is recorded as
+**not verified** — never as passing.
