@@ -203,7 +203,7 @@ rather than decorative:
 | `ReplicationSlotInvalidated` | `wal_status="lost"` | 1m |
 | `ReplicationSlotInactive` | no consumer | 15m |
 
-**Unverified, and recorded as such:** that this alerting is live after a cold start. The overlay is
+**NOT PROVEN, and recorded as such:** that this alerting is live after a cold start. The overlay is
 not brought up by `make up-dev` or `make up-analytics`, and the check that would confirm it
 (`make check-alerting`) exits 0 without running any of its checks. See
 `docs/runbooks/analytics-pipeline.md` §3.4 for the manual verification and for the command that will

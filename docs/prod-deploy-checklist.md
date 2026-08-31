@@ -123,7 +123,7 @@ make dbt-run                     # build staging and marts
       configuration and the on-call destination are Security's to specify. An alert that fires into
       a channel nobody reads is worse than no alert, because it manufactures the belief that
       something is watching.
-- [ ] **Do NOT tick the box above on the strength of `make check-alerting`.** It cannot currently
+- [ ] **NOT PROVEN: do NOT tick the box above on the strength of `make check-alerting`.** It cannot currently
       pass: it probes `/-/healthy`, JSON-decodes the plain text that endpoint returns, reports the
       resulting error as "Prometheus not reachable", and exits **0**. It prints "NOT a pass" and
       succeeds. Verify by hand until Platform-Infra fixes it:
