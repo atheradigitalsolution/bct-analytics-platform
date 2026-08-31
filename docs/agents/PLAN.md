@@ -826,3 +826,62 @@ worth doing properly at the next quiet window.
 - **`is_profit_and_loss = NULL` unexercised.** Real in the model (LEFT join, section lines) but this
   seed has `account_id IS NULL` count 0. Stated in the metric description so that a NULL-free result
   is not read as proof NULL cannot occur.
+
+### Instance 17 — a defect with nothing to notice
+
+Frontend's observation, adopted by Platform-Infra, and it is a sharper specimen than instance 10.
+
+Instance 10 at least had a **tell**: `.env` carried a 20-character random password that *advertised* a
+decision nothing implemented. The JWKS host defect had no tell at all. `.env` held the **correct**
+value, so on this machine everything worked, every day, for everyone — while `.env.example` shipped a
+host that has never been resolvable, and a fresh clone would reject **every valid login** and report
+it as a client-side 401.
+
+> Their `.env` masked the defect the way a working tree masked the `.gitignore` exclusion earlier in
+> this build, and the 401 would have landed on whoever ran the clone-verification gate rather than
+> whoever caused it.
+
+**The generalisation: a local file that is more correct than the tracked one hides the tracked one's
+defect completely.** There is no line to spot, no stale comment, no advertised claim — simply nothing
+to notice. Instances 1, 10, 12 and 17 are all this shape, and it is why "verify from a clone, never
+from the working tree" is a MANDATORY gate step in this plan rather than a nicety.
+
+### Instance 10's shape closed in the Makefile
+
+The four reserved-but-undefined targets are defined (`6998a66`, `f3086d1`), and **the missing artefact
+was the order**, which now lives in the targets rather than in a comment:
+
+```
+up-dev -> up-analytics -> up-gateway -> up-semantic -> cdc-start
+
+gateway BEFORE semantic-api   the API fetches JWKS from it; reversed, it 401s every VALID login
+provision BEFORE run          publication first, slot second - WAL retention and ADR 0001's 2 GB
+                              cap start counting the instant a slot exists
+```
+
+`up-gateway` runs `gen-jwt-keys.sh` first, and Platform-Infra checked rather than assumed that it
+refuses to overwrite: `keep jwt` / `keep jwt-next`, rc 0, against the live keys. That removes the last
+manual step between a fresh clone and a working gateway.
+
+**The exec-bit question is decided: `bash`, not `chmod`.** Every recipe invokes
+`bash scripts/analytics/x.sh`. The reasoning is the stronger one: **this repo has already proven it
+cannot reliably record that bit** — `core.fileMode=false` defeats both `git commit -- path` and
+`-c core.fileMode=true`, and the plumbing route leaves a pending revert in an index three agents
+share. Adding a target that invoked a script directly would have converted a latent problem into a
+load-bearing one on Linux. `bash` costs nothing and cannot rot. `scripts/analytics/` untouched.
+
+### A container trap, and the right instrument for it
+
+`cdc-run.sh` uses `docker run --rm`, so `docker stop` **deletes** the container and `docker start`
+then fails with "no such container". `cdc-status` named the remedy but not the reason, which is
+exactly what makes an operator reach for `docker start`. Recorded at the recipe.
+
+Platform-Infra's instrument choice is the rule again: **verify with `docker inspect`, not `docker ps`
+— the latter cannot distinguish "stopped" from "never existed".** Same family as
+`/api/v1/label/__name__/values` returning names ever seen, and as the Lead's `grep -c` returning 0.
+
+### Coordination note
+
+Platform-Infra held ~6 minutes at Frontend's request rather than restarting a service mid-p95-run: a
+restart poisons all 300 samples, between runs it costs nothing. Two agents sequencing their own work
+through a shared resource without the Lead arbitrating is the roster working as intended.
