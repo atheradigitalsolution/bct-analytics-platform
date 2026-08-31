@@ -199,16 +199,91 @@ def test_live_sync_create_update_delete(
     assert delete_latency < LANDING_SLA_SECONDS
 
 
-def test_live_sync_delete_reaches_the_mart(marts_exist, cdc_running, evidence):
+def test_live_sync_delete_reaches_the_mart(marts_exist, cdc_running, cdc_warehouse, evidence):
     """The same delete, one layer up: it must also disappear from ``marts.dim_partner``.
 
-    Separated from the test above deliberately. The landing-zone test proves the CDC contract; this
-    one proves dbt's incremental logic applies the tombstone. They fail for entirely different
-    reasons, and conflating them would make a failure ambiguous.
+    Separated from the landing-zone test deliberately. That one proves the CDC contract; this one
+    proves dbt's model applies the tombstone. They fail for entirely different reasons -- a missing
+    tombstone versus a model that reads ``raw`` without filtering ``_op='D'`` -- and conflating them
+    would make a failure ambiguous.
+
+    This one runs ``dbt build``, because the mart is only as current as the last build. That makes
+    it slow and it is worth it: "the row is gone from the landing zone's projection" is a claim
+    about a SQL expression I wrote in the test, while "the row is gone from the mart" is a claim
+    about the model that actually serves the dashboard.
     """
+    from conftest import run
+    from helpers import odoo as odoo_helper
+
     assert "dim_partner" in marts_exist, (
         "marts exist but dim_partner is not among them: %r" % (marts_exist,)
     )
-    pytest.skip(
-        "written against marts.dim_partner; extend once dbt models are green. NOT RUN."
+    tenant = env.env("CDC_TENANT_SLUG", env.env("ODOO_DB_NAME", "bct"))
+    salt = env.env("WAREHOUSE_MASK_SALT_" + tenant.upper()) or env.env("WAREHOUSE_MASK_SALT_DEFAULT")
+
+    tag = uuid.uuid4().hex[:12]
+    name = "QA Mart Delete " + tag
+    pk = odoo_helper.create_partner(name, "qa.mart.%s@contoh.invalid" % tag, "+62-800-" + tag[:6])
+    digest = pdp.digest(name, salt)
+
+    landed, seconds = wait_for(
+        lambda: db.query(
+            cdc_warehouse,
+            "SELECT _op FROM raw.res_partner WHERE _tenant_id='%s' AND id=%d;" % (tenant, pk),
+        ),
+        LANDING_SLA_SECONDS, 0.5,
     )
+    assert landed, "the partner never reached raw.res_partner (%.1fs)" % seconds
+
+    build = run(["make", "dbt-run"], timeout=1800)
+    assert build.returncode == 0, (build.stdout + build.stderr)[-1500:]
+    present = db.query(
+        db.warehouse_admin(),
+        "SELECT partner_id, name, is_current FROM marts.dim_partner "
+        "WHERE tenant_id='%s' AND partner_id=%d;" % (tenant, pk),
+    )
+    evidence.add(
+        "marts.dim_partner after CREATE (id=%d, digest %s...)" % (pk, digest[:16]),
+        "%r" % (present,),
+    )
+    assert present, (
+        "the partner landed in raw but never appeared in marts.dim_partner after a dbt build"
+    )
+
+    # ---- now delete it, and require the mart to lose it -------------------------------
+    assert odoo_helper.unlink_partner(pk), "unlink() did not remove res_partner id=%d" % pk
+    tombstoned, seconds = wait_for(
+        lambda: any(r[0] == "D" for r in db.query(
+            cdc_warehouse,
+            "SELECT _op FROM raw.res_partner WHERE _tenant_id='%s' AND id=%d;" % (tenant, pk),
+        )),
+        LANDING_SLA_SECONDS, 0.5,
+    )
+    assert tombstoned, "no tombstone landed for id=%d after %.1fs" % (pk, seconds)
+
+    build = run(["make", "dbt-run"], timeout=1800)
+    assert build.returncode == 0, (build.stdout + build.stderr)[-1500:]
+
+    remaining = db.query(
+        db.warehouse_admin(),
+        "SELECT partner_id, name, is_current FROM marts.dim_partner "
+        "WHERE tenant_id='%s' AND partner_id=%d;" % (tenant, pk),
+    )
+    current = [r for r in remaining if r[2] == "t"]
+    evidence.add(
+        "marts.dim_partner after DELETE",
+        "rows for the key: %r\ncurrent rows: %r" % (remaining, current),
+    )
+    assert not current, (
+        "the partner was deleted in Odoo and tombstoned in raw, but marts.dim_partner still carries "
+        "a CURRENT row for it: %r. A dashboard would still show this person." % current
+    )
+
+    # And the digest is gone from the mart entirely as a current value.
+    leaked = db.query(
+        db.warehouse_admin(),
+        "SELECT count(*) FROM marts.dim_partner WHERE tenant_id='%s' AND name='%s' "
+        "AND is_current;" % (tenant, digest),
+    )
+    evidence.add("current rows still carrying that partner's name digest", leaked[0][0])
+    assert int(leaked[0][0]) == 0
