@@ -771,6 +771,43 @@ def cmd_verify(args) -> int:
         )
     else:
         print("OK  every raw table refuses a redelivered CDC change at the storage layer")
+
+    # CONNECTION BUDGET. The warehouse's max_connections is a SHARED resource
+    # and every consumer sizes its pool against it: semantic-api 16 (Backend,
+    # derived in Warehouse.__init__), dbt DBT_THREADS+1, the CDC loader 3, the
+    # exporter 3, plus ad-hoc psql. Nobody owns the total, which is exactly the
+    # kind of number that is correct on the day it is written and wrong three
+    # months later when one consumer is retuned in isolation.
+    #
+    # Checked here rather than documented in two repositories. Measured peak on
+    # this warehouse during a full dbt build was 10 concurrent (dbt 5 of them,
+    # against the 8 Backend budgeted), so there is real slack today - the point
+    # is to notice the day there is not.
+    consumers = {
+        "semantic-api pool (Backend)": 16,
+        "dbt (DBT_THREADS + 1)": int(os.environ.get("DBT_THREADS", "4")) + 1,
+        "CDC loader": 3,
+        "postgres_exporter": 3,
+        "ad-hoc psql headroom": 4,
+    }
+    with wh.cursor() as cur:
+        cur.execute("SELECT current_setting('max_connections')::int, "
+                    "current_setting('superuser_reserved_connections')::int")
+        max_conn, reserved = cur.fetchone()
+    usable = max_conn - reserved
+    claimed = sum(consumers.values())
+    if claimed > usable:
+        ok = False
+        print(f"CONNECTION BUDGET OVERSUBSCRIBED: {claimed} claimed vs {usable} usable "
+              f"(max_connections {max_conn} - {reserved} reserved)", file=sys.stderr)
+        for name, n in consumers.items():
+            print(f"    {n:>3}  {name}", file=sys.stderr)
+        print("  Raise max_connections in analytics/warehouse/postgresql.conf, or lower a pool. "
+              "Exhaustion surfaces as a 503 from semantic-api and a failed dbt thread, "
+              "neither of which names this as the cause.", file=sys.stderr)
+    else:
+        print(f"OK  connection budget: {claimed} claimed of {usable} usable "
+              f"({usable - claimed} spare)")
     return 0 if ok else 5
 
 
