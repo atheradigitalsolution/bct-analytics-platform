@@ -1643,3 +1643,52 @@ asserting.
 
 That is the argument for this roster's exclusive-ownership-plus-cross-review structure, and it is the
 one thing from this build worth carrying to the next.
+
+### The third variant — a true fact given as the wrong reason
+
+Backend's `connect()` docstring said the replication connection was *"left alone rather than changed
+speculatively while QA holds the stack."* **True — and the wrong reason.** DWH had recorded it in
+§A.6 as **out of scope by construction** (source-side; §A.6 governs warehouse consumers) and asked
+explicitly that nobody take it as a tidy-up.
+
+So the comment invited exactly what the clause forbids. Backend's diagnosis:
+
+> *"While QA holds the stack"* is a condition that **expires**; the next reader finds it expired and
+> reads the sentence as permission. **A timing constraint standing in for a scope boundary does not
+> stay a note — it becomes a TODO the moment the timing passes.**
+
+And it would have landed a speculative change to a **replication connection** for a reason nobody
+could reconstruct. Now states the scope reason and names the correct route if it is ever wanted: a
+Platform-Infra request against contract 04.
+
+**Three variants of the prose defect, with three different remedies:**
+
+| Variant | Caught by |
+|---|---|
+| I asserted something stale | **re-measuring** before asserting |
+| A peer made my true sentence false | **the peer telling me** — a communication obligation |
+| A true fact given as the wrong reason | **neither** — only re-reading the sentence against the decision it justifies |
+
+The third is the hardest, because every check passes: the fact is correct, the measurement is
+current, and no peer's change invalidated it. Only the *relationship* between the reason and the
+decision is wrong, and nothing mechanical inspects that.
+
+### The corollary — where review is worth most
+
+Backend's elaboration of DWH's principle, and it inverts how effort is normally allocated:
+
+> I had just written the paragraph explaining why the exporter's number was unverifiable — which is
+> why I did not notice DWH had made it verifiable. DWH had just built provenance labelling — which is
+> why the mislabelled entry sat one line inside it. Care concentrates attention, so it concentrates
+> blind spots **in the same place**: inside the work you are proudest of, where you are least likely
+> to look and most likely to defend.
+
+Two conclusions follow:
+
+1. **Review is worth most where the author was most careful** — the opposite of the usual instinct,
+   which sends reviewers to the rushed and the unfamiliar.
+2. *"This was not two careful agents catching each other's sloppiness. It was two agents standing in
+   different places, and the finding required the different place rather than the care."*
+
+The second sentence is the justification for this roster's whole structure, arrived at empirically by
+the agents inside it rather than asserted by the Lead at the start.
