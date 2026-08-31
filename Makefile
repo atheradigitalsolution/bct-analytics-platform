@@ -356,6 +356,13 @@ cdc-start: ## Provision the publication, then start the CDC loader (TENANT=<slug
 cdc-status: ## Show the CDC loader, its replication slot and its last success
 	@# Reports; never fails. A status command that exits non-zero because the
 	@# thing is down is a status command people stop running.
+	@#
+	@# "NOT running" here can mean DELETED, not stopped. cdc-run.sh uses
+	@# `docker run --rm`, so `docker stop odoo19-bct-cdc` removes the container
+	@# outright and a later `docker start` fails with "no such container" while
+	@# the loader stays down. Do not reach for `docker start`; `make cdc-start`
+	@# is the remedy in both cases, because cdc-run.sh does `docker rm -f` and
+	@# recreates. Found by Frontend, the hard way.
 	@echo "container:"
 	@docker ps --format '  {{.Names}}	{{.Status}}' --filter name=odoo19-bct-cdc 2>/dev/null | grep . || echo "  odoo19-bct-cdc is NOT running  (make cdc-start)"
 	@echo "replication slot:"
