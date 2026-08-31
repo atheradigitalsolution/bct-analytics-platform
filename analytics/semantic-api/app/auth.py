@@ -57,10 +57,20 @@ class Verifier:
         self._client = PyJWKClient(jwks_url, cache_keys=True, lifespan=cache_seconds)
         self._lock = threading.Lock()
         self._last_refresh = 0.0
+        #: Has this verifier EVER seen a key from the configured JWKS URL? Distinguishing "the
+        #: endpoint has never answered" from "this token's kid is unknown" is the whole point of
+        #: this flag: both used to produce the identical 401 and the identical log line, so a
+        #: misconfigured SEMANTIC_API_JWKS_URL was indistinguishable from a forged token. Proven
+        #: live: `login-gateway` does not resolve on the compose network -- only the container
+        #: name `odoo19-bct-login-gateway` does -- and .env.example still ships the former, so a
+        #: fresh clone rejects every valid token while reporting a client-side problem.
+        self._jwks_ever_loaded = False
 
     def _signing_key(self, token: str):
         try:
-            return self._client.get_signing_key_from_jwt(token).key
+            key = self._client.get_signing_key_from_jwt(token).key
+            self._jwks_ever_loaded = True
+            return key
         except Exception:
             # A kid that is not in the cached JWKS is the normal signal that the gateway has
             # rotated. Refresh once, at most every 10 s, then give up -- an unbounded refresh on
@@ -70,11 +80,29 @@ class Verifier:
                     self._last_refresh = time.time()
                     try:
                         self._client.fetch_data()
+                        self._jwks_ever_loaded = True
                     except Exception as exc:  # pragma: no cover - network dependent
-                        _logger.warning("JWKS refresh failed: %s", exc)
+                        _logger.error(
+                            "JWKS fetch from %s failed: %s: %s. Every token will be rejected "
+                            "until this URL is reachable, and the rejection looks exactly like a "
+                            "bad token to the caller. Check SEMANTIC_API_JWKS_URL -- on the "
+                            "compose network the gateway answers to its CONTAINER name "
+                            "(odoo19-bct-login-gateway), not to a compose service name.",
+                            self.jwks_url, exc.__class__.__name__, exc,
+                        )
             try:
-                return self._client.get_signing_key_from_jwt(token).key
+                key = self._client.get_signing_key_from_jwt(token).key
+                self._jwks_ever_loaded = True
+                return key
             except Exception:
+                if not self._jwks_ever_loaded:
+                    # Deliberately a different message from the kid case. The client still gets a
+                    # 401 either way -- config detail must not leak -- but the SERVER-side text an
+                    # operator reads now names the real cause instead of blaming the token.
+                    raise TokenRejected(
+                        "JWKS at %s has never yielded a key; this is a server configuration "
+                        "fault, not a bad token" % self.jwks_url
+                    ) from None
                 raise TokenRejected("No JWKS key matches the token's kid") from None
 
     def verify(self, token: str) -> Session:

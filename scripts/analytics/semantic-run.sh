@@ -31,6 +31,13 @@ docker rm -f "$NAME" >/dev/null 2>&1 || true
 DSN="host=${SEMANTIC_API_WAREHOUSE_HOST:-warehouse-db} port=${SEMANTIC_API_WAREHOUSE_PORT:-5432}"
 DSN="$DSN dbname=${WAREHOUSE_DB} user=${WAREHOUSE_RLS_USER} password=${WAREHOUSE_RLS_PASSWORD}"
 
+# The fallback is the gateway's CONTAINER name, not a compose service name. There is no
+# compose service for the gateway in this repo -- scripts/analytics/gateway-run.sh starts it
+# as `docker run --name odoo19-bct-login-gateway`, so that is the only name Docker's embedded
+# DNS resolves on odoo19-bct_bct. Proven, not assumed: from a container on that network,
+# `login-gateway` is NXDOMAIN while `odoo19-bct-login-gateway` serves the JWKS with both kids.
+# A wrong value here rejects every valid token and looks like a client-side auth failure.
+
 # MSYS_NO_PATHCONV is scoped to this one invocation, never exported (contract 04 section 11).
 # shellcheck disable=SC2086
 exec env MSYS_NO_PATHCONV=1 docker run --rm $DETACH --name "$NAME" \
@@ -40,7 +47,7 @@ exec env MSYS_NO_PATHCONV=1 docker run --rm $DETACH --name "$NAME" \
   --cap-drop ALL \
   --read-only \
   -e SEMANTIC_API_WAREHOUSE_DSN="$DSN" \
-  -e SEMANTIC_API_JWKS_URL="${SEMANTIC_API_JWKS_URL:-http://login-gateway:8080/.well-known/jwks.json}" \
+  -e SEMANTIC_API_JWKS_URL="${SEMANTIC_API_JWKS_URL:-http://odoo19-bct-login-gateway:8080/.well-known/jwks.json}" \
   -e SEMANTIC_API_JWT_ISSUER="${SEMANTIC_API_JWT_ISSUER:-${LOGIN_GATEWAY_JWT_ISSUER}}" \
   -e SEMANTIC_API_JWT_AUDIENCE="${SEMANTIC_API_JWT_AUDIENCE:-${LOGIN_GATEWAY_JWT_AUDIENCE}}" \
   -e SEMANTIC_API_MAX_LIMIT="${SEMANTIC_API_MAX_LIMIT:-5000}" \
