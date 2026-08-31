@@ -147,3 +147,98 @@ def test_dbt_models_referenced_by_the_project_are_in_the_clone(clone, evidence):
         "%d dbt file(s) exist locally but are not tracked, so `dbt build` on a fresh clone would "
         "not see them: %r" % (len(absent), absent[:20])
     )
+
+
+NEWLINE = chr(10)
+
+
+def test_every_directly_invoked_script_is_executable_in_the_clone(clone, evidence):
+    """A script invoked as a command must carry the exec bit **in git**, not just on this disk.
+
+    Windows has no exec bit and `core.filemode=false` hides its absence, so a script that works here
+    can be `Permission denied` on the first Linux clone that runs it. Platform-Infra hit exactly
+    that: `scripts/up-dev.sh` executes `scripts/init-db.sh` directly, inside `make up-dev`.
+
+    Two things this deliberately does NOT do, because the obvious versions are wrong.
+
+    It does not assert "has a shebang, therefore 100755". That would flag `postgres/init/00-init.sh`
+    and `analytics/warehouse/init/00-bootstrap.sh`, which the Postgres entrypoint *sources* when they
+    are not executable -- working exactly as intended -- and `scripts/lib/common.sh`, which is only
+    ever sourced.
+
+    And it does not grep every tracked file for the path. My first version did, and reported ten
+    "defects" that were prose: a `pytest.skip` message, a sentence in a contract, a comment in a SQL
+    test. An assertion firing on the wrong subject is the failure this suite exists to catch. So a
+    match counts only in **command position** -- first token of a line or of a `&&` / `;` / `|`
+    clause -- inside a shell script, Makefile or workflow, and never after a quote.
+    """
+    import re
+    import subprocess
+
+    listing = subprocess.run(
+        ["git", "ls-files", "-s"], capture_output=True, text=True, cwd=str(clone)
+    ).stdout
+    modes = {}
+    for row in listing.splitlines():
+        mode, _, _, path = row.split(maxsplit=3)
+        modes[path] = mode
+
+    scripts = {}
+    for path, mode in modes.items():
+        if not path.endswith((".sh", ".py")):
+            continue
+        try:
+            head = (clone / path).read_text(encoding="utf-8", errors="replace").split(NEWLINE, 1)[0]
+        except OSError:
+            continue
+        if head.startswith("#!"):
+            scripts[path] = mode
+
+    sources = []
+    for path in modes:
+        if not (path.endswith((".sh", ".yml", ".yaml")) or path.split("/")[-1] == "Makefile"):
+            continue
+        try:
+            sources.append((path, (clone / path).read_text(encoding="utf-8", errors="replace")))
+        except OSError:
+            continue
+
+    invoked, report = {}, []
+    for script, mode in sorted(scripts.items()):
+        # Command position, then the prefixes a call site legitimately puts in front of a
+        # path: an opening quote, a `$REPO_ROOT/`-style variable, `./`. The real defect
+        # Platform-Infra found is written `"$REPO_ROOT/scripts/init-db.sh"` -- quoted AND
+        # variable-prefixed -- so a pattern rejecting either would have missed the one case
+        # that mattered, and this test would have passed while proving nothing.
+        pattern = re.compile(
+            r"""(?:^|(?<=&&)|(?<=;)|(?<=[|])|(?<=[(])|(?<=`))"""
+            r"""[ 	]*@?["']?(?:\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/)?(?:[.]/)?"""
+            + re.escape(script) + r"""(?![\w./-])"""
+        )
+        sites = []
+        for path, text in sources:
+            for raw in text.splitlines():
+                line = raw.rstrip()
+                if line.lstrip("\t ").startswith("#"):
+                    continue
+                match = pattern.search(line)
+                if not match:
+                    continue
+                sites.append("%s: %s" % (path, line.lstrip("\t ")[:88]))
+                break
+            if sites:
+                break
+        if sites:
+            invoked[script] = (mode, sites)
+        report.append("%s  %-56s %s" % (mode, script, "invoked as a command" if sites else ""))
+
+    evidence.add("tracked scripts with a shebang, and their git mode", NEWLINE.join(report))
+    broken = {s: v for s, v in invoked.items() if v[0] != "100755"}
+    evidence.add(
+        "invoked as a command but NOT executable in git",
+        NEWLINE.join("%s  %s -- %s" % (v[0], s, v[1][0]) for s, v in broken.items()) or "none",
+    )
+    assert not broken, (
+        "%d script(s) are invoked as a command yet are not executable in a fresh clone, so they "
+        "would be 'Permission denied' on Linux: %r" % (len(broken), sorted(broken))
+    )
