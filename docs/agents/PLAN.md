@@ -784,3 +784,45 @@ Backend nearly shipped the JWKS fix broken by putting a comment **inside** a bac
 `docker run`. `bash -n` passed on **both** the broken and the working version, because the construct
 is syntactically fine. Only running the script found it. Recorded because `bash -n` appears in this
 repo's tooling and reads like a safety net it is not.
+
+### A conflict that would be absorbed as a no-op — DWH, investigating its own suspected fault
+
+DWH assumed the duplicate `res_partner` rows were its own fixture landing twice, **checked before
+answering, and was wrong**:
+
+```
+id | _op |   _lsn    | copies | 101 seconds apart, identical payloads
+46 | U   | 0/A313AC0 |   2    |
+```
+
+Real LSNs, not `0/0` — at-least-once redelivery consistent with a consumer restart resuming from a
+`confirmed_flush_lsn` that had not advanced past those changes. All 16 raw tables swept; `res_partner`
+is the only one affected. It does **not** reach the marts: `dim_partner` holds 48 current rows with
+zero `partner_key`s having more than one current version, and the 48-vs-47 gap that first looked like
+an SCD2 duplicate is the unknown member, not a defect.
+
+**The reason it is harmless is narrower than "duplicates are deduplicated", and that is the finding.**
+It is harmless *because the payloads are identical*. A redelivery carrying a **different** payload at
+the same `_lsn` would be resolved silently by the `_ingested_at desc, _row_id desc` tiebreak — the
+correct answer, but **a real conflict absorbed as if it were a no-op**. Backend's metric is the only
+thing that would ever say so, which is why it stays.
+
+**Ruling on the 104 fixture rows: leave them.** `_lsn 0/0` is contract 05 §D's lowest-precedence
+snapshot layer and the backfill resume landing 0 rows is that rule working, not failing. Digests are
+byte-identical, reconciliation is green, and clearing `raw` while Frontend is measuring is risk for no
+correctness gain. One caveat recorded rather than acted on: **a fixture-derived base cannot represent
+a row deleted between the fixture load and CDC start** — no tombstone would exist. That window was
+minutes here with no deletes. The general rule stays "the base snapshot comes from the backfill",
+worth doing properly at the next quiet window.
+
+### Open, routed, and deliberately not done today
+
+- **Four reserved-but-undefined make targets** (`up-gateway`, `up-semantic`, `cdc-start`,
+  `cdc-status`, Makefile:298). The whole Backend service tier is script-invoked in an order recorded
+  nowhere. Instance 10's shape; routed to Platform-Infra.
+- **`scripts/analytics/*.sh` at mode `100644`** (six files). Latent — every caller uses `bash x.sh` —
+  and becomes load-bearing the moment a make target invokes one directly on Linux. Backend declined
+  it deliberately while agents hold the tree, and gave the recipe including the shared-index resync.
+- **`is_profit_and_loss = NULL` unexercised.** Real in the model (LEFT join, section lines) but this
+  seed has `account_id IS NULL` count 0. Stated in the metric description so that a NULL-free result
+  is not read as proof NULL cannot occur.
