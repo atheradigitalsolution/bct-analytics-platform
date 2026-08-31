@@ -113,7 +113,7 @@ node_projects:
     path: insight-portal
     owner: Frontend
     wave: 4
-    status: pending
+    status: present
 
 python_projects:
   - name: login-gateway
