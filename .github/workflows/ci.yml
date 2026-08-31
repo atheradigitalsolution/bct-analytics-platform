@@ -174,14 +174,73 @@ jobs:
       - name: Semgrep - project rules (blocking)
         run: |
           set -euo pipefail
+          # ONE scan, JSON only. This step used to pass `--json --output F --text`
+          # together, and semgrep then wrote the TEXT report into F: the "machine
+          # readable" artefact this job uploads was not JSON and could not be parsed.
+          # Worse, the console printed only "Ran 28 rules on 183 files: 1 finding" - the
+          # gate failed WITHOUT SAYING WHAT IT FOUND, and the reason had to be recovered
+          # by downloading an artefact and reading it by eye. Both discovered on the
+          # first real CI run, 2026-08-31.
+          #
+          # A gate that will not say why it refused is a gate people learn to route
+          # around, so the findings are rendered below from the JSON, to the console AND
+          # to the step summary. python3 not jq: jq is absent on the operator host and
+          # nothing here may depend on it.
+          status=0
           semgrep scan \
             --config .semgrep/ \
             --error \
             --metrics=off \
             --disable-version-check \
-            --json --output semgrep-project.json \
-            --text
-          echo "### Semgrep project rules: no findings" >> "$GITHUB_STEP_SUMMARY"
+            --json --output semgrep-project.json || status=$?
+
+          python3 - "$status" <<'PY'
+          import json, os, sys
+          status = int(sys.argv[1])
+          try:
+              with open("semgrep-project.json", encoding="utf-8") as fh:
+                  doc = json.load(fh)
+          except (OSError, json.JSONDecodeError) as exc:
+              # The artefact being unparseable is itself the bug this rewrite fixes, so it
+              # is fatal rather than ignored.
+              print(f"FAIL: semgrep-project.json is not valid JSON ({exc}).", file=sys.stderr)
+              sys.exit(1)
+
+          results = doc.get("results", [])
+          errors = doc.get("errors", [])
+          scanned = len(doc.get("paths", {}).get("scanned", []))
+
+          # EMPTY-RESULT RULE. "no findings" is the passing state, and it looks identical
+          # whether the rules are clean or the scan matched no files at all. Assert the
+          # population before believing the silence.
+          if scanned == 0:
+              print("FAIL: semgrep scanned 0 files. 'No findings' over an empty target set "
+                    "is not a pass - the config or the checkout is broken.", file=sys.stderr)
+              sys.exit(1)
+
+          lines = []
+          for r in results:
+              lines.append(
+                  f"- `{r['check_id']}`  \n"
+                  f"  `{r['path']}`:{r['start']['line']}  \n"
+                  f"  {r['extra']['message'].strip().splitlines()[0]}"
+              )
+              print(f"::error file={r['path']},line={r['start']['line']},"
+                    f"title={r['check_id']}::{r['extra']['message'].strip().splitlines()[0]}")
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+              if results:
+                  fh.write(f"### Semgrep project rules: {len(results)} blocking finding(s)\n\n")
+                  fh.write("\n".join(lines) + "\n")
+              else:
+                  fh.write(f"### Semgrep project rules: no findings over {scanned} scanned file(s)\n")
+              if errors:
+                  fh.write(f"\n{len(errors)} scan error(s); see the uploaded report.\n")
+
+          print(f"semgrep: {len(results)} finding(s) over {scanned} scanned file(s)")
+          sys.exit(status)
+          PY
+
 
       - name: Semgrep - registry rules (advisory, never blocking)
         continue-on-error: true
@@ -287,15 +346,31 @@ jobs:
             exit 1
           fi
           echo "auditing ${n} project requirement file(s)"
+          # Audit EVERY file, then fail. Under `set -e` this loop used to abort on the
+          # first vulnerable manifest, so the first real CI run reported one advisory in
+          # analytics/cdc/requirements-dev.txt and never looked at the other five. A gate
+          # that stops at the first finding turns remediation into a sequence of CI runs
+          # and makes the true blast radius unknowable from any single one of them.
+          failed=""
           while read -r req; do
             echo "::group::pip-audit $req"
-            pip-audit --strict --requirement "$req" --desc
+            if ! pip-audit --strict --requirement "$req" --desc; then
+              failed="${failed}${req} "
+            fi
             echo "::endgroup::"
           done < project-reqs.txt
           {
             echo "### sca-python audited ${n} project requirement file(s)"
             sed 's/^/- `/;s/$/`/' project-reqs.txt
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$failed" ]; then
+            {
+              echo ""
+              echo "**Vulnerable:** $(echo "$failed" | sed 's/ $//;s/ /, /g')"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "FAIL: known vulnerabilities in: ${failed}" >&2
+            exit 1
+          fi
 
 
       - name: CycloneDX SBOM
@@ -757,7 +832,14 @@ jobs:
       WAREHOUSE_DB: warehouse
       WAREHOUSE_DB_USER: warehouse
       WAREHOUSE_DB_PASSWORD: ci-only-not-a-secret
-      DBT_PROFILES_DIR: analytics/dbt
+      # ABSOLUTE, deliberately. This was `analytics/dbt`, a RELATIVE path, while tiers 1
+      # and 2 run with `working-directory: analytics/dbt` - so dbt resolved
+      # `analytics/dbt/analytics/dbt` and died with "Path 'analytics/dbt' does not exist"
+      # on the first real CI run. The path existed; the cwd it was resolved against was
+      # not the one it was written for. A value whose meaning depends on the caller's
+      # working directory is the same defect class as a guard that depends on a file mode
+      # this repo cannot record: make it independent of the caller.
+      DBT_PROFILES_DIR: ${{ github.workspace }}/analytics/dbt
       DBT_THREADS: "4"
     steps:
       - name: Checkout

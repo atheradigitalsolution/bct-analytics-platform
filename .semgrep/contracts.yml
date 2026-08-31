@@ -112,6 +112,24 @@ rules:
       cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
       contract: docs/agents/contracts/02-session.md
       owner: Security
+      exception: >-
+        A verifier is only proven to reject `alg: none` by a test that MINTS an
+        `alg: none` token. On the first real CI run this rule blocked exactly that -
+        analytics/semantic-api/tests/test_auth.py:113 - which would have pressured
+        Backend into deleting a negative security test to make the gate go green. A rule
+        that destroys the control it exists to protect is worse than no rule. The
+        carve-out below is rule-scoped, matching bct-contract01-masking-salt-hardcoded;
+        it is NOT a .semgrepignore entry, which would exempt those paths from every rule
+        at once. A weak algorithm configured in NON-test code is still blocking, and a
+        genuine exception outside a test path is suppressed line-by-line with
+        `# nosemgrep: bct-contract02-jwt-weak-algorithm - <reason>`.
+    paths:
+      exclude:
+        - "*_test.py"
+        - "test_*.py"
+        - "**/tests/**"
+        - "*.test.ts"
+        - "*.spec.ts"
     pattern-regex: (?i)algorithms?\s*[:=]\s*\[?\s*["'](none|hs256|hs384|hs512)["']
 
   - id: bct-contract02-jwt-verification-disabled
@@ -177,8 +195,11 @@ rules:
       exclude:
         - "*_test.py"
         - "test_*.py"
-        - "tests/"
-        - "*/tests/*"
+        # `*/tests/*` is deprecated: Semgrepignore v2 will read it as ANCHORED
+        # (`/*/tests/*`), silently narrowing this carve-out to one directory level below
+        # the repo root. semgrep warns about it on every run today. `**/tests/**` keeps
+        # the intended unanchored meaning under both the old and the new semantics.
+        - "**/tests/**"
         - "*.test.ts"
         - "*.spec.ts"
     patterns:
