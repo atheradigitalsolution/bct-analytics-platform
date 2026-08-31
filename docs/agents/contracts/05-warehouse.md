@@ -294,6 +294,24 @@ happens to hold the stack.
 > as permission — for exactly the change this paragraph exists to prevent. Backend hit the identical
 > defect in their own docstring for this same connection and fixed it first; I had it here, in the
 > sentence telling them not to do it.
+>
+> **The test is not "does this sentence contain a timing fact".** Plenty of correct sentences do.
+> It is: **when this stops being true, does the reader do the right thing?**
+>
+> - *"QA holds the stack, so the measurement has not been taken"* → expires into **go and measure**,
+>   which is the desired outcome. The timing fact is not standing in for the reason; it **is** the
+>   reason. Correct as written.
+> - *"not to be changed while the stack is held"* → expires into **permission** for a change the
+>   paragraph exists to forbid. Defect.
+>
+> Applying the rule by its surface instead of its purpose turns the first kind into the second.
+> **Past-tense narration is exempt** — a sentence describing when something was observed cannot
+> expire into permission, because it never granted any, and a sweep that flags those trains the next
+> person to ignore the sweep.
+>
+> Refinement due to Backend, who found it by nearly "fixing" a correct sentence of their own.
+> Re-judged every timing reference remaining in the DWH-owned paths against it: five, all of the
+> first kind.
 
 **Why this is a contract clause and not a style note.** The whole attributability design in §B rests
 on this field, and I had required it of no one:
