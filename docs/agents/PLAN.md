@@ -466,3 +466,60 @@ Until instance 12's repair path lands, a cold start here reproduces Finding 5 re
 
 **Do not** mark any deferred item green on resume without re-running its evidence. Twelve instances
 in this build say the green would be for the wrong reason.
+
+## RESUMED — instances 13 and 14
+
+### Instance 13 — the Alertmanager check could not fail, found by obeying the standing rule
+
+Platform-Infra fixed instance 11, then tried to make each repaired check go red as required. Check 2
+would not. With `odoo19-bct-alertmanager` **stopped**, `/api/v1/alertmanagers` kept reporting
+`active=1 dropped=0` for 90 seconds and the gate printed *"Alertmanager reachable"*, rc 0 — while
+`:39093/-/ready` refused the connection.
+
+The cause: that endpoint reports the **configured** target from `static_configs`, not a live one,
+and Alertmanager is not itself a scrape target. **A firing alert would have gone nowhere with every
+gate green.** Now probed directly: stopped -> FAIL rc 1, started -> rc 0.
+
+This one is worth more than the bug. It was found only because the author was required to make a
+*passing* check fail, on a fix that was already working. Instance 11's fix would have shipped
+green and still had a dark Alertmanager underneath it. **The standing rule paid for itself here.**
+
+`check-alerting`'s first-ever real run also revealed it had been treating the label names
+`slot_name`, `wal_status`, `on_breach` and `source_table` as metric names.
+
+### Instance 14 — a fix that arms a trap instead of springing it
+
+Every script in the repo was committed mode `100644`, because this host is Windows with
+`core.filemode=false`. `scripts/up-dev.sh:59` executes `"$REPO_ROOT/scripts/init-db.sh"` directly,
+so **`make up-dev` was "Permission denied" on a Linux fresh clone** — invisible here, since the
+Makefile invokes most scripts as `bash x.sh`. Platform-Infra fixed 15 scripts to `100755` and
+correctly stayed out of `scripts/analytics/` (Backend's path), which remains `100644` for five files.
+
+The Lead then found where that condition becomes load-bearing. `.github/workflows/ci.yml:822`:
+
+```bash
+FIXTURE=scripts/analytics/dbt-ci-fixture.sh
+if [ ! -x "$FIXTURE" ]; then ... "does not exist" ... exit 0; fi
+"$FIXTURE"
+```
+
+Today this skips honestly — the file genuinely does not exist. **The defect is latent and fires on
+delivery.** When DWH/QA commit the fixture from this host it lands `100644`, `[ ! -x ]` is still
+true, tier 3 still skips, and the summary asserts the file "does not exist" when it does. CI stays
+green and `dbt build` never runs against a fixture everyone believes is active.
+
+**The generalised rule.** A guard must not conflate *absent* with *present but unusable*. Those are
+different states with different remedies, and collapsing them produces a message that is actively
+false in the second case. Test for existence, invoke mode-independently (`bash "$FIXTURE"`, which is
+what every other caller in this repo already does — `tests/helpers/loader.py:26`), and give
+"exists but not executable" its own non-green outcome. Routed to Security, who owns `ci.yml`.
+
+### Open, carried forward
+
+- **`SEMANTIC_API_JWKS_URL` drift**, found by Platform-Infra and not planted by it: `.env` says
+  `http://odoo19-bct-login-gateway:8080/...`, `.env.example` says `http://login-gateway:8080/...`.
+  **Backend's to adjudicate** — one of them is wrong and the drift report will now surface it.
+- **An `alertmanager` scrape job** would let check 1 cover its liveness for free. Platform-Infra
+  declined to take it: it edits `observability/prometheus/scrape.d` and needs a reload while QA and
+  Frontend hold the stack. Recorded as a deliberate deferral, not an oversight.
+- **`scripts/analytics/*.sh` are still `100644`** — Backend's path, same exec-bit condition.
