@@ -327,3 +327,89 @@ for stable pagination over an append-only table.
 Raising this rather than silently tolerating the drift was the right call — "exactly these" is the
 kind of wording that either binds or should be changed, and a contract nobody enforces is worse than
 no contract.
+
+## C. Mart list and grain — bind `source_model` against this
+
+Published by DWH after `dbt build` completed green (PASS=316, ERROR=0). Row counts are from the
+built warehouse, not estimates. **Every fact, dimension and mart below carries `tenant_id`** and
+every one of them has `ENABLE` + `FORCE ROW LEVEL SECURITY` with both policies from §A.
+
+### Facts — one row per source document line
+
+| Model | Grain (unique key) | Rows | Freshness SLA | Notes for `source_model` |
+|---|---|---|---|---|
+| `marts.fct_sale_order_line` | `(tenant_id, sale_order_line_id)` | 624 | 300 s | Section/note lines excluded (`display_type is null`) |
+| `marts.fct_account_move_line` | `(tenant_id, account_move_line_id)` | 862 | 3600 s | Carries `revenue_signed_subtotal` and `is_revenue_line` |
+| `marts.fct_stock_move` | `(tenant_id, stock_move_id)` | 496 | 300 s | Carries `signed_quantity`; `operating_unit_unassigned` flags moves with no picking |
+| `marts.fct_pos_order_line` | `(tenant_id, pos_order_line_id)` | 352 | 300 s | |
+| `marts.fct_ppob_transaction` | `(tenant_id, ppob_transaction_id)` | 19 220 | **60 s (page)** | `commission_revenue` is the ONLY revenue column — see the warning below |
+
+### Dimensions
+
+| Model | Grain (unique key) | Rows | Type |
+|---|---|---|---|
+| `marts.dim_date` | `(tenant_id, date_day)` → `date_key` | 2 922 | static, 2025-01-01…2027-12-31 |
+| `marts.dim_partner` | `partner_version_key` | 104 | **SCD2** |
+| `marts.dim_product` | `product_version_key` | 30 | **SCD2**, variant grain |
+| `marts.dim_company` | `company_key` | 2 | Type 1 |
+| `marts.dim_operating_unit` | `operating_unit_key` | 6 | Type 1, + UNASSIGNED member per tenant |
+| `marts.dim_biller` | `biller_key` | 12 | Type 1 |
+| `marts.dim_tenant` | `tenant_key` | 2 | Type 1 |
+
+### Pre-aggregated marts — bind these, not the facts
+
+| Model | Grain | Rows | SLA |
+|---|---|---|---|
+| `marts.mart_sales_daily` | `(tenant_id, date_day, operating_unit_id, company_id, partner_key, product_key)` | 580 | 300 s |
+| `marts.mart_revenue_daily` | `(tenant_id, date_day, operating_unit_id, company_id, revenue_channel, partner_key, product_key)` | 1 554 | 900 s |
+| `marts.mart_stock_position` | `(tenant_id, product_key, company_id, operating_unit_id)` | 54 | 300 s |
+| `marts.mart_ppob_transaction` | `(tenant_id, date_day, operating_unit_id, biller_key, state)` | 690 | **60 s (page)** |
+
+They are rolled up to the **lowest grain contract 03 declares**, `partner_key` and `product_key`
+included, so each one can answer its own declared dimension list without the API falling back to a
+fact table.
+
+### Joining a fact to a dimension
+
+Facts carry the durable key, computed from the id they already hold — `md5(tenant_id || '|' || id)`,
+never a lookup. Two join modes:
+
+```sql
+-- current state
+join marts.dim_partner d on d.partner_key = f.partner_key and d.is_current
+-- as of the event
+join marts.dim_partner d on d.partner_key = f.partner_key
+                        and f.date_day >= d.valid_from::date
+                        and f.date_day <  d.valid_to::date
+```
+
+Joining an SCD2 dimension **without** one of those predicates multiplies rows by the version count.
+`unique_combination(tenant_id, partner_key, is_current)` is tested, so `is_current` is safe.
+
+### Three semantics a query compiler must not get wrong
+
+1. **PPOB `amount` is not revenue.** It is pass-through money owed to the biller. The revenue of a
+   PPOB row is `commission`, exposed as `commission_revenue`. A typical row is 100 000 IDR of
+   `pass_through_amount` against 1 500 IDR of `commission_revenue`, so binding the wrong column
+   overstates revenue by roughly 40×.
+2. **`mart_revenue_daily` is three channels, unioned, not summed.** `revenue_channel` is one of
+   `invoice`, `pos`, `ppob_commission`. A caller wanting total revenue sums across the channel
+   deliberately; a caller who does not know the difference gets a breakdown rather than a wrong
+   single number. Credit notes are already netted off inside `invoice`.
+3. **`operating_unit_id = -1` is the UNASSIGNED member**, not a missing value. `stock.move` carries
+   no `operating_unit_id` and reaches one only through its picking; moves with no picking (inventory
+   adjustments, scrap) have none. In this database that is 9 of 248 moves and they carry the
+   largest quantities in the dataset, so dropping them would have made the stock mart wrong by its
+   biggest numbers.
+
+### Reconciliation, and what it means for a stale read
+
+`warehouse.recon_daily` compares every mart against a **live read of Odoo** through `postgres_fdw`
+as `warehouse_reader`, per tenant per day: 1 638 checks, all passing at time of publication.
+`assert_reconciliation_matches_odoo` is `severity: error` and fails the build.
+
+**It deliberately does not reconcile the current day.** Today is being written; Odoo committed a row
+seconds ago whose WAL record is not decoded yet, both numbers are correct, and they differ. A test
+that flaps is a test everyone learns to ignore. Freshness for the current day is served from
+`warehouse.mart_freshness`, which is what `meta.is_stale` is for — the two answer different
+questions and neither substitutes for the other.
