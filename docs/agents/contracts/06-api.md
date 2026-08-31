@@ -259,30 +259,22 @@ Notes that matter for panel design:
   `postgres_exporter`'s `pg_replication_slots_pg_wal_lsn_diff` instead**, which keeps reporting after
   this process is gone. The value of publishing both is that they can *disagree*.
 
-  > **UNMET DEPENDENCY, as of Phase 3.** QA measured that `postgres-exporter` currently emits **no**
-  > `pg_replication_slots_*` series at all: the v0.16 collector is off by default and the compose
-  > service passes neither the flag nor a query file. So the paging path this section prescribes
-  > **does not exist yet**, and until Platform-Infra enables it the consumer-side gauge above is the
-  > only slot-lag signal in the system — which is precisely the configuration this note warns
-  > against, because it cannot report the failure that matters most. Do not read this paragraph as
-  > describing something that works today. Whichever metric naming Platform-Infra lands on has to
-  > reach `observability/prometheus/rules/analytics-alerts.yml` as well as `platform.rules.yml`.
-- `bct_cdc_landing_row_amplification` (rows ÷ distinct ids) is legitimately **above 1** — append-only
-  means one row per change, and the backfill/stream overlap adds one more. It is a trend.
-  `bct_cdc_landing_duplicate_changes` (rows sharing `(id, _op, _lsn)`) has **no legitimate cause**
-  and should be `0`.
-
-#### A trap when running the loader against a probe slug
-
-`CDC_TENANT_SLUG` names the **publication and the replication slot**. The value written to
-`_tenant_id` in the landing zone comes from **`CDC_TENANT_DB`**. The two are independent.
-
-The consequence is the dangerous part, found by QA while designing a resumability test: a probe run
-under a *new slug* but the *live database* resumes from the live tenant's high-water mark and
-therefore **lands nothing — which is indistinguishable from a passing test**. A throwaway run must
-set `CDC_TENANT_DB` as well as `CDC_TENANT_SLUG`, or it is measuring nothing.
-
-Both are forwarded by `scripts/analytics/cdc-run.sh`, along with `CDC_PUBLICATION` and `CDC_SLOT`.
+  > **A trap when verifying this, worth knowing before you conclude the series is missing.** These
+  > are **per-slot** series: with no replication slot in existence, `postgres_exporter` emits none of
+  > them, and "no samples" is indistinguishable from "this exporter does not export them". Both QA
+  > and the Lead measured zero during the window when a cold start had destroyed every slot, and
+  > concluded the paging path did not exist. It does. Verified directly with a slot present:
+  >
+  > ```
+  > pg_replication_slots_pg_wal_lsn_diff{slot_name="bct_slot_bct",...} 56
+  > pg_replication_slots_active{slot_name="bct_slot_bct",...} 1
+  > pg_replication_slot_wal_status{slot_name="bct_slot_bct",wal_status="reserved"} 1
+  > ```
+  >
+  > v0.16 emits both the built-in `pg_replication_slot_slot_*` family and the legacy
+  > `pg_replication_slots_*` names, so no rule expression needs changing. **Establish that a slot
+  > exists before reading an absence as evidence** — an alert test should skip with a reason when
+  > there are none, not fail, and not pass.
 
 ### semantic-api — `odoo19-bct-semantic-api:8080/metrics`
 
