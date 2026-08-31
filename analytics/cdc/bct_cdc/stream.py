@@ -33,7 +33,7 @@ from psycopg2 import sql
 
 from . import metrics as m
 from . import warehouse as wh
-from .pgoutput import UNCHANGED, PgOutputDecoder, format_lsn
+from .pgoutput import UNCHANGED, PgOutputDecoder, format_lsn, parse_lsn
 
 _logger = logging.getLogger(__name__)
 
@@ -41,7 +41,8 @@ _logger = logging.getLogger(__name__)
 class StreamConsumer:
     """Callable passed to psycopg2's ``consume_stream``."""
 
-    def __init__(self, tenant, slot, plans, warehouse_conn, status_conn, on_flush=None):
+    def __init__(self, tenant, slot, plans, warehouse_conn, status_conn, on_flush=None,
+                 resume_floor_lsn=None):
         self.tenant = tenant
         self.slot = slot
         self.plans = plans  # table -> MaskPlan
@@ -52,6 +53,13 @@ class StreamConsumer:
         self.pending_lsn = None
         self.on_flush = on_flush
         self.counts = {}
+        #: Changes at or below this LSN are already in the landing zone and are dropped on arrival.
+        #: See :func:`bct_cdc.warehouse.landed_max_lsn` for why this window exists at all: feedback
+        #: follows durability by design, so dying between the warehouse commit and send_feedback
+        #: makes Postgres redeliver changes that ARE landed. Defaults to 0, which floors nothing,
+        #: so a caller that does not pass it gets exactly the old behaviour.
+        self.resume_floor = parse_lsn(resume_floor_lsn) if resume_floor_lsn else 0
+        self.skipped_redelivered = 0
 
     # -- unchanged TOAST values ------------------------------------------------------
 
@@ -102,7 +110,26 @@ class StreamConsumer:
             table = change.relation.name
             plan = self.plans.get(table)
             if plan is not None:
-                self._buffer(change, table, plan)
+                if change.lsn <= self.resume_floor:
+                    # Already landed before the last restart. Dropping it is not "ignoring an
+                    # error": at-least-once redelivery is the guaranteed behaviour of logical
+                    # replication and the price of confirming LSNs only after durability. The
+                    # payload is necessarily identical -- it is the same WAL record -- so this can
+                    # never discard a change that differs from the row already stored.
+                    self.skipped_redelivered += 1
+                    m.REDELIVERED_SKIPPED.labels(
+                        tenant=self.tenant, source_table=table
+                    ).inc()
+                    if self.skipped_redelivered in (1, 10, 100, 1000):
+                        _logger.info(
+                            "skipped %d redelivered change(s) at or below the resume floor %s; "
+                            "latest was %s.%s at %s. This is expected after a restart, not a "
+                            "fault.",
+                            self.skipped_redelivered, format_lsn(self.resume_floor),
+                            self.tenant, table, format_lsn(change.lsn),
+                        )
+                else:
+                    self._buffer(change, table, plan)
 
         # A commit boundary is the only safe place to confirm an LSN: everything up to here is a
         # whole transaction, and once the warehouse has committed it, Postgres may release the WAL.

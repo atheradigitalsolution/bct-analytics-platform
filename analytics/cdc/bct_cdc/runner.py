@@ -381,9 +381,16 @@ def _publish_amplification(conn, tenant, tables) -> None:
             )
         if duplicates:
             _logger.error(
-                "raw.%s holds %d row(s) sharing (id, _op, _lsn) for tenant %s. A change is "
-                "identified by its WAL position, so this has no legitimate cause: the same change "
-                "was landed twice.", table, duplicates, tenant,
+                "raw.%s holds %d row(s) sharing (id, _op, _lsn) for tenant %s: the same change "
+                "landed twice. There IS a known mechanism and it is not corruption: "
+                "at-least-once redelivery after a restart that resumed from a confirmed_flush_lsn "
+                "which had not advanced past those changes. Because it is the same WAL record the "
+                "payloads are identical and the marts are unaffected, DWH's raw_latest "
+                "partitioning by (_tenant_id, id) and taking rank 1. The resume floor now prevents "
+                "NEW duplicates; rows already landed stay, so this figure does not self-clear and "
+                "a CONSTANT value is history, not an active fault. GROWTH after a stable restart "
+                "would be the real fault.",
+                table, duplicates, tenant,
             )
 
 
@@ -437,8 +444,19 @@ def _stream(settings, plans, warehouse_conn, replication_conn, args) -> int:
     status_conn = wh.connect(settings.warehouse_dsn)
     cur = replication_conn.cursor()
     options = {"proto_version": "1", "publication_names": settings.publication}
+    # The resume floor, read back out of the landing zone rather than from pipeline_state. This is
+    # what makes a restart idempotent for the STREAM: feedback follows durability by design, so
+    # Postgres redelivers anything committed to the warehouse but not yet confirmed. Without this
+    # the redelivered changes land a second time -- observed by DWH on res_partner, two changes at
+    # real LSNs with identical payloads, landed 101 seconds apart.
+    resume_floor = wh.landed_max_lsn(warehouse_conn, settings.tenant, list(plans))
+    _logger.info(
+        "resume floor %s: changes at or below this LSN are already landed and will be dropped "
+        "if Postgres redelivers them", resume_floor,
+    )
     consumer = StreamConsumer(
-        settings.tenant, settings.slot, plans, warehouse_conn, status_conn
+        settings.tenant, settings.slot, plans, warehouse_conn, status_conn,
+        resume_floor_lsn=resume_floor,
     )
     cur.start_replication(slot_name=settings.slot, decode=False, options=options)
     m.UP.labels(tenant=settings.tenant).set(1)

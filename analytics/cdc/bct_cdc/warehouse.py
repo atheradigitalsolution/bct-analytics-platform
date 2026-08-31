@@ -25,7 +25,7 @@ import psycopg2
 import psycopg2.extras
 from psycopg2 import sql
 
-from .pgoutput import format_lsn
+from .pgoutput import format_lsn, parse_lsn
 from .policy import ColumnPolicy
 
 _logger = logging.getLogger(__name__)
@@ -180,6 +180,49 @@ def landed_high_water(conn, tenant: str, table: str) -> tuple:
     return int(row[0] or 0), row[1]
 
 
+def landed_max_lsn(conn, tenant: str, tables) -> str:
+    """Highest ``_lsn`` this tenant has already landed, across every replicated table.
+
+    This is the **resume floor** for the stream, and it exists because logical replication is
+    at-least-once by construction, not by accident. :meth:`stream.StreamConsumer.flush` writes the
+    warehouse transaction and only then calls ``send_feedback`` -- deliberately, because confirming
+    an LSN the warehouse has not stored tells Postgres it may discard that WAL and the rows are
+    then gone from both ends. The unavoidable cost of that ordering is a window: die between the
+    commit and the feedback and Postgres redelivers changes that ARE already landed.
+
+    That window is not hypothetical. DWH measured it on ``res_partner``::
+
+        id | _op |   _lsn    | copies | first_seen              | last_seen
+        46 | U   | 0/A313AC0 |   2    | 2026-08-31 08:13:54.86  | 2026-08-31 08:15:35.59
+        47 | U   | 0/A3139D8 |   2    | 2026-08-31 08:13:54.86  | 2026-08-31 08:15:35.59
+
+    Real LSNs, identical payloads, 101 seconds apart -- a restart resuming from a
+    ``confirmed_flush_lsn`` that had not advanced past them.
+
+    Derived from the DATA, not from ``warehouse.pipeline_state``, for the same reason
+    :func:`landed_high_water` is: a progress table can disagree with the rows it describes, and
+    reading the maximum back out of the landing zone cannot disagree with itself, because it *is*
+    the data. The global maximum across tables is the correct floor rather than a per-table one:
+    ``flush`` writes every buffered table inside ONE warehouse transaction, so landing is atomic
+    across tables, and logical decoding delivers transactions in commit order. Any change at or
+    below this LSN therefore belongs to a transaction that was already landed in full.
+
+    Returns ``'0/0'`` when nothing has been landed yet, which floors nothing.
+    """
+    highest = 0
+    for table in tables:
+        ident = sql.Identifier("raw", table)
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL("SELECT MAX(_lsn)::text FROM {} WHERE _tenant_id = %s").format(ident),
+                (tenant,),
+            )
+            row = cur.fetchone()
+        if row and row[0]:
+            highest = max(highest, parse_lsn(row[0]))
+    return format_lsn(highest)
+
+
 def load_column_policy(conn) -> list:
     with conn.cursor() as cur:
         cur.execute(
@@ -261,11 +304,22 @@ def insert_rows(conn, table: str, columns: list, rows: list) -> int:
 
     Plain ``INSERT``, with no ``ON CONFLICT``: DWH's landing tables carry ``(_tenant_id, id, _lsn)``
     as a **non-unique** index, so there is no constraint for a conflict clause to key on.
-    Idempotency comes instead from never re-reading a range — the backfill resumes from the highest
-    id already landed, so a replay finds nothing to insert. A unique index would let the database
-    enforce that as well as the loader; it has been requested from DWH. Until it exists the property
-    rests on the resume logic rather than on the storage layer, which is worth stating plainly
-    rather than implying.
+    Idempotency rests on the caller, and it is worth being precise about WHICH caller, because
+    the earlier version of this docstring was true of one path and false of the other:
+
+    * The **backfill** never re-reads a range — it resumes from the highest id already landed,
+      so a replay finds nothing to insert. That has always held.
+    * The **stream** had no such property. Feedback deliberately follows durability, so a death
+      between the warehouse commit and ``send_feedback`` makes Postgres redeliver changes that
+      are already landed. DWH measured exactly that on ``res_partner``: two changes, real LSNs,
+      identical payloads, landed 101 seconds apart. The old sentence covered the backfill and
+      silently implied the stream, which is how the duplicate went unexplained long enough for
+      another agent to go looking for a fixture artefact in their own code.
+
+    The stream now floors itself at :func:`landed_max_lsn`. A unique index on
+    ``(_tenant_id, id, _op, _lsn)`` would let the database enforce this as well as the loader;
+    it has been requested from DWH and does not exist yet, so the property still rests on the
+    loader rather than on the storage layer. Stated plainly rather than implied.
     """
     if not rows:
         return 0
@@ -293,9 +347,14 @@ def landing_amplification(conn, tenant: str, table: str) -> tuple:
       greater than 1 -- an insert plus three computed-field updates is four rows for one id -- and
       the deliberate backfill/stream overlap adds one more. It is a trend to watch, not a fault.
     * ``duplicate_change_rows`` counts rows sharing ``(id, _op, _lsn)``, **among rows that have an
-      LSN**. A change is identified by its WAL position, so this has no legitimate cause and should
-      be exactly 0. This is the number that distinguishes "the table grew because the data changed"
-      from "the loader landed the same change twice".
+      LSN**. This is the number that distinguishes "the table grew because the data changed"
+      from "the loader landed the same change twice". It used to say the latter had *no
+      legitimate cause*. That was wrong, and the wrongness had a cost: DWH spent an
+      investigation looking for a fixture artefact in their own code before establishing it
+      was at-least-once redelivery from this loader. The cause is known — see
+      :func:`landed_max_lsn` — the resume floor now prevents new occurrences, and because
+      rows already landed are never removed, this figure does not return to 0 on its own.
+      Read GROWTH, not level.
     * ``unordered_rows`` counts rows with a NULL ``_lsn``. They are **not** lost to the marts —
       DWH's ``raw_latest`` macro orders by ``coalesce(_lsn, '0/0')``, so a NULL sorts last in
       precedence and any real CDC row supersedes it for the same key, which is exactly what makes a

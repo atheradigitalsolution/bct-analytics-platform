@@ -54,6 +54,16 @@ LAST_SUCCESS = Gauge(
     ["tenant", "source_table"],
 )
 
+REDELIVERED_SKIPPED = Counter(
+    "bct_cdc_redelivered_changes_skipped_total",
+    "Changes dropped because their LSN was at or below the resume floor -- i.e. already landed "
+    "before the last restart. Logical replication is at-least-once, so a NON-ZERO value here is "
+    "normal after a restart and is the pipeline working, not failing. What matters is the shape: "
+    "a step at restart and flat afterwards is healthy; continuous growth means the stream is "
+    "looping over WAL it never confirms.",
+    ["tenant", "source_table"],
+)
+
 FAILURES = Counter(
     "bct_cdc_failure_count_total",
     "Loader failures.",
@@ -88,9 +98,12 @@ LANDING_AMPLIFICATION = Gauge(
 
 LANDING_DUPLICATE_CHANGES = Gauge(
     "bct_cdc_landing_duplicate_changes",
-    "Landing rows that share (id, _op, _lsn) with another row, per table. Unlike amplification "
-    "this has no legitimate cause: a change is identified by its WAL position, so two rows with "
-    "the same change key are the same change landed twice. Should be 0. Counted only among rows "
+    "Landing rows that share (id, _op, _lsn) with another row, per table: the same change landed "
+    "twice. The known mechanism is at-least-once redelivery after a restart, since feedback "
+    "follows durability by design; the resume floor now prevents new ones. Because a redelivery "
+    "is the same WAL record, duplicate payloads are identical and the marts absorb them. This "
+    "gauge does NOT self-clear, so a steady non-zero value is history and only GROWTH after a "
+    "stable restart is a fault. Counted only among rows "
     "that HAVE an LSN -- SQL treats two NULL-bearing rows as equal for DISTINCT, so without that "
     "filter two genuinely different unordered changes are reported as one duplicate. That was a "
     "real false positive on sale_order_line, not a hypothetical.",
