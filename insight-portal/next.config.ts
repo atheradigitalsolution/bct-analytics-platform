@@ -11,6 +11,20 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   output: "standalone",
+  /**
+   * The image optimizer is off, and that is a security decision rather than a performance one.
+   *
+   * `npm audit` reports three HIGH findings against this project. None is a defect in Next itself:
+   * `next` is flagged only because it depends on `postcss` (build-time only, not in the runtime
+   * image, and the advisories need attacker-controlled CSS - ours is ours) and on `sharp`, whose
+   * libvips CVEs are reachable ONLY through the image optimizer. The advertised fix is
+   * `next@16.3.3`, a breaking major that this brief pins away from at 15.5.21.
+   *
+   * This dashboard renders no images at all - `public/` is empty and no `next/image` is imported -
+   * so turning the optimizer off costs nothing and removes the only path that reaches sharp. It is
+   * a narrowing of exposure, not a fix for the CVE, and it is reported as such.
+   */
+  images: { unoptimized: true },
   poweredByHeader: false,
   reactStrictMode: true,
   compress: true,

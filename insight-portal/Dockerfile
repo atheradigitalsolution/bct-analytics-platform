@@ -40,6 +40,24 @@ COPY --from=build --chown=root:root /app/.next/standalone ./
 COPY --from=build --chown=root:root /app/.next/static ./.next/static
 COPY --from=build --chown=root:root /app/public ./public
 
+# Drop sharp and its libvips binaries from the shipped image.
+#
+# `npm audit` reports three HIGH findings against this project and none is a defect in Next: `next`
+# is flagged only because it depends on `postcss` (build-time only, absent from this stage) and on
+# `sharp`, whose libvips CVEs - CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591 -
+# are reachable only through the image optimizer. The advertised fix is `next@16.3.3`, a breaking
+# major this brief pins away from at 15.5.21.
+#
+# This dashboard renders no images: `public/` is empty and nothing imports `next/image`. The
+# optimizer is off in next.config.ts, and these packages are the only thing that would have used it,
+# so removing them takes the CVE out of the artefact rather than merely out of the code path. That
+# distinction matters because Trivy scans the image, not the reasoning.
+#
+# Verified rather than assumed: with both directories removed, the standalone server starts and all
+# five views return 200. The HEALTHCHECK below would fail the container if that ever stopped being
+# true.
+RUN rm -rf ./node_modules/sharp ./node_modules/@img
+
 # Owned by root and readable by the runtime user, never writable by it: the process has no reason to
 # modify its own code, and a read-only root filesystem in compose makes that structural rather than
 # a matter of file modes alone.
