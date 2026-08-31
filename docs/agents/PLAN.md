@@ -384,3 +384,53 @@ it at once. Recorded here so the deferral is a decision with a reason, not an om
 
 **DSAR erasure propagation into the warehouse is NOT automated. It is a manual runbook.** Stated
 plainly in `docs/pdp-compliance.md` as §3.2 requires, rather than implied.
+
+### Instance 10 CLOSED — verified by the Lead, negative assertion first
+
+```
+admin / admin (Odoo default)               -> false     <- the default is now refused
+admin / $BCT_DEV_USER_PASSWORD             -> 2
+demo.ou1@contoh.invalid / $BCT_DEV_USER..  -> 5
+demo.ou2@contoh.invalid / $BCT_DEV_USER..  -> 6
+```
+
+`make seed-demo` also closes QA's "no make target seeds demo data" gap, and `check-dev-passwords`
+exits 1 against an uninitialised database — the property `check-alerting` lacked. Note the order of
+the assertions: the negative is first, because a check that only tries the good password passes on a
+stack that accepts both.
+
+### Instance 12 — a fix that cannot reach the population it was written for
+
+Finding 5 was fixed in `.env.example:139` and remains broken in every existing `.env`, including the
+operator's:
+
+```
+.env.example:139   ODOO_INIT_MODULES=custom_pdp_core,...,custom_demo_seed   <- fixed
+.env:122           ODOO_INIT_MODULES=base,web                               <- still broken
+```
+
+The remedy is `make dev-bootstrap`, which merges `.env.example` into an existing `.env`. Trace it —
+`scripts/gen-env-secrets.py:159-161`:
+
+```python
+if example_value != PLACEHOLDER:
+    # Not a secret. Prefer whatever .env already says so hand edits to
+    # ports and tunables survive a re-run.
+    value = existing.get(key, example_value)
+```
+
+For every non-secret key the **existing** value wins. `ODOO_INIT_MODULES` is not a new key — it is
+present with the wrong value — so bootstrap preserves `base,web` indefinitely. **The tool built to
+repair the environment is the thing that protects the defect.**
+
+The preservation rule is correct; clobbering a hand-tuned port would be worse. The defect is that
+the divergence is **silent**, which is instances 8/9/10/11 again: the author's view (`.env.example`
+is right) and the consumer's view (`.env` is still wrong) differ, and nothing reports it.
+
+**Generalised rule.** Any mechanism that reconciles two copies of state — config, fixtures, schema,
+a lockfile — must **report what it chose not to change**. Silent preservation is indistinguishable
+from silent breakage. This is the reconciliation form of the empty-result rule: "no output" from a
+merge does not mean "nothing diverged".
+
+Consequence for the deferred third cold start: on this host it reproduces Finding 5 regardless of
+what `.env.example` says, until either a repair path lands or the operator edits one line.
