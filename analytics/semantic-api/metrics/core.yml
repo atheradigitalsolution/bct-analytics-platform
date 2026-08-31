@@ -299,11 +299,21 @@
   label: "Saldo Akun"
   description: >-
     Signed general-ledger balance (debit minus credit) from posted move lines, summed per account.
-    Deliberately NOT split into profit-and-loss and balance-sheet metrics: fct_account_move_line
-    carries account_id but no account TYPE, and there is no dim_account, so nothing in the warehouse
-    distinguishes an income account from an asset one. Two metrics differing only in name would
-    return identical numbers under two different headings, which is worse than one honest metric.
-    Use the account_id dimension to break it down, and is_revenue_line to isolate revenue lines.
+    Still deliberately NOT split into separate pnl_account_balance and balance_sheet_account_balance
+    metrics. DWH has now landed account_type and is_profit_and_loss on fct_account_move_line, so the
+    split is finally POSSIBLE - but two metrics differing only in name would return the same numbers
+    under two headings, and the honest form of that split is a group-by, not a second metric name.
+    Group or filter by account_type ('income', 'asset_receivable', 'expense', ...) for the ledger
+    breakdown, is_profit_and_loss to separate P&L from balance sheet, and is_revenue_line to isolate
+    revenue lines. is_profit_and_loss is NULL - not false - on lines with no account at all (section
+    and note lines): a section line is neither P&L nor balance sheet, and filing it under balance
+    sheet by omission is the coalesce-unknown-to-zero mistake. Render the NULL group, do not drop it
+    - and note that this seed contains ZERO such rows (account_id IS NULL count = 0), so the branch
+    is real in the model and UNEXERCISED in the data. A NULL-free result here is not evidence that
+    NULL cannot occur; it is evidence that nobody has posted a section line yet.
+    Live through this API, tenant bct, 2025-01-01..2026-12-31: income -439,850,000 and
+    asset_receivable +439,850,000, summing to exactly 0. A ledger that does not sum to zero over
+    all account types means the binding is wrong, and that is the cheapest check available.
   grain: [date_day, tenant_id, account_id]
   dimensions:
     - date_day
@@ -317,6 +327,8 @@
     - move_type
     - payment_state
     - is_revenue_line
+    - account_type
+    - is_profit_and_loss
   derived_dimensions:
     date_month: {from: date_day, grain: month}
   filters:
@@ -324,6 +336,7 @@
     operating_unit_id: {type: "int[]", required: false}
     account_id: {type: "int[]", required: false}
     move_type: {type: "string[]", required: false}
+    account_type: {type: "string[]", required: false}
   type: decimal
   unit: IDR
   aggregation: sum
@@ -332,31 +345,63 @@
   refresh_sla_seconds: 3600
   pdp_class: internal
 
+- name: stock_valuation
+  label: "Nilai Persediaan"
+  description: >-
+    On-hand stock valued at unit cost, per product and operating unit. Previously undeclarable and
+    now enabled by DWH's dim_product_cost: mart_stock_position carries unit_cost, stock_valuation
+    and has_unit_cost, so the value comes from standard_price unpacked per company - NOT from
+    list_price, which is the sales price and would overstate inventory by the entire margin.
+    READ has_unit_cost BEFORE READING THE TOTAL. Rows for products with no cost carry a NULL
+    stock_valuation, and SQL SUM() skips NULL without comment, so the total is a subtotal that
+    looks finished. Measured on tenant bct: 28 position rows, 27 summed, 1 silently skipped,
+    250 units of real stock outside a total that reads as complete. has_unit_cost is a declared
+    dimension precisely so a caller can group by it and see the excluded rows; a panel that shows
+    the number without it is reporting an incomplete figure as a final one.
+  grain: [tenant_id, operating_unit_id, product_key]
+  dimensions:
+    - tenant_id
+    - operating_unit_id
+    - product_key
+    - product_id
+    - company_id
+    - has_unit_cost
+  filters:
+    operating_unit_id: {type: "int[]", required: false}
+    product_key: {type: "string[]", required: false}
+  type: decimal
+  unit: IDR
+  aggregation: sum
+  measure: stock_valuation
+  source_model: mart_stock_position
+  refresh_sla_seconds: 300
+  pdp_class: internal
+
 # ----------------------------------------------------------------------------------------------
-# DELIBERATELY NOT DECLARED — two metrics were commissioned and are absent on purpose.
-# Recorded here rather than only in a message, because the next person to notice the gap will read
-# this file, not the thread.
+# RESOLVED -- both metrics this file used to decline are now declared above.
 #
-# 1. stock_valuation (IDR)
-#    Needs a per-product COST. What exists:
-#      - dim_product.list_price  -> the SALES price. Valuing inventory at list price overstates it
-#        by the entire margin. This is the pass_through_amount shape exactly: a plausible column
-#        that yields a wrong number by a large factor, with nothing to make the error visible.
-#      - raw.product_product.standard_price -> the real cost, ALREADY LANDED and classified
-#        internal/none. But it is `jsonb`, because standard_price is company-dependent in Odoo 19:
-#        the value is a map keyed by company id, not a number. Same shape as res.partner.barcode.
-#      - fct_stock_move carries quantities only; no value column anywhere in marts.
-#    TO ENABLE: DWH surfaces `standard_price` on dim_product, unpacked per company from the jsonb.
-#    That is a dim_product change, not a new mart, and not something the semantic layer may fake.
+# Kept as a record rather than deleted, because the reason each was blocked is the reason each is
+# now correct, and a future reader who sees only the declaration cannot tell a sound binding from
+# a plausible one.
 #
-# 2. pnl_account_balance / balance_sheet_account_balance
-#    Splitting the ledger needs an account TYPE (income/expense vs asset/liability/equity).
-#    fct_account_move_line carries account_id and nothing else about the account, and there is no
-#    dim_account in marts. Declaring two metrics that differ only in name would return IDENTICAL
-#    numbers under two headings - a balance sheet that is actually invoice revenue lines.
-#    TO ENABLE: DWH adds `account_type` to fct_account_move_line from account.account.account_type
-#    (one column). `account_balance` above then splits by filtering on it, with no new metric.
+# 1. stock_valuation -- WAS BLOCKED on the absence of a per-product cost. dim_product carried only
+#    list_price (the SALES price: valuing inventory at it overstates by the whole margin, the
+#    pass_through_amount shape exactly), and raw.product_product.standard_price, while landed and
+#    classified internal/none, is `jsonb` -- company-dependent in Odoo 19, so a map keyed by company
+#    id rather than a number.
+#    UNBLOCKED BY: DWH's dim_product_cost, which unpacks standard_price per company, and
+#    mart_stock_position gaining unit_cost / stock_valuation / has_unit_cost. Declared above WITH
+#    has_unit_cost as a dimension, because the NULL-skipping SUM() is the new hazard that column
+#    exists to make visible.
 #
-# Until then both render "Not available in this build", naming the metric required. An empty panel
-# that says why is worth more than a populated one that is wrong.
+# 2. pnl_account_balance / balance_sheet_account_balance -- WAS BLOCKED on the absence of an account
+#    TYPE: fct_account_move_line had account_id and nothing else about the account, so two metrics
+#    differing only in name would have returned IDENTICAL numbers under two headings.
+#    UNBLOCKED BY: DWH adding account_type and is_profit_and_loss to fct_account_move_line. Still
+#    NOT declared as two metrics, and that decision has not changed: the split is a group-by on
+#    account_balance, which is now possible and is the truthful form. A second metric name for the
+#    same measure over a filtered set is a view, not a metric.
+#
+# The rule this file keeps: an empty panel that names its missing metric is worth more than a
+# populated one that is wrong. Nothing above is declared against a substituted column.
 # ----------------------------------------------------------------------------------------------

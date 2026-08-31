@@ -3,7 +3,7 @@
     {
       "name": "account_balance",
       "label": "Saldo Akun",
-      "description": "Signed general-ledger balance (debit minus credit) from posted move lines, summed per account. Deliberately NOT split into profit-and-loss and balance-sheet metrics: fct_account_move_line carries account_id but no account TYPE, and there is no dim_account, so nothing in the warehouse distinguishes an income account from an asset one. Two metrics differing only in name would return identical numbers under two different headings, which is worse than one honest metric. Use the account_id dimension to break it down, and is_revenue_line to isolate revenue lines.",
+      "description": "Signed general-ledger balance (debit minus credit) from posted move lines, summed per account. Still deliberately NOT split into separate pnl_account_balance and balance_sheet_account_balance metrics. DWH has now landed account_type and is_profit_and_loss on fct_account_move_line, so the split is finally POSSIBLE - but two metrics differing only in name would return the same numbers under two headings, and the honest form of that split is a group-by, not a second metric name. Group or filter by account_type ('income', 'asset_receivable', 'expense', ...) for the ledger breakdown, is_profit_and_loss to separate P&L from balance sheet, and is_revenue_line to isolate revenue lines. is_profit_and_loss is NULL - not false - on lines with no account at all (section and note lines): a section line is neither P&L nor balance sheet, and filing it under balance sheet by omission is the coalesce-unknown-to-zero mistake. Render the NULL group, do not drop it - and note that this seed contains ZERO such rows (account_id IS NULL count = 0), so the branch is real in the model and UNEXERCISED in the data. A NULL-free result here is not evidence that NULL cannot occur; it is evidence that nobody has posted a section line yet. Live through this API, tenant bct, 2025-01-01..2026-12-31: income -439,850,000 and asset_receivable +439,850,000, summing to exactly 0. A ledger that does not sum to zero over all account types means the binding is wrong, and that is the cheapest check available.",
       "grain": [
         "date_day",
         "tenant_id",
@@ -20,7 +20,9 @@
         "company_id",
         "move_type",
         "payment_state",
-        "is_revenue_line"
+        "is_revenue_line",
+        "account_type",
+        "is_profit_and_loss"
       ],
       "filters": {
         "date_range": {
@@ -37,6 +39,10 @@
           "required": false
         },
         "move_type": {
+          "type": "string[]",
+          "required": false
+        },
+        "account_type": {
           "type": "string[]",
           "required": false
         }
@@ -399,6 +405,40 @@
       },
       "type": "decimal",
       "unit": "unit",
+      "aggregation": "sum",
+      "refresh_sla_seconds": 300,
+      "pdp_class": "internal",
+      "source_model": "mart_stock_position"
+    },
+    {
+      "name": "stock_valuation",
+      "label": "Nilai Persediaan",
+      "description": "On-hand stock valued at unit cost, per product and operating unit. Previously undeclarable and now enabled by DWH's dim_product_cost: mart_stock_position carries unit_cost, stock_valuation and has_unit_cost, so the value comes from standard_price unpacked per company - NOT from list_price, which is the sales price and would overstate inventory by the entire margin. READ has_unit_cost BEFORE READING THE TOTAL. Rows for products with no cost carry a NULL stock_valuation, and SQL SUM() skips NULL without comment, so the total is a subtotal that looks finished. Measured on tenant bct: 28 position rows, 27 summed, 1 silently skipped, 250 units of real stock outside a total that reads as complete. has_unit_cost is a declared dimension precisely so a caller can group by it and see the excluded rows; a panel that shows the number without it is reporting an incomplete figure as a final one.",
+      "grain": [
+        "tenant_id",
+        "operating_unit_id",
+        "product_key"
+      ],
+      "dimensions": [
+        "tenant_id",
+        "operating_unit_id",
+        "product_key",
+        "product_id",
+        "company_id",
+        "has_unit_cost"
+      ],
+      "filters": {
+        "operating_unit_id": {
+          "type": "int[]",
+          "required": false
+        },
+        "product_key": {
+          "type": "string[]",
+          "required": false
+        }
+      },
+      "type": "decimal",
+      "unit": "IDR",
       "aggregation": "sum",
       "refresh_sla_seconds": 300,
       "pdp_class": "internal",

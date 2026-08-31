@@ -112,6 +112,19 @@ def main():
                         help="Generate shapes from the registry alone; no running API needed.")
     args = parser.parse_args()
 
+    # The mode must be CHOSEN. Before this, a bare `make metric-fixtures` with no token quietly
+    # produced offline shapes and overwrote live transcripts with synthetic values -- same
+    # envelope, same filenames, no warning, exit 0. That is the silent-preservation failure from
+    # the other direction: a tool that reconciles two representations must say which one it wrote.
+    if not args.offline and not args.token:
+        print("refusing to guess the mode.", file=sys.stderr)
+        print("  live:    make metric-fixtures ARGS='--token <jwt>'   (a real API transcript)", file=sys.stderr)
+        print("  offline: make metric-fixtures ARGS=--offline         (shapes only; CI)", file=sys.stderr)
+        print("No token was supplied and --offline was not given. Writing offline shapes "
+              "here would silently replace live transcripts with synthetic values.",
+              file=sys.stderr)
+        return 2
+
     from app.registry import load_registry
 
     registry = load_registry(METRICS_DIR)
@@ -126,9 +139,15 @@ def main():
             try:
                 payload = live_fixture(args.url, args.token, metric, dimensions)
             except (urllib.error.URLError, urllib.error.HTTPError) as exc:
-                print("live fetch failed for %s (%s); falling back to offline shape"
-                      % (metric.name, exc.__class__.__name__))
-                payload = offline_fixture(metric, dimensions)
+                # NOT a fallback any more. Writing an offline shape over a live transcript on a
+                # network blip produced a file indistinguishable from a good one, so the next
+                # reader could not tell a real 439,850,000 from a synthetic 1,000,000. Fail, name
+                # the metric, and leave whatever is on disk alone.
+                print("live fetch FAILED for %s: %s: %s"
+                      % (metric.name, exc.__class__.__name__, exc), file=sys.stderr)
+                print("Nothing written. Fix the API/token, or pass --offline to deliberately "
+                      "generate shapes instead of transcripts.", file=sys.stderr)
+                return 1
         else:
             payload = offline_fixture(metric, dimensions)
 
@@ -156,7 +175,8 @@ def main():
         handle.write("\n")
     written.append(os.path.relpath(catalogue, ROOT))
 
-    print("wrote %d fixture file(s):" % len(written))
+    print("mode: %s" % ("live transcript via " + args.url if not args.offline else "offline shapes"))
+    print("wrote %d fixture file(s) for %d registry metric(s):" % (len(written), len(registry.all())))
     for path in written:
         print("  " + path.replace("\\", "/"))
     return 0
