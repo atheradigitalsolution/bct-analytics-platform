@@ -284,7 +284,7 @@ def utcnow() -> dt.datetime:
 
 
 def landing_amplification(conn, tenant: str, table: str) -> tuple:
-    """Return ``(rows, distinct_ids, duplicate_change_rows)`` for one landing table.
+    """Return ``(rows, distinct_ids, duplicate_change_rows, unordered_rows)`` for one table.
 
     Two different numbers, because they mean different things and conflating them is what made the
     last investigation slow:
@@ -292,19 +292,35 @@ def landing_amplification(conn, tenant: str, table: str) -> tuple:
     * ``rows / distinct_ids`` is **amplification**. Append-only versioning makes it legitimately
       greater than 1 -- an insert plus three computed-field updates is four rows for one id -- and
       the deliberate backfill/stream overlap adds one more. It is a trend to watch, not a fault.
-    * ``duplicate_change_rows`` counts rows sharing ``(id, _op, _lsn)``. A change is identified by
-      its WAL position, so this has **no legitimate cause** and should be exactly 0. This is the
-      number that distinguishes "the table is growing because the data changed" from "the loader
-      landed the same change twice".
+    * ``duplicate_change_rows`` counts rows sharing ``(id, _op, _lsn)``, **among rows that have an
+      LSN**. A change is identified by its WAL position, so this has no legitimate cause and should
+      be exactly 0. This is the number that distinguishes "the table grew because the data changed"
+      from "the loader landed the same change twice".
+    * ``unordered_rows`` counts rows with a NULL ``_lsn``.
+
+    The ``_lsn IS NOT NULL`` filter is not tidiness, it is a correctness fix for this metric. SQL
+    row comparison treats two NULL-bearing rows as equal for ``DISTINCT``, so two genuinely
+    different changes that both landed without an LSN counted as one duplicate. The first version
+    of this query reported exactly that false positive on ``sale_order_line``.
+
+    A NULL ``_lsn`` is its own signal and is now surfaced as one: contract 05 makes
+    ``(_tenant_id, pk, _lsn)`` the ordering key, so a row without an LSN cannot participate in the
+    mart's "latest non-deleted version per key" rule. This loader never writes one -- every landed
+    row carries ``format_lsn`` of a real WAL position -- so a non-zero value here means rows arrived
+    in the landing zone by some other route.
     """
     ident = sql.Identifier("raw", table)
     with conn.cursor() as cur:
         cur.execute(
             sql.SQL(
-                "SELECT count(*), count(DISTINCT id), count(*) - count(DISTINCT (id, _op, _lsn)) "
+                "SELECT count(*), "
+                "       count(DISTINCT id), "
+                "       count(*) FILTER (WHERE _lsn IS NOT NULL) "
+                "         - count(DISTINCT (id, _op, _lsn)) FILTER (WHERE _lsn IS NOT NULL), "
+                "       count(*) FILTER (WHERE _lsn IS NULL) "
                 "FROM {} WHERE _tenant_id = %s"
             ).format(ident),
             (tenant,),
         )
         row = cur.fetchone()
-    return int(row[0]), int(row[1]), int(row[2])
+    return int(row[0]), int(row[1]), int(row[2]), int(row[3])

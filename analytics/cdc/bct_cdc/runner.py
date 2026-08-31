@@ -305,7 +305,7 @@ def _publish_amplification(conn, tenant, tables) -> None:
     """Publish landing-zone growth so epoch duplication is visible without an investigation."""
     for table in tables:
         try:
-            rows, distinct_ids, duplicates = wh.landing_amplification(conn, tenant, table)
+            rows, distinct_ids, duplicates, unordered = wh.landing_amplification(conn, tenant, table)
         except Exception as exc:  # pragma: no cover - a metric must not kill the loader
             _logger.debug("amplification probe failed for %s: %s", table, exc)
             conn.rollback()
@@ -315,6 +315,13 @@ def _publish_amplification(conn, tenant, tables) -> None:
                 rows / float(distinct_ids)
             )
         m.LANDING_DUPLICATE_CHANGES.labels(tenant=tenant, source_table=table).set(duplicates)
+        m.LANDING_UNORDERED.labels(tenant=tenant, source_table=table).set(unordered)
+        if unordered:
+            _logger.warning(
+                "raw.%s holds %d row(s) with a NULL _lsn for tenant %s. They cannot be ordered by "
+                "the mart's latest-version rule. This loader never writes one.",
+                table, unordered, tenant,
+            )
         if duplicates:
             _logger.error(
                 "raw.%s holds %d row(s) sharing (id, _op, _lsn) for tenant %s. A change is "

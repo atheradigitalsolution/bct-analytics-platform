@@ -90,6 +90,18 @@ LANDING_DUPLICATE_CHANGES = Gauge(
     "bct_cdc_landing_duplicate_changes",
     "Landing rows that share (id, _op, _lsn) with another row, per table. Unlike amplification "
     "this has no legitimate cause: a change is identified by its WAL position, so two rows with "
-    "the same change key are the same change landed twice. Should be 0.",
+    "the same change key are the same change landed twice. Should be 0. Counted only among rows "
+    "that HAVE an LSN -- SQL treats two NULL-bearing rows as equal for DISTINCT, so without that "
+    "filter two genuinely different unordered changes are reported as one duplicate. That was a "
+    "real false positive on sale_order_line, not a hypothetical.",
+    ["tenant", "source_table"],
+)
+
+LANDING_UNORDERED = Gauge(
+    "bct_cdc_landing_unordered_rows",
+    "Landing rows with a NULL _lsn. Contract 05 makes (_tenant_id, pk, _lsn) the ordering key, so "
+    "such a row cannot take part in the mart's latest-non-deleted-version rule. This loader never "
+    "writes one -- every row it lands carries format_lsn of a real WAL position -- so a non-zero "
+    "value means rows reached the landing zone by another route.",
     ["tenant", "source_table"],
 )

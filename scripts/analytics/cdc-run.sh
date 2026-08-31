@@ -52,4 +52,6 @@ exec env MSYS_NO_PATHCONV=1 docker run --rm $DETACH --name "$NAME" \
   -e CDC_VERIFY_DIGEST_SPEC="${CDC_VERIFY_DIGEST_SPEC:-1}" \
   -e CDC_BATCH_SIZE="${CDC_BATCH_SIZE:-2000}" \
   -e CDC_SOURCE_TABLES="${CDC_SOURCE_TABLES:-}" \
+  -e CDC_PUBLICATION="${CDC_PUBLICATION:-}" \
+  -e CDC_SLOT="${CDC_SLOT:-}" \
   odoo19-bct-cdc:local "$@"
