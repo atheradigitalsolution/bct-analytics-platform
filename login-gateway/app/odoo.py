@@ -9,6 +9,7 @@ plaintext store the whole masking design exists to prevent.
 from __future__ import annotations
 
 import json
+import re
 import logging
 import urllib.error
 import urllib.parse
@@ -111,15 +112,44 @@ class OdooError(Exception):
     pass
 
 
+#: A database name is about to become part of a HOSTNAME, so it is validated
+#: against the same expression every other layer uses rather than trusted. The
+#: caller already checks it against allowed_databases; this is the second lock.
+_DB_RE = re.compile(r"^[a-z][a-z0-9_]{1,62}$")
+
+
 class OdooClient:
+    """JSON-RPC to Odoo, addressed PER DATABASE.
+
+    A single fixed URL cannot serve more than one tenant. dbfilter is ^%d$, so
+    Odoo reads the database from the first label of the Host header -- which
+    means a gateway pointed at http://bct.athera.localhost:8069 authenticates
+    every login against `bct`, whatever database the caller asked for.
+    Measured: a correct super-admin password for athera_admin came back as
+    `upstream_unavailable`, because the request had reached the wrong database
+    and found no such user.
+
+    So the URL is a TEMPLATE. `{db}` is substituted per call, and
+    compose/odoo.yml carries a network alias for each served database.
+    A plain URL with no `{db}` still works and stays single-tenant, which is
+    what an installation with one database wants.
+    """
+
     def __init__(self, url: str, timeout: float = 15.0) -> None:
-        scheme = urllib.parse.urlparse(url).scheme
+        scheme = urllib.parse.urlparse(url.replace("{db}", "db")).scheme
         if scheme not in ("http", "https"):
             raise ValueError("LOGIN_GATEWAY_ODOO_URL must be http or https, got %r" % scheme)
         self.url = url.rstrip("/")
         self.timeout = timeout
 
-    def _call(self, service: str, method: str, args: list):
+    def _url_for(self, db: str) -> str:
+        if "{db}" not in self.url:
+            return self.url
+        if not _DB_RE.match(db or ""):
+            raise OdooError("refusing to build a hostname from database name %r" % db)
+        return self.url.replace("{db}", db)
+
+    def _call(self, db: str, service: str, method: str, args: list):
         payload = {
             "jsonrpc": "2.0",
             "method": "call",
@@ -129,7 +159,7 @@ class OdooClient:
         try:
             body = json.dumps(payload).encode("utf-8")
             response = _HTTP_ONLY_OPENER.open(
-                self.url + "/jsonrpc", data=body, timeout=self.timeout
+                self._url_for(db) + "/jsonrpc", data=body, timeout=self.timeout
             )
             with response:
                 parsed = json.loads(response.read().decode("utf-8"))
@@ -153,7 +183,7 @@ class OdooClient:
         return parsed.get("result")
 
     def authenticate(self, db: str, login: str, password: str) -> int:
-        uid = self._call("common", "authenticate", [db, login, password, {}])
+        uid = self._call(db, "common", "authenticate", [db, login, password, {}])
         if not uid:
             raise AuthenticationFailed()
         return int(uid)
@@ -161,16 +191,32 @@ class OdooClient:
     def execute(self, db: str, uid: int, password: str, model: str, method: str,
                 args: list, kwargs: dict | None = None):
         return self._call(
+            db,
             "object", "execute_kw", [db, uid, password, model, method, args, kwargs or {}]
         )
 
 
 def read_session_claims(client: OdooClient, db: str, uid: int, password: str) -> dict:
     """Read the company and Operating Unit entitlement that fill the contract 02 claim set."""
-    rows = client.execute(
-        db, uid, password, "res.users", "read",
-        [[uid], ["company_id", "company_ids", "allowed_operating_unit_ids"]],
-    )
+    # `allowed_operating_unit_ids` belongs to custom_operating_unit, and not every
+    # database installs it -- the ATHERA admin database carries the control-plane
+    # modules and nothing else. Reading a field that does not exist fails the whole
+    # call, and the gateway turned that into a 503 on a CORRECT super-admin
+    # password: "entitlement read failed: object.execute_kw failed". Measured.
+    #
+    # So the OU field is read separately and its absence is an ANSWER, not an
+    # error: a database with no Operating Units grants none. That is the same
+    # fail-closed reading `allowed_ou: []` already has, and it is why the retry
+    # below cannot widen anyone's entitlement.
+    try:
+        rows = client.execute(
+            db, uid, password, "res.users", "read",
+            [[uid], ["company_id", "company_ids", "allowed_operating_unit_ids"]],
+        )
+    except OdooError:
+        rows = client.execute(
+            db, uid, password, "res.users", "read", [[uid], ["company_id", "company_ids"]],
+        )
     if not rows:
         raise OdooError("res.users.read returned nothing for the authenticated uid")
     row = rows[0]
@@ -186,11 +232,16 @@ def read_session_claims(client: OdooClient, db: str, uid: int, password: str) ->
     allowed_ou = list(row.get("allowed_operating_unit_ids") or [])
     # has_group is a recordset method, not @api.model, so execute_kw must pass the ids first:
     # [[uid], group]. Calling it as [group] raises "missing 1 required positional argument".
-    all_ou = bool(
-        client.execute(
-            db, uid, password, "res.users", "has_group", [[uid], GROUP_ALL_OPERATING_UNITS]
+    # Same reasoning: a group that does not exist in this database is not an
+    # authentication failure, and its absence means the bypass is NOT granted.
+    try:
+        all_ou = bool(
+            client.execute(
+                db, uid, password, "res.users", "has_group", [[uid], GROUP_ALL_OPERATING_UNITS]
+            )
         )
-    )
+    except OdooError:
+        all_ou = False
 
     # A group that does not exist in this database is not an authentication
     # failure — a tenant that never installed the control-plane modules simply

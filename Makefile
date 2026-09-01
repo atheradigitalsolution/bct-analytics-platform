@@ -176,6 +176,11 @@ up-orchestrator: ## Start the tenant-orchestrator (the control-plane API)
 	@$(DC_PLATFORM) up -d --build tenant-orchestrator
 	@echo "orchestrator  http://127.0.0.1:$${ORCHESTRATOR_HOST_PORT:-38300}   (every /v1/* route is HMAC-signed)"
 
+.PHONY: up-console
+up-console: ## Start the Super Admin CMS (requires an is_super_admin session)
+	@$(DC_PLATFORM) up -d --build hub-portal
+	@echo "hub-portal    http://127.0.0.1:$${HUB_PORTAL_HOST_PORT:-33003}   (https://admin.athera.localhost through caddy)"
+
 .PHONY: up-site
 up-site: ## Start the public ATHERA site (content comes from the control-plane DB)
 	@$(DC_PLATFORM) up -d --build marketing-site

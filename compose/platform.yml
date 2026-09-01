@@ -213,6 +213,64 @@ services:
       - bct
 
   # =========================================================================
+  # hub-portal — Super Admin CMS.
+  #
+  # The diagram's console: Client Management and Subscription Management over
+  # tenant_registry, and the content half over cms.
+  #
+  # ITS GATE IS is_super_admin, NOT subscription_active. A super admin is
+  # staff, not a client: they have no registry row, so their token carries
+  # subscription_active=false and no products. Gating on the subscription claim
+  # would lock the operators out of the tool they use to fix subscriptions.
+  #
+  # It signs to the orchestrator SERVER-SIDE. The shared secret is that
+  # service's whole authentication boundary, so a console that signed in the
+  # browser would ship it to every visitor; src/lib/orchestrator.ts is
+  # `server-only` and importing it from a client component is a build error.
+  # =========================================================================
+  hub-portal:
+    build:
+      context: ../hub-portal
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-hub-portal:local
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-hub-portal
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    read_only: true
+    user: "10008:10008"
+    mem_limit: 512m
+    environment:
+      HUB_PORTAL_ORCHESTRATOR_URL: ${HUB_PORTAL_ORCHESTRATOR_URL:-http://tenant-orchestrator:8080}
+      ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET:?ORCHESTRATOR_SHARED_SECRET is required - run `make dev-bootstrap`}
+      HUB_PORTAL_LOGIN_GATEWAY_URL: ${HUB_PORTAL_LOGIN_GATEWAY_URL:-http://login-gateway:8080}
+      HUB_PORTAL_JWKS_URL: ${HUB_PORTAL_JWKS_URL:-http://login-gateway:8080/.well-known/jwks.json}
+      HUB_PORTAL_JWT_ISSUER: ${LOGIN_GATEWAY_JWT_ISSUER:-https://login-gateway.local/}
+      HUB_PORTAL_JWT_AUDIENCE: ${LOGIN_GATEWAY_JWT_AUDIENCE:-insight-portal}
+      HUB_PORTAL_COOKIE_SECURE: ${HUB_PORTAL_COOKIE_SECURE:-false}
+      ATHERA_ADMIN_DB: ${ATHERA_ADMIN_DB:-athera_admin}
+      # The console edits drafts, so it reads the tables rather than the
+      # published-only views. It uses the orchestrator's role, which already
+      # owns the writes.
+      HUB_PORTAL_CMS_DSN: ${HUB_PORTAL_CMS_DSN:?HUB_PORTAL_CMS_DSN is required - run `make dev-bootstrap`}
+      TZ: ${TZ:-Asia/Jakarta}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${HUB_PORTAL_HOST_PORT:-33003}:3000"
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    networks:
+      - bct
+
+  # =========================================================================
   # caddy — the single entry point, and the thing that makes more than one
   # Odoo database reachable at all.
   #

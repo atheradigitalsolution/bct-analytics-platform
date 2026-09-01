@@ -104,8 +104,34 @@ athera.localhost {
 }
 
 # ----- Super Admin CMS ---------------------------------------------------
-# The Host rewrite is the whole trick; see the header.
+# The console, since hub-portal landed. It gates on the is_super_admin claim
+# the login gateway mints, signs to the orchestrator server-side, and edits the
+# CMS the public site reads.
 admin.athera.localhost {
+	encode zstd gzip
+	tls internal
+
+	reverse_proxy hub-portal:3000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# ----- The admin database's Odoo UI --------------------------------------
+# Still reachable, and still needed: tenant.registry, custom_hub_console and
+# the onboarding journey are Odoo models, and hub-portal covers the lifecycle
+# rather than replacing the whole console. The Host rewrite is the trick
+# described in the header — %d is the FIRST LABEL, so `odoo-admin` would look
+# for a database of that name.
+odoo-admin.athera.localhost {
 	encode zstd gzip
 	tls internal
 
