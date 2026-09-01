@@ -190,6 +190,7 @@ services:
       ODOO_DB_PASSWORD: ${ODOO_DB_PASSWORD:?ODOO_DB_PASSWORD is required - run `make dev-bootstrap`}
       ODOO_DB_MAXCONN: ${ODOO_DB_MAXCONN:-32}
       ODOO_DB_NAME: ${ODOO_DB_NAME:-bct}
+      ODOO_DB_NAMES: ${ODOO_DB_NAMES:-bct}
       ODOO_DBFILTER: ${ODOO_DBFILTER:-^bct$$}
       ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD:?ODOO_ADMIN_PASSWD is required - run `make dev-bootstrap`}
       ODOO_LIST_DB: ${ODOO_LIST_DB:-False}
@@ -211,6 +212,13 @@ services:
       # res.partner raises and no partner can be written at all.
       CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY:?CORETAX_SERTEL_MASTER_KEY is required - run `make dev-bootstrap`}
       ODOO_WITHOUT_DEMO: ${ODOO_WITHOUT_DEMO:-True}
+      # queue_job channel capacities. Read by the job runner at start
+      # (jobrunner/runner.py reads ODOO_QUEUE_JOB_CHANNELS before the config
+      # file), because queue.job.channel has no `capacity` field in this
+      # version. root.athera_provision is held at 1 so two tenant provisionings
+      # cannot run at once -- each holds a registry open on a half-built
+      # database for minutes.
+      ODOO_QUEUE_JOB_CHANNELS: ${ODOO_QUEUE_JOB_CHANNELS:-root:2,root.athera_provision:1}
       ODOO_EMAIL_FROM: ${ODOO_EMAIL_FROM:-noreply@localhost}
       ODOO_SMTP_SERVER: ${ODOO_SMTP_SERVER:-localhost}
       ODOO_SMTP_PORT: ${ODOO_SMTP_PORT:-25}
@@ -267,6 +275,7 @@ services:
           # the place that now decides reachability.
           - ${ODOO_DB_NAME:-bct}.${ATHERA_DOMAIN:-athera.localhost}
           - ${ATHERA_ADMIN_DB:-athera_admin}.${ATHERA_DOMAIN:-athera.localhost}
+          - acme.${ATHERA_DOMAIN:-athera.localhost}
 
 # --- Networks --------------------------------------------------------------
 # One explicit network. Named `bct` inside the file; the actual docker network

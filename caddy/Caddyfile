@@ -193,3 +193,27 @@ bct.athera.localhost {
 		level INFO
 	}
 }
+
+acme.athera.localhost {
+	encode zstd gzip
+	tls internal
+
+	@longpoll path /longpolling/* /websocket
+	handle @longpoll {
+		reverse_proxy odoo:8072 {
+			import odoo_headers
+		}
+	}
+
+	handle {
+		reverse_proxy odoo:8069 {
+			import odoo_headers
+		}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
