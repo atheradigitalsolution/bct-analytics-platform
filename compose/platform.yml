@@ -120,6 +120,51 @@ services:
       - bct
 
   # =========================================================================
+  # tenant-orchestrator — the control-plane API.
+  #
+  # custom_super_admin, custom_hub_console and custom_tenant_infra have been
+  # calling http://tenant-orchestrator:8080 since ADR 0002 imported them, into
+  # nothing. This is the thing they were calling.
+  #
+  # ITS ENTIRE PRIVILEGE IS A POSTGRES ROLE. No docker socket: building a tenant
+  # database needs the Odoo CLI, and rather than make a network-facing service
+  # root on the host, it asks custom_athera_provisioner to spawn that CLI inside
+  # the Odoo container. See tenant-orchestrator/app/odoo_rpc.py.
+  # =========================================================================
+  tenant-orchestrator:
+    build:
+      context: ../tenant-orchestrator
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-tenant-orchestrator:local
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-tenant-orchestrator
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    read_only: true
+    mem_limit: 256m
+    environment:
+      ORCHESTRATOR_REGISTRY_DSN: ${ORCHESTRATOR_REGISTRY_DSN:?ORCHESTRATOR_REGISTRY_DSN is required - run `make dev-bootstrap`}
+      ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET:?ORCHESTRATOR_SHARED_SECRET is required - run `make dev-bootstrap`}
+      ORCHESTRATOR_HMAC_WINDOW_SECONDS: ${ORCHESTRATOR_HMAC_WINDOW_SECONDS:-300}
+      # The ADMIN database's hostname, not the service name. dbfilter is ^%d$$,
+      # so a URL whose first label is not a database name reaches no database.
+      ORCHESTRATOR_ODOO_URL: ${ORCHESTRATOR_ODOO_URL:-http://athera_admin.athera.localhost:8069}
+      ATHERA_ADMIN_DB: ${ATHERA_ADMIN_DB:-athera_admin}
+      ORCHESTRATOR_ODOO_LOGIN: ${ORCHESTRATOR_ODOO_LOGIN:-admin}
+      ORCHESTRATOR_ODOO_PASSWORD: ${ORCHESTRATOR_ODOO_PASSWORD:-}
+      ORCHESTRATOR_PROVISION_MODULES: ${ODOO_INIT_MODULES:-}
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ORCHESTRATOR_HOST_PORT:-38300}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - bct
+
+  # =========================================================================
   # caddy — the single entry point, and the thing that makes more than one
   # Odoo database reachable at all.
   #

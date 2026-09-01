@@ -168,6 +168,11 @@ stats: ## One-shot memory and CPU usage for this project's containers
 control-plane: ## Create the admin database + tenant_registry schema (idempotent)
 	@bash scripts/control-plane-apply.sh
 
+.PHONY: up-orchestrator
+up-orchestrator: ## Start the tenant-orchestrator (the control-plane API)
+	@$(DC_PLATFORM) up -d --build tenant-orchestrator
+	@echo "orchestrator  http://127.0.0.1:$${ORCHESTRATOR_HOST_PORT:-38300}   (every /v1/* route is HMAC-signed)"
+
 .PHONY: control-plane-status
 control-plane-status: ## Show the registry: tenants, plans, and the audit chain's integrity
 	@# Reports; never fails. A status command that exits non-zero because the

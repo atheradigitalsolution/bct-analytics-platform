@@ -185,7 +185,15 @@ $fn$;
 CREATE TABLE IF NOT EXISTS tenant_registry.action_log (
   id          BIGSERIAL PRIMARY KEY,
   ts          TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
-  tenant_id   BIGINT       REFERENCES tenant_registry.tenants(id) ON DELETE SET NULL,
+  -- NO FOREIGN KEY, deliberately. It had ON DELETE SET NULL, which needs an
+  -- UPDATE on this table -- and the append-only trigger below refuses every
+  -- UPDATE. The two cancelled out: deleting a tenant that had ever been acted
+  -- on failed with "UPDATE ONLY tenant_registry.action_log SET tenant_id =
+  -- NULL", and the only ways out were to drop the audit guarantee or to leak
+  -- rows forever. An append-only log should not hold a mutable reference into
+  -- a table that can be deleted; tenant_slug is the durable identifier and
+  -- survives the tenant it names, which is what an audit trail is for.
+  tenant_id   BIGINT,
   tenant_slug VARCHAR(63),
   action      VARCHAR(64)  NOT NULL,
   actor       VARCHAR(128) NOT NULL,

@@ -100,6 +100,13 @@ images:
       Holds the RS256 signing key (contract 02). Highest-value image in the stack; its
       findings are release-blocking regardless of severity score.
 
+  - name: tenant-orchestrator
+    dockerfile: tenant-orchestrator/Dockerfile
+    context: tenant-orchestrator
+    owner: Backend
+    wave: 3
+    status: present
+
   - name: insight-portal
     dockerfile: insight-portal/Dockerfile
     context: insight-portal
