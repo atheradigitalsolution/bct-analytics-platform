@@ -252,28 +252,45 @@ disagreeing.
 > not yet describe end to end. What follows is accurate as corrected; §8.1 records what is
 > still genuinely absent.
 
-### 8.1 Still absent, as of 2026-09-01
+### 8.1 The ATHERA build, and what is genuinely left
 
-The ATHERA concept diagram names surfaces this repository does not have. Recorded here rather
-than in a planning document, because a reader comparing the diagram to the code needs it:
+This section listed six absent surfaces on 2026-09-01. All six were built on 2026-09-01 and
+2026-09-02. It is rewritten rather than deleted, because a reader comparing the diagram to the
+code needs to know which parts are load-bearing and which are stubs.
 
-- **The public ATHERA site and its CMS.** The receiving end exists — `custom_onboarding_journey`
-  serves `/onboarding/public/intake` with Turnstile and a per-IP rate limit, and its manifest
-  says "via the marketing site" — but no marketing site does.
-- **`tenant-orchestrator`.** `custom_super_admin`, `custom_hub_console` and
-  `custom_tenant_infra` are installed and all three call `http://tenant-orchestrator:8080`
-  over HMAC. Nothing answers.
-- **The control-plane database.** `custom_super_admin` mirrors `tenant_registry.tenants` from a
-  master DB. There is no such schema and no such database; `tenant.registry` holds 0 rows.
-- **`ai-gateway`.** `custom_ai_bridge` and `custom_ai_features` are installed, and the second
-  serves an NLQ chat at `/ai/chat`. Both call an AI gateway that is not in this repo.
-- **Platform-level subscriptions.** `plan_tier` is a bare `Char`. `custom_subscription` bills a
-  *tenant's* customers, not tenants for the platform.
-- **A second real client.** `bct_t2` is a warehouse fixture, not an Odoo database; the OLTP
-  cluster holds only `bct`.
+| Diagram node | Where it is |
+|---|---|
+| ATHERA Company Profile / Product / ETC. | `marketing-site/`, pages in `cms.page` |
+| Login, Super Admin? | `login-gateway/`, claim `is_super_admin` |
+| Super Admin CMS, Client Management | `hub-portal/` at `admin.athera.localhost` |
+| Subscription Management, Active? | `tenant_registry.plans`, `is_active()`, claim `subscription_active` |
+| Postgres (control plane) | schemas `tenant_registry` + `cms` in the admin Odoo database |
+| Client Dashboard, ATHERA Insight | `insight-portal/` + `semantic-api/` + the warehouse |
+| ODOO | the odoo stack, plus the delivery modules already installed |
+| ATHERA Agent | `ai-gateway/` |
+| Client Environment x2 | `bct` and `acme`, with different plans and different entitlements |
+| Odoo Postgres -> DW | `analytics/cdc/` |
+| Reverse proxy | `caddy/` |
 
-The pattern behind most of that list: ADR 0002 imported the Odoo modules that CALL these
-services without importing the services themselves.
+**Genuinely left, and each is a decision rather than an oversight:**
+
+- **The live Anthropic call has never run.** There is no API key on the build machine and the
+  operator has chosen to leave it unset. Everything around the call is exercised: HMAC in both
+  directions, the tenant fence (10 tests), the schema refusals, the 501s and the
+  no-credential error path. The call itself is untested, and this says so rather than implying
+  otherwise.
+- **`/v1/workflow/anomaly` and `/v1/workflow/classify` answer 501.** `custom_ai_features` calls
+  both. An anomaly scan that silently returned "no anomalies" would be believed.
+- **Backups through the orchestrator answer 501.** `scripts/tenant-backup.sh` does it correctly
+  on the host; that container has neither `pg_dump` nor the filestore, deliberately.
+- **`gentle` is a registry row with no route.** A third tenant, provisioned end to end through
+  the API as the orchestrator's acceptance test, deliberately left without a network alias or a
+  Caddy block. Reachability is a separate, reviewed step -- see the `athera-client-onboard`
+  skill.
+- **Per-client dbt models and metrics for a non-Odoo Insight source.** `import-policy` classifies
+  their columns; the marts and the metric registry are bespoke per client, which is the shape of
+  the work rather than a defect in it.
+
 
 ### 8.2 Never built
 

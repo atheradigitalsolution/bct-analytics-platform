@@ -16,6 +16,96 @@ On 2026-09-01 the operator reversed the addon half of that decision and the suit
 after all; `docs/adr/0002-addon-import.md` records that reversal, so the two entries below are
 not in conflict — they are consecutive decisions.
 
+### Added — the ATHERA platform (2026-09-01 / 2026-09-02)
+
+The operator supplied a concept diagram named ATHERA — a company with three products, a public
+site, a super-admin console and a per-client environment layer. The word appears nowhere in this
+repository, so `docs/athera` does not exist and `docs/architecture.md` §8.1 carries the mapping
+from each diagram node to the code that serves it.
+
+**The finding that shaped all of it.** ADR 0002 imported the Odoo modules that CALL a set of
+backend services without importing the services. `custom_super_admin`, `custom_hub_console` and
+`custom_tenant_infra` had been calling `http://tenant-orchestrator:8080` into nothing;
+`custom_ai_bridge` and `custom_ai_features` the same for an AI gateway. Separately,
+`login-gateway`, `semantic-api` and `cdc` had working code, Dockerfiles and reserved ports but
+appeared in no compose file — and two of them were run by shell scripts while being **built by
+nothing**, so a fresh clone could not start them.
+
+- **Four product stacks** under `compose/`: `odoo`, `insight`, `platform`, `agent`, plus
+  observability. Split by product so one can move to its own VPS; the mechanism that actually
+  makes that possible is env-driven inter-service URLs, not the file layout.
+- **`tenant-orchestrator`** — the control-plane API those three modules were calling. Its entire
+  privilege is one Postgres role and one Odoo login. **No docker socket**: the upstream platform
+  repo mounts one, which would make a network-facing service root on the host.
+- **`custom_athera_provisioner`** — builds a tenant database by spawning `odoo -d … -i …` as a
+  child process inside the Odoo container. Odoo's RPC route is closed by
+  `@check_db_management_enabled` while `list_db` is False, and it stays False.
+- **Control plane** — `tenant_registry` (clients, plans, entitlement, hash-chained audit) and
+  `cms` (the public site's content) in the admin Odoo database. `is_active()` is the single
+  implementation of the "Active?" decision; the gateway, the orchestrator and the console all
+  consult it.
+- **`is_super_admin` / `subscription_active` / `products` claims**, minted on every login **and
+  every refresh**, each defaulting to the denying value.
+- **`hub-portal`** — Super Admin CMS, gated on `is_super_admin`, signing to the orchestrator
+  server-side.
+- **`ai-gateway`** — ATHERA Agent. `/v1/workflow/nlq` returns an Odoo **domain, never SQL**, and
+  the returned plan is re-validated against the caller's own schema before it leaves the process.
+- **`marketing-site`** — the public site, pages in `cms.page`, typed blocks and no
+  `dangerouslySetInnerHTML` anywhere.
+- **`caddy`** — the single entry point. Not decoration: a `dbfilter` naming two databases was
+  measured to serve **neither**, and the Host header is the only per-request way to say which.
+- **A second and third client** — `acme` and `gentle`, with different plans and different
+  entitlements, `gentle` provisioned end to end through the signed API.
+- **`import-policy`** — column classification for an Insight client who is not on Odoo.
+- **Five skills** in `.claude/skills/athera-*`.
+
+### Fixed — found by measuring, not by reasoning
+
+- **Widening `ODOO_DBFILTER` to `^(bct|athera_admin)$` served NEITHER database.** Odoo cannot
+  choose, so `/web/login` answered `303 → /web/database/selector`, which `list_db=False`
+  disables. Only `^%d$` behind a proxy works.
+- **Odoo with `proxy_mode` prefers `X-Forwarded-Host` over `Host`.** Rewriting only `Host` left
+  the admin route on 303 while a direct request with the same header answered 200.
+- **`dbfilter` applies to JSON-RPC too**, which took the login gateway down with
+  `upstream_unavailable` on a correct password until `compose/odoo.yml` gained a network alias
+  per served database.
+- **`LOGIN_GATEWAY_ODOO_URL` was one fixed hostname**, so every login authenticated against
+  `bct` whatever database was asked for. It is now a `{db}` template.
+- **`read_session_claims` read a field only `custom_operating_unit` provides**, turning a correct
+  super-admin password into a 503 on a database that does not install it. Its absence is now an
+  answer, not an error.
+- **`queue_job` runs jobs inside an HTTP request**, so `limit_time_real` applies and installing
+  `website` into another database dies in its own data file. Provisioning shells out instead.
+- **`odoo -i` leaves admin on Odoo's default password**, producing a tenant that provisioned
+  cleanly, reported success and could not be logged into.
+- **`action_log.tenant_id` had `ON DELETE SET NULL`** against a table whose append-only trigger
+  refuses every UPDATE — so a tenant that had ever been acted on could not be deleted at all.
+- **`anthropic==0.75.0` does not accept `fallbacks`**, raising `TypeError` at request time and
+  turning every call into a 500. Support is detected once at construction.
+- **`new URL(path, request.url)` in a route handler resolves against the BIND address**, so the
+  console's login answered `Location: http://0.0.0.0:3000/`.
+- **`[...slug]` does not match `/`**, so the marketing site's home page 404'd while every other
+  page rendered.
+- **`ODOO_INIT_MODULES` named five modules while the live database had 332**, so `make down-hard`
+  would have silently returned the platform to a five-module stack.
+
+### Known gaps — the ATHERA platform
+
+- **The live Anthropic call has never run.** No API key on the build machine, and the operator has
+  chosen to leave it unset. HMAC both ways, the tenant fence (10 tests), the schema refusals, the
+  501s and the no-credential error path are all exercised; the model call itself is not.
+- **`/v1/workflow/anomaly` and `/v1/workflow/classify` answer 501**, as do backups through the
+  orchestrator. `custom_ai_features` calls the first two and `scripts/tenant-backup.sh` already
+  does the third correctly on the host.
+- **`gentle` is a registry row with no network alias and no Caddy block.** Provisioned through the
+  API as the orchestrator's acceptance test and deliberately left unreachable; reachability is a
+  separate reviewed step.
+- **78 ruff findings across the imported addons are accepted as dated debt** to 2027-03-31, scoped
+  to `addons/` with the reasoning in `.pre-commit-config.yaml`. B023 (20) is a verified false
+  positive; the other 58 are real.
+- **Per-client dbt models and metrics for a non-Odoo Insight source are bespoke work per client.**
+  `import-policy` classifies their columns; the marts are the engagement.
+
 ### Added — addon suite (ADR 0002)
 
 - **149 modules imported** from `sarangrumah/odoo-platform` into `addons/<group>/`,
