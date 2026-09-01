@@ -26,6 +26,7 @@ same policy.
     "license": "LGPL-3",
     "depends": ["custom_pdp_core"],
     "data": [
+        "views/generated_search_views.xml",
         "security/ir.model.access.csv",
         "data/pdp_masking_rule_data.xml",
         "views/pdp_masking_rule_views.xml",

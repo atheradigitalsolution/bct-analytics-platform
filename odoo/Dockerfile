@@ -44,10 +44,24 @@ RUN set -eux; \
     command -v curl; \
     openssl version
 
-# --- No pip installs --------------------------------------------------------
-# This image installs zero extra Python packages on purpose. Every runtime
-# dependency comes from the pinned base image. If an addon later needs one, add
-# it here with an exact `==` pin (and a hash), never as a bare package name.
+# --- Python dependencies ----------------------------------------------------
+# This image shipped zero extra Python packages until ADR 0002 brought in the
+# odoo-platform addon suite. Eight of those modules declare external_dependencies
+# the base image does not carry, so the rule the original comment set out is now
+# exercised rather than repealed: every package is pinned with `==` AND a hash.
+#
+# --require-hashes makes an unpinned or unhashed line a build error.
+# --no-deps means pip resolves nothing at build time; requirements.txt is the
+# complete transitive closure, computed once and committed. A dependency that
+# appears from nowhere is therefore a build failure, not a silent addition.
+COPY requirements.txt /tmp/requirements.txt
+# The final python3 -c asserts the imports the addons actually perform, rather
+# than trusting that pip exited 0.
+RUN set -eux; \
+    pip install --no-cache-dir --require-hashes --no-deps \
+        --break-system-packages -r /tmp/requirements.txt; \
+    rm -f /tmp/requirements.txt; \
+    python3 -c "import xmlschema, jwt, httpx, croniter, pymupdf, docx, pptx, oracledb"
 
 # --- Config template --------------------------------------------------------
 # `admin_passwd` is a FileOnlyOption in odoo/tools/config.py: no CLI flag, no

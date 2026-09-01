@@ -182,6 +182,20 @@ paths = [
 targetRules = ["generic-api-key", "hashicorp-tf-password", "curl-auth-header", "curl-auth-user"]
 
 [[allowlists]]
+description = "Test fixtures inside vendored OCA modules, scoped to the generic entropy rule. reason: addons/_vendor/ is third-party code redistributed unchanged (queue_job from github.com/OCA/queue, auth_jwt from github.com/OCA/server-auth, both LGPL-3). auth_jwt/tests/test_auth_jwt.py signs its own tokens with a key= literal reading `thesecret` followed by digits - a self-describing fixture in a unit test that never leaves the test process. Editing vendored code to satisfy our scanner is the wrong repair: the change is lost on the next re-vendor and leaves a copy that no longer matches upstream, so the fix belongs upstream and this is where we record accepting it meanwhile. Scoped to tests/ inside _vendor only, so a credential in vendored RUNTIME code still fails. expires: 2027-02-28 - re-review whenever _vendor is refreshed."
+paths = [
+  '''^addons/_vendor/[^/]+/tests/.*\.py$''',
+]
+targetRules = ["generic-api-key"]
+
+[[allowlists]]
+description = "Minified third-party assets bundled inside vendored modules, scoped to the generic entropy rule. reason: addons/_vendor/queue_job/static/lib/ carries vis-network.min.js and its stylesheet - a graph library shipped by upstream OCA, not written here. Minified JavaScript is high-entropy BY CONSTRUCTION: the minifier renames every property and local to short opaque tokens, so an entropy rule cannot tell one from a credential and flags the compression itself. Scoped to static/lib/ under _vendor and to minified files only, so a real key committed into vendored Python or into a hand-written asset still fails. expires: 2027-02-28 - re-review whenever _vendor is refreshed."
+paths = [
+  '''^addons/_vendor/[^/]+/static/lib/.*\.min\.(js|css)$''',
+]
+targetRules = ["generic-api-key"]
+
+[[allowlists]]
 description = "Lockfile integrity hashes. reason: package-lock.json / yarn.lock / uv.lock integrity fields are base64 SHA-512 digests; treating them as credentials produces hundreds of false positives the moment the Node services land, which is how a secrets gate dies. Scoped to the generic entropy rule only. expires: 2027-02-28 - re-review when login-gateway and insight-portal land in wave 4."
 paths = [
   '''(^|/)package-lock\.json$''',

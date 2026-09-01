@@ -78,8 +78,12 @@ def main() -> int:
 
     tracked = set(subprocess.run(["git", "ls-files"], cwd=ROOT,
                                  capture_output=True, text=True).stdout.split("\n"))
-    for manifest in sorted((ROOT / "addons").glob("*/__manifest__.py")):
-        module = manifest.parent.name
+    # rglob, not glob("*/..."). ADR 0002 nested the tree as
+    # addons/<group>/<module>/, so a one-level glob sees only the five modules
+    # written here and is blind to the 149 imported ones - which is exactly the
+    # class of silent omission this guard exists to catch.
+    for manifest in sorted((ROOT / "addons").rglob("__manifest__.py")):
+        module = manifest.parent.relative_to(ROOT / "addons").as_posix()
         try:
             spec = ast.literal_eval(manifest.read_text(encoding="utf-8"))
         except (ValueError, SyntaxError) as exc:
@@ -103,7 +107,7 @@ def main() -> int:
               "  `git add -f` fixes one file and leaves the next one broken.", file=sys.stderr)
         return 1
 
-    n = sum(1 for _ in (ROOT / "addons").glob("*/__manifest__.py"))
+    n = sum(1 for _ in (ROOT / "addons").rglob("__manifest__.py"))
     print(f"gitignore guard: OK - {len(MUST_SHIP)} must-ship and "
           f"{len(MUST_BE_IGNORED)} must-ignore patterns correct; "
           f"all declared data/demo files across {n} addon(s) are tracked")

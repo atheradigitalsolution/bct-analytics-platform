@@ -60,8 +60,17 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
          r"(?!changeme\b)(?!password\b)(?!REDACTED\b)(?!secret\b)"
          r"[^\s:/@<>{}$%*]{6,}@"
      )),
+    # The negative lookahead carries the exemptions, so each one is visible at the
+    # point it applies rather than hidden in a path allowlist. `not-the-password`
+    # and friends are values a test uses precisely BECAUSE they are wrong: a login
+    # test that asserts the failure redirect has to send a password that fails.
+    # Exempting the value keeps the rule pointed at real credentials; exempting the
+    # file would stop scanning a file that could later hold one.
     ("hardcoded password assignment",
-     re.compile(r"""(?i)\b(password|passwd|secret|api_key|token)\s*[:=]\s*["'](?!changeme|CHANGEME|\$|\{\{|<)[^"'\s]{12,}["']""")),
+     re.compile(r"""(?i)\b(password|passwd|secret|api_key|token)\s*[:=]\s*["']"""
+                r"""(?!changeme|CHANGEME|\$|\{\{|<)"""
+                r"""(?![\w-]*(?:not-the-|wrong-|invalid-|dummy-|placeholder-|example-))"""
+                r"""[^"'\s]{12,}["']""")),
 ]
 
 # Paths where a match is expected and meaningless: this scanner's own rules,

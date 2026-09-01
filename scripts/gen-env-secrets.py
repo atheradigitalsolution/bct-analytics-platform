@@ -81,6 +81,11 @@ LENGTHS: dict[str, int] = {
     "WAREHOUSE_MASK_SALT_DEFAULT": 64,
     "WAREHOUSE_MASK_SALT_BCT": 64,
     "LOGIN_GATEWAY_JWT_KID": 16,
+    # custom_core derives a Fernet key from this. Its parser treats 44 chars as a
+    # ready-made Fernet key and 64 as hex; a random alphanumeric string is
+    # reliably neither, and `bytes.fromhex` on a 64-char alnum value raises. 32
+    # takes the pad-and-encode branch, which always yields a valid key.
+    "CORETAX_SERTEL_MASTER_KEY": 32,
     # A human types this one into /web/login by hand, so it is shorter than the
     # machine-to-machine credentials. 24 chars of [A-Za-z0-9] is ~143 bits.
     "BCT_DEV_USER_PASSWORD": 24,
