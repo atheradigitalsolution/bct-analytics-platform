@@ -44,6 +44,7 @@ ENVFILE      ?= .env
 C_ODOO     := -f compose/odoo.yml -f compose/odoo.dev.yml
 C_INSIGHT  := -f compose/insight.yml
 C_PLATFORM := -f compose/platform.yml
+C_AGENT    := -f compose/agent.yml
 C_OBS      := -f compose/observability.yml
 
 # COMPOSE_IGNORE_ORPHANS: a target that names only some of the project's files
@@ -56,12 +57,13 @@ COMPOSE := COMPOSE_IGNORE_ORPHANS=true docker compose -p $(PROJECT) --env-file $
 DC          := $(COMPOSE) $(C_ODOO)
 DC_INSIGHT  := $(COMPOSE) $(C_ODOO) $(C_INSIGHT)
 DC_PLATFORM := $(COMPOSE) $(C_ODOO) $(C_PLATFORM)
+DC_AGENT    := $(COMPOSE) $(C_ODOO) $(C_AGENT)
 DC_OBS      := $(COMPOSE) $(C_ODOO) $(C_OBS)
 
 # Every stack at once. `down` uses this: it previously used DC_OBS, which does
 # not name the insight or platform files, so a `make down` reported success
 # while leaving warehouse-db, semantic-api, cdc and the portal running.
-DC_ALL := $(COMPOSE) $(C_ODOO) $(C_INSIGHT) $(C_PLATFORM) $(C_OBS)
+DC_ALL := $(COMPOSE) $(C_ODOO) $(C_INSIGHT) $(C_PLATFORM) $(C_AGENT) $(C_OBS)
 
 # Optional argument variables, documented per target:
 #   TENANT=<slug>   MODULES=<a,b>   FROM=<backup dir>   INTO=<slug>   SERVICE=<name>
@@ -172,6 +174,11 @@ control-plane: ## Create the admin database + tenant_registry schema (idempotent
 up-orchestrator: ## Start the tenant-orchestrator (the control-plane API)
 	@$(DC_PLATFORM) up -d --build tenant-orchestrator
 	@echo "orchestrator  http://127.0.0.1:$${ORCHESTRATOR_HOST_PORT:-38300}   (every /v1/* route is HMAC-signed)"
+
+.PHONY: up-agent
+up-agent: ## Start ATHERA Agent (ai-gateway; the LLM provider comes from .env)
+	@$(DC_AGENT) up -d --build ai-gateway
+	@echo "ai-gateway    http://127.0.0.1:$${AI_GATEWAY_HOST_PORT:-38400}   (every /v1/* route is HMAC-signed)"
 
 .PHONY: control-plane-status
 control-plane-status: ## Show the registry: tenants, plans, and the audit chain's integrity

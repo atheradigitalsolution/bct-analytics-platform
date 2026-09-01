@@ -210,6 +210,16 @@ services:
       # NOT optional once the addon suite is installed: custom_storefront_api
       # encrypts PII on res.partner through it, so without this key `create` on
       # res.partner raises and no partner can be written at all.
+      # The two HMAC secrets the imported addons sign with, and the URLs they
+      # sign toward. custom_ai_bridge reads AI_GATEWAY_URL and
+      # custom.security._gateway_secret(); custom_super_admin reads
+      # ORCHESTRATOR_URL and _orchestrator_secret(). Both raise rather than
+      # send an unsigned request, so an unset value here is a loud failure in
+      # the UI rather than a silent one on the wire.
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:?GATEWAY_SHARED_SECRET is required - run `make dev-bootstrap`}
+      AI_GATEWAY_URL: ${AI_GATEWAY_URL:-http://ai-gateway:8080}
+      ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET:?ORCHESTRATOR_SHARED_SECRET is required - run `make dev-bootstrap`}
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL:-http://tenant-orchestrator:8080}
       CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY:?CORETAX_SERTEL_MASTER_KEY is required - run `make dev-bootstrap`}
       ODOO_WITHOUT_DEMO: ${ODOO_WITHOUT_DEMO:-True}
       # queue_job channel capacities. Read by the job runner at start

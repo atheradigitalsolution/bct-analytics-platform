@@ -100,6 +100,13 @@ images:
       Holds the RS256 signing key (contract 02). Highest-value image in the stack; its
       findings are release-blocking regardless of severity score.
 
+  - name: ai-gateway
+    dockerfile: ai-gateway/Dockerfile
+    context: ai-gateway
+    owner: Backend
+    wave: 3
+    status: present
+
   - name: tenant-orchestrator
     dockerfile: tenant-orchestrator/Dockerfile
     context: tenant-orchestrator
