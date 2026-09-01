@@ -100,6 +100,13 @@ images:
       Holds the RS256 signing key (contract 02). Highest-value image in the stack; its
       findings are release-blocking regardless of severity score.
 
+  - name: marketing-site
+    dockerfile: marketing-site/Dockerfile
+    context: marketing-site
+    owner: Frontend
+    wave: 4
+    status: present
+
   - name: ai-gateway
     dockerfile: ai-gateway/Dockerfile
     context: ai-gateway
@@ -127,6 +134,12 @@ images:
       makes a later disappearance a hard failure instead of a silent skip.
 
 node_projects:
+  - name: marketing-site
+    path: marketing-site
+    owner: Frontend
+    wave: 4
+    status: present
+
   - name: insight-portal
     path: insight-portal
     owner: Frontend

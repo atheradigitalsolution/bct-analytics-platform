@@ -67,8 +67,8 @@
 }
 
 # ----- Public site -------------------------------------------------------
-# Phase 4. Until marketing-site exists this is a holding response rather than
-# a proxy to nothing: a 502 from an absent upstream reads like an outage.
+# The diagram's top-left. Pages come from cms.page in the control-plane
+# database, so "Company Profile / Product / ETC." are rows rather than routes.
 athera.localhost {
 	encode zstd gzip
 	tls internal
@@ -88,7 +88,12 @@ athera.localhost {
 	}
 
 	handle {
-		respond "ATHERA — marketing site lands in Phase 4. Console: https://admin.athera.localhost  Dashboard: https://app.athera.localhost" 200
+		reverse_proxy marketing-site:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
 	}
 
 	log {

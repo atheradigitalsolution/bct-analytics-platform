@@ -165,6 +165,54 @@ services:
       - bct
 
   # =========================================================================
+  # marketing-site — the public ATHERA site.
+  #
+  # The diagram's top-left: ATHERA Company Profile, with Company Profile,
+  # Product and ETC. hanging off it. Those are ROWS in cms.page, not routes in
+  # code, so adding a page is an edit in the console rather than a deploy.
+  #
+  # It holds ONE credential, and it is a read-only role scoped to two VIEWS
+  # (cms.published_page, cms.published_block). It has no grant on cms.page at
+  # all, so "the public site cannot serve a draft" is a property of what the
+  # role can reach rather than of a WHERE clause somebody has to remember.
+  # =========================================================================
+  marketing-site:
+    build:
+      context: ../marketing-site
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-marketing-site:local
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-marketing-site
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    read_only: true
+    user: "10007:10007"
+    mem_limit: 512m
+    environment:
+      MARKETING_SITE_DSN: ${MARKETING_SITE_DSN:?MARKETING_SITE_DSN is required - run `make dev-bootstrap`}
+      MARKETING_SITE_POOL_MAX: ${MARKETING_SITE_POOL_MAX:-4}
+      # Where the diagram's Login node points. It leaves this site entirely:
+      # the gateway owns credentials, and a form here would be a second place
+      # that could ask for them.
+      MARKETING_SITE_LOGIN_URL: ${MARKETING_SITE_LOGIN_URL:-https://app.athera.localhost}
+      TZ: ${TZ:-Asia/Jakarta}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MARKETING_SITE_HOST_PORT:-33002}:3000"
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    networks:
+      - bct
+
+  # =========================================================================
   # caddy — the single entry point, and the thing that makes more than one
   # Odoo database reachable at all.
   #

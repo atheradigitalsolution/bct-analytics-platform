@@ -54,6 +54,8 @@ ORCH_USER="${ORCHESTRATOR_DB_USER:-tenant_orchestrator}"
 ORCH_PASS="${ORCHESTRATOR_DB_PASSWORD:?ORCHESTRATOR_DB_PASSWORD is required — run 'make dev-bootstrap'}"
 GW_USER="${LOGIN_GATEWAY_REGISTRY_USER:-login_gateway_registry}"
 GW_PASS="${LOGIN_GATEWAY_REGISTRY_PASSWORD:?LOGIN_GATEWAY_REGISTRY_PASSWORD is required — run 'make dev-bootstrap'}"
+SITE_USER="${MARKETING_SITE_DB_USER:-marketing_site_reader}"
+SITE_PASS="${MARKETING_SITE_DB_PASSWORD:?MARKETING_SITE_DB_PASSWORD is required - run 'make dev-bootstrap'}"
 
 validate_slug "$ADMIN_DB"
 
@@ -93,7 +95,9 @@ fi
 # reverse order fails on a fresh cluster with "role does not exist".
 log "[2/4] control-plane roles"
 psql_super "$POSTGRES_DB" -q -v ON_ERROR_STOP=1 \
-    -v orch="$ORCH_USER" -v orchpass="$ORCH_PASS"     -v gw="$GW_USER" -v gwpass="$GW_PASS" <<'SQL'
+    -v orch="$ORCH_USER" -v orchpass="$ORCH_PASS" \
+    -v gw="$GW_USER" -v gwpass="$GW_PASS" \
+    -v site="$SITE_USER" -v sitepass="$SITE_PASS" <<'SQL'
 -- \gexec, not a DO block. psql does NOT substitute :'vars' inside a
 -- dollar-quoted body, so EXECUTE format(..., :'orch') inside DO $do$ ... $do$
 -- reaches the server as the literal text :'orch' and fails at runtime.
@@ -111,6 +115,12 @@ SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'orch', :'orchpass')
 \gexec
 SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'orch', :'orchpass')
  WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'orch');
+\gexec
+SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'site', :'sitepass')
+ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'site');
+\gexec
+SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'site', :'sitepass')
+ WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'site');
 \gexec
 SELECT 'CREATE ROLE tenant_registry_reader NOLOGIN'
  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tenant_registry_reader');
@@ -140,6 +150,14 @@ dc exec -T postgres psql -v ON_ERROR_STOP=1 --no-psqlrc --quiet \
     -U "$POSTGRES_USER" -d "$ADMIN_DB" \
     < "$REPO_ROOT/postgres/init/sql/40-tenant-registry.sql"
 
+# The CMS lives in the SAME database. The diagram draws one Postgres under the
+# left branch, and both halves are edited by the same people from the same
+# console; a second cluster would buy nothing and cost a join.
+log "      + cms schema (the public site content)"
+dc exec -T postgres psql -v ON_ERROR_STOP=1 --no-psqlrc --quiet \
+    -U "$POSTGRES_USER" -d "$ADMIN_DB" \
+    < "$REPO_ROOT/postgres/init/sql/41-cms.sql"
+
 # Grants live here rather than in the schema file because the schema file also
 # runs from docker-entrypoint-initdb.d on a fresh cluster, where the Odoo role
 # that needs the grant does not exist yet.
@@ -163,6 +181,16 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA tenant_registry
 GRANT tenant_registry_reader TO "$POSTGRES_USER";
 GRANT tenant_registry_reader TO "$GW_USER";
 GRANT CONNECT ON DATABASE "$ADMIN_DB" TO "$GW_USER";
+-- The public site reads published content and nothing else: SELECT on the two
+-- views only, NOT on cms.page. A draft is therefore not merely filtered out of
+-- its queries -- it is outside what the role can reach at all.
+GRANT USAGE ON SCHEMA cms TO "$SITE_USER";
+GRANT SELECT ON cms.published_page, cms.published_block TO "$SITE_USER";
+GRANT CONNECT ON DATABASE "$ADMIN_DB" TO "$SITE_USER";
+-- The console edits through the orchestrator, so that role owns the writes.
+GRANT USAGE ON SCHEMA cms TO "$ORCH_USER";
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA cms TO "$ORCH_USER";
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA cms TO "$ORCH_USER";
 SQL
 
 # --- 4. describe reality --------------------------------------------------

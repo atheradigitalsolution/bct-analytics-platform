@@ -175,6 +175,11 @@ up-orchestrator: ## Start the tenant-orchestrator (the control-plane API)
 	@$(DC_PLATFORM) up -d --build tenant-orchestrator
 	@echo "orchestrator  http://127.0.0.1:$${ORCHESTRATOR_HOST_PORT:-38300}   (every /v1/* route is HMAC-signed)"
 
+.PHONY: up-site
+up-site: ## Start the public ATHERA site (content comes from the control-plane DB)
+	@$(DC_PLATFORM) up -d --build marketing-site
+	@echo "marketing-site http://127.0.0.1:$${MARKETING_SITE_HOST_PORT:-33002}   (https://athera.localhost through caddy)"
+
 .PHONY: up-agent
 up-agent: ## Start ATHERA Agent (ai-gateway; the LLM provider comes from .env)
 	@$(DC_AGENT) up -d --build ai-gateway
