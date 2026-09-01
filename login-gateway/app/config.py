@@ -30,6 +30,11 @@ class Settings:
     rate_limit_window_seconds: int
     rate_limit_lockout_seconds: int
     cookie_secure: bool
+    #: DSN for the ATHERA control plane. Empty means entitlement enforcement is
+    #: OFF and every authenticated tenant is issued a token claiming every
+    #: product — see app/registry.py, which says so at WARNING on every boot.
+    registry_dsn: str
+    registry_cache_ttl: int
 
     def key_paths(self) -> list:
         return [
@@ -75,4 +80,9 @@ def settings_from_env(environ: dict | None = None) -> Settings:
         # default must be the safe one: an operator who forgets this variable should get a cookie
         # that fails on http rather than one that silently travels in the clear.
         cookie_secure=env.get("LOGIN_GATEWAY_COOKIE_SECURE", "1") not in ("0", "false", "no"),
+        registry_dsn=env.get("LOGIN_GATEWAY_REGISTRY_DSN", ""),
+        # Short on purpose. This is the window in which a just-suspended tenant
+        # can still mint a session by refreshing, so it trades staleness for
+        # load on the control plane and should stay in the tens of seconds.
+        registry_cache_ttl=int(env.get("LOGIN_GATEWAY_REGISTRY_CACHE_TTL", "30")),
     )

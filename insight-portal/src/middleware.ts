@@ -85,6 +85,32 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return forbidden(request);
   }
 
+  /**
+   * The diagram's "Active?" decision, enforced here for the same reason the tenant guard is:
+   * middleware runs before any page renders, so the refusal cannot depend on a component
+   * remembering to check.
+   *
+   * The subscription page itself is exempt, or an inactive client would be redirected to the
+   * page explaining why they were redirected, forever.
+   *
+   * A LAPSED SUBSCRIPTION IS NOT A 403. The session is valid and the person is who they say they
+   * are; what has run out is the entitlement. Treating it as an authorisation failure would send
+   * them back to the login screen to re-enter a correct password that cannot help, which is the
+   * single most confusing thing this branch could do.
+   */
+  if (!session.subscription_active && !pathname.startsWith("/subscription")) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "subscription_inactive", detail: "This tenant's subscription is not active." },
+        { status: 402 },
+      );
+    }
+    const info = request.nextUrl.clone();
+    info.pathname = "/subscription";
+    info.search = "";
+    return NextResponse.redirect(info);
+  }
+
   return NextResponse.next();
 }
 

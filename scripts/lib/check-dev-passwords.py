@@ -18,8 +18,10 @@ green on a stack that accepts BOTH passwords - which is precisely the defective
 state instance 10 describes. So `admin`/`admin` MUST be refused for this to pass.
 """
 import base64
+import http.client
 import os
 import sys
+import urllib.parse
 import xmlrpc.client
 
 url = os.environ["BCT_CHECK_URL"]
@@ -27,7 +29,67 @@ db = os.environ["BCT_CHECK_DB"]
 password = base64.b64decode(os.environ["BCT_DEV_PW_B64"]).decode("utf-8")
 demo = [x for x in os.environ.get("BCT_CHECK_DEMO", "").split(",") if x]
 
-common = xmlrpc.client.ServerProxy(url + "/xmlrpc/2/common", allow_none=True)
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    """Claim one hostname, connect to another address.
+
+    http.client derives the Host header from the CONNECTION's host, not from
+    the URL — so overriding either one alone cannot produce "Host says
+    bct.athera.localhost, socket goes to 127.0.0.1". This splits them: the
+    superclass keeps the virtual host (and therefore emits the right Host),
+    and connect() is pointed at the real address.
+    """
+
+    def __init__(self, vhost, port, connect_addr, **kwargs):
+        super().__init__(vhost, port, **kwargs)
+        self._connect_addr = connect_addr
+
+    def connect(self):
+        self.sock = self._create_connection(
+            self._connect_addr, self.timeout, self.source_address)
+        if self._tunnel_host:
+            self._tunnel()
+
+
+class _PinnedTransport(xmlrpc.client.Transport):
+    """XML-RPC over a connection whose Host names the tenant.
+
+    Needed since ODOO_DBFILTER became ^%d$ on 2026-09-01. Odoo picks the
+    database from the FIRST LABEL of the Host header, and that applies to
+    XML-RPC exactly as it applies to a browser. Measured, in order:
+
+      Host: 127.0.0.1:38069          -> 404, authenticate never reaches a db
+      Host: ...,bct.athera.localhost -> 500, ValueError parsing the port
+                                        (setting the header by hand duplicates
+                                        the one http.client already sent)
+      Host: bct.athera.localhost     -> 200, uid 2
+
+    Only the third is a working check. The first would report a healthy stack
+    as a wrong password, which is worse than not checking at all.
+    """
+
+    def __init__(self, connect_addr, **kwargs):
+        super().__init__(**kwargs)
+        self._connect_addr = connect_addr
+
+    def make_connection(self, host):
+        if self._connection and host == self._connection[0]:
+            return self._connection[1]
+        chost, _extra, _x509 = self.get_host_info(host)
+        vhost, _, vport = chost.partition(":")
+        conn = _PinnedHTTPConnection(
+            vhost, int(vport) if vport else None, self._connect_addr)
+        self._connection = host, conn
+        return conn
+
+
+parsed = urllib.parse.urlsplit(url)
+vhost = os.environ.get("BCT_CHECK_VHOST") or "%s.%s" % (
+    db, os.environ.get("ATHERA_DOMAIN", "athera.localhost"))
+_port = parsed.port or 80
+
+common = xmlrpc.client.ServerProxy(
+    "http://%s:%d/xmlrpc/2/common" % (vhost, _port), allow_none=True,
+    transport=_PinnedTransport((parsed.hostname or "127.0.0.1", _port)))
 
 
 def auth(login, secret):

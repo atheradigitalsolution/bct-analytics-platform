@@ -31,6 +31,7 @@ from .config import settings_from_env
 from .keys import load_key_ring
 from .odoo import AuthenticationFailed, OdooClient, OdooError, read_session_claims
 from .ratelimit import RateLimiter
+from .registry import Registry
 from .tokens import mint_access_token, mint_refresh_token
 
 _logger = logging.getLogger("login_gateway")
@@ -112,6 +113,9 @@ def create_app(settings=None) -> FastAPI:
         settings.rate_limit_lockout_seconds,
     )
     store = RefreshStore()
+    # One instance, created at app build time so the WARNING about a missing
+    # control plane is emitted once at boot rather than on every login.
+    registry = Registry(settings.registry_dsn, settings.registry_cache_ttl)
     # Credentials are held only for the lifetime of a refresh chain, never logged and never
     # returned. They are needed because Odoo's execute_kw authenticates every call.
     sessions = {}
@@ -156,6 +160,14 @@ def create_app(settings=None) -> FastAPI:
         )
 
     def _issue(response: Response, tenant: str, uid: int, claims: dict, password: str) -> dict:
+        # The control-plane lookup happens on EVERY issue, which means on every
+        # refresh as well as on login. That is deliberate: a subscription that
+        # lapses mid-session must stop the next refresh, not merely the next
+        # login, or a client with a long-lived refresh chain never notices.
+        ent = registry.lookup(tenant)
+        claims = dict(claims)
+        claims["subscription_active"] = ent.active
+        claims["products"] = ent.products
         token, expires = mint_access_token(settings, ring, tenant, uid, claims)
         refresh = store.issue(tenant, uid, settings.refresh_token_ttl)
         with sessions_lock:
@@ -172,6 +184,11 @@ def create_app(settings=None) -> FastAPI:
             "roles": claims["roles"],
             "allowed_ou": claims["allowed_ou"],
             "all_ou": claims["all_ou"],
+            # Mirrored into the response body as well as the token so the
+            # portal can branch before it has decoded anything.
+            "is_super_admin": bool(claims.get("is_super_admin", False)),
+            "subscription_active": ent.active,
+            "products": list(ent.products),
         }
 
     @router.post("/auth/login")

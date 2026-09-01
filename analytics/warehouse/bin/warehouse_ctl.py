@@ -491,6 +491,22 @@ BEGIN
 END
 $ux$;""",
     ]
+
+    # SCHEMA EVOLUTION. `CREATE TABLE IF NOT EXISTS` is a no-op once the table
+    # exists, so a source column added after the landing table was first built
+    # would never appear in raw -- and the loader's INSERT, which names every
+    # policy column, would fail with "column ... does not exist". That is not
+    # hypothetical: installing the odoo-platform addon suite took res_company
+    # from 121 classified columns to 186, and this is where it surfaced.
+    #
+    # ADD COLUMN IF NOT EXISTS is additive and idempotent. It deliberately does
+    # NOT drop anything: a column that has since been reclassified `secret` is
+    # left in place and caught by the leak assertion in cmd_gen_raw_ddl, which
+    # is the loud failure we want rather than a silent DROP of landed data.
+    ddl += [
+        f'ALTER TABLE raw.{table} ADD COLUMN IF NOT EXISTS {line.strip().rstrip(",")};'
+        for line in lines
+    ]
     return "\n".join(ddl)
 
 
@@ -532,6 +548,75 @@ def cmd_gen_raw_ddl(args) -> int:
     with wh.cursor() as cur:
         cur.execute("SELECT count(*) FROM warehouse.column_policy WHERE pdp_class='secret'")
         n_secret = cur.fetchone()[0]
+    # ORPHANS. gen-raw-ddl only ever ADDS columns, so a source column that is
+    # renamed or removed leaves its old column behind in raw. Contract 01 makes an
+    # unclassified landed column a hard failure, and that is exactly what an orphan
+    # becomes, so they cannot simply be ignored.
+    #
+    # An empty orphan is dropped: it carries nothing, and leaving it would fail the
+    # contract for no gain. An orphan WITH DATA is never dropped here -- the tool
+    # does not get to decide that landed data is worthless. It is reported with the
+    # statement to run, and the command fails so the pipeline stops rather than
+    # continuing in a state contract 01 forbids.
+    with wh.cursor() as cur:
+        cur.execute("""
+            SELECT c.table_name, c.column_name
+            FROM information_schema.columns c
+            WHERE c.table_schema = 'raw'
+              -- metadata columns are ours, not the source's
+              AND left(c.column_name, 1) <> '_'
+              AND NOT EXISTS (
+                SELECT 1 FROM warehouse.column_policy p
+                WHERE p.source_table = c.table_name AND p.source_column = c.column_name)
+            ORDER BY 1, 2
+        """)
+        orphans = cur.fetchall()
+
+    dropped, populated = [], []
+    for table, col in orphans:
+        with wh.cursor() as cur:
+            cur.execute(f'SELECT count(*) FROM raw.{table} WHERE "{col}" IS NOT NULL')
+            if cur.fetchone()[0]:
+                populated.append((table, col, "not empty"))
+            else:
+                # Dependants matter. dbt's staging and marts views select from
+                # raw and are rebuilt from source on every run, so cascading
+                # through them costs nothing. Anything else is somebody's object
+                # and a blanket CASCADE would take it out silently.
+                cur.execute("""
+                    SELECT DISTINCT dn.nspname, dc.relname, dc.relkind
+                    FROM pg_depend d
+                    JOIN pg_rewrite r  ON r.oid = d.objid
+                    JOIN pg_class   dc ON dc.oid = r.ev_class
+                    JOIN pg_namespace dn ON dn.oid = dc.relnamespace
+                    WHERE d.refobjid = %s::regclass
+                      AND d.refobjsubid = (
+                        SELECT attnum FROM pg_attribute
+                        WHERE attrelid = %s::regclass AND attname = %s)
+                """, (f"raw.{table}", f"raw.{table}", col))
+                deps = cur.fetchall()
+                foreign = [f"{s}.{r}" for s, r, k in deps
+                           if s not in ("staging", "marts") or k != "v"]
+                if foreign:
+                    populated.append((table, col, "depended on by " + ", ".join(foreign)))
+                    continue
+                cur.execute(f'ALTER TABLE raw.{table} DROP COLUMN "{col}" CASCADE')
+                rebuilt = sorted({f"{s}.{r}" for s, r, _ in deps})
+                dropped.append(f"{table}.{col}"
+                               + (f" (+{len(rebuilt)} dbt view(s) dbt will rebuild)" if rebuilt else ""))
+    wh.commit()
+
+    if dropped:
+        print(f"==> dropped {len(dropped)} empty orphan column(s): {', '.join(dropped)}")
+    if populated:
+        print("FATAL: these landed columns have no policy row and were not dropped.",
+              file=sys.stderr)
+        print("       They are not dropped automatically. Decide, then run:", file=sys.stderr)
+        for table, col, why in populated:
+            print(f'         -- {why}', file=sys.stderr)
+            print(f'         ALTER TABLE raw.{table} DROP COLUMN "{col}" CASCADE;', file=sys.stderr)
+        return 5
+
     print(f"==> {n_secret} `secret` columns exist in the policy and NONE of them exists in raw")
     return 0
 
@@ -796,7 +881,7 @@ def cmd_verify(args) -> int:
     # RECEIVES it. This runs in the dbt container, which did not have
     # SEMANTIC_API_POOL_MAX at all, so reading it there would have looked live
     # and returned the default forever - the same bug wearing a different hat.
-    # docker-compose.analytics.yml now passes it through, and the provenance
+    # compose/insight.yml now passes it through, and the provenance
     # column is what makes a regression of either kind visible instead of
     # inferred.
     def _env_int(name: str, default: int) -> tuple[int, str]:
@@ -814,7 +899,7 @@ def cmd_verify(args) -> int:
         # Backend's runner (warehouse_conn, heartbeat, status_conn), none of
         # them configurable. Confirmed with Backend rather than assumed.
         ("CDC loader", 3, "literal - not configurable (runner.py 229/413/444)"),
-        # CORRECTED. This said "literal - fixed in docker-compose.analytics.yml",
+        # CORRECTED. This said "literal - fixed in compose/insight.yml",
         # which cited evidence that does not support it: that file sets
         # --disable-default-metrics and a custom query path, both of which
         # change WHAT the exporter queries, not HOW MANY connections it opens.
@@ -826,7 +911,7 @@ def cmd_verify(args) -> int:
         # cannot separate them - which is why an earlier `warehouse_rls = 2`
         # reading in this build was not attributable to either consumer. The
         # exporter now sets application_name=warehouse-exporter in its DSN
-        # (docker-compose.analytics.yml), so the NEXT measurement can attribute
+        # (compose/insight.yml), so the NEXT measurement can attribute
         # it. It is still UNVERIFIED because nobody has taken that measurement,
         # and the label changes when someone does, not when the means to do it
         # exists. To close it:

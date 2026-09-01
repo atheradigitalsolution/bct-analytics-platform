@@ -40,7 +40,7 @@ set -euo pipefail
 
 # --- overridable --------------------------------------------------------------
 DEPLOY_PROJECT="${DEPLOY_PROJECT:-odoo19-bct}"
-DEPLOY_COMPOSE="${DEPLOY_COMPOSE:-docker-compose.yml}"
+DEPLOY_COMPOSE="${DEPLOY_COMPOSE:-compose/odoo.yml}"
 DEPLOY_TENANT="${DEPLOY_TENANT:-bct}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
 HEALTH_INTERVAL="${HEALTH_INTERVAL:-5}"
@@ -127,7 +127,7 @@ log "pulling ${DEPLOY_IMAGE}@${DEPLOY_DIGEST}"
 docker pull "${DEPLOY_IMAGE}@${DEPLOY_DIGEST}"
 
 # The digest is applied through a generated compose OVERRIDE rather than by
-# editing docker-compose.yml. That file belongs to Platform-Infra, and a deploy
+# editing compose/odoo.yml. That file belongs to Platform-Infra, and a deploy
 # that rewrites another agent's tracked file - on the production host, mid-swap -
 # is both a path violation and an excellent way to lose the ability to roll back.
 DEPLOY_OVERRIDE="${DEPLOY_OVERRIDE:-$(mktemp -t bct-deploy-override-XXXXXX.yml)}"

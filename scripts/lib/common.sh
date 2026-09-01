@@ -98,25 +98,53 @@ load_env() {
 # command so container-side paths survive, which would also leave an absolute
 # host-side `-f /e/Projects/...` unconverted and unopenable by docker.exe.
 # A relative path needs no conversion, so both work at once.
-dc() {
+#
+# --env-file is passed explicitly. The compose files moved to compose/ on
+# 2026-09-01, and compose looks for `.env` in the PROJECT DIRECTORY, which is
+# the directory of the first -f file. Without this flag every `${VAR}` would
+# resolve empty. It is belt-and-braces here because load_env has already
+# exported the same values into this process, and a real environment variable
+# wins over --env-file either way — but a script that forgets load_env should
+# still get a working stack rather than a confusing interpolation error.
+#
+# COMPOSE_FILES_ODOO is the odoo product stack. Callers that need another
+# stack pass its file through dc_with, below.
+COMPOSE_FILES_ODOO=(-f compose/odoo.yml -f compose/odoo.dev.yml)
+
+# dc_with FILE... -- ARGS...   run compose with an explicit file list
+dc_with() {
+    local files=()
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do files+=("$1"); shift; done
+    [ "${1:-}" = "--" ] && shift
     (
         cd "$REPO_ROOT"
-        # These scripts intentionally load only the base + dev files, so compose
-        # sees the running observability containers (same project, different
-        # overlay) as orphans and prints a scary warning on every `up`. It never
-        # removes them - that needs --remove-orphans, which nothing here passes -
-        # but the warning trains people to ignore compose output.
+        # A call that names only some of the project's files sees the rest of
+        # the project's containers as orphans and prints a scary warning on
+        # every `up`. It never removes them — that needs --remove-orphans,
+        # which nothing here passes — but the warning trains people to ignore
+        # compose output.
         export COMPOSE_IGNORE_ORPHANS=true
         if [ "$IS_MSYS" = "1" ]; then
             MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
-                docker compose -p "$COMPOSE_PROJECT_NAME" \
-                    -f docker-compose.yml -f docker-compose.dev.yml "$@"
+                docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env \
+                    "${files[@]}" "$@"
         else
-            docker compose -p "$COMPOSE_PROJECT_NAME" \
-                -f docker-compose.yml -f docker-compose.dev.yml "$@"
+            docker compose -p "$COMPOSE_PROJECT_NAME" --env-file .env \
+                "${files[@]}" "$@"
         fi
     )
 }
+
+# The odoo product stack — postgres, redis, odoo. The default for every script
+# that predates the product split.
+dc() { dc_with "${COMPOSE_FILES_ODOO[@]}" -- "$@"; }
+
+# The insight product stack — warehouse-db, cdc, semantic-api, insight-portal.
+dc_insight() { dc_with "${COMPOSE_FILES_ODOO[@]}" -f compose/insight.yml -- "$@"; }
+
+# The shared platform stack — login-gateway, and later the orchestrator, the
+# super-admin console, caddy and the marketing site.
+dc_platform() { dc_with "${COMPOSE_FILES_ODOO[@]}" -f compose/platform.yml -- "$@"; }
 
 # --- Guards ----------------------------------------------------------------
 require_docker() {
@@ -159,7 +187,12 @@ wait_healthy() {
             for svc in "$@"; do
                 [ "$(health_of "$svc")" = "healthy" ] && continue
                 printf '\n--- last 40 log lines: %s ---\n' "$svc" >&2
-                dc logs --tail 40 "$svc" >&2 2>&1 || true
+                # `docker logs` on the container name, not `dc logs` on the
+                # service: this helper is now called for services that live in
+                # the insight and platform stacks too, and `dc` names only the
+                # odoo files, so `dc logs semantic-api` would print nothing at
+                # exactly the moment the logs matter most.
+                docker logs --tail 40 "$(container_of "$svc")" >&2 2>&1 || true
             done
             return 1
         fi

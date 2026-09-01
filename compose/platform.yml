@@ -1,0 +1,181 @@
+# ===========================================================================
+# ATHERA platform — the layer that belongs to no single product.
+#
+#   make up-platform       (adds these on top of the odoo stack)
+#   make down-platform     (removes only these)
+#
+# One of four product stacks (compose/odoo.yml, compose/insight.yml,
+# compose/platform.yml, compose/agent.yml). This one holds what all three
+# products share, which is why it is separate from every one of them:
+#
+#   login-gateway     the diagram's Login node. Insight, Odoo and Agent all
+#                     authenticate through it. A product stack that owned the
+#                     identity provider could not be moved to its own VPS
+#                     without dragging the other two products with it.
+#
+# ARRIVING IN LATER PHASES, and named here so the shape is visible:
+#   tenant-orchestrator   Phase 2 — the REST API that custom_super_admin,
+#                         custom_hub_console and custom_tenant_infra already
+#                         call at http://tenant-orchestrator:8080 today, and
+#                         which does not exist yet.
+#   hub-portal            Phase 2 — Super Admin CMS.
+#   caddy                 end of Phase 2 — single entry point, per-host
+#                         dbfilter. Deliberately NOT earlier: before a second
+#                         tenant exists, hostname routing solves nothing and
+#                         widening ODOO_DBFILTER without a proxy in front
+#                         would make every database reachable on 38069.
+#   marketing-site        Phase 4 — the public ATHERA site.
+#
+# PORTS. 127.0.0.1 only, never 0.0.0.0. This host also runs odoo19-platform-*,
+# odoo19-analytics-* and smart-warga-*; publishing on 0.0.0.0 would expose
+# services to the LAN. Contract 04 §4.
+# ===========================================================================
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+
+  # =========================================================================
+  # login-gateway — authenticates against Odoo over JSON-RPC, issues RS256
+  # JWTs, publishes JWKS with two keys so a rotation never needs an outage.
+  #
+  # Promoted from scripts/analytics/gateway-run.sh on 2026-09-01. Its code and
+  # Dockerfile were complete and its port was reserved in .env.example, but it
+  # appeared in no compose file, so `make up` never started it and the portal
+  # pointed at a host that did not exist.
+  #
+  # KEYS ARE MOUNTED, NEVER BAKED. A key in an image layer is a key in every
+  # registry copy and every `docker save` tarball. `make up-platform` runs
+  # gen-jwt-keys.sh first, which refuses to overwrite an existing key.
+  #
+  # read_only: the gateway writes nothing to disk. Its refresh store and rate
+  # limiter are in-process dicts, which also means it is single-replica by
+  # construction — scaling it horizontally needs a shared store first.
+  # =========================================================================
+  login-gateway:
+    build:
+      context: ../login-gateway
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-login-gateway:local
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-login-gateway
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    read_only: true
+    mem_limit: 256m
+    environment:
+      LOGIN_GATEWAY_JWT_ALGORITHM: ${LOGIN_GATEWAY_JWT_ALGORITHM:-RS256}
+      LOGIN_GATEWAY_JWT_KID: ${LOGIN_GATEWAY_JWT_KID:?LOGIN_GATEWAY_JWT_KID is required - run `make dev-bootstrap`}
+      LOGIN_GATEWAY_JWT_NEXT_KID: ${LOGIN_GATEWAY_JWT_NEXT_KID:?LOGIN_GATEWAY_JWT_NEXT_KID is required - run `make dev-bootstrap`}
+      LOGIN_GATEWAY_JWT_PRIVATE_KEY_PATH: ${LOGIN_GATEWAY_JWT_PRIVATE_KEY_PATH:-/run/secrets/jwt-private.pem}
+      LOGIN_GATEWAY_JWT_PUBLIC_KEY_PATH: ${LOGIN_GATEWAY_JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt-public.pem}
+      LOGIN_GATEWAY_JWT_NEXT_PRIVATE_KEY_PATH: ${LOGIN_GATEWAY_JWT_NEXT_PRIVATE_KEY_PATH:-/run/secrets/jwt-next-private.pem}
+      LOGIN_GATEWAY_JWT_NEXT_PUBLIC_KEY_PATH: ${LOGIN_GATEWAY_JWT_NEXT_PUBLIC_KEY_PATH:-/run/secrets/jwt-next-public.pem}
+      LOGIN_GATEWAY_JWT_ISSUER: ${LOGIN_GATEWAY_JWT_ISSUER:-https://login-gateway.local/}
+      LOGIN_GATEWAY_JWT_AUDIENCE: ${LOGIN_GATEWAY_JWT_AUDIENCE:-insight-portal}
+      LOGIN_GATEWAY_ACCESS_TOKEN_TTL: ${LOGIN_GATEWAY_ACCESS_TOKEN_TTL:-3600}
+      LOGIN_GATEWAY_REFRESH_TOKEN_TTL: ${LOGIN_GATEWAY_REFRESH_TOKEN_TTL:-1209600}
+      LOGIN_GATEWAY_REFRESH_COOKIE_NAME: ${LOGIN_GATEWAY_REFRESH_COOKIE_NAME:-bct_refresh}
+      LOGIN_GATEWAY_COOKIE_SECURE: ${LOGIN_GATEWAY_COOKIE_SECURE:-0}
+      # Service name, not container name. Both resolve on this network, but the
+      # service name is what survives a move to another host with only an .env
+      # change. The same reasoning applies to every inter-service URL here.
+      LOGIN_GATEWAY_ODOO_URL: ${LOGIN_GATEWAY_ODOO_URL:-http://odoo:8069}
+      # The gateway's entire tenant allow-list. Widening it admits a database
+      # to the login surface, so it is a reviewed edit — the same posture
+      # ODOO_DBFILTER has in contract 04 §8.
+      LOGIN_GATEWAY_ALLOWED_DATABASES: ${LOGIN_GATEWAY_ALLOWED_DATABASES:-bct}
+      LOGIN_GATEWAY_RATE_LIMIT_MAX_ATTEMPTS: ${LOGIN_GATEWAY_RATE_LIMIT_MAX_ATTEMPTS:-5}
+      LOGIN_GATEWAY_RATE_LIMIT_WINDOW_SECONDS: ${LOGIN_GATEWAY_RATE_LIMIT_WINDOW_SECONDS:-300}
+      LOGIN_GATEWAY_RATE_LIMIT_LOCKOUT_SECONDS: ${LOGIN_GATEWAY_RATE_LIMIT_LOCKOUT_SECONDS:-900}
+      # The control-plane read behind the diagram's "Active?" decision. Empty
+      # disables entitlement enforcement entirely and the gateway says so at
+      # WARNING on every boot — it is not a silent default.
+      LOGIN_GATEWAY_REGISTRY_DSN: ${LOGIN_GATEWAY_REGISTRY_DSN:-}
+      LOGIN_GATEWAY_REGISTRY_CACHE_TTL: ${LOGIN_GATEWAY_REGISTRY_CACHE_TTL:-30}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ../login-gateway/secrets:/run/secrets:ro
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${LOGIN_GATEWAY_HOST_PORT:-38120}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - bct
+
+  # =========================================================================
+  # caddy — the single entry point, and the thing that makes more than one
+  # Odoo database reachable at all.
+  #
+  # Not a convenience. Odoo picks a database with `dbfilter`, and a filter
+  # naming two databases was measured to serve NEITHER — /web/login answers
+  # 303 -> /web/database/selector and list_db=False disables that selector.
+  # The Host header is the only per-request way to say which database is meant,
+  # so multi-tenancy needs a proxy that sets it. See caddy/Caddyfile.
+  #
+  # ODOO_PROXY_MODE=True has been on since before anything sat in front of
+  # Odoo, which meant X-Forwarded-* was trusted while a client could forge it.
+  # That setting is correct only now, and only because this service sets those
+  # headers on every proxied route.
+  # =========================================================================
+  caddy:
+    image: caddy:2.8-alpine@sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-caddy
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    mem_limit: 256m
+    environment:
+      # Read by the Caddyfile so the admin route's Host rewrite tracks the
+      # database name instead of hard-coding it in two places.
+      ATHERA_ADMIN_DB: ${ATHERA_ADMIN_DB:-athera_admin}
+      TZ: ${TZ:-UTC}
+    cap_add:
+      # Caddy binds 80 and 443 INSIDE the container. Both are below 1024, and
+      # the image runs as root only long enough to bind them; without this the
+      # bind fails outright. It is the one capability added back here, and it
+      # is added for that reason alone.
+      - NET_BIND_SERVICE
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${CADDY_HTTP_PORT:-38080}:80"
+      - "${BIND_ADDRESS:-127.0.0.1}:${CADDY_HTTPS_PORT:-38443}:443"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - bct
+
+networks:
+  bct:
+    name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}_bct
+    driver: bridge
+
+volumes:
+  # The local CA lives here. Losing it means every browser that trusted the
+  # root has to trust a new one, so it is a named volume rather than a tmpfs.
+  caddydata:
+    name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}_caddydata
+  caddyconfig:
+    name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}_caddyconfig

@@ -35,7 +35,7 @@ check() {
 # 1 -------------------------------------------------------------------------
 step "1. compose config validates"
 check "compose config -q exits 0" \
-    bash -c 'docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q && echo CONFIG_OK'
+    bash -c 'docker compose --env-file .env -f compose/odoo.yml -f compose/odoo.dev.yml config -q && echo CONFIG_OK'
 
 # 2 -------------------------------------------------------------------------
 step "2. services healthy"
@@ -49,38 +49,45 @@ step "3+4. postgres logical decoding settings"
 dc exec -T postgres psql -U odoo -tAc \
     "show wal_level; show max_replication_slots; show max_wal_senders; show max_slot_wal_keep_size;"
 check "wal_level = logical" bash -c \
-    "[ \"\$(docker compose -p $COMPOSE_PROJECT_NAME -f docker-compose.yml -f docker-compose.dev.yml exec -T postgres psql -U odoo -tAc 'show wal_level')\" = logical ]"
+    "[ \"\$(docker compose -p $COMPOSE_PROJECT_NAME --env-file .env -f compose/odoo.yml -f compose/odoo.dev.yml exec -T postgres psql -U odoo -tAc 'show wal_level')\" = logical ]"
 check "max_slot_wal_keep_size is bounded (not -1)" bash -c \
-    "v=\$(docker compose -p $COMPOSE_PROJECT_NAME -f docker-compose.yml -f docker-compose.dev.yml exec -T postgres psql -U odoo -tAc 'show max_slot_wal_keep_size'); echo \"  value=\$v\"; [ \"\$v\" != '-1' ] && [ -n \"\$v\" ]"
+    "v=\$(docker compose -p $COMPOSE_PROJECT_NAME --env-file .env -f compose/odoo.yml -f compose/odoo.dev.yml exec -T postgres psql -U odoo -tAc 'show max_slot_wal_keep_size'); echo \"  value=\$v\"; [ \"\$v\" != '-1' ] && [ -n \"\$v\" ]"
 
 # 5 -------------------------------------------------------------------------
-step "5. /web/login returns 200"
+step "3. /web/login returns 200"
 URL="http://${BIND_ADDRESS:-127.0.0.1}:${ODOO_HOST_HTTP_PORT:-38069}/web/login"
 curl -s -o /dev/null -w "login=%{http_code}\n" "$URL"
-check "/web/login = 200" bash -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' '$URL')\" = 200 ]"
+# The Host header names the database. dbfilter is ^%d$ now that Caddy is the
+# entry point, and %d is the first label of the host: without this the request
+# resolves %d to "127", matches nothing, and answers 303 to a database selector
+# that list_db=False has disabled. Checking the bare URL would report a healthy
+# stack as broken.
+VHOST="${ODOO_DB_NAME:-bct}.athera.localhost"
+check "/web/login = 200 (Host: $VHOST)" bash -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: $VHOST' '$URL')\" = 200 ]"
+check "admin console = 200" bash -c "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: ${ATHERA_ADMIN_DB:-athera_admin}.athera.localhost' '$URL')\" = 200 ]"
 
 # 6 -------------------------------------------------------------------------
-step "6. odoo runs as a non-root uid"
+step "4. odoo runs as a non-root uid"
 dc exec -T odoo id
 check "odoo uid != 0" bash -c \
-    "[ \"\$(docker compose -p $COMPOSE_PROJECT_NAME -f docker-compose.yml -f docker-compose.dev.yml exec -T odoo id -u | tr -d '\r')\" != 0 ]"
+    "[ \"\$(docker compose -p $COMPOSE_PROJECT_NAME --env-file .env -f compose/odoo.yml -f compose/odoo.dev.yml exec -T odoo id -u | tr -d '\r')\" != 0 ]"
 
 # 7 -------------------------------------------------------------------------
-step "7. no setuid/setgid binaries in the odoo image"
+step "5. no setuid/setgid binaries in the odoo image"
 suid="$(dc exec -T odoo find / -xdev -perm /6000 -type f 2>/dev/null | tr -d '\r' || true)"
 if [ -n "$suid" ]; then printf '%s\n' "$suid"; else echo "(none)"; fi
 check "no SUID/SGID files" bash -c "[ -z \"$suid\" ]"
 
 # 8 -------------------------------------------------------------------------
-step "8. warehouse_reader is read-only by construction"
+step "6. warehouse_reader is read-only by construction"
 check "warehouse-reader-check.sh" bash "$REPO_ROOT/scripts/warehouse-reader-check.sh"
 
 # 9 -------------------------------------------------------------------------
-step "9. no real secret in tracked files"
+step "7. no real secret in tracked files"
 check "scan-secrets" python3 "$REPO_ROOT/scripts/scan-secrets.py"
 
 # 10 ------------------------------------------------------------------------
-step "10. make help documents every target"
+step "8. make help documents every target"
 # `make help` colourises target names, so the raw output starts each line with
 # an ANSI escape, not the target. Strip escapes before comparing, or every
 # single target reads as undocumented.
@@ -95,7 +102,7 @@ if [ -n "$undocumented" ]; then echo "undocumented targets:"; printf '  %s\n' $u
 check "no undocumented targets" bash -c "[ -z \"$undocumented\" ]"
 
 # 11 ------------------------------------------------------------------------
-step "11. other stacks on this host are untouched"
+step "9. other stacks on this host are untouched"
 docker ps --format '{{.Names}}\t{{.Status}}' | grep -E 'odoo19-(platform|analytics)' | head
 check "odoo19-platform-odoo still up" bash -c \
     "docker ps --format '{{.Names}}\t{{.Status}}' | grep -q 'odoo19-platform-odoo.*Up'"
@@ -103,15 +110,25 @@ check "odoo19-analytics-odoo still up" bash -c \
     "docker ps --format '{{.Names}}\t{{.Status}}' | grep -q 'odoo19-analytics-odoo.*Up'"
 
 # 12 ------------------------------------------------------------------------
-step "12. .gitignore does not silently drop a file that must ship"
+step "10. .gitignore does not silently drop a file that must ship"
 check "gitignore guard" python3 "$REPO_ROOT/scripts/check-gitignore.py"
 
 # 13 ------------------------------------------------------------------------
-step "13. the alerting path is armed, not merely syntactically valid"
+step "11. every custom model can actually be searched"
+# A model with no search view gives the user no filters, no Group By, and a
+# search box that only looks at `name`. 285 of the imported models shipped that
+# way. This gate lives here rather than in CI because it reads ir_model_fields
+# from the running database: the question "does this model have a search view"
+# has no honest answer from static files alone, since a view can come from any
+# module in the graph.
+check "search views complete" python3 "$REPO_ROOT/scripts/generate-search-views.py" --check
+
+# 14 ------------------------------------------------------------------------
+step "12. the alerting path is armed, not merely syntactically valid"
 check "alerting armed" python3 "$REPO_ROOT/scripts/check-alerting.py"
 
 # 14 ------------------------------------------------------------------------
-step "14. the dev login credential is applied, and Odoo's default is refused"
+step "13. the dev login credential is applied, and Odoo's default is refused"
 # PLAN.md instance 10. The half of this that matters is the NEGATIVE: a check
 # that only asserts "$BCT_DEV_USER_PASSWORD logs in" is green on a stack that
 # accepts BOTH passwords, which is precisely the defective state. So

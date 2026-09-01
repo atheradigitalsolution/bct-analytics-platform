@@ -155,7 +155,7 @@ set +e
 (
     export RUN_COLDSTART=1
     export COMPOSE_PROJECT_NAME="$PROJECT"
-    export COMPOSE_FILE="docker-compose.yml:docker-compose.dev.yml"
+    export COMPOSE_FILE="compose/odoo.yml:compose/odoo.dev.yml"
     export COMPOSE_PATH_SEPARATOR=":"
     export COMPOSE_IGNORE_ORPHANS=true
     cd "$REPO_ROOT" && bash tests/run.sh -m coldstart "$@"

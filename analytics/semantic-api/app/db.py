@@ -67,7 +67,7 @@ TENANT_SETTING = "app.tenant_id"
 #: ``usename`` cannot tell us apart. This string is the only thing that can.
 #:
 #: Set HERE rather than in scripts/analytics/semantic-run.sh because the DSN reaches this service by
-#: two routes -- that script and docker-compose.analytics.yml -- and a value set in one of them is
+#: two routes -- that script and compose/insight.yml -- and a value set in one of them is
 #: absent from the other. Passed as a psycopg2 keyword, which make_dsn merges into the DSN, so it
 #: holds whatever the DSN string itself contains.
 APPLICATION_NAME = "semantic-api"

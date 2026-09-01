@@ -1,7 +1,7 @@
 # Analytics warehouse — design notes
 
 Owner: **Data Warehouse agent**. Scope: `analytics/warehouse/**`, `analytics/dbt/**`,
-`docker-compose.analytics.yml`, `observability/*analytics-*`.
+`compose/insight.yml`, `observability/*analytics-*`.
 
 Read `docs/adr/0001-analytics-warehouse.md` first — it is binding — then
 `docs/agents/contracts/05-warehouse.md`, which is the seam with Backend.

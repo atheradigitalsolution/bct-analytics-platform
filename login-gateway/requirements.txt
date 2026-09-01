@@ -25,3 +25,7 @@ pydantic==2.13.5
 PyJWT[crypto]==2.13.0
 cryptography==50.0.1
 prometheus-client==0.21.1
+
+# Reads tenant_registry for the "Active?" decision (app/registry.py). Same pin as
+# the semantic API, so the two services carry one driver version between them.
+psycopg2-binary==2.9.10

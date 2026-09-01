@@ -247,6 +247,36 @@ disagreeing.
 
 ## 8. What does not exist
 
+> **Read §8.1 first.** On 2026-09-01 this section was found to be stale in two places, both
+> now struck through below, and the platform gained a four-stack layout this document does
+> not yet describe end to end. What follows is accurate as corrected; §8.1 records what is
+> still genuinely absent.
+
+### 8.1 Still absent, as of 2026-09-01
+
+The ATHERA concept diagram names surfaces this repository does not have. Recorded here rather
+than in a planning document, because a reader comparing the diagram to the code needs it:
+
+- **The public ATHERA site and its CMS.** The receiving end exists — `custom_onboarding_journey`
+  serves `/onboarding/public/intake` with Turnstile and a per-IP rate limit, and its manifest
+  says "via the marketing site" — but no marketing site does.
+- **`tenant-orchestrator`.** `custom_super_admin`, `custom_hub_console` and
+  `custom_tenant_infra` are installed and all three call `http://tenant-orchestrator:8080`
+  over HMAC. Nothing answers.
+- **The control-plane database.** `custom_super_admin` mirrors `tenant_registry.tenants` from a
+  master DB. There is no such schema and no such database; `tenant.registry` holds 0 rows.
+- **`ai-gateway`.** `custom_ai_bridge` and `custom_ai_features` are installed, and the second
+  serves an NLQ chat at `/ai/chat`. Both call an AI gateway that is not in this repo.
+- **Platform-level subscriptions.** `plan_tier` is a bare `Char`. `custom_subscription` bills a
+  *tenant's* customers, not tenants for the platform.
+- **A second real client.** `bct_t2` is a warehouse fixture, not an Odoo database; the OLTP
+  cluster holds only `bct`.
+
+The pattern behind most of that list: ADR 0002 imported the Odoo modules that CALL these
+services without importing the services themselves.
+
+### 8.2 Never built
+
 Stated because a reader will otherwise assume the master prompt's world:
 
 - **The 162-addon platform, the UU PDP module family, Coretax/e-Faktur and PPh withholding.** The
@@ -256,9 +286,12 @@ Stated because a reader will otherwise assume the master prompt's world:
   and DSAR lifecycle are not modelled in Odoo at all.
 - **Any DSAR erasure automation.** See `docs/pdp-compliance.md` §5 — it is a manual runbook, and
   that document says so in those words.
-- **`insight-portal`.** The dashboard does not exist yet; the box in §1 is where it attaches, and
-  contract 06 is the shape it will bind to. Nothing in this repository renders a chart today, so
-  the §6 "five views render" item is not merely untested — it is unbuilt.
+- ~~**`insight-portal`.**~~ CORRECTED 2026-09-01. It exists and it runs: Next.js 15, five views
+  plus a drill-down under `/t/[tenant]/`, folded into `compose/insight.yml`. This entry said it was
+  unbuilt for as long as it was, and then for a while after it was not — which is the failure mode
+  this whole section exists to prevent, so it is struck through rather than deleted.
+- ~~**The 162-addon platform.**~~ Also corrected: ADR 0002 imported 149 modules on 2026-09-01 and
+  332 install. The line above is the decision as taken on 2026-08-31; the reversal is ADR 0002.
 - **A workflow orchestrator.** ADR 0001 rejected Airflow and Dagster: the CDC consumer is a
   long-running process, and the only scheduled work is `dbt build` on an interval.
 

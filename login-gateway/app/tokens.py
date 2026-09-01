@@ -38,6 +38,18 @@ def mint_access_token(settings, ring, tenant: str, uid: int, claims: dict) -> tu
         # nothing rather than everything.
         "all_ou": bool(claims.get("all_ou", False)),
         "company_ids": claims["company_ids"],
+        # --- ATHERA, 2026-09-01 -------------------------------------------
+        # The diagram's two decision diamonds, as claims. Both are written
+        # explicitly and both default to the DENYING value, for the same reason
+        # the GATE 3 amendment made all_ou explicit: a claim that is absent
+        # must grant nothing, never everything. A verifier that forgets to read
+        # `subscription_active` still sees `false` if it was false.
+        "is_super_admin": bool(claims.get("is_super_admin", False)),
+        "subscription_active": bool(claims.get("subscription_active", False)),
+        # Which of insight/odoo/agent this tenant's plan includes. Empty is a
+        # valid and meaningful answer: an unknown or unplanned tenant gets no
+        # product, which is what tenant_registry.entitlements() returns for one.
+        "products": list(claims.get("products", ())),
         "iat": issued,
         "exp": expires,
     }

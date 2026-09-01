@@ -15,11 +15,24 @@ from helpers import db
 
 pytestmark = [pytest.mark.live]
 
+# The four that predate the product split, plus the three that were promoted
+# from `docker run` scripts into compose on 2026-09-01. Those three had working
+# code, a Dockerfile and a reserved port, and appeared in no compose file at
+# all -- so a "full" stack could report success with the login gateway, the
+# metric API and the CDC loader all down, and the portal rendering nothing.
+# They belong here for the same reason the first four do.
+#
+# cdc is NOT in this list. It only runs once a publication exists, which is
+# `make cdc-start`, so requiring it here would fail a correct stack that has
+# simply not been given a tenant to follow yet. test_08_freshness covers it.
 REQUIRED = [
     "odoo19-bct-odoo",
     "odoo19-bct-postgres",
     "odoo19-bct-redis",
     "odoo19-bct-warehouse-db",
+    "odoo19-bct-login-gateway",
+    "odoo19-bct-semantic-api",
+    "odoo19-bct-insight-portal",
 ]
 
 

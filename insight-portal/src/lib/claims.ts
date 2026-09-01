@@ -20,6 +20,20 @@ export interface Session {
   /** The explicit bypass. **Absent is `false`.** Never infer it from an empty `allowed_ou`. */
   all_ou: boolean;
   company_ids: number[];
+  /**
+   * The diagram's "Super Admin?" decision. **Absent is `false`.** Derived in the gateway from
+   * `custom_super_admin.group_super_admin` and nowhere else, so a session cannot claim it by
+   * having a role name that merely looks administrative.
+   */
+  is_super_admin: boolean;
+  /**
+   * The diagram's "Active?" decision, answered by `tenant_registry.is_active()` in the control
+   * plane. **Absent is `false`**, which is the same rule `all_ou` follows and for the same reason:
+   * a token minted before this claim existed must not be read as a paid subscription.
+   */
+  subscription_active: boolean;
+  /** Which ATHERA products the tenant's plan grants. Empty means none, never all. */
+  products: string[];
   iat: number;
   exp: number;
 }
@@ -62,6 +76,11 @@ export function toSession(payload: JWTPayload): Session | null {
     allowed_ou: asNumberArray(payload.allowed_ou),
     all_ou: payload.all_ou === true,
     company_ids: asNumberArray(payload.company_ids),
+    // `=== true`, not truthiness, and not `!== false`. Same shape as all_ou above: an absent or
+    // malformed claim becomes false, so an old token grants nothing rather than everything.
+    is_super_admin: payload.is_super_admin === true,
+    subscription_active: payload.subscription_active === true,
+    products: asStringArray(payload.products),
     iat: typeof payload.iat === "number" ? payload.iat : 0,
     exp: typeof payload.exp === "number" ? payload.exp : 0,
   };

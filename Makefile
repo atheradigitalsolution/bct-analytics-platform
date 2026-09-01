@@ -20,13 +20,48 @@ SHELL := /bin/bash
 .ONESHELL:
 
 PROJECT      ?= odoo19-bct
-COMPOSE_BASE := docker-compose.yml
-COMPOSE_DEV  := docker-compose.dev.yml
-COMPOSE_OBS  := docker-compose.observability.yml
-COMPOSE_ANALYTICS := docker-compose.analytics.yml
 
-DC     := docker compose -p $(PROJECT) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV)
-DC_OBS := docker compose -p $(PROJECT) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV) -f $(COMPOSE_OBS)
+# ---------------------------------------------------------------------------
+# COMPOSE FILES — one per PRODUCT, under compose/.
+#
+# The split is by product, not by concern, so that a product can later be
+# moved to its own VPS by changing URLs in .env and nothing else:
+#
+#   compose/odoo.yml        ODOO       postgres, redis, odoo
+#   compose/insight.yml     Insight    warehouse-db, cdc, semantic-api, portal
+#   compose/platform.yml    shared     login-gateway (+ orchestrator, hub-portal,
+#                                      caddy, marketing-site in later phases)
+#   compose/agent.yml       Agent      ai-gateway (Phase 3)
+#   compose/observability.yml          prometheus, grafana, loki, exporters
+#
+# --env-file is EXPLICIT and not optional. Compose looks for `.env` in the
+# project directory, which since the move is compose/ — so without this flag
+# every `${VAR}` silently resolves empty and required-variable interpolation
+# fails. Passing it is cheaper than a `.env` living in two places.
+# ---------------------------------------------------------------------------
+ENVFILE      ?= .env
+
+C_ODOO     := -f compose/odoo.yml -f compose/odoo.dev.yml
+C_INSIGHT  := -f compose/insight.yml
+C_PLATFORM := -f compose/platform.yml
+C_OBS      := -f compose/observability.yml
+
+# COMPOSE_IGNORE_ORPHANS: a target that names only some of the project's files
+# sees the rest of the project's containers as orphans and prints a warning on
+# every `up`. It never removes them — that needs --remove-orphans, which no
+# target here passes — but the warning trains people to ignore compose output,
+# which is how a real message gets missed.
+COMPOSE := COMPOSE_IGNORE_ORPHANS=true docker compose -p $(PROJECT) --env-file $(ENVFILE)
+
+DC          := $(COMPOSE) $(C_ODOO)
+DC_INSIGHT  := $(COMPOSE) $(C_ODOO) $(C_INSIGHT)
+DC_PLATFORM := $(COMPOSE) $(C_ODOO) $(C_PLATFORM)
+DC_OBS      := $(COMPOSE) $(C_ODOO) $(C_OBS)
+
+# Every stack at once. `down` uses this: it previously used DC_OBS, which does
+# not name the insight or platform files, so a `make down` reported success
+# while leaving warehouse-db, semantic-api, cdc and the portal running.
+DC_ALL := $(COMPOSE) $(C_ODOO) $(C_INSIGHT) $(C_PLATFORM) $(C_OBS)
 
 # Optional argument variables, documented per target:
 #   TENANT=<slug>   MODULES=<a,b>   FROM=<backup dir>   INTO=<slug>   SERVICE=<name>
@@ -73,30 +108,38 @@ build: ## Rebuild the Odoo image (pinned digest; no cache reuse for apt layers)
 	@$(DC) build odoo
 
 .PHONY: config
-config: ## Validate and print the merged compose configuration
-	@$(DC) config -q && echo "CONFIG_OK"
+config: ## Validate the merged compose configuration of EVERY product stack
+	@$(DC_ALL) config -q && echo "CONFIG_OK"
 
 # ==== Lifecycle
 
 .PHONY: up-dev
-up-dev: ## Start the dev stack, initialise the database, wait for healthy
+up-dev: ## Start the odoo stack, initialise the database, wait for healthy
 	@bash scripts/up-dev.sh
+
+.PHONY: up
+up: ## Start every product stack in dependency order, then report the URLs
+	@bash scripts/up-all.sh
 
 .PHONY: down
 down: ## Stop and remove this project's containers (volumes are KEPT)
 	@echo "scoped to project $(PROJECT) only — other stacks on this host are untouched"
-	@$(DC_OBS) down --remove-orphans
+	@$(DC_ALL) down --remove-orphans
 
 .PHONY: down-hard
 down-hard: ## DESTRUCTIVE: down + delete this project's volumes (all data lost)
 	@echo ""
-	@echo "  This deletes volumes $(PROJECT)_pgdata, _odoodata, _redisdata."
+	@echo "  This deletes volumes $(PROJECT)_pgdata, _odoodata, _redisdata,"
+	@echo "  _warehousedata and the observability volumes."
 	@echo "  Every database and every filestore in project $(PROJECT) is lost."
 	@echo "  Other projects on this host are NOT affected."
 	@echo ""
+	@echo "  The rebuilt stack installs \$$ODOO_INIT_MODULES and nothing else."
+	@echo "  Anything installed by hand since the last cold start is gone with it."
+	@echo ""
 	@read -r -p "  Type the project name to confirm: " reply; \
 	 if [ "$$reply" = "$(PROJECT)" ]; then \
-	     $(DC_OBS) down -v --remove-orphans; \
+	     $(DC_ALL) down -v --remove-orphans; \
 	 else \
 	     echo "  aborted."; exit 1; \
 	 fi
@@ -106,18 +149,31 @@ restart: ## Restart services (SERVICE=<name> for one, default all)
 	@$(DC) restart $(SERVICE)
 
 .PHONY: ps
-ps: ## Show this project's containers and health
-	@$(DC) ps
+ps: ## Show this project's containers and health, across every product stack
+	@$(DC_ALL) ps
 
 .PHONY: logs
 logs: ## Follow logs (SERVICE=<name> for one, default all)
-	@$(DC) logs -f --tail=200 $(SERVICE)
+	@$(DC_ALL) logs -f --tail=200 $(SERVICE)
 
 .PHONY: stats
 stats: ## One-shot memory and CPU usage for this project's containers
 	@docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.CPUPerc}}' \
-	    $$($(DC_OBS) ps -q 2>/dev/null) 2>/dev/null || \
+	    $$($(DC_ALL) ps -q 2>/dev/null) 2>/dev/null || \
 	 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}'
+
+# ==== Control plane (ATHERA Phase 2)
+
+.PHONY: control-plane
+control-plane: ## Create the admin database + tenant_registry schema (idempotent)
+	@bash scripts/control-plane-apply.sh
+
+.PHONY: control-plane-status
+control-plane-status: ## Show the registry: tenants, plans, and the audit chain's integrity
+	@# Reports; never fails. A status command that exits non-zero because the
+	@# thing is not built yet is a status command people stop running.
+	@$(DC) exec -T postgres psql -U $${POSTGRES_USER:-odoo} -d $${ATHERA_ADMIN_DB:-athera_admin} 	    --no-psqlrc -P pager=off -c 	    "SELECT slug, state, plan_code, insight_source_kind, tenant_registry.is_active(slug) AS active, tenant_registry.entitlements(slug) AS products FROM tenant_registry.tenants ORDER BY id" 	    2>/dev/null || echo "  tenant_registry not present in $${ATHERA_ADMIN_DB:-athera_admin}  (make control-plane)"
+	@$(DC) exec -T postgres psql -U $${POSTGRES_USER:-odoo} -d $${ATHERA_ADMIN_DB:-athera_admin} 	    --no-psqlrc -tA -c 	    "SELECT '  audit chain: ' || CASE WHEN count(*) = 0 THEN 'intact' ELSE count(*) || ' BROKEN LINK(S)' END FROM tenant_registry.verify_action_chain()" 	    2>/dev/null || true
 
 # ==== Database
 
@@ -229,7 +285,10 @@ down-obs: ## Stop only the observability services (the base stack keeps running)
 # rest of this file. Names are taken from the namespace reserved in
 # docs/agents/contracts/04-platform.md 6 and collide with nothing above.
 
-DC_ANALYTICS := docker compose -p $(PROJECT) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV) -f $(COMPOSE_ANALYTICS)
+# Kept as an alias of DC_INSIGHT. The warehouse is one part of ATHERA Insight
+# rather than a product of its own, so the stack it lives in is named for the
+# product; this name stays because the runbooks and contracts use it.
+DC_ANALYTICS := $(DC_INSIGHT)
 
 # `run --rm --no-deps`, not `exec`: dbt is a batch job, not a service. Leaving a
 # restart-policy container idling would burn ~150 MiB of the VPS budget for
@@ -330,27 +389,45 @@ warehouse-restore: ## Restore a warehouse backup: make warehouse-restore FROM=ba
 
 GATEWAY_SCRIPTS := scripts/analytics
 
-.PHONY: up-gateway
-up-gateway: ## Start the login gateway (generates its RS256 keys on first run)
+# These three moved from `docker run` to compose on 2026-09-01. The scripts in
+# scripts/analytics/ still work and are still the way to run an ad-hoc variant
+# (a second CDC loader under a different --name, say), but the managed path is
+# compose: `docker run --rm` made `docker stop` DELETE the container, and left
+# all three invisible to `docker compose ps`, `make down` and `make stats`.
+
+.PHONY: up-platform
+up-platform: ## Start the shared platform stack (login-gateway; keys generated on first run)
 	@# gen-jwt-keys.sh REFUSES to overwrite an existing key (--force to replace),
 	@# so this is safe on every run and removes the one manual step that stood
 	@# between a fresh clone and a working gateway. Rotating keys behind live
 	@# tokens is the failure it protects against; it is not this target's job.
 	@bash $(GATEWAY_SCRIPTS)/gen-jwt-keys.sh
-	@bash $(GATEWAY_SCRIPTS)/gateway-run.sh --detach
+	@$(DC_PLATFORM) up -d --build login-gateway
 	@echo "login-gateway  http://127.0.0.1:$${LOGIN_GATEWAY_HOST_PORT:-38120}   jwks: /.well-known/jwks.json"
 
+.PHONY: up-gateway
+up-gateway: up-platform ## Alias of up-platform, kept because the runbooks name it
+
 .PHONY: up-semantic
-up-semantic: ## Start the semantic API (run up-gateway FIRST - it fetches JWKS from it)
-	@bash $(GATEWAY_SCRIPTS)/semantic-run.sh --detach
+up-semantic: ## Start the semantic API (run up-platform FIRST - it verifies against the gateway's JWKS)
+	@$(DC_INSIGHT) up -d --build semantic-api
 	@echo "semantic-api   http://127.0.0.1:$${SEMANTIC_API_HOST_PORT:-38200}"
+
+.PHONY: up-portal
+up-portal: ## Start the Insight portal (needs semantic-api and login-gateway up)
+	@$(DC_INSIGHT) up -d --build insight-portal
+	@echo "insight-portal http://127.0.0.1:$${INSIGHT_PORTAL_HOST_PORT:-33000}"
+
+.PHONY: portal-build
+portal-build: ## Rebuild the Insight portal image without starting it
+	@$(DC_INSIGHT) build insight-portal
 
 .PHONY: cdc-start
 cdc-start: ## Provision the publication, then start the CDC loader (TENANT=<slug>)
 	@# Publication FIRST, then the consumer, which creates the slot at the end of
 	@# its own startup checks. Never the reverse - see the ordering note above.
 	@bash $(GATEWAY_SCRIPTS)/cdc-provision.sh --slug $(if $(TENANT),$(TENANT),$${ODOO_DB_NAME:-bct})
-	@bash $(GATEWAY_SCRIPTS)/cdc-run.sh --detach
+	@$(DC_INSIGHT) up -d --build cdc
 
 .PHONY: cdc-status
 cdc-status: ## Show the CDC loader, its replication slot and its last success
@@ -375,7 +452,9 @@ cdc-status: ## Show the CDC loader, its replication slot and its last success
 # Namespace claimed by later agents (docs/agents/contracts/04-platform.md):
 #   Data Warehouse : CLAIMED above, in the "Analytics warehouse" section.
 #   Backend        : DEFINED above, in "Backend service tier". All four.
-#   Frontend       : up-portal  portal-build
+#   Frontend       : up-portal  portal-build — DEFINED above as of 2026-09-01,
+#                    in "Backend service tier", when the portal was folded into
+#                    compose/insight.yml. They are no longer reserved.
 #
 # Claimed since publication, on request via the Lead:
 #   QA             : test  test-coldstart          (recipes here, tests/run.sh is QA's)

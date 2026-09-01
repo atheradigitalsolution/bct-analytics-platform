@@ -40,7 +40,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$REPO_ROOT"
 
 PROJECT="${PROJECT:-odoo19-bct}"
-DC=(docker compose -p "$PROJECT" -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.analytics.yml)
+DC=(docker compose -p "$PROJECT" --env-file .env -f compose/odoo.yml -f compose/odoo.dev.yml -f compose/insight.yml)
 
 # shellcheck disable=SC1091
 set -a; . ./.env; set +a

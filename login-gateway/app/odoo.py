@@ -87,6 +87,12 @@ _HTTP_ONLY_OPENER = _build_http_only_opener()
 #: Operating Unit. Bypasses the per-unit record rules.").
 GROUP_ALL_OPERATING_UNITS = "custom_operating_unit.group_operating_unit_all"
 
+#: The diagram's "Super Admin?" decision, and the ONLY place it is derived.
+#: custom_super_admin restricts every write on tenant.registry to this group,
+#: so a session claiming super-admin without it would be able to open a console
+#: whose every button then fails — worse than being refused the console.
+GROUP_SUPER_ADMIN = "custom_super_admin.group_super_admin"
+
 #: Odoo groups -> contract 02 roles. Unmapped users get the least-privileged role, never none:
 #: a session with no role at all would be indistinguishable from a bug in the mapping.
 ROLE_MAP = (
@@ -186,6 +192,16 @@ def read_session_claims(client: OdooClient, db: str, uid: int, password: str) ->
         )
     )
 
+    # A group that does not exist in this database is not an authentication
+    # failure — a tenant that never installed the control-plane modules simply
+    # has no super admin, which is the correct answer rather than an error.
+    try:
+        is_super_admin = bool(
+            client.execute(db, uid, password, "res.users", "has_group",
+                           [[uid], GROUP_SUPER_ADMIN]))
+    except OdooError:
+        is_super_admin = False
+
     roles = [DEFAULT_ROLE]
     for group, role in ROLE_MAP:
         try:
@@ -199,6 +215,7 @@ def read_session_claims(client: OdooClient, db: str, uid: int, password: str) ->
         "company_ids": [int(c) for c in company_ids],
         "allowed_ou": [int(o) for o in allowed_ou],
         "all_ou": all_ou,
+        "is_super_admin": is_super_admin,
         # Ordered most-privileged last so a consumer taking roles[-1] is not surprised; the
         # authoritative check is membership, not position.
         "roles": sorted(set(roles)),

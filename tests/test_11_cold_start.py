@@ -90,8 +90,10 @@ def test_project_volumes_are_genuinely_removed(foreign_before, evidence):
     # `down-hard` prompts for confirmation, so the project name is fed to it on stdin.
     result = run(
         ["docker", "compose", "-p", PROJECT,
-         "-f", "docker-compose.yml", "-f", "docker-compose.dev.yml",
-         "-f", "docker-compose.analytics.yml", "-f", "docker-compose.observability.yml",
+         "--env-file", ".env",
+         "-f", "compose/odoo.yml", "-f", "compose/odoo.dev.yml",
+         "-f", "compose/insight.yml", "-f", "compose/platform.yml",
+         "-f", "compose/observability.yml",
          "down", "-v", "--remove-orphans"],
         timeout=600,
     )
@@ -123,8 +125,8 @@ def test_make_up_dev_brings_the_stack_up_from_nothing(foreign_before, evidence):
     evidence.add("/web/login answers", "after %.0fs: %s" % (seconds, bool(ok)))
     assert ok, "Odoo never answered /web/login after a cold start"
 
-    ps = run(["docker", "compose", "-p", PROJECT, "-f", "docker-compose.yml",
-              "-f", "docker-compose.dev.yml", "ps"], timeout=120)
+    ps = run(["docker", "compose", "-p", PROJECT, "--env-file", ".env",
+              "-f", "compose/odoo.yml", "-f", "compose/odoo.dev.yml", "ps"], timeout=120)
     evidence.add("docker compose -p %s ps" % PROJECT, ps.stdout)
 
 
