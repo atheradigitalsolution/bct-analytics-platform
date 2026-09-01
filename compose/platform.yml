@@ -193,7 +193,10 @@ services:
       # Where the diagram's Login node points. It leaves this site entirely:
       # the gateway owns credentials, and a form here would be a second place
       # that could ask for them.
-      MARKETING_SITE_LOGIN_URL: ${MARKETING_SITE_LOGIN_URL:-https://app.athera.localhost}
+      # Default derived from ATHERA_DOMAIN rather than spelled out, for the
+      # same reason caddy/Caddyfile stopped spelling its hostnames out: a second
+      # place holding the domain is a second place to forget.
+      MARKETING_SITE_LOGIN_URL: ${MARKETING_SITE_LOGIN_URL:-https://app.${ATHERA_DOMAIN:-athera.localhost}}
       TZ: ${TZ:-Asia/Jakarta}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${MARKETING_SITE_HOST_PORT:-33002}:3000"
@@ -295,6 +298,23 @@ services:
       # Read by the Caddyfile so the admin route's Host rewrite tracks the
       # database name instead of hard-coding it in two places.
       ATHERA_ADMIN_DB: ${ATHERA_ADMIN_DB:-athera_admin}
+      # Every site address in the Caddyfile is built from this. It is the SAME
+      # variable compose/odoo.yml builds its network aliases from, which is the
+      # point: the browser-facing hostname and the in-network RPC name for a
+      # database cannot drift apart if there is only one place to change them.
+      ATHERA_DOMAIN: ${ATHERA_DOMAIN:-athera.localhost}
+      # `internal` issues from the local CA. An EMAIL ADDRESS here turns on
+      # ACME with that address as the account - `tls <email>` is Caddy's own
+      # syntax, so production differs by this one value.
+      #
+      # Do not set an email before the DNS records exist and have propagated.
+      # Let's Encrypt rate-limits FAILED validations at 5 per hostname per
+      # hour, so a Caddy that starts early spends that budget and is locked out
+      # at the moment DNS becomes correct.
+      ATHERA_TLS: ${ATHERA_TLS:-internal}
+      # The public site proxies /onboarding/* into Odoo, which needs a Host
+      # whose first label is a real database.
+      ODOO_DB_NAME: ${ODOO_DB_NAME:-bct}
       TZ: ${TZ:-UTC}
     cap_add:
       # Caddy binds 80 and 443 INSIDE the container. Both are below 1024, and
@@ -307,8 +327,18 @@ services:
       - caddydata:/data
       - caddyconfig:/config
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${CADDY_HTTP_PORT:-38080}:80"
-      - "${BIND_ADDRESS:-127.0.0.1}:${CADDY_HTTPS_PORT:-38443}:443"
+      # CADDY_BIND_ADDRESS, deliberately NOT ${BIND_ADDRESS}. That one variable
+      # is shared by every published port in this project - postgres 35432,
+      # redis 36379, warehouse-db 35433, grafana, prometheus, loki. Setting it
+      # to 0.0.0.0 to put Caddy on the internet would put all of those there
+      # too, which is the opposite of what a reverse proxy in front is for.
+      #
+      # So Caddy gets its own, defaulting to ${BIND_ADDRESS} so a workstation
+      # behaves exactly as before. Production sets CADDY_BIND_ADDRESS=0.0.0.0
+      # with CADDY_HTTP_PORT=80 / CADDY_HTTPS_PORT=443, and leaves
+      # BIND_ADDRESS at 127.0.0.1.
+      - "${CADDY_BIND_ADDRESS:-${BIND_ADDRESS:-127.0.0.1}}:${CADDY_HTTP_PORT:-38080}:80"
+      - "${CADDY_BIND_ADDRESS:-${BIND_ADDRESS:-127.0.0.1}}:${CADDY_HTTPS_PORT:-38443}:443"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
       interval: 30s
