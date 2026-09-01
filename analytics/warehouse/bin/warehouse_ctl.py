@@ -42,6 +42,8 @@ USAGE
 from __future__ import annotations
 
 import argparse
+import csv
+import pathlib
 import os
 import sys
 
@@ -510,6 +512,133 @@ $ux$;""",
     return "\n".join(ddl)
 
 
+# ---------------------------------------------------------------------------
+# import-policy — the classification path for a client who is NOT on Odoo.
+# ---------------------------------------------------------------------------
+#: pdp_class -> (transform, mask_null). The database enforces this pairing with
+#: column_policy_class_transform_ck, so deriving it here rather than asking for
+#: it removes a whole class of mistake: a column classified correctly and
+#: transformed wrongly. `sensitive` is the one class with a real choice, and
+#: --nullable in the CSV picks the second form.
+_CLASS_TRANSFORM = {
+    "public":    ("none", False),
+    "internal":  ("none", False),
+    "personal":  ("hmac_sha256", False),
+    "sensitive": ("hmac_sha256", False),
+    "secret":    ("drop", False),
+}
+
+
+def cmd_import_policy(args) -> int:
+    """Load a column classification from CSV, for a source that is not Odoo.
+
+    WHY THIS EXISTS. sync-policy reads pdp.field.classification out of an Odoo
+    database. A client who subscribes only to ATHERA Insight brings their own
+    application and has no such table -- but the CDC loader still hard-exits
+    with code 3 on any unclassified column, and that refusal is the point:
+    unclassified data must not land. So the classification has to come from
+    somewhere, and for these clients it comes from a file their onboarding
+    produces.
+
+    Same table, same constraints, same fail-closed posture. This is an
+    additional SOURCE for warehouse.column_policy, not a second policy system.
+
+    CSV columns: source_table, source_column, pdp_class [, nullable]
+    `nullable` is only meaningful for pdp_class=sensitive.
+    """
+    path = pathlib.Path(args.file)
+    if not path.is_file():
+        print(f"no such file: {path}", file=sys.stderr)
+        return 2
+
+    rows, bad = [], []
+    seen_tables = set()
+    with path.open(newline="", encoding="utf-8") as fh:
+        for lineno, rec in enumerate(csv.DictReader(fh), start=2):
+            table = (rec.get("source_table") or "").strip()
+            column = (rec.get("source_column") or "").strip()
+            klass = (rec.get("pdp_class") or "").strip().lower()
+            nullable = (rec.get("nullable") or "").strip().lower() in ("1", "true", "yes")
+
+            if not table or not column:
+                bad.append(f"line {lineno}: source_table and source_column are both required")
+                continue
+            if klass not in _CLASS_TRANSFORM:
+                bad.append(
+                    f"line {lineno}: {table}.{column} has pdp_class {klass!r}; "
+                    f"must be one of {', '.join(sorted(_CLASS_TRANSFORM))}"
+                )
+                continue
+
+            transform, mask_null = _CLASS_TRANSFORM[klass]
+            if klass == "sensitive" and nullable:
+                transform, mask_null = "hmac_sha256_nullable", True
+            elif nullable:
+                bad.append(
+                    f"line {lineno}: {table}.{column} sets nullable but pdp_class is "
+                    f"{klass!r}; only `sensitive` may be nullable"
+                )
+                continue
+
+            seen_tables.add(table)
+            rows.append((table, column, klass, transform, mask_null))
+
+    if bad:
+        # Every fault at once. Reporting the first and exiting would make
+        # classifying a real schema an exercise in re-running the command.
+        print(f"\nFATAL: {len(bad)} problem(s) in {path}:", file=sys.stderr)
+        for b in bad:
+            print(f"  - {b}", file=sys.stderr)
+        print(
+            "\nContract 01: an unclassified or mis-classified column is a hard failure, "
+            "never a silent default to `public`.",
+            file=sys.stderr,
+        )
+        return 2
+    if not rows:
+        print(f"{path} contained no rows", file=sys.stderr)
+        return 2
+
+    wh = connect_warehouse()
+    with wh.cursor() as cur:
+        psycopg2.extras.execute_values(
+            cur,
+            "INSERT INTO warehouse.column_policy "
+            "(source_table, source_column, pdp_class, transform, mask_null) VALUES %s "
+            "ON CONFLICT (source_table, source_column) DO UPDATE SET "
+            "  pdp_class = EXCLUDED.pdp_class, transform = EXCLUDED.transform, "
+            "  mask_null = EXCLUDED.mask_null, updated_at = now()",
+            rows,
+        )
+        # Stale rows are removed ONLY for the tables this file names. A global
+        # sweep here would delete the Odoo tenants' policy on the first import
+        # for an external client -- the two share this table, and each source
+        # is only authoritative for its own tables.
+        cur.execute(
+            "DELETE FROM warehouse.column_policy p "
+            "WHERE p.source_table = ANY(%s) "
+            "  AND NOT EXISTS (SELECT 1 FROM (VALUES %s) AS v(t, c) "
+            "                   WHERE v.t = p.source_table AND v.c = p.source_column)"
+            % ("%s", ", ".join(["(%s, %s)"] * len(rows))),
+            [list(seen_tables)] + [x for r in rows for x in (r[0], r[1])],
+        )
+        removed = cur.rowcount
+        cur.execute(
+            "SELECT pdp_class, count(*) FROM warehouse.column_policy "
+            "WHERE source_table = ANY(%s) GROUP BY 1 ORDER BY 1",
+            (list(seen_tables),),
+        )
+        by_class = cur.fetchall()
+    wh.commit()
+
+    print(f"==> warehouse.column_policy: {len(rows)} rows upserted from {path}, "
+          f"{removed} stale rows removed")
+    print(f"    tables: {', '.join(sorted(seen_tables))}")
+    for klass, n in by_class:
+        print(f"      {klass:<10} {n}")
+    return 0
+
+
 def cmd_gen_raw_ddl(args) -> int:
     wh = connect_warehouse()
     odoo = connect_odoo(os.environ.get("ODOO_DB_NAME", "bct"))
@@ -949,6 +1078,12 @@ def main() -> int:
 
     sub.add_parser("sync-policy", help="Materialise warehouse.column_policy from custom_pdp_core")
 
+    p = sub.add_parser(
+        "import-policy",
+        help="Load warehouse.column_policy from CSV, for an Insight client that is not on Odoo",
+    )
+    p.add_argument("--file", required=True, help="CSV: source_table,source_column,pdp_class[,nullable]")
+
     p = sub.add_parser("gen-raw-ddl", help="Generate and apply raw.* landing tables from the policy")
     p.add_argument("--print-only", action="store_true", help="print the DDL instead of applying it")
 
@@ -967,6 +1102,7 @@ def main() -> int:
     args = ap.parse_args()
     return {
         "sync-policy": cmd_sync_policy,
+        "import-policy": cmd_import_policy,
         "gen-raw-ddl": cmd_gen_raw_ddl,
         "gen-fdw": cmd_gen_fdw,
         "load-fixture": cmd_load_fixture,

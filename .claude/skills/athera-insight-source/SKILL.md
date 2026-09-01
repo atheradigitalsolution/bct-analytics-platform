@@ -22,7 +22,19 @@ SHOW max_slot_wal_keep_size;       -- must not be -1: an unbounded slot can fill
 
 **Odoo-specific, and therefore the work:**
 
-1. **Column classification.** `warehouse_ctl.py sync-policy` reads `pdp_field_classification` out of Odoo. A non-Odoo client has no such table, and the loader **hard-exits with code 3** on any unclassified column. That exit is a feature: unclassified data must not land. Supply the classification per client into `warehouse.column_policy` — same table, so this is an addition, not a new system.
+1. **Column classification — `warehouse_ctl.py import-policy`.** `sync-policy` reads `pdp_field_classification` out of Odoo; a non-Odoo client has no such table, and the loader **hard-exits with code 3** on any unclassified column. That exit is a feature: unclassified data must not land. So the classification comes from a CSV instead, into the same `warehouse.column_policy` — an additional source, not a second policy system.
+
+```bash
+# CSV columns: source_table,source_column,pdp_class[,nullable]
+make import-policy FILE=policies/<client>.csv
+```
+
+`analytics/warehouse/policies/example-external-client.csv` is a worked example. Three things it does for you:
+
+- **The transform follows the class.** `secret → drop`, `personal → hmac_sha256`, `sensitive → hmac_sha256` (or `hmac_sha256_nullable` with `nullable=true`). The database enforces the pairing with `column_policy_class_transform_ck`, so deriving it removes a whole class of mistake: a column classified correctly and transformed wrongly.
+- **Every fault at once**, with line numbers. An unknown class, a missing column name, or `nullable` on a class that may not be nullable each fail the whole import — never a silent default to `public`.
+- **Stale rows are pruned only for the tables the file names.** A global sweep would delete the Odoo tenants' policy the first time you import for an external client; the two share this table and each source is authoritative only for its own tables. Verified: importing 10 external rows left all 1067 Odoo rows intact.
+
 2. **dbt models.** Staging is named for Odoo tables (`stg_res_partner`, `stg_account_move_line`). A client's schema is their own, so their marts are bespoke.
 3. **The metric registry.** `analytics/semantic-api/metrics/core.yml` stands on those marts. New source, new metrics.
 

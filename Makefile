@@ -70,6 +70,7 @@ DC_ALL := $(COMPOSE) $(C_ODOO) $(C_INSIGHT) $(C_PLATFORM) $(C_AGENT) $(C_OBS)
 TENANT  ?=
 MODULES ?=
 FROM    ?=
+FILE    ?=
 INTO    ?=
 SERVICE ?=
 ARGS    ?=
@@ -352,6 +353,11 @@ dbt-run: ## Build every dbt model (seeds, snapshots, staging, marts)
 .PHONY: dbt-test
 dbt-test: ## Run every dbt test, including the reconciliation against live Odoo
 	@$(DBT) test
+
+.PHONY: import-policy
+import-policy: ## Load a non-Odoo client's column classification: make import-policy FILE=policies/x.csv
+	@test -n "$(FILE)" || { echo "FILE is required, e.g. FILE=policies/acme.csv (relative to analytics/warehouse/)"; exit 1; }
+	@$(WCTL) import-policy --file /warehouse/$(FILE)
 
 .PHONY: dbt-docs
 dbt-docs: ## Generate the dbt catalogue into analytics/dbt/target
