@@ -17,6 +17,7 @@ load_env
 
 PASS=0
 FAIL=0
+SKIPPED=0
 RESULTS=()
 
 step() { printf '\n\033[1m=== %s ===\033[0m\n' "$*"; }
@@ -30,6 +31,15 @@ check() {
         RESULTS+=("FAIL  $label")
         FAIL=$((FAIL + 1))
     fi
+}
+
+# A check that cannot apply on this host is NOT a pass and NOT a failure.
+# Recording it as either is worse than recording it as neither: a false FAIL
+# trains people to read a red summary as normal, and a false PASS claims
+# evidence that was never gathered.
+skip() {
+    RESULTS+=("SKIP  $1  ($2)")
+    SKIPPED=$((SKIPPED + 1))
 }
 
 # 1 -------------------------------------------------------------------------
@@ -103,11 +113,21 @@ check "no undocumented targets" bash -c "[ -z \"$undocumented\" ]"
 
 # 11 ------------------------------------------------------------------------
 step "9. other stacks on this host are untouched"
-docker ps --format '{{.Names}}\t{{.Status}}' | grep -E 'odoo19-(platform|analytics)' | head
-check "odoo19-platform-odoo still up" bash -c \
-    "docker ps --format '{{.Names}}\t{{.Status}}' | grep -q 'odoo19-platform-odoo.*Up'"
-check "odoo19-analytics-odoo still up" bash -c \
-    "docker ps --format '{{.Names}}\t{{.Status}}' | grep -q 'odoo19-analytics-odoo.*Up'"
+# These two siblings live on the development workstation, not on a deployment
+# host. Asserting them unconditionally makes `make verify` report two permanent
+# FAILs on any machine that legitimately runs only this stack - and a summary
+# that is always red is a summary nobody reads, which is how a real failure
+# gets past a reviewer. The check keeps its teeth where it has any: a sibling
+# that EXISTS must still be Up. Only one that was never there is skipped.
+docker ps -a --format '{{.Names}}\t{{.Status}}' | grep -E 'odoo19-(platform|analytics)' | head
+for sibling in odoo19-platform-odoo odoo19-analytics-odoo; do
+    if docker ps -a --format '{{.Names}}' | grep -qx "$sibling"; then
+        check "$sibling still up" bash -c \
+            "docker ps --format '{{.Names}}\t{{.Status}}' | grep -q '$sibling.*Up'"
+    else
+        skip "$sibling still up" "not present on this host"
+    fi
+done
 
 # 12 ------------------------------------------------------------------------
 step "10. .gitignore does not silently drop a file that must ship"
@@ -160,5 +180,5 @@ check "base stack idles under 4 GiB" bash -c "python3 -c \"import sys; sys.exit(
 # --- summary ---------------------------------------------------------------
 printf '\n\033[1m=== summary ===\033[0m\n'
 printf '%s\n' "${RESULTS[@]}"
-printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
+printf '\n%d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIPPED"
 [ "$FAIL" -eq 0 ]

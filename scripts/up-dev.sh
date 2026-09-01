@@ -66,11 +66,19 @@ dc up -d
 WAIT_TIMEOUT=180 wait_healthy postgres redis odoo || die "odoo did not become healthy."
 
 URL="http://${BIND_ADDRESS:-127.0.0.1}:${ODOO_HOST_HTTP_PORT:-38069}/web/login"
-code="$(curl -s -o /dev/null -w '%{http_code}' "$URL" || echo 000)"
+# The Host header names the database. dbfilter is ^%d$ now that Caddy is the
+# entry point, and %d is the FIRST LABEL of the host - so a bare request to
+# 127.0.0.1 resolves %d to "127", matches no database, and answers 303 to a
+# selector that list_db=False has disabled. Probing without it reports a
+# HEALTHY stack as broken and exits 1, which stops step 1 of every bring-up on
+# a fresh host. up-all.sh and verify.sh were corrected for this on 2026-09-01;
+# this script was missed.
+VHOST="${ODOO_DB_NAME:-bct}.${ATHERA_DOMAIN:-athera.localhost}"
+code="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $VHOST" "$URL" || echo 000)"
 if [ "$code" = "200" ]; then
-    log "stack is up. $URL -> HTTP $code"
+    log "stack is up. $URL (Host: $VHOST) -> HTTP $code"
 else
-    warn "$URL returned HTTP $code (expected 200). Recent odoo logs:"
+    warn "$URL (Host: $VHOST) returned HTTP $code (expected 200). Recent odoo logs:"
     dc logs --tail 40 odoo >&2 || true
     exit 1
 fi
