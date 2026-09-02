@@ -119,7 +119,12 @@ step "9. other stacks on this host are untouched"
 # that is always red is a summary nobody reads, which is how a real failure
 # gets past a reviewer. The check keeps its teeth where it has any: a sibling
 # that EXISTS must still be Up. Only one that was never there is skipped.
-docker ps -a --format '{{.Names}}\t{{.Status}}' | grep -E 'odoo19-(platform|analytics)' | head
+# `|| true` because common.sh sets -Eeuo pipefail: with no sibling present grep
+# exits 1, pipefail raises it, and set -e kills the script BEFORE the loop below
+# ever runs. This is a reporting line, not an assertion - the assertions are in
+# the loop. Found by running verify on the deployment host this block was
+# rewritten for, which is where it should have been proven in the first place.
+docker ps -a --format '{{.Names}}\t{{.Status}}' | grep -E 'odoo19-(platform|analytics)' | head || true
 for sibling in odoo19-platform-odoo odoo19-analytics-odoo; do
     if docker ps -a --format '{{.Names}}' | grep -qx "$sibling"; then
         check "$sibling still up" bash -c \
