@@ -64,13 +64,43 @@ Until this runs, the client authenticates successfully and is sent straight to `
 
 Skip this and the login gateway answers `upstream_unavailable` on a correct password.
 
-### 5. Caddy route
+### 5. Two allow-lists, and NO Caddy route
 
-Add a block to `caddy/Caddyfile` modelled on the `bct` one — including the `@longpoll` handler, or every bus subscription occupies an HTTP worker for its full timeout. There is **no wildcard route on purpose**: a wildcard plus `^%d$` makes every database in the cluster reachable by guessing its name.
+**Since the SSO cutover (2026-09-03) a client gets no hostname and no Caddy block.** They reach Odoo at the shared `odoo.<domain>`, and the signed route token decides which database the edge rewrites Host to. Adding a per-tenant site block would put the tenant back on the public DNS the "clients are known by login, not by DNS" decision removed them from.
+
+What does have to be widened is two allow-lists in `.env`, and both are reviewed edits:
+
+```
+ODOO_DB_NAMES=bct,athera_admin,acme                 # odoo.conf db_name; Odoo will not serve it otherwise
+LOGIN_GATEWAY_ALLOWED_DATABASES=bct,athera_admin,acme   # or the gateway refuses it as bad credentials
+```
+
+Then restart both: `docker compose -p odoo19-bct --env-file .env -f compose/odoo.yml -f compose/odoo.dev.yml -f compose/platform.yml up -d odoo login-gateway`
+
+**Ignore what `tenant-provision.sh` prints about `ODOO_DBFILTER`.** Its closing report still tells you to rewrite it as `^(bct|acme)$`. `ODOO_DBFILTER` is `^%d$` — the database comes from the Host label, so the filter needs no edit and following that advice narrows reachability instead of widening it. The report is stale, not a step.
+
+### 5b. Install the SSO module into the client database
 
 ```bash
-MSYS_NO_PATHCONV=1 docker exec odoo19-bct-caddy caddy reload --config /etc/caddy/Caddyfile
+docker compose -p odoo19-bct --env-file .env -f compose/odoo.yml -f compose/odoo.dev.yml \
+  run --rm --no-deps -T odoo odoo -d acme -i custom_athera_sso --stop-after-init --without-demo=True
 ```
+
+**Skip this and the door dead-ends at a 404 that looks like a routing bug.** Odoo controllers are per-database: the gateway happily mints a correct ticket, redirects to `/athera/sso` on the shared hostname, and the client's database has no such route. Found the hard way while provisioning the first pilot.
+
+### 5c. Give the admin account a real password
+
+`tenant-provision.sh` initialises the database through the Odoo CLI, which leaves the built-in `admin` on Odoo's default credential. The moment the slug is in `LOGIN_GATEWAY_ALLOWED_DATABASES`, that account is reachable from the internet through the login page. Set it before activating:
+
+```bash
+docker compose ... run --rm --no-deps -T odoo odoo shell -d acme --no-http <<'EOF'
+u = env['res.users'].browse(2)
+u.write({'login': 'admin@<client>.invalid', 'password': '<generated>'})
+env.cr.commit()
+EOF
+```
+
+Store the credential at `/opt/athera-backup/config/<slug>-admin-credential.txt`, mode 600 — the same place `.env` snapshots already live, so it is covered by the daily backup.
 
 ### 6. Masking salt
 
@@ -87,6 +117,8 @@ make cdc-start TENANT=acme
 ```
 
 Publication first, then the consumer. One loader per tenant: a second client means a second `cdc` container, because a loader binds to one `CDC_TENANT_DB` with its own publication and slot.
+
+**Steps 6-8 are for clients whose plan includes `insight`. Skip them entirely for an `odoo_care` client** — and skipping them is not laziness. `warehouse.mart_freshness` reads `pipeline_state.last_success_at`, which only the CDC loader writes, so a tenant registered in the warehouse without a feed misses its freshness SLA every hour forever. That is exactly what the `bct_t2` fixture does today, and it cost a route-to-nowhere in Alertmanager plus upstream issue #15.
 
 ### 8. Warehouse registry
 
@@ -120,3 +152,5 @@ State alone is enough; nothing needs restarting. `state='suspended'` or a `valid
 
 - No deprovision script. `scripts/tenant-provision.sh` has a TODO where it belongs.
 - `LOGIN_GATEWAY_ALLOWED_DATABASES` must also name the new slug, or the gateway refuses it with the same response it gives bad credentials.
+- Nothing teaches the backup script about a new tenant. `/usr/local/bin/athera-backup.sh` carries a hard-coded list in two places (`for tenant in ...` and the checksum loop `for name in ...`); a tenant missing from either is backed up silently incompletely, or not at all. Add the slug to BOTH and run the script once by hand rather than waiting for 03:30.
+- Provisioning does not register the tenant anywhere the operator can see it fail. There is no check that the slug is absent from the reserved set (`insight`, `odoo`, `app`, `admin`, `auth`, `www`, `mail`) — those would hijack a platform route.

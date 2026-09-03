@@ -107,3 +107,6 @@ desktop.ini
 !.vscode/extensions.json
 *.swp
 *~
+
+# Sisa patch — jangan pernah ter-commit (temuan secret-scan 2026-09-03)
+*.orig

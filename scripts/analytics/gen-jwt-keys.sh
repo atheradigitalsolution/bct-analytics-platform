@@ -30,7 +30,8 @@ while [ $# -gt 0 ]; do
 done
 
 mkdir -p "$OUT"
-chmod 700 "$OUT"
+chmod 700 "$OUT" 2>/dev/null || true   # Di Linux direktori ini dimiliki uid container (10002) agar bind mount
+                                      # read-only bisa dibaca; chmod oleh user host akan gagal dan itu wajar.
 
 gen() {
   local name="$1"
@@ -41,8 +42,8 @@ gen() {
   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
     -out "$OUT/$name-private.pem" 2>/dev/null
   openssl rsa -in "$OUT/$name-private.pem" -pubout -out "$OUT/$name-public.pem" 2>/dev/null
-  chmod 600 "$OUT/$name-private.pem"
-  chmod 644 "$OUT/$name-public.pem"
+  chmod 600 "$OUT/$name-private.pem" 2>/dev/null || true
+  chmod 644 "$OUT/$name-public.pem" 2>/dev/null || true
   echo "created $name"
 }
 
