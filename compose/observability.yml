@@ -45,6 +45,8 @@ services:
   # Prometheus — metrics store and alert evaluator.
   # =========================================================================
   prometheus:
+    mem_limit: 384m
+    memswap_limit: 768m
     image: prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-prometheus
     <<: [*restart-policy, *hardening]
@@ -84,6 +86,14 @@ services:
   # at 512 MiB and page at 1 GiB, i.e. with half the cap still in hand.
   # =========================================================================
   alertmanager:
+    mem_limit: 128m
+    memswap_limit: 256m
+    # Alertmanager mengirim email lewat Postfix milik Mailcow yang berjalan di HOST,
+    # bukan di jaringan compose ini. `host-gateway` memberi nama yang stabil untuk
+    # host — IP bridge Docker bisa berubah saat jaringan dibuat ulang, dan
+    # menuliskannya langsung di alertmanager.yml adalah bom waktu.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     image: prom/alertmanager:v0.28.0@sha256:d5155cfac40a6d9250ffc97c19db2c5e190c7bc57c6b67125c94903358f8c7d8
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-alertmanager
     <<: [*restart-policy, *hardening]
@@ -110,6 +120,8 @@ services:
   # Loki — log store.
   # =========================================================================
   loki:
+    mem_limit: 512m
+    memswap_limit: 768m
     image: grafana/loki:3.3.2@sha256:8af2de1abbdd7aa92b27c9bcc96f0f4140c9096b507c77921ffddf1c6ad6c48f
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-loki
     <<: [*restart-policy, *hardening]
@@ -143,6 +155,8 @@ services:
   # containers in its own config.
   # =========================================================================
   promtail:
+    mem_limit: 192m
+    memswap_limit: 384m
     image: grafana/promtail:3.3.2@sha256:cb4990801ec58975c5e231057c2bcf204c85fac428eec65ad66e0016c64b9608
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-promtail
     <<: [*restart-policy, *hardening]
@@ -161,6 +175,8 @@ services:
   # Grafana.
   # =========================================================================
   grafana:
+    mem_limit: 256m
+    memswap_limit: 512m
     image: grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-grafana
     <<: [*restart-policy, *hardening]
@@ -213,6 +229,8 @@ services:
   # max_slot_wal_keep_size design depends on.
   # =========================================================================
   postgres-exporter:
+    mem_limit: 128m
+    memswap_limit: 256m
     image: prometheuscommunity/postgres-exporter:v0.16.0@sha256:6999a7657e2f2fb0ca6ebf417213eebf6dc7d21b30708c622f6fcb11183a2bb0
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-postgres-exporter
     <<: [*restart-policy, *hardening]
@@ -240,6 +258,8 @@ services:
   # Prometheus TSDB filling the same disk.
   # =========================================================================
   node-exporter:
+    mem_limit: 128m
+    memswap_limit: 256m
     image: prom/node-exporter:v1.8.2@sha256:4032c6d5bfd752342c3e631c2f1de93ba6b86c41db6b167b9a35372c139e7706
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-node-exporter
     <<: [*restart-policy, *hardening]
