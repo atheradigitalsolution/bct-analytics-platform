@@ -432,11 +432,22 @@ services:
       INSIGHT_PORTAL_JWT_ISSUER: ${LOGIN_GATEWAY_JWT_ISSUER:-https://login-gateway.local/}
       INSIGHT_PORTAL_JWT_AUDIENCE: ${LOGIN_GATEWAY_JWT_AUDIENCE:-insight-portal}
       INSIGHT_PORTAL_ODOO_DB: ${ODOO_DB_NAME:-bct}
-      # Plain HTTP on a loopback port in development. Set true behind TLS; the
-      # cookie is httpOnly and SameSite=Strict either way.
-      INSIGHT_PORTAL_COOKIE_SECURE: ${INSIGHT_PORTAL_COOKIE_SECURE:-false}
+      # Bawaan `true`: portal ini kini memuat data keuangan, dan sebuah cookie sesi tanpa
+      # atribut Secure boleh dikirim browser lewat HTTP polos. Setel false HANYA untuk
+      # pengembangan di loopback tanpa TLS. httpOnly dan SameSite=Strict berlaku di keduanya.
+      INSIGHT_PORTAL_COOKIE_SECURE: ${INSIGHT_PORTAL_COOKIE_SECURE:-true}
       INSIGHT_PORTAL_REQUEST_TIMEOUT_MS: ${INSIGHT_PORTAL_REQUEST_TIMEOUT_MS:-8000}
       INSIGHT_PORTAL_CACHE_TTL_SECONDS: ${INSIGHT_PORTAL_CACHE_TTL_SECONDS:-30}
+      # Penagihan sisi klien. DSN memakai role `billing_portal`: SELECT pada tiga view
+      # billing.tenant_* yang menyaring dirinya sendiri, INSERT pada antrean klaim, dan tidak
+      # ada yang lain. Kosong berarti /billing gagal keras, bukan menampilkan halaman kosong.
+      INSIGHT_PORTAL_BILLING_DSN: ${INSIGHT_PORTAL_BILLING_DSN:-}
+      INSIGHT_PORTAL_BILLING_POOL_MAX: ${INSIGHT_PORTAL_BILLING_POOL_MAX:-4}
+      # Nomor rekening tidak pernah ada di repo. Kosong = halaman menyuruh menghubungi operator.
+      INSIGHT_PORTAL_BANK_NAME: ${INSIGHT_PORTAL_BANK_NAME:-}
+      INSIGHT_PORTAL_BANK_ACCOUNT: ${INSIGHT_PORTAL_BANK_ACCOUNT:-}
+      INSIGHT_PORTAL_BANK_HOLDER: ${INSIGHT_PORTAL_BANK_HOLDER:-}
+      INSIGHT_PORTAL_BILLING_CONTACT: ${INSIGHT_PORTAL_BILLING_CONTACT:-}
       TZ: ${TZ:-Asia/Jakarta}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${INSIGHT_PORTAL_HOST_PORT:-33000}:3000"

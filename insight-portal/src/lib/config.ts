@@ -46,4 +46,20 @@ export const config = {
   requestTimeoutMs: Number(env("INSIGHT_PORTAL_REQUEST_TIMEOUT_MS", "8000")),
   /** Server-side aggregate cache TTL ceiling, in seconds. Never exceeds the metric's own SLA. */
   cacheTtlCeilingSeconds: Number(env("INSIGHT_PORTAL_CACHE_TTL_SECONDS", "30")),
+  /**
+   * Instruksi transfer manual, ditampilkan di halaman faktur.
+   *
+   * DARI ENVIRONMENT, BUKAN DARI REPO. Nomor rekening perusahaan di dalam berkas yang terlacak
+   * adalah undangan penipuan faktur: siapa pun bisa membaca repo publik ini, meniru surat
+   * penagihan, dan menukar satu digit. Kosong berarti halaman menyuruh klien menghubungi
+   * operator, dan itu kegagalan yang benar.
+   *
+   * SUMBER KEBENARAN JANGKA PANJANG adalah `res.partner.bank` milik perusahaan di Odoo — tempat
+   * operator sudah mengelola data semacam ini. Belum ada barisnya hari ini; ketika ada, nilai
+   * ini menjadi cadangan, bukan sebaliknya.
+   */
+  bankName: env("INSIGHT_PORTAL_BANK_NAME", ""),
+  bankAccountNumber: env("INSIGHT_PORTAL_BANK_ACCOUNT", ""),
+  bankAccountHolder: env("INSIGHT_PORTAL_BANK_HOLDER", ""),
+  billingContact: env("INSIGHT_PORTAL_BILLING_CONTACT", ""),
 } as const;

@@ -33,6 +33,23 @@ export default async function LoginPage({
       ? nextRaw
       : "";
 
+  /**
+   * Kode klien, boleh di-prefill lewat `?db=acme` supaya tautan yang kami kirimkan ke klien tidak
+   * meminta mereka mengetik apa pun yang tidak mereka hafal.
+   *
+   * KENAPA FIELD INI ADA SEKARANG, PADAHAL SEBELUMNYA TIDAK. Sebelumnya database dipaku ke satu
+   * nilai konfigurasi, yang berarti hanya tenant itu yang bisa masuk sama sekali — klien pilot
+   * pertama tidak bisa membuka halaman tagihannya sendiri karena ia bukan tenant itu.
+   *
+   * KENAPA INI BUKAN ORACLE ENUMERASI. `login-gateway` menjawab database tak dikenal, login tak
+   * ada, dan sandi salah dengan respons yang IDENTIK byte-per-byte (401, header sama, bodi sama).
+   * Diukur, bukan diasumsikan. Halaman gateway sendiri sudah menerima `db` di formulirnya sejak
+   * cutover SSO; ini mengikuti keputusan itu, bukan membuat keputusan baru.
+   */
+  const dbRaw = params.db;
+  const db =
+    typeof dbRaw === "string" && /^[a-z0-9][a-z0-9_-]{0,62}$/.test(dbRaw) ? dbRaw : "";
+
   return (
     <main id="main" className="mx-auto flex min-h-screen max-w-md items-center px-4">
       <div
@@ -57,6 +74,26 @@ export default async function LoginPage({
 
         <form method="post" action="/api/auth/login" className="mt-4 space-y-3">
           <input type="hidden" name="next" value={next} />
+          <div>
+            <label htmlFor="db" className="block text-xs font-medium text-ink-2">
+              Kode klien
+            </label>
+            <input
+              id="db"
+              name="db"
+              type="text"
+              inputMode="text"
+              autoComplete="organization"
+              defaultValue={db}
+              placeholder="mis. acme"
+              pattern="[a-z0-9][a-z0-9_-]*"
+              className="mt-1 w-full rounded border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}
+            />
+            <p className="mt-1 text-[11px] text-ink-3">
+              Kosongkan bila Anda tidak diberi kode klien.
+            </p>
+          </div>
           <div>
             <label htmlFor="login" className="block text-xs font-medium text-ink-2">
               Pengguna

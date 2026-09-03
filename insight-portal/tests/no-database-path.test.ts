@@ -98,7 +98,27 @@ const DATABASE_DRIVERS = [
   "redis",
 ];
 
-test("no database driver is a dependency of this application", () => {
+/**
+ * SATU-SATUNYA berkas yang boleh menyentuh database secara langsung.
+ *
+ * Invarian aslinya adalah "aplikasi ini tidak punya jalur database sama sekali", dan itu ditulis
+ * ketika aplikasi ini hanya berisi dasbor. Permukaan penagihan klien (2026-09-04) memerlukan
+ * jalur langsung ke `athera_admin`, karena faktur ATHERA kepada kliennya tidak pernah ada di
+ * mart: CDC memberi makan dari database KLIEN, bukan dari database kontrol.
+ *
+ * YANG DIPERTAHANKAN — dan justru diperketat. Maksud invarian itu bukan "tidak ada driver";
+ * maksudnya adalah JALUR ANALITIK tidak boleh punya jalan pintas ke gudang data. Karena itu
+ * pengecualian di bawah dibatasi pada SATU berkas dengan nama tepat, bukan pada seluruh aplikasi.
+ * Menambah `pg` ke `lib/semantic.ts` tetap merah. Menambah pool kedua di halaman mana pun tetap
+ * merah. Yang dulu dijaga oleh ketiadaan dependensi kini dijaga oleh daftar berisi satu nama.
+ *
+ * Cara membuatnya merah, diuji: mengganti `DIRECT_DB_FILE` ke berkas lain membuat uji importir
+ * gagal sambil menyebut `src/lib/billing.ts`; menambahkan `import { Pool } from "pg"` ke
+ * `src/lib/semantic.ts` membuatnya gagal sambil menyebut berkas itu.
+ */
+const DIRECT_DB_FILE = "src/lib/billing.ts";
+
+test("the only database driver declared is the one the billing surface needs", () => {
   const parsed: unknown = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const record = parsed as {
     dependencies?: Record<string, string>;
@@ -106,17 +126,39 @@ test("no database driver is a dependency of this application", () => {
   };
   const declared = Object.keys({ ...record.dependencies, ...record.devDependencies });
   assert.ok(declared.length > 0, "no dependencies parsed; the check would pass vacuously");
-  const found = declared.filter((name) => DATABASE_DRIVERS.includes(name));
+  const found = declared.filter((name) => DATABASE_DRIVERS.includes(name)).sort();
   assert.deepEqual(
     found,
-    [],
-    "the portal reaches the warehouse only through the semantic API; a driver here would be a second path",
+    ["pg"],
+    "only `pg` may be declared, and only for the billing surface; any other driver is a second path",
   );
 });
 
-test("no source file contains SQL", () => {
+test("only the billing surface imports the database driver", () => {
   const offenders: string[] = [];
   for (const file of sourceFiles()) {
+    const rel = relative(root, file);
+    if (rel === DIRECT_DB_FILE) continue;
+    const text = stripComments(readFileSync(file, "utf8"));
+    if (/from\s+["\']pg["\']|require\(\s*["\']pg["\']\s*\)/.test(text)) offenders.push(rel);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "the analytics path reaches the warehouse only through the semantic API",
+  );
+});
+
+test("the billing surface is the file it claims to be", () => {
+  // Menjaga uji di atas tidak menjadi hijau-hampa kalau berkasnya dipindah atau dihapus.
+  const text = readFileSync(join(root, DIRECT_DB_FILE), "utf8");
+  assert.ok(/from "pg"/.test(text), `${DIRECT_DB_FILE} no longer imports pg; the carve-out is stale`);
+});
+
+test("no source file outside the billing surface contains SQL", () => {
+  const offenders: string[] = [];
+  for (const file of sourceFiles()) {
+    if (relative(root, file) === DIRECT_DB_FILE) continue;
     const text = stripComments(readFileSync(file, "utf8"));
     if (/\bSELECT\b[\s\S]{0,120}\bFROM\b/i.test(text)) offenders.push(relative(root, file));
     if (
@@ -132,9 +174,23 @@ test("no source file names a warehouse schema or mart in a string", () => {
   const offenders: string[] = [];
   for (const file of sourceFiles()) {
     const text = stripComments(readFileSync(file, "utf8"));
-    if (/["'`]marts\./.test(text)) offenders.push(relative(root, file));
+    if (/["\'`]marts\./.test(text)) offenders.push(relative(root, file));
   }
   assert.deepEqual(offenders, []);
+});
+
+test("the billing surface never reaches into the warehouse", () => {
+  // Pengecualian SQL di atas berlaku untuk satu berkas; ia TIDAK berlaku untuk gudang data.
+  // Kalau suatu hari seseorang menempelkan kueri mart ke sini karena "sudah ada koneksinya",
+  // itulah persis jalan pintas yang invarian aslinya ada untuk mencegah.
+  const text = stripComments(readFileSync(join(root, DIRECT_DB_FILE), "utf8"));
+  for (const schema of ["marts.", "staging.", "raw.", "warehouse."]) {
+    assert.equal(
+      text.includes(schema),
+      false,
+      `${DIRECT_DB_FILE} names ${schema}; the warehouse is reached through the semantic API only`,
+    );
+  }
 });
 
 test("no unmasking path exists anywhere in the source", () => {

@@ -112,7 +112,26 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
    * Both are 402, never 403 — see the note above. `/subscription` stays exempt for both, or the
    * page that explains the refusal would itself be refused, forever.
    */
-  if (!pathname.startsWith("/subscription")) {
+  /**
+   * `/billing` DIKECUALIKAN dari kedua penolakan contract 07, dan hanya dari itu — ia tetap di
+   * balik autentikasi seperti semua yang lain.
+   *
+   * Alasannya sama persis dengan alasan `/subscription` dikecualikan, hanya lebih tajam: klien
+   * yang langganannya berhenti adalah klien yang PALING butuh melihat fakturnya. Menutup halaman
+   * tagihan ketika tagihan itulah yang belum dibayar adalah lingkaran yang tidak bisa diputus
+   * oleh siapa pun kecuali operator lewat telepon.
+   *
+   * Pengecualian produk juga wajib, bukan kenyamanan: paket yang tidak memuat `insight` — misalnya
+   * `odoo_care` — menghasilkan `products` tanpa `"insight"`. Tanpa pengecualian ini, klien yang
+   * membayar penuh untuk paket semacam itu tidak akan pernah bisa membuka halaman tagihannya.
+   */
+  // `/api/billing` HARUS ikut, dan ini bukan kelengkapan kosmetik: tanpa baris kedua, klien
+  // berpaket non-Insight melihat halaman tagihannya dengan sempurna lalu mendapat 402 begitu
+  // ia menekan "Kirim konfirmasi". Ditemukan oleh uji ujung-ke-ujung, bukan oleh pembacaan.
+  const billingSurface =
+    pathname.startsWith("/billing") || pathname.startsWith("/api/billing");
+
+  if (!pathname.startsWith("/subscription") && !billingSurface) {
     const refusal = !session.subscription_active
       ? { error: "subscription_inactive", detail: "This tenant's subscription is not active." }
       : !session.products.includes("insight")

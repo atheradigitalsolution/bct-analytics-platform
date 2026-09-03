@@ -28,6 +28,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const login = form.get("login");
   const password = form.get("password");
   const nextRaw = form.get("next");
+  const dbRaw = form.get("db");
   const next =
     typeof nextRaw === "string" && nextRaw.startsWith("/") && !nextRaw.startsWith("//")
       ? nextRaw
@@ -37,12 +38,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (typeof login !== "string" || typeof password !== "string") return failure;
 
+  /**
+   * Kode klien -> database Odoo. Kosong berarti bawaan konfigurasi, sehingga tautan lama dan
+   * klien tenant utama tidak berubah perilakunya sama sekali.
+   *
+   * Pola dibatasi di SINI, bukan hanya di formulir HTML: atribut `pattern` adalah kenyamanan
+   * untuk manusia, bukan pemeriksaan. Nilai yang tidak berbentuk slug ditolak sebelum menyentuh
+   * jaringan, jadi tidak ada yang bisa menyelundupkan spasi, newline, atau JSON ke dalam badan
+   * permintaan yang dikirim ke gateway.
+   *
+   * Yang TIDAK dilakukan di sini: memeriksa apakah database itu ada. Itu urusan gateway, dan
+   * gateway sengaja menjawabnya dengan penolakan yang identik dengan sandi salah. Menambahkan
+   * pemeriksaan "database tidak dikenal" di lapisan ini akan membocorkan tepat apa yang gateway
+   * susah payah sembunyikan.
+   */
+  const db =
+    typeof dbRaw === "string" && /^[a-z0-9][a-z0-9_-]{0,62}$/.test(dbRaw)
+      ? dbRaw
+      : config.odooDatabase;
+
   let upstream: Response;
   try {
     upstream = await fetch(config.loginGatewayUrl + "/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ db: config.odooDatabase, login, password }),
+      body: JSON.stringify({ db, login, password }),
       cache: "no-store",
     });
   } catch {
@@ -61,7 +81,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const session = await verifyToken(token);
   if (session === null) return failure;
 
-  const destination = next ?? "/t/" + session.tenant_id + "/overview";
+  /**
+   * Ke mana orang ini mendarat.
+   *
+   * Mengirim SETIAP sesi ke dasbor Insight adalah cacat: untuk paket yang tidak memuat `insight`,
+   * middleware langsung memantulkannya ke `/subscription` dengan pesan "paket Anda tidak mencakup
+   * Insight" — sambutan pertama yang buruk untuk klien yang membayar penuh. Yang tidak berhak atas
+   * Insight diantar ke halaman tagihannya sendiri, yang memang berlaku untuk semua paket.
+   */
+  const home = session.products.includes("insight")
+    ? "/t/" + session.tenant_id + "/overview"
+    : "/billing";
+  const destination = next ?? home;
   const response = redirectTo(destination);
   response.cookies.set(config.sessionCookieName, token, {
     httpOnly: true,
