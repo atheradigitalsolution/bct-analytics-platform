@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!--
+    Antrean klaim pembayaran dari klien.
+
+    KENAPA TIDAK ADA TOMBOL "TANDAI LUNAS" DI SINI. Mencatat pembayaran punya akibat akuntansi:
+    jurnal, pajak, rekonsiliasi bank. Jalurnya adalah layar pembayaran Odoo yang sudah membawa
+    semua itu. Menyalin satu tombol ke layar ini berarti dua jalan menuju satu perbuatan, dan yang
+    kedua tidak akan pernah selengkap yang pertama — alasan yang sama sudah ditulis di
+    models/billing_overview.py untuk hub-portal.
+
+    Operator memakai layar ini untuk MELIHAT klaim, lalu merekonsiliasi di faktur, lalu menandai
+    klaimnya terverifikasi atau ditolak. Itulah satu-satunya dua kolom yang boleh ia ubah.
+  -->
+  <record id="view_athera_payment_claim_list" model="ir.ui.view">
+    <field name="name">athera.payment.claim.list</field>
+    <field name="model">athera.payment.claim</field>
+    <field name="arch" type="xml">
+      <list string="Klaim pembayaran" default_order="create_date desc"
+            decoration-warning="state == 'new'" decoration-muted="state == 'rejected'">
+        <field name="create_date" string="Diterima"/>
+        <field name="tenant_slug"/>
+        <field name="invoice_number"/>
+        <field name="amount" sum="Total diklaim"/>
+        <field name="paid_on"/>
+        <field name="bank_name"/>
+        <field name="reference"/>
+        <field name="state"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_athera_payment_claim_form" model="ir.ui.view">
+    <field name="name">athera.payment.claim.form</field>
+    <field name="model">athera.payment.claim</field>
+    <field name="arch" type="xml">
+      <form string="Klaim pembayaran">
+        <sheet>
+          <group>
+            <group string="Yang dinyatakan klien">
+              <field name="tenant_slug"/>
+              <field name="invoice_number"/>
+              <field name="invoice_id"/>
+              <field name="amount"/>
+              <field name="paid_on"/>
+              <field name="bank_name"/>
+              <field name="reference"/>
+              <field name="claimed_by_uid"/>
+              <field name="note"/>
+            </group>
+            <group string="Putusan operator">
+              <field name="state"/>
+              <field name="handled_note"/>
+            </group>
+          </group>
+          <div class="alert alert-info" role="status">
+            Menandai klaim ini terverifikasi TIDAK mencatat pembayaran apa pun. Catat pembayaran
+            pada fakturnya di Akuntansi, lalu kembali ke sini untuk menutup klaimnya.
+          </div>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_athera_payment_claim" model="ir.actions.act_window">
+    <field name="name">Klaim pembayaran</field>
+    <field name="res_model">athera.payment.claim</field>
+    <field name="view_mode">list,form</field>
+    <field name="context">{'search_default_baru': 1}</field>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiley_face">Belum ada klaim pembayaran.</p>
+      <p>Klien mengirimkan konfirmasi dari halaman tagihannya di portal.</p>
+    </field>
+  </record>
+
+  <record id="view_athera_payment_claim_search" model="ir.ui.view">
+    <field name="name">athera.payment.claim.search</field>
+    <field name="model">athera.payment.claim</field>
+    <field name="arch" type="xml">
+      <search string="Klaim pembayaran">
+        <field name="tenant_slug"/>
+        <field name="invoice_number"/>
+        <field name="reference"/>
+        <filter name="baru" string="Menunggu verifikasi" domain="[('state','=','new')]"/>
+        <separator/>
+        <!-- Filter group-by ditulis datar, tanpa pembungkus <group string="...">: RNG view
+             pencarian Odoo 19 menolak atribut string pada group di sini, dan penolakannya
+             muncul sebagai ParseError yang menunjuk baris record, bukan baris penyebabnya. -->
+        <filter name="group_tenant" string="Tenant" context="{'group_by':'tenant_slug'}"/>
+        <filter name="group_state" string="Status" context="{'group_by':'state'}"/>
+      </search>
+    </field>
+  </record>
+</odoo>

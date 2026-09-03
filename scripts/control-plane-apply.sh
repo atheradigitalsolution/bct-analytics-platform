@@ -55,6 +55,8 @@ ORCH_PASS="${ORCHESTRATOR_DB_PASSWORD:?ORCHESTRATOR_DB_PASSWORD is required — 
 GW_USER="${LOGIN_GATEWAY_REGISTRY_USER:-login_gateway_registry}"
 GW_PASS="${LOGIN_GATEWAY_REGISTRY_PASSWORD:?LOGIN_GATEWAY_REGISTRY_PASSWORD is required — run 'make dev-bootstrap'}"
 SITE_USER="${MARKETING_SITE_DB_USER:-marketing_site_reader}"
+BILL_USER="${BILLING_PORTAL_DB_USER:-billing_portal}"
+BILL_PASS="${BILLING_PORTAL_DB_PASSWORD:?BILLING_PORTAL_DB_PASSWORD is required - run 'make dev-bootstrap'}"
 SITE_PASS="${MARKETING_SITE_DB_PASSWORD:?MARKETING_SITE_DB_PASSWORD is required - run 'make dev-bootstrap'}"
 
 validate_slug "$ADMIN_DB"
@@ -97,12 +99,21 @@ log "[2/4] control-plane roles"
 psql_super "$POSTGRES_DB" -q -v ON_ERROR_STOP=1 \
     -v orch="$ORCH_USER" -v orchpass="$ORCH_PASS" \
     -v gw="$GW_USER" -v gwpass="$GW_PASS" \
-    -v site="$SITE_USER" -v sitepass="$SITE_PASS" <<'SQL'
+    -v site="$SITE_USER" -v sitepass="$SITE_PASS" \
+    -v bill="$BILL_USER" -v billpass="$BILL_PASS" <<'SQL'
 -- \gexec, not a DO block. psql does NOT substitute :'vars' inside a
 -- dollar-quoted body, so EXECUTE format(..., :'orch') inside DO $do$ ... $do$
 -- reaches the server as the literal text :'orch' and fails at runtime.
 -- Building the statement in a SELECT and running it through \gexec keeps the
--- credential out of the shell's argv AND out of a dollar-quoted string.
+-- credential out of a dollar-quoted string.
+--
+-- KOREKSI 2026-09-04: versi sebelumnya kalimat ini juga mengklaim "keeps the
+-- credential out of the shell's argv". Itu TIDAK BENAR dan klaim keamanan yang
+-- salah lebih berbahaya daripada tidak ada klaim: psql tetap dipanggil dengan
+-- `-v orchpass=<rahasia>`, sehingga nilainya terlihat di `ps auxww` selama
+-- skrip berjalan. Yang benar-benar dicegah di sini adalah ECHO oleh \gexec,
+-- bukan argv. Menutup celah argv butuh berkas variabel atau stdin, dan itu
+-- perubahan tersendiri yang menyentuh keempat role sekaligus.
 --
 -- \o /dev/null is NOT cosmetic. \gexec prints the statement it is about to
 -- run, and that statement contains the role's password in clear text — so the
@@ -135,6 +146,15 @@ SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'gw', :'gwpass')
 \gexec
 SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'gw', :'gwpass')
  WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'gw');
+\gexec
+-- Portal penagihan klien. Role TERPISAH dari tenant_orchestrator dengan sengaja: portal yang
+-- menghadap klien tidak boleh mewarisi hak tulis ke tenant_registry hanya karena keduanya
+-- kebetulan membaca database yang sama.
+SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'bill', :'billpass')
+ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'bill');
+\gexec
+SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'bill', :'billpass')
+ WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'bill');
 \gexec
 \o
 SQL
@@ -187,6 +207,10 @@ GRANT CONNECT ON DATABASE "$ADMIN_DB" TO "$GW_USER";
 GRANT USAGE ON SCHEMA cms TO "$SITE_USER";
 GRANT SELECT ON cms.published_page, cms.published_block TO "$SITE_USER";
 GRANT CONNECT ON DATABASE "$ADMIN_DB" TO "$SITE_USER";
+-- Grant pada schema `billing` TIDAK di sini: view-nya dibuat oleh custom_athera_billing
+-- (models/client_billing.py), dan grant harus mengikuti pembuatnya atau ia menunjuk objek
+-- yang belum ada. Yang harus ada lebih dulu hanyalah izin menyambung.
+GRANT CONNECT ON DATABASE "$ADMIN_DB" TO "$BILL_USER";
 -- The console edits through the orchestrator, so that role owns the writes.
 GRANT USAGE ON SCHEMA cms TO "$ORCH_USER";
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA cms TO "$ORCH_USER";

@@ -29,6 +29,7 @@ Kedua arah menulis tenant_registry.action_log dalam transaksi yang sama.
         "data/ir_cron.xml",
         "views/athera_subscription_views.xml",
         "views/account_move_views.xml",
+        "views/payment_claim_views.xml",
         "views/menu_views.xml",
     ],
     "installable": True,

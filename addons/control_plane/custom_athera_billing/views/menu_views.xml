@@ -4,4 +4,10 @@
             groups="custom_super_admin.group_super_admin"/>
   <menuitem id="menu_athera_subscription" name="Langganan"
             parent="menu_athera_billing_root" action="action_athera_subscription" sequence="10"/>
+  <!-- Di SINI dan bukan di payment_claim_views.xml: menu induk lahir di berkas ini, dan Odoo
+       menyelesaikan rujukan xml_id saat memuat — sebuah menuitem yang menunjuk induk yang belum
+       dimuat gagal dengan galat yang menyerupai salah ketik. Aksinya sendiri sudah ada, karena
+       payment_claim_views.xml dimuat lebih dulu. -->
+  <menuitem id="menu_athera_payment_claim" name="Klaim pembayaran"
+            parent="menu_athera_billing_root" action="action_athera_payment_claim" sequence="20"/>
 </odoo>
