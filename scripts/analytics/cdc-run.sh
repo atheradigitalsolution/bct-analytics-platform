@@ -38,6 +38,7 @@ exec env MSYS_NO_PATHCONV=1 docker run --rm $DETACH --name "$NAME" \
   --security-opt no-new-privileges \
   --cap-drop ALL \
   --read-only \
+  --memory "${CDC_MEM_LIMIT:-512m}" \
   -e WAREHOUSE_READER_USER -e WAREHOUSE_READER_PASSWORD \
   -e WAREHOUSE_DB -e WAREHOUSE_LOADER_USER -e WAREHOUSE_LOADER_PASSWORD \
   -e WAREHOUSE_MASK_SALT_DEFAULT -e WAREHOUSE_MASK_SALT_BCT \

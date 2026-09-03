@@ -180,30 +180,30 @@ groups:
       # container 512 MB — dibayarkan untuk fixture yang ada semata-mata agar `dbt test` punya
       # tenant kedua. Biaya nyata untuk nilai produk nol.
 
-      - alert: MartDataStaleAlert
-        # SINYAL YANG MENGUKUR DATA, BUKAN PROSES.
-        #
-        # `bct_warehouse_mart_stale` berasal dari heartbeat loader, sehingga ia hijau selama
-        # prosesnya hidup — TERMASUK ketika proses itu hidup dan tidak menerima apa pun.
-        # Terukur pada 2026-09-04: loader dinyalakan, memindahkan nol baris, dan seluruh 14 mart
-        # `bct` berpindah ke "fresh" dalam hitungan detik di atas data berumur 2,4 jam.
-        # `data_stale` berasal dari baris yang benar-benar mendarat, jadi ia tetap merah.
-        #
-        # WARNING DAN BUKAN PAGE, dengan sengaja. Sumber yang memang sedang sepi — malam, akhir
-        # pekan, instalasi berlalu-lintas rendah — akan menaikkan ini secara sah. Ia mendiagnosis,
-        # bukan membangunkan orang. Yang membangunkan orang tetap slot lag, karena slot yang
-        # tertinggal adalah kegagalan tanpa penjelasan yang tidak berbahaya.
-        expr: bct_warehouse_mart_data_stale{is_test_tenant="false"} == 1
-        for: 30m
-        labels:
-          severity: warning
-          component: warehouse
-        annotations:
-          summary: "No rows have landed for {{ $labels.mart }} (tenant {{ $labels.tenant }})"
-          description: >-
-            The loader may well be alive - check bct_warehouse_mart_stale for the same mart. If
-            that is 0 while this is 1, the pipeline is running and nothing is arriving, which
-            points at the SOURCE or the publication rather than at the consumer.
+      # TIDAK ADA ATURAN `MartDataStale` DI SINI, DAN ITU KEPUTUSAN YANG DIBALIK SETELAH DIUKUR.
+      #
+      # Metrik `bct_warehouse_mart_data_stale` ADA dan diekspor; yang tidak ada adalah alert yang
+      # menyala darinya. Versi pertama commit ini memasangnya sebagai warning dengan `for: 30m`,
+      # dan pada instalasi berlalu-lintas rendah ia langsung menaikkan hampir setiap mart sekaligus
+      # — persis kelelahan-alert yang alertmanager.yml peringatkan dan yang issue #15 keluhkan
+      # pada bct_t2 (angka persisnya ada di catatan operator, bukan di sini). Memasangnya
+      # sambil tahu ia akan menyala permanen berarti mengulangi cacat yang commit ini perbaiki,
+      # hanya dari arah lain.
+      #
+      # KENAPA TIDAK ADA DETEKSI YANG HILANG:
+      #   * loader mati            -> CdcConsumerDown (critical, di bawah), bct_cdc_up == 0
+      #   * konsumen tertinggal    -> aturan slot-lag, pada ambang ADR 0001
+      #   * dasbor mengaku segar   -> warehouse.mart_freshness.is_data_stale, yaitu kolom yang
+      #                               dibaca permukaan, dan tempat cacat itu sebenarnya terlihat
+      # Yang benar-benar hilang hanyalah "sumber berhenti mengirim padahal seharusnya mengirim",
+      # dan pertanyaan itu TIDAK BISA dijawab tanpa tahu pola trafik yang diharapkan. Ambang yang
+      # dipilih tanpa data pola akan menyala terus pada tenant berlalu-lintas rendah dan diam
+      # terlalu lama pada tenant sibuk — dua cara gagal sekaligus, dari satu angka tebakan.
+      #
+      # PEMICU UNTUK MENAMBAHKANNYA: sebuah tenant yang polanya sudah terukur. Ambangnya diambil
+      # dari pola tenant itu sendiri (mis. p99 jeda antar-baris pada jam kerja) dan diberi label
+      # per tenant, bukan satu angka bulat untuk semua. Sampai saat itu sinyalnya hidup sebagai
+      # metrik dan kolom view, di mana ia bisa dibaca dan di-dasbor tanpa membangunkan siapa pun.
 
       - alert: WarehouseFreshnessUnknown
         # THE GAP THE OTHER TWO CANNOT COVER, and it is the one a cold start

@@ -365,7 +365,13 @@ services:
     <<: [*restart-policy, *hardening]
     logging: *default-logging
     read_only: true
-    mem_limit: 512m
+    # ${CDC_MEM_LIMIT} dan bukan angka telanjang: scripts/analytics/cdc-run.sh menyalakan
+    # loader yang SAMA lewat `docker run`, dan sampai 2026-09-04 hanya berkas ini yang punya
+    # plafon. Akibatnya container produksi kehilangan plafonnya diam-diam setiap kali suite uji
+    # menghentikan lalu menyalakan ulang loader — terbaca normal di `docker stats`, yang
+    # menampilkan total host sebagai penyebut ketika tidak ada plafon. Satu variabel, dua
+    # pembaca, tidak ada yang bisa menyimpang.
+    mem_limit: ${CDC_MEM_LIMIT:-512m}
     environment:
       WAREHOUSE_READER_USER: ${WAREHOUSE_READER_USER:-warehouse_reader}
       WAREHOUSE_READER_PASSWORD: ${WAREHOUSE_READER_PASSWORD:?WAREHOUSE_READER_PASSWORD is required}

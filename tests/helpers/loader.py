@@ -7,6 +7,7 @@ of this suite's own so that a test can never stop the long-running loader by acc
 
 from __future__ import annotations
 
+import os
 import subprocess
 
 from . import db
@@ -133,8 +134,39 @@ def stop_main(timeout=30):
     )
 
 
+#: The compose invocation that OWNS the main loader. Mirrors `dc_insight` in scripts/lib/common.sh,
+#: including the project-name override -- hardcoding `odoo19-bct` would have made the docstring's
+#: "mirrors dc_insight" false for anyone running with COMPOSE_PROJECT_NAME set.
+_COMPOSE = [
+    "docker", "compose",
+    "-p", os.environ.get("COMPOSE_PROJECT_NAME", "odoo19-bct"),
+    "--env-file", ".env",
+    "-f", "compose/odoo.yml", "-f", "compose/odoo.dev.yml", "-f", "compose/insight.yml",
+]
+
+
 def start_main(timeout=300):
-    return run_loader(MAIN, [], detach=True, timeout=timeout)
+    """Restore the main loader THROUGH COMPOSE, not through `cdc-run.sh`.
+
+    `cdc-run.sh` is a `docker run`, and a `docker run` carries only the flags it happens to spell
+    out. It spells out the hardening (`--read-only`, `--cap-drop ALL`, `no-new-privileges`) and,
+    since 2026-09-04, the memory ceiling -- but it cannot carry the healthcheck or the restart
+    policy, because `--rm` and a restart policy are mutually exclusive.
+
+    So every run of this suite used to hand production back a DEGRADED container: same image, same
+    hardening, no ceiling, no healthcheck, no restart policy. Nothing reported it. `docker stats`
+    prints the host total as the denominator when there is no limit, which reads exactly like a
+    limit, and that is how a missing ceiling survived being looked at directly.
+
+    Compose recreates the service from its declaration instead, so what the suite gives back is
+    what `make up` would have created. `run_loader` stays for the cases that need settings compose
+    does not express -- `run_loader_direct` and the alternate-name loaders.
+    """
+    assert_project_scoped(MAIN)
+    return subprocess.run(
+        _COMPOSE + ["up", "-d", "--no-build", MAIN.replace("odoo19-bct-", "")],
+        capture_output=True, text=True, timeout=timeout, cwd=str(repo_root()),
+    )
 
 
 LIVE_CHECKSUM = """
