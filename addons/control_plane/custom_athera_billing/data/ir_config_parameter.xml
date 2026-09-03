@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <!--
+      Masa tenggang sejak jatuh tempo sampai akses ditutup. Keputusan user 2026-09-03: 14 hari,
+      dan harus bisa diatur — jadi ia parameter yang bisa disunting operator, bukan konstanta di
+      dalam kode. `noupdate` supaya nilai yang sudah disunting tidak dikembalikan saat upgrade.
+    -->
+    <record id="param_grace_days" model="ir.config_parameter">
+      <field name="key">athera_billing.grace_days</field>
+      <field name="value">14</field>
+    </record>
+  </data>
+</odoo>

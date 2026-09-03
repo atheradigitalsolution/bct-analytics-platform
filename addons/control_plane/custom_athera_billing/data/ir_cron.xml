@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <!--
+      Tiga cron, sengaja terpisah. Menerbitkan faktur, menerapkan pembayaran, dan menangguhkan
+      penunggak adalah tiga kegagalan yang berbeda: menggabungkannya berarti satu error saat
+      menerbitkan faktur ikut menghentikan pembayaran yang seharusnya membuka akses klien lain.
+    -->
+    <record id="cron_generate_invoices" model="ir.cron">
+      <field name="name">ATHERA Billing: terbitkan faktur jatuh tempo</field>
+      <field name="model_id" ref="model_athera_subscription"/>
+      <field name="state">code</field>
+      <field name="code">model._cron_generate_invoices()</field>
+      <field name="interval_number">1</field>
+      <field name="interval_type">days</field>
+      <field name="active" eval="True"/>
+    </record>
+
+    <!--
+      Pembayaran diperiksa TIAP JAM, bukan harian. Klien yang sudah membayar dan masih tertutup
+      aksesnya adalah keluhan; klien yang telat ditangguhkan sehari bukan.
+    -->
+    <record id="cron_apply_payments" model="ir.cron">
+      <field name="name">ATHERA Billing: terapkan pembayaran ke hak akses</field>
+      <field name="model_id" ref="model_athera_subscription"/>
+      <field name="state">code</field>
+      <field name="code">model._cron_apply_payments()</field>
+      <field name="interval_number">1</field>
+      <field name="interval_type">hours</field>
+      <field name="active" eval="True"/>
+    </record>
+
+    <record id="cron_enforce_arrears" model="ir.cron">
+      <field name="name">ATHERA Billing: tangguhkan penunggak lewat masa tenggang</field>
+      <field name="model_id" ref="model_athera_subscription"/>
+      <field name="state">code</field>
+      <field name="code">model._cron_enforce_arrears()</field>
+      <field name="interval_number">1</field>
+      <field name="interval_type">days</field>
+      <field name="active" eval="True"/>
+    </record>
+  </data>
+</odoo>

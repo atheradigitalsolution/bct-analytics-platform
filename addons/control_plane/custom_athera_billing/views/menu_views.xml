@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <menuitem id="menu_athera_billing_root" name="ATHERA Billing" sequence="12"
+            groups="custom_super_admin.group_super_admin"/>
+  <menuitem id="menu_athera_subscription" name="Langganan"
+            parent="menu_athera_billing_root" action="action_athera_subscription" sequence="10"/>
+</odoo>

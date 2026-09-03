@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!--
+    Billing dilihat dan diubah oleh super admin saja. Tidak ada grup "billing user" tersendiri:
+    yang boleh melihat langganan seluruh klien adalah orang yang sudah boleh melihat seluruh
+    tenant, dan menambah grup kedua hanya menciptakan dua definisi untuk satu kenyataan.
+  -->
+  <record id="rule_athera_subscription_company" model="ir.rule">
+    <field name="name">Langganan ATHERA: per perusahaan</field>
+    <field name="model_id" ref="model_athera_subscription"/>
+    <field name="domain_force">[(1, '=', 1)]</field>
+    <field name="global" eval="True"/>
+  </record>
+</odoo>
