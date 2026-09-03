@@ -183,19 +183,32 @@ bct_warehouse_reconciliation:
 bct_warehouse_mart:
   query: |
     SELECT
-      mart_name                        AS mart,
-      tenant_id                        AS tenant,
+      f.mart_name                      AS mart,
+      f.tenant_id                      AS tenant,
       -- Carried as a LABEL so Alertmanager can route by the ADR's own
       -- page/alert distinction instead of the rules re-deciding it. ADR 0001
       -- deliberately made the SLAs non-uniform (PPOB 60 s pages, finance
       -- 60 min alerts) and rejected uniform-strict as wasting VPS headroom;
       -- an alert file that flattened that back out would undo a GATE 2
       -- decision by accident.
-      on_breach                        AS on_breach,
-      sla_seconds::bigint              AS sla_seconds,
-      coalesce(age_seconds, 0)::bigint AS age_seconds,
-      CASE WHEN is_stale THEN 1 ELSE 0 END::bigint AS stale
-    FROM warehouse.mart_freshness
+      f.on_breach                      AS on_breach,
+      f.sla_seconds::bigint            AS sla_seconds,
+      coalesce(f.age_seconds, 0)::bigint AS age_seconds,
+      CASE WHEN f.is_stale THEN 1 ELSE 0 END::bigint AS stale,
+      -- Sinyal KEDUA, ditambahkan 2026-09-04. `stale` di atas dihitung dari heartbeat loader,
+      -- jadi ia menjawab "apakah prosesnya hidup?". `data_stale` dihitung dari baris yang
+      -- benar-benar mendarat, jadi ia menjawab "apakah datanya bergerak?". Keduanya diekspor
+      -- karena kombinasinyalah yang mendiagnosis: stale=0 dengan data_stale=1 berarti pipa
+      -- hidup tetapi tidak ada yang datang.
+      coalesce(f.data_age_seconds, 0)::bigint AS data_age_seconds,
+      CASE WHEN f.is_data_stale THEN 1 ELSE 0 END::bigint AS data_stale,
+      -- Label, bukan gauge, dan alasannya sama dengan `on_breach` di atas: aturan alert harus
+      -- bisa MEROUTE berdasarkan fakta ini tanpa memutuskannya ulang. Tenant fiksture dimuat
+      -- oleh `load-fixture` lewat FDW, bukan oleh CDC; menagihkan SLA pipeline kepadanya
+      -- menghasilkan paging permanen untuk kondisi yang tidak pernah bisa pulih (issue #15).
+      CASE WHEN coalesce(tr.is_test_tenant, false) THEN 'true' ELSE 'false' END AS is_test_tenant
+    FROM warehouse.mart_freshness f
+    LEFT JOIN warehouse.tenant_registry tr ON tr.tenant_id = f.tenant_id
   metrics:
     - mart:
         usage: "LABEL"
@@ -215,6 +228,15 @@ bct_warehouse_mart:
     - stale:
         usage: "GAUGE"
         description: "1 when age exceeds the SLA, or when the mart has never loaded"
+    - data_age_seconds:
+        usage: "GAUGE"
+        description: "Seconds since a row actually LANDED for this mart's sources (not a heartbeat)"
+    - data_stale:
+        usage: "GAUGE"
+        description: "1 when no row has landed within the SLA. Red while `stale` is green means the loader is alive but nothing is arriving."
+    - is_test_tenant:
+        usage: "LABEL"
+        description: "true for fixture tenants loaded by load-fixture rather than by CDC"
 
 # ---------------------------------------------------------------------------
 # Pipeline progress straight from warehouse.pipeline_state — the same table

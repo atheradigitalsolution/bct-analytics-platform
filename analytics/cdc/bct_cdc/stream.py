@@ -190,6 +190,9 @@ class StreamConsumer:
                     sum(c for (t, _), c in self.counts.items() if t == table), self.slot,
                 )
                 m.LAST_SUCCESS.labels(tenant=self.tenant, source_table=table).set(time.time())
+                # Dalam blok ini `touched` hanya berisi tabel yang benar-benar menerima baris,
+                # jadi gauge peristiwa boleh disetel di sini tanpa syarat tambahan.
+                m.LAST_ROW.labels(tenant=self.tenant, source_table=table).set(time.time())
             self.buffer = {}
             self.counts = {}
             if self.on_flush is not None:

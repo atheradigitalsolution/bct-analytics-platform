@@ -54,6 +54,19 @@ LAST_SUCCESS = Gauge(
     ["tenant", "source_table"],
 )
 
+LAST_ROW = Gauge(
+    "bct_cdc_last_row_timestamp_seconds",
+    "Unix timestamp of the last cycle that actually LANDED rows for this table. This is an EVENT, "
+    "not a heartbeat: it does not move on a cycle that carried nothing, which is precisely how it "
+    "differs from bct_cdc_last_success_timestamp_seconds and precisely why both exist. Alert on "
+    "`time() - bct_cdc_last_row_timestamp_seconds`, never on the gauge's own value -- a TIMESTAMP "
+    "ages by itself in PromQL, whereas a pre-computed lag gauge freezes at its last value the "
+    "moment the data stops, which makes a stalled pipeline look permanently healthy. That is the "
+    "same trap bct_cdc_end_to_end_lag_seconds falls into, and the reason this metric is a "
+    "timestamp rather than a second lag figure.",
+    ["tenant", "source_table"],
+)
+
 REDELIVERED_SKIPPED = Counter(
     "bct_cdc_redelivered_changes_skipped_total",
     "Changes dropped because their LSN was at or below the resume floor -- i.e. already landed "

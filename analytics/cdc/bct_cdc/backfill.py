@@ -111,5 +111,10 @@ def backfill_table(
         warehouse_conn, tenant, table,
         parse_lsn(snapshot_lsn) if snapshot_lsn else None, landed, slot,
     )
+    if landed > 0:
+        # `if landed` dan bukan tanpa syarat: sebuah backfill yang melanjutkan dan menemukan
+        # nol baris baru bukan bukti bahwa data bergerak, dan menyetel gauge di situ akan
+        # membuat setiap restart menyegarkan sinyal tanpa satu baris pun tiba.
+        m.LAST_ROW.labels(tenant=tenant, source_table=table).set(time.time())
     _logger.info("backfill %s.%s complete: %d rows landed this run", tenant, table, landed)
     return landed

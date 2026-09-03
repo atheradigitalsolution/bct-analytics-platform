@@ -93,6 +93,23 @@ CREATE TABLE IF NOT EXISTS warehouse.pipeline_state (
   PRIMARY KEY (tenant_id, source_table)
 );
 
+-- last_row_at — ditambahkan 2026-09-04. ALTER terpisah, bukan kolom di dalam CREATE TABLE
+-- di atas: CREATE TABLE IF NOT EXISTS adalah no-op senyap pada tabel yang sudah ada, jadi
+-- menambahkan kolom di sana berarti gudang data yang sudah berjalan tidak akan pernah
+-- mendapatkannya. Pola yang sama sudah dipakai bagian CONSTRAINT CONVERGENCE di bawah.
+ALTER TABLE warehouse.pipeline_state ADD COLUMN IF NOT EXISTS last_row_at timestamptz;
+
+COMMENT ON COLUMN warehouse.pipeline_state.last_success_at IS
+  'HEARTBEAT. Maju setiap siklus poll yang berhasil, TERMASUK siklus yang memindahkan nol baris. '
+  'Ia menjawab "apakah loader hidup?", bukan "apakah datanya mutakhir?".';
+
+COMMENT ON COLUMN warehouse.pipeline_state.last_row_at IS
+  'PERISTIWA. Hanya maju ketika baris benar-benar mendarat di raw.*. Ia menjawab "kapan data '
+  'terakhir bergerak?". Dipisahkan dari last_success_at karena keduanya menjawab pertanyaan '
+  'berbeda dan pernah tertukar: sebuah loader yang dinyalakan sekejap membuat heartbeat maju, '
+  'sehingga dasbor mengaku segar di atas data berumur 1,6 hari. Satu angka tidak bisa menjadi '
+  'dua jawaban sekaligus.';
+
 COMMENT ON TABLE warehouse.pipeline_state IS
   'Frozen contract 05. Backend''s CDC loader writes; semantic-api serves meta.last_refreshed_at '
   'and meta.is_stale from it. Never compute freshness from a clock.';
@@ -274,7 +291,16 @@ SELECT
     CASE
       WHEN max(ps.last_success_at) IS NULL THEN true
       ELSE (now() - max(ps.last_success_at)) > make_interval(secs => s.sla_seconds)
-    END                                                           AS is_stale
+    END                                                           AS is_stale,
+    -- Tiga kolom di bawah adalah sinyal KEDUA, bukan pengganti. `is_stale` tetap persis seperti
+    -- sebelumnya karena semantic-api, insight-portal, dan (sejak 2026-09-04) portal tagihan
+    -- membacanya; mengubah artinya berarti mengubah arti sebuah kontrak beku dari bawah.
+    max(ps.last_row_at)                                           AS last_row_at,
+    extract(epoch FROM (now() - max(ps.last_row_at)))::bigint     AS data_age_seconds,
+    CASE
+      WHEN max(ps.last_row_at) IS NULL THEN true
+      ELSE (now() - max(ps.last_row_at)) > make_interval(secs => s.sla_seconds)
+    END                                                           AS is_data_stale
 FROM warehouse.mart_sla s
 JOIN warehouse.pipeline_state ps
   ON ps.source_table = ANY (s.source_tables)
@@ -282,7 +308,13 @@ GROUP BY s.mart_name, ps.tenant_id, s.sla_seconds, s.on_breach;
 
 COMMENT ON VIEW warehouse.mart_freshness IS
   'metric contract §3: the single source of meta.last_refreshed_at / meta.is_stale. '
-  'A mart with no pipeline_state row reports is_stale = true, never "fresh".';
+  'A mart with no pipeline_state row reports is_stale = true, never "fresh". '
+  'DUA PERTANYAAN, DUA JAWABAN: is_stale = "apakah loader hidup?" (dari heartbeat), '
+  'is_data_stale = "apakah data bergerak?" (dari baris yang benar-benar mendarat). '
+  'Keduanya perlu. is_stale sendirian membuat loader yang hidup tetapi tidak menerima apa-apa '
+  'tampak sehat; is_data_stale sendirian membuat sumber yang memang sedang sepi tampak rusak. '
+  'Pasangannya yang mendiagnosis: stale=false + data_stale=true berarti pipa hidup tetapi tidak '
+  'ada yang datang -- periksa sumbernya.';
 
 
 -- ---------------------------------------------------------------------------

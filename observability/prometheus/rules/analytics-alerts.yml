@@ -140,7 +140,7 @@ groups:
       # on_breach=page. Before the on_breach label existed it matched nothing
       # and could never have fired at all.
       - alert: MartStalePage
-        expr: bct_warehouse_mart_stale{on_breach="page"} == 1
+        expr: bct_warehouse_mart_stale{on_breach="page",is_test_tenant="false"} == 1
         for: 2m
         labels:
           severity: critical
@@ -153,7 +153,7 @@ groups:
             stale PPOB view hides exactly the SLA breaches it exists to show.
 
       - alert: MartStaleAlert
-        expr: bct_warehouse_mart_stale{on_breach="alert"} == 1
+        expr: bct_warehouse_mart_stale{on_breach="alert",is_test_tenant="false"} == 1
         for: 10m
         labels:
           severity: warning
@@ -165,6 +165,45 @@ groups:
             dashboard is already showing meta.is_stale for it - both read the same
             warehouse.mart_freshness view, so an operator and a user are looking at one
             number rather than two that can disagree.
+
+      # ISSUE #15. `is_test_tenant="false"` pada kedua aturan di atas, dan ia bukan kerapian.
+      # `bct_t2` adalah fixture yang dimuat `load-fixture` lewat FDW, bukan oleh CDC. Ia tidak
+      # punya slot, tidak punya publikasi, dan tidak akan pernah punya loader — jadi SLA
+      # pipeline-nya melahirkan tujuh alert permanen, dua di antaranya severity=critical, untuk
+      # kondisi yang secara struktur tidak bisa pulih. alertmanager.yml sendiri sudah menulis
+      # prinsipnya: kebisingan melatih orang mengabaikan alert, dan itu lebih buruk daripada
+      # tidak punya alert sama sekali. Menyaring di sini dan bukan di route Alertmanager supaya
+      # alasannya hidup bersama aturannya.
+      #
+      # Yang TIDAK dilakukan: memberi bct_t2 loader CDC-nya sendiri. Itu berarti slot replikasi
+      # kedua pada database `bct` yang sama, menahan WAL terhadap plafon 2 GB yang sama, plus
+      # container 512 MB — dibayarkan untuk fixture yang ada semata-mata agar `dbt test` punya
+      # tenant kedua. Biaya nyata untuk nilai produk nol.
+
+      - alert: MartDataStaleAlert
+        # SINYAL YANG MENGUKUR DATA, BUKAN PROSES.
+        #
+        # `bct_warehouse_mart_stale` berasal dari heartbeat loader, sehingga ia hijau selama
+        # prosesnya hidup — TERMASUK ketika proses itu hidup dan tidak menerima apa pun.
+        # Terukur pada 2026-09-04: loader dinyalakan, memindahkan nol baris, dan seluruh 14 mart
+        # `bct` berpindah ke "fresh" dalam hitungan detik di atas data berumur 2,4 jam.
+        # `data_stale` berasal dari baris yang benar-benar mendarat, jadi ia tetap merah.
+        #
+        # WARNING DAN BUKAN PAGE, dengan sengaja. Sumber yang memang sedang sepi — malam, akhir
+        # pekan, instalasi berlalu-lintas rendah — akan menaikkan ini secara sah. Ia mendiagnosis,
+        # bukan membangunkan orang. Yang membangunkan orang tetap slot lag, karena slot yang
+        # tertinggal adalah kegagalan tanpa penjelasan yang tidak berbahaya.
+        expr: bct_warehouse_mart_data_stale{is_test_tenant="false"} == 1
+        for: 30m
+        labels:
+          severity: warning
+          component: warehouse
+        annotations:
+          summary: "No rows have landed for {{ $labels.mart }} (tenant {{ $labels.tenant }})"
+          description: >-
+            The loader may well be alive - check bct_warehouse_mart_stale for the same mart. If
+            that is 0 while this is 1, the pipeline is running and nothing is arriving, which
+            points at the SOURCE or the publication rather than at the consumer.
 
       - alert: WarehouseFreshnessUnknown
         # THE GAP THE OTHER TWO CANNOT COVER, and it is the one a cold start

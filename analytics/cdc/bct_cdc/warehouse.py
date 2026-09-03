@@ -274,23 +274,39 @@ def load_column_policy(conn) -> list:
 
 
 def record_success(conn, tenant: str, table: str, lsn, rows: int, slot: str) -> None:
-    """Advance ``warehouse.pipeline_state``. This is what ``meta.last_refreshed_at`` reads."""
+    """Advance ``warehouse.pipeline_state``. This is what ``meta.last_refreshed_at`` reads.
+
+    TWO TIMESTAMPS, AND THEY ARE NOT THE SAME CLAIM.
+
+    ``last_success_at`` is a HEARTBEAT: it moves on every successful cycle, including cycles that
+    carried nothing. That is deliberate and must stay -- without it an idle pipeline and a dead one
+    look identical, and PPOB's 60 s SLA would report stale every quiet minute.
+
+    ``last_row_at`` is an EVENT: it moves ONLY when ``rows > 0``. It is what makes "the data is
+    current" a statement about data rather than about a process. The two were one column until
+    2026-09-04, and the cost of that was measured: a loader started for a few seconds advanced the
+    heartbeat, and the dashboard then reported fresh over data 1.6 days old. ``COALESCE`` keeps the
+    previous value on a zero-row cycle rather than overwriting it with NULL -- an empty cycle is not
+    evidence that data stopped, it is simply not evidence that it moved.
+    """
     with conn, conn.cursor() as cur:
         cur.execute(
             """
             INSERT INTO warehouse.pipeline_state
-                (tenant_id, source_table, last_lsn, last_success_at, rows_loaded, last_error,
-                 failure_count, slot_name)
-            VALUES (%s, %s, %s, now(), %s, NULL, 0, %s)
+                (tenant_id, source_table, last_lsn, last_success_at, last_row_at, rows_loaded,
+                 last_error, failure_count, slot_name)
+            VALUES (%s, %s, %s, now(), CASE WHEN %s > 0 THEN now() END, %s, NULL, 0, %s)
             ON CONFLICT (tenant_id, source_table) DO UPDATE SET
                 last_lsn        = COALESCE(EXCLUDED.last_lsn, warehouse.pipeline_state.last_lsn),
                 last_success_at = EXCLUDED.last_success_at,
+                last_row_at     = COALESCE(EXCLUDED.last_row_at,
+                                           warehouse.pipeline_state.last_row_at),
                 rows_loaded     = warehouse.pipeline_state.rows_loaded + EXCLUDED.rows_loaded,
                 last_error      = NULL,
                 failure_count   = 0,
                 slot_name       = EXCLUDED.slot_name
             """,
-            (tenant, table, format_lsn(lsn) if lsn else None, rows, slot),
+            (tenant, table, format_lsn(lsn) if lsn else None, rows, rows, slot),
         )
 
 

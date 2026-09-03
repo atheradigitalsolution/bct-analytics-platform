@@ -893,15 +893,30 @@ def cmd_load_fixture(args) -> int:
                 # pipeline_state is the ONLY source of meta.last_refreshed_at.
                 # Writing it here means the freshness a dashboard shows after a
                 # fixture load is real metadata, not a fabricated timestamp.
+                # last_row_at as well as last_success_at, and guarded on n > 0 (issue #15).
+                #
+                # A fixture tenant has no CDC loader and never will, so nothing else would ever
+                # write these columns for it -- which left `bct_t2` permanently and meaninglessly
+                # stale, firing seven alerts including two pages for a condition that cannot
+                # clear. Writing both here makes freshness describe what actually happened: this
+                # tenant WAS refreshed, by a different mechanism, at this moment. It then ages
+                # honestly instead of being stale from birth.
+                #
+                # `CASE WHEN %s > 0` and not an unconditional now(): a fixture load that copied
+                # nothing is not evidence that data moved, and the column exists precisely to
+                # stop a process that ran from being mistaken for data that arrived.
                 cur.execute(
                     "INSERT INTO warehouse.pipeline_state "
-                    "  (tenant_id, source_table, last_success_at, rows_loaded, slot_name) "
-                    "VALUES (%s, %s, now(), %s, NULL) "
+                    "  (tenant_id, source_table, last_success_at, last_row_at, rows_loaded, "
+                    "   slot_name) "
+                    "VALUES (%s, %s, now(), CASE WHEN %s > 0 THEN now() END, %s, NULL) "
                     "ON CONFLICT (tenant_id, source_table) DO UPDATE SET "
                     "  last_success_at = now(), "
+                    "  last_row_at = COALESCE(EXCLUDED.last_row_at, "
+                    "                         warehouse.pipeline_state.last_row_at), "
                     "  rows_loaded = warehouse.pipeline_state.rows_loaded + EXCLUDED.rows_loaded, "
                     "  last_error = NULL, failure_count = 0",
-                    (tid, table, n),
+                    (tid, table, n, n),
                 )
             total += n
             print(f"    raw.{table:<22} {n:>6} rows")
