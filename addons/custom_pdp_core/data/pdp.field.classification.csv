@@ -216,6 +216,7 @@ pdp_pos_order__amount_paid,pos.order,amount_paid,internal,Not personal data - bu
 pdp_pos_order__amount_return,pos.order,amount_return,internal,Not personal data - business record,,False
 pdp_pos_order__amount_tax,pos.order,amount_tax,internal,Not personal data - business record,,False
 pdp_pos_order__amount_total,pos.order,amount_total,internal,Not personal data - business record,,False
+pdp_pos_order__cashier,pos.order,cashier,personal,UU 27/2022 Art. 4(2) - data pribadi umum,Direct identifier of a natural person; hashed at load so joins survive.,False
 pdp_pos_order__company_id,pos.order,company_id,internal,Not personal data - business record,,False
 pdp_pos_order__config_id,pos.order,config_id,internal,Not personal data - business record,,False
 pdp_pos_order__create_date,pos.order,create_date,internal,Not personal data - business record,,False
@@ -224,6 +225,7 @@ pdp_pos_order__crm_team_id,pos.order,crm_team_id,internal,Not personal data - bu
 pdp_pos_order__currency_rate,pos.order,currency_rate,internal,Not personal data - business record,,False
 pdp_pos_order__date_order,pos.order,date_order,internal,Not personal data - business record,,False
 pdp_pos_order__email,pos.order,email,personal,UU 27/2022 Art. 4(2) - data pribadi umum,Direct identifier of a natural person; hashed at load so joins survive.,False
+pdp_pos_order__employee_id,pos.order,employee_id,internal,Not personal data - business record,,False
 pdp_pos_order__fiscal_position_id,pos.order,fiscal_position_id,internal,Not personal data - business record,,False
 pdp_pos_order__floating_order_name,pos.order,floating_order_name,personal,UU 27/2022 Art. 4(2) - data pribadi umum,Direct identifier of a natural person; hashed at load so joins survive.,False
 pdp_pos_order__general_customer_note,pos.order,general_customer_note,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,Free text - may contain any category of personal data; dropped to NULL at load.,True
