@@ -22,6 +22,12 @@ export const config = {
    * in a request body. The token the gateway returns remains the only authority on tenant anyway.
    */
   odooDatabase: env("INSIGHT_PORTAL_ODOO_DB", "bct"),
+  /**
+   * The Odoo door on the gateway's own host, absolute because it is another origin. Shown only to
+   * a session whose plan carries `odoo` — the link is a convenience, and the gate that matters is
+   * the one the gateway re-reads on every request behind it.
+   */
+  odooDoorUrl: env("INSIGHT_PORTAL_ODOO_DOOR_URL", ""),
   /** JWKS for RS256 verification. Two keys are published; selection is by `kid`. Contract 06 §5. */
   jwksUrl: env(
     "INSIGHT_PORTAL_JWKS_URL",

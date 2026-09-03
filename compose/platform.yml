@@ -115,6 +115,9 @@ services:
       # coordinated edit: the Odoo module reads the name off the exchange reply,
       # but an already-issued cookie under the old name is simply ignored.
       LOGIN_GATEWAY_ROUTE_COOKIE_NAME: ${LOGIN_GATEWAY_ROUTE_COOKIE_NAME:-athera_route}
+      # The gateway's OWN public base, used to send a browser to its login page. It cannot be
+      # inferred from the request: behind the edge the Host that arrives here is the Odoo host.
+      LOGIN_GATEWAY_PUBLIC_BASE: ${LOGIN_GATEWAY_PUBLIC_BASE:-https://auth.${ATHERA_DOMAIN:-athera.localhost}}
       TZ: ${TZ:-UTC}
     volumes:
       - ../login-gateway/secrets:/run/secrets:ro
@@ -257,6 +260,7 @@ services:
       ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET:?ORCHESTRATOR_SHARED_SECRET is required - run `make dev-bootstrap`}
       HUB_PORTAL_LOGIN_GATEWAY_URL: ${HUB_PORTAL_LOGIN_GATEWAY_URL:-http://login-gateway:8080}
       HUB_PORTAL_JWKS_URL: ${HUB_PORTAL_JWKS_URL:-http://login-gateway:8080/.well-known/jwks.json}
+      HUB_PORTAL_ODOO_DOOR_URL: ${HUB_PORTAL_ODOO_DOOR_URL:-https://auth.${ATHERA_DOMAIN:-athera.localhost}/auth/sso/odoo}
       HUB_PORTAL_JWT_ISSUER: ${LOGIN_GATEWAY_JWT_ISSUER:-https://login-gateway.local/}
       HUB_PORTAL_JWT_AUDIENCE: ${LOGIN_GATEWAY_JWT_AUDIENCE:-insight-portal}
       HUB_PORTAL_COOKIE_SECURE: ${HUB_PORTAL_COOKIE_SECURE:-false}

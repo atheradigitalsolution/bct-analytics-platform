@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { config } from "@/lib/config";
 import type { PortalFilters } from "@/lib/filters";
 import type { Session } from "@/lib/jwt";
 
@@ -42,6 +43,11 @@ export function ViewShell({
         active={active}
         roles={session.roles}
         subject={session.sub}
+        odooDoor={
+          config.odooDoorUrl !== "" && session.products.includes("odoo")
+            ? config.odooDoorUrl
+            : null
+        }
       />
       <main id="main" className="mx-auto max-w-6xl px-3 py-4 sm:px-4">
         <h1 className="text-lg font-semibold text-ink sm:text-xl">{title}</h1>

@@ -24,13 +24,15 @@ import threading
 import time
 
 from fastapi import APIRouter, FastAPI, Request, Response
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.concurrency import run_in_threadpool
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
 from pydantic import BaseModel, Field
 
 from .config import settings_from_env
 from .keys import load_key_ring
 from . import sso as sso_mod
+from . import webui
 from .odoo import AuthenticationFailed, OdooClient, OdooError, read_session_claims
 from .ratelimit import RateLimiter
 from .registry import Registry
@@ -137,7 +139,7 @@ def create_app(settings=None) -> FastAPI:
     sessions = {}
     sessions_lock = threading.Lock()
 
-    app = FastAPI(title="BCT login gateway", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="ATHERA login gateway", docs_url=None, redoc_url=None, openapi_url=None)
     router = APIRouter()
 
     def _audit(event: str, **fields) -> None:
@@ -207,62 +209,172 @@ def create_app(settings=None) -> FastAPI:
             "products": list(ent.products),
         }
 
-    @router.post("/auth/login")
-    def login(payload: LoginRequest, request: Request, response: Response):
-        client_ip = request.client.host if request.client else "unknown"
-        account_key = "account:%s:%s" % (payload.db, payload.login)
+    #: Longest form body worth reading on an unauthenticated endpoint. Three short fields and a
+    #: token; anything larger is not a login attempt, and reading it would be work an anonymous
+    #: caller gets to ask for.
+    MAX_FORM_BYTES = 8192
+    CSRF_COOKIE = "athera_login_csrf"
+
+    def _safe_path(value: str, fallback: str) -> str:
+        """A path on this site, never an absolute URL. `//host` is absolute to a browser even
+        though it starts with a slash, which is the case a naive startswith('/') lets through."""
+        return value if value.startswith("/") and not value.startswith("//") else fallback
+
+    def _set_csrf_cookie(response: Response, token: str) -> None:
+        response.set_cookie(
+            CSRF_COOKIE, token, max_age=600, httponly=True, secure=settings.cookie_secure,
+            samesite="strict", path="/auth",
+        )
+
+    def _authenticate(db: str, login_name: str, password: str, client_ip: str):
+        """The single login path. Returns (uid, claims, None) or (None, None, code).
+
+        Both surfaces -- the JSON API and the browser form -- come through here, so the allow-list,
+        the rate limiter, the audit record and the deliberate sameness of every refusal cannot
+        drift apart between them. A second copy of this logic is how one surface quietly ends up
+        without a lockout.
+        """
+        account_key = "account:%s:%s" % (db, login_name)
         source_key = "source:%s" % client_ip
 
         for key in (account_key, source_key):
             remaining = limiter.is_locked(key)
             if remaining:
                 AUTH_TOTAL.labels(result="ratelimited").inc()
-                _audit("login.ratelimited", db=payload.db, source=client_ip)
-                return JSONResponse(
-                    {"error": "rate_limited",
-                     "detail": "Too many authentication attempts. Try again later."},
-                    status_code=429,
-                    headers={"Retry-After": str(int(remaining) + 1)},
-                )
+                _audit("login.ratelimited", db=db, source=client_ip)
+                return None, None, ("rate_limited", int(remaining) + 1)
 
-        if payload.db not in settings.allowed_databases:
-            # Same response as bad credentials: whether a database exists is not something an
+        if db not in settings.allowed_databases:
+            # Same answer as bad credentials: whether a database exists is not something an
             # unauthenticated caller gets to enumerate.
             limiter.record_failure(source_key)
             AUTH_TOTAL.labels(result="invalid").inc()
-            _audit("login.failed", db=payload.db, source=client_ip, reason="database")
-            return _invalid()
+            _audit("login.failed", db=db, source=client_ip, reason="database")
+            return None, None, ("invalid", 0)
 
         try:
-            uid = odoo.authenticate(payload.db, payload.login, payload.password)
+            uid = odoo.authenticate(db, login_name, password)
         except AuthenticationFailed:
             limiter.record_failure(account_key)
             limiter.record_failure(source_key)
             AUTH_TOTAL.labels(result="invalid").inc()
-            _audit("login.failed", db=payload.db, source=client_ip, reason="credentials")
-            return _invalid()
+            _audit("login.failed", db=db, source=client_ip, reason="credentials")
+            return None, None, ("invalid", 0)
         except OdooError as exc:
             AUTH_TOTAL.labels(result="upstream_error").inc()
             _logger.error("login upstream failure: %s", exc)
-            return JSONResponse(
-                {"error": "upstream_unavailable", "detail": "Authentication backend unavailable."},
-                status_code=503,
-            )
+            return None, None, ("upstream", 0)
 
         try:
-            claims = read_session_claims(odoo, payload.db, uid, payload.password)
+            claims = read_session_claims(odoo, db, uid, password)
         except OdooError as exc:
             AUTH_TOTAL.labels(result="upstream_error").inc()
             _logger.error("entitlement read failed: %s", exc)
-            return JSONResponse(
-                {"error": "upstream_unavailable", "detail": "Authentication backend unavailable."},
-                status_code=503,
-            )
+            return None, None, ("upstream", 0)
 
         limiter.record_success(account_key)
         AUTH_TOTAL.labels(result="success").inc()
-        _audit("login.success", db=payload.db, uid=uid, source=client_ip,
+        _audit("login.success", db=db, uid=uid, source=client_ip,
                roles=",".join(claims["roles"]), all_ou=claims["all_ou"])
+        return uid, claims, None
+
+    @router.get("/auth/login")
+    def login_form_page(next: str = "/auth/sso/odoo", db: str = ""):
+        """The browser's way in. See app/webui.py for why the gateway has a page at all."""
+        csrf = secrets.token_urlsafe(24)
+        page = webui.login_page(_safe_path(next, "/auth/sso/odoo"), db[:64], csrf)
+        response = HTMLResponse(page)
+        _set_csrf_cookie(response, csrf)
+        return response
+
+    def _login_form_failed(next_path: str, db: str, message: str, status: int):
+        """A refusal re-renders the form, and does it under the status code the failure deserves.
+
+        401 and not 200: the fail2ban jail reads Caddy's access log for a failed login, and a
+        refusal that reports itself as success is a refusal the jail cannot count.
+        """
+        csrf = secrets.token_urlsafe(24)
+        response = HTMLResponse(
+            webui.login_page(next_path, db, csrf, message), status_code=status
+        )
+        _set_csrf_cookie(response, csrf)
+        return response
+
+    @router.post("/auth/login/form")
+    async def login_form(request: Request):
+        length = int(request.headers.get("content-length") or 0)
+        if length > MAX_FORM_BYTES:
+            return JSONResponse({"error": "payload_too_large"}, status_code=413)
+        raw = await request.body()
+        if len(raw) > MAX_FORM_BYTES:
+            return JSONResponse({"error": "payload_too_large"}, status_code=413)
+        fields = urllib.parse.parse_qs(raw.decode("utf-8", "replace"), keep_blank_values=True)
+        client_ip = request.client.host if request.client else "unknown"
+        cookie_csrf = request.cookies.get(CSRF_COOKIE) or ""
+
+        def one(name, limit=1024):
+            return ((fields.get(name) or [""])[0])[:limit]
+
+        # Authentication is blocking (XML-RPC to Odoo), and this handler is async so it can read
+        # the body. Running it inline would block the event loop for every other request for the
+        # length of an Odoo round trip.
+        return await run_in_threadpool(
+            _handle_login_form, one("db", 64), one("login", 320), one("password", 1024),
+            one("next", 2048), one("csrf", 256), cookie_csrf, client_ip,
+        )
+
+    def _handle_login_form(db, login_name, password, next_value, form_csrf, cookie_csrf, client_ip):
+        next_path = _safe_path(next_value, "/auth/sso/odoo")
+
+        # Double submit. Without it, a third-party page can POST this form and land the visitor in
+        # an ATTACKER'S session -- and this session is the one that opens the Odoo door, so a
+        # login CSRF here is not a curiosity.
+        if not cookie_csrf or not secrets.compare_digest(form_csrf, cookie_csrf):
+            _audit("login.csrf_rejected", db=db, source=client_ip)
+            return _login_form_failed(next_path, db, webui.EXPIRED, 400)
+
+        if not db or not login_name or not password:
+            return _login_form_failed(next_path, db, webui.INVALID, 401)
+
+        uid, claims, error = _authenticate(db, login_name, password, client_ip)
+        if error is not None:
+            kind, retry = error
+            if kind == "rate_limited":
+                response = _login_form_failed(next_path, db, webui.RATE_LIMITED, 429)
+                response.headers["Retry-After"] = str(retry)
+                return response
+            if kind == "upstream":
+                return _login_form_failed(next_path, db, webui.UPSTREAM, 503)
+            return _login_form_failed(next_path, db, webui.INVALID, 401)
+
+        response = RedirectResponse(next_path, status_code=303)
+        # _issue sets the refresh cookie on whatever response is actually returned, which is the
+        # whole point of this surface: the cookie finally lands on the gateway's own host.
+        _issue(response, db, uid, claims, password)
+        response.delete_cookie(CSRF_COOKIE, path="/auth")
+        return response
+
+    @router.post("/auth/login")
+    def login(payload: LoginRequest, request: Request, response: Response):
+        """The JSON API. Identical policy to the browser form, because both call _authenticate."""
+        client_ip = request.client.host if request.client else "unknown"
+        uid, claims, error = _authenticate(payload.db, payload.login, payload.password, client_ip)
+        if error is not None:
+            kind, retry = error
+            if kind == "rate_limited":
+                return JSONResponse(
+                    {"error": "rate_limited",
+                     "detail": "Too many authentication attempts. Try again later."},
+                    status_code=429,
+                    headers={"Retry-After": str(retry)},
+                )
+            if kind == "upstream":
+                return JSONResponse(
+                    {"error": "upstream_unavailable",
+                     "detail": "Authentication backend unavailable."},
+                    status_code=503,
+                )
+            return _invalid()
         return _issue(response, payload.db, uid, claims, payload.password)
 
     @router.post("/auth/refresh")
@@ -328,6 +440,23 @@ def create_app(settings=None) -> FastAPI:
         "detail": "This tenant's subscription is not active.",
     }
 
+    def _wants_html(request: Request) -> bool:
+        """A person, as opposed to the portal or a script. Only the presentation branches on this;
+        every authorisation decision is the same either way."""
+        return "text/html" in (request.headers.get("accept") or "")
+
+    def _login_redirect(inner_next: str):
+        """Send the browser to the gateway's own login page, remembering where it was going.
+
+        The absolute base comes from configuration and not from the request: behind two proxies the
+        Host that arrives here is the ODOO host, so building this from {host} would send people to
+        a login page that does not exist there.
+        """
+        target = "%s/auth/login?next=%s" % (
+            settings.public_base, urllib.parse.quote(inner_next, safe=""),
+        )
+        return RedirectResponse(target, status_code=303)
+
     def _sso_refusal(ent):
         """402 either way; the body says which of the two happened. Never 403: the person is
         authenticated and is who they say they are, exactly as contract 07 sets out."""
@@ -336,8 +465,15 @@ def create_app(settings=None) -> FastAPI:
 
     @router.get("/auth/sso/odoo")
     def sso_odoo(request: Request, response: Response, next: str = "/odoo"):
+        safe_next = _safe_path(next, "/odoo")
         token = request.cookies.get(settings.refresh_cookie_name)
         if not token:
+            # No ATHERA session on this host yet. A person gets the login page; anything speaking
+            # JSON keeps the status code it can act on.
+            if _wants_html(request):
+                return _login_redirect(
+                    "/auth/sso/odoo?next=" + urllib.parse.quote(safe_next, safe="")
+                )
             return JSONResponse(
                 {"error": "no_refresh_token", "detail": "No refresh cookie present."},
                 status_code=401,
@@ -382,9 +518,8 @@ def create_app(settings=None) -> FastAPI:
         ticket = sso_mod.mint_ticket(
             settings, ring, tenant, uid, bool(claims.get("is_super_admin", False))
         )
-        # `next` is a path on the Odoo host and is never allowed to become an absolute URL: a
-        # redirector that accepts one is an open redirect wearing an SSO costume.
-        safe_next = next if next.startswith("/") and not next.startswith("//") else "/odoo"
+        # `next` was validated on the way in: a path on the Odoo host and never an absolute URL,
+        # because a redirector that accepts one is an open redirect wearing an SSO costume.
         target = "%s/athera/sso?ticket=%s&next=%s" % (
             settings.odoo_sso_base, ticket, urllib.parse.quote(safe_next, safe=""),
         )
@@ -441,6 +576,16 @@ def create_app(settings=None) -> FastAPI:
             try:
                 claims = sso_mod.verify_route_token(settings, ring, token)
             except Exception:  # noqa: BLE001
+                # Expiry lands here too, and after ROUTE_TTL that is the ordinary case rather than
+                # an attack. A person is sent back through the handoff; a forged token takes the
+                # same path and gets no further, because the door is still the gateway.
+                if _wants_html(request):
+                    return _login_redirect(
+                        "/auth/sso/odoo?next=" + urllib.parse.quote(
+                            _safe_path(request.headers.get("x-forwarded-uri", "/odoo"), "/odoo"),
+                            safe="",
+                        )
+                    )
                 return JSONResponse(
                     {"error": "invalid_route", "detail": "Route token is not valid."},
                     status_code=401,
@@ -454,6 +599,15 @@ def create_app(settings=None) -> FastAPI:
             query = urllib.parse.urlparse(uri).query
             ticket = urllib.parse.parse_qs(query).get("ticket", [""])[0]
             if not ticket:
+                # THE COLD ENTRY. Someone typed the Odoo hostname with no ATHERA session at all.
+                # Before this existed the edge answered a bare JSON 401 and the door was unusable
+                # by a human -- which is why the cutover waited for it.
+                if _wants_html(request):
+                    return _login_redirect(
+                        "/auth/sso/odoo?next=" + urllib.parse.quote(
+                            _safe_path(uri or "/odoo", "/odoo"), safe="",
+                        )
+                    )
                 return JSONResponse(
                     {"error": "no_session", "detail": "No ATHERA session for the Odoo door."},
                     status_code=401,

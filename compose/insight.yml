@@ -427,6 +427,8 @@ services:
       INSIGHT_PORTAL_SEMANTIC_API_URL: ${INSIGHT_PORTAL_SEMANTIC_API_URL:-http://semantic-api:8080}
       INSIGHT_PORTAL_LOGIN_GATEWAY_URL: ${INSIGHT_PORTAL_LOGIN_GATEWAY_URL:-http://login-gateway:8080}
       INSIGHT_PORTAL_JWKS_URL: ${INSIGHT_PORTAL_JWKS_URL:-http://login-gateway:8080/.well-known/jwks.json}
+      # Absolute: another origin. The link is a convenience; the gate is the door itself.
+      INSIGHT_PORTAL_ODOO_DOOR_URL: ${INSIGHT_PORTAL_ODOO_DOOR_URL:-https://auth.${ATHERA_DOMAIN:-athera.localhost}/auth/sso/odoo}
       INSIGHT_PORTAL_JWT_ISSUER: ${LOGIN_GATEWAY_JWT_ISSUER:-https://login-gateway.local/}
       INSIGHT_PORTAL_JWT_AUDIENCE: ${LOGIN_GATEWAY_JWT_AUDIENCE:-insight-portal}
       INSIGHT_PORTAL_ODOO_DB: ${ODOO_DB_NAME:-bct}

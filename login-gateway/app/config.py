@@ -41,6 +41,11 @@ class Settings:
     odoo_sso_base: str
     #: Nama cookie token rute, host-scoped pada hostname Odoo.
     route_cookie_name: str
+    #: Basis publik gerbang itu sendiri (`https://auth.<domain>`). Dipakai untuk
+    #: mengalihkan peramban tanpa sesi ke halaman login. Gerbang tidak bisa
+    #: menyimpulkannya dari permintaan: di belakang dua lapis proxy, Host yang
+    #: sampai ke sini adalah host Odoo, bukan host gerbang.
+    public_base: str
 
     def key_paths(self) -> list:
         return [
@@ -100,4 +105,7 @@ def settings_from_env(environ: dict | None = None) -> Settings:
             "LOGIN_GATEWAY_ODOO_SSO_BASE", "https://odoo.athera.localhost"
         ).rstrip("/"),
         route_cookie_name=env.get("LOGIN_GATEWAY_ROUTE_COOKIE_NAME", "athera_route"),
+        public_base=env.get(
+            "LOGIN_GATEWAY_PUBLIC_BASE", "https://auth.athera.localhost"
+        ).rstrip("/"),
     )

@@ -18,11 +18,14 @@ export function Nav({
   active,
   roles,
   subject,
+  odooDoor,
 }: {
   tenant: string;
   active: string;
   roles: string[];
   subject: string;
+  /** Absolute URL of the SSO door, or null when this plan does not include Odoo. */
+  odooDoor?: string | null;
 }) {
   return (
     <header
@@ -30,7 +33,7 @@ export function Nav({
       style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
     >
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 sm:px-4">
-        <span className="text-sm font-semibold text-ink">BCT Insight</span>
+        <span className="text-sm font-semibold text-ink">ATHERA Insight</span>
         <span
           className="rounded px-1.5 py-0.5 text-[11px] font-medium"
           style={{ background: "var(--accent-soft)", color: "var(--series-1)" }}
@@ -40,7 +43,23 @@ export function Nav({
         <span className="hidden text-[11px] text-ink-3 sm:inline">
           {subject} - {roles.length === 0 ? "tanpa peran" : roles.join(", ")}
         </span>
-        <form method="post" action="/api/auth/logout" className="ml-auto">
+        {odooDoor ? (
+          <a
+            href={odooDoor}
+            className="ml-auto text-xs underline text-ink-2"
+            /* Another origin, and one that hands out a session. `noopener` so the opened document
+               cannot reach back through window.opener; `noreferrer` so the door is not told which
+               view the visitor came from. */
+            rel="noopener noreferrer"
+          >
+            Buka Odoo
+          </a>
+        ) : null}
+        <form
+          method="post"
+          action="/api/auth/logout"
+          className={odooDoor ? "" : "ml-auto"}
+        >
           <button type="submit" className="text-xs underline text-ink-2">
             Keluar
           </button>
