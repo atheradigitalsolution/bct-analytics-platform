@@ -35,6 +35,12 @@ class Settings:
     #: product — see app/registry.py, which says so at WARNING on every boot.
     registry_dsn: str
     registry_cache_ttl: int
+    #: Base URL peramban untuk pintu Odoo. BUKAN `odoo_url`, yang merupakan template
+    #: `{db}` untuk JSON-RPC di dalam jaringan. Keduanya sengaja terpisah: yang satu
+    #: alamat yang diketik manusia, yang satu nama layanan internal.
+    odoo_sso_base: str
+    #: Nama cookie token rute, host-scoped pada hostname Odoo.
+    route_cookie_name: str
 
     def key_paths(self) -> list:
         return [
@@ -85,4 +91,13 @@ def settings_from_env(environ: dict | None = None) -> Settings:
         # can still mint a session by refreshing, so it trades staleness for
         # load on the control plane and should stay in the tens of seconds.
         registry_cache_ttl=int(env.get("LOGIN_GATEWAY_REGISTRY_CACHE_TTL", "30")),
+        # The deployment's real domain arrives from compose, which derives it from
+        # ATHERA_DOMAIN. The fallback here matches the rest of the repo and is a
+        # development address on purpose: a production hostname hard-coded as a
+        # default is one that keeps working after the variable that was supposed
+        # to control it has been deleted.
+        odoo_sso_base=env.get(
+            "LOGIN_GATEWAY_ODOO_SSO_BASE", "https://odoo.athera.localhost"
+        ).rstrip("/"),
+        route_cookie_name=env.get("LOGIN_GATEWAY_ROUTE_COOKIE_NAME", "athera_route"),
     )

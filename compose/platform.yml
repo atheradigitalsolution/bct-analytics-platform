@@ -105,6 +105,16 @@ services:
       # WARNING on every boot — it is not a silent default.
       LOGIN_GATEWAY_REGISTRY_DSN: ${LOGIN_GATEWAY_REGISTRY_DSN:-}
       LOGIN_GATEWAY_REGISTRY_CACHE_TTL: ${LOGIN_GATEWAY_REGISTRY_CACHE_TTL:-30}
+      # The browser-facing address of the Odoo door (brief 08). Derived from
+      # ATHERA_DOMAIN rather than spelled out, for the same reason
+      # MARKETING_SITE_LOGIN_URL is: a deployment that changes its domain must
+      # not have to remember a second place. NOT LOGIN_GATEWAY_ODOO_URL, which
+      # is the in-network JSON-RPC address and is a different thing entirely.
+      LOGIN_GATEWAY_ODOO_SSO_BASE: ${LOGIN_GATEWAY_ODOO_SSO_BASE:-https://odoo.${ATHERA_DOMAIN:-athera.localhost}}
+      # Host-scoped cookie carrying the signed route token. Renaming it is a
+      # coordinated edit: the Odoo module reads the name off the exchange reply,
+      # but an already-issued cookie under the old name is simply ignored.
+      LOGIN_GATEWAY_ROUTE_COOKIE_NAME: ${LOGIN_GATEWAY_ROUTE_COOKIE_NAME:-athera_route}
       TZ: ${TZ:-UTC}
     volumes:
       - ../login-gateway/secrets:/run/secrets:ro
