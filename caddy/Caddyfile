@@ -20,7 +20,7 @@
 # the mechanism that makes multi-tenancy work at all.
 #
 # %d IS THE FIRST LABEL OF THE HOST, not the whole thing. That is the one
-# subtlety here. `odoo-admin.<domain>` would give %d = "odoo-admin" and look
+# subtlety here. `odoo.<domain>` would give %d = "odoo" and look
 # for a database of that name. So that route REWRITES the upstream Host to
 # `<ATHERA_ADMIN_DB>.<domain>`, which makes %d resolve to exactly the right
 # database. Tenant routes need no such rewrite: their hostname's first label
@@ -46,14 +46,14 @@
 # at the moment DNS becomes correct.
 #
 # EVERY HOSTNAME BELOW NEEDS A DNS RECORD in production. Currently:
-#   @  www  app  admin  odoo-admin  auth  bct  acme
+#   @  www  insight  admin  odoo  auth  bct  acme
 #
 # HOSTS FILE, workstation only. Windows does not resolve *.localhost
 # automatically. Add:
 #     127.0.0.1  athera.localhost
 #     127.0.0.1  admin.athera.localhost
-#     127.0.0.1  odoo-admin.athera.localhost
-#     127.0.0.1  app.athera.localhost
+#     127.0.0.1  odoo.athera.localhost
+#     127.0.0.1  insight.athera.localhost
 #     127.0.0.1  bct.athera.localhost
 #     127.0.0.1  <slug>.athera.localhost      per provisioned client
 # Anything scripted can skip that with `curl -H 'Host: ...'`, which is how the
@@ -176,26 +176,63 @@ admin.{$ATHERA_DOMAIN:athera.localhost} {
 # Still reachable, and still needed: tenant.registry, custom_hub_console and
 # the onboarding journey are Odoo models, and hub-portal covers the lifecycle
 # rather than replacing the whole console. The Host rewrite is the trick
-# described in the header — %d is the FIRST LABEL, so `odoo-admin` would look
+# described in the header — %d is the FIRST LABEL, so `odoo` would look
 # for a database of that name.
-odoo-admin.{$ATHERA_DOMAIN:athera.localhost} {
+odoo.{$ATHERA_DOMAIN:athera.localhost} {
 	encode zstd gzip
 	import site_tls
 
-	reverse_proxy odoo:8069 {
-		# BOTH headers, and that is the whole fix. Rewriting Host alone was
-		# measured to leave this route on 303 -> /web/database/selector while a
-		# direct request carrying the same Host answered 200. The reason:
-		# odoo runs with proxy_mode=True, which makes it prefer
-		# X-Forwarded-Host over Host when deciding what %d is — and Caddy sets
-		# X-Forwarded-Host automatically from the ORIGINAL request, so it said
-		# "odoo-admin" and looked for a database of that name. Overriding only
-		# the header a human thinks of is how this fails silently.
-		header_up Host "{$ATHERA_ADMIN_DB:athera_admin}.{$ATHERA_DOMAIN:athera.localhost}"
-		header_up X-Forwarded-Host "{$ATHERA_ADMIN_DB:athera_admin}.{$ATHERA_DOMAIN:athera.localhost}"
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
+	# Public pricing at the edge — served BEFORE the gate and before any Odoo Host
+	# rewrite, so a visitor with no session can still read what Odoo costs. It never
+	# enters Odoo and never touches %d/dbfilter.
+	handle /harga* {
+		rewrite * /harga/odoo
+		reverse_proxy marketing-site:3000 {
+			import app_headers
+		}
+	}
+
+	handle {
+		# THE GATE (brief 08, cutover 2026-09-03). Every request asks the gateway one
+		# question: which database is this for? A signed route token answers it, and the
+		# entitlement behind that token is re-read on each request — so a cancelled
+		# subscription closes this door in seconds rather than at the end of a session.
+		#
+		# WHY forward_auth AND NOT A COOKIE CADDY READS ITSELF. Odoo picks its database
+		# from the first label of Host, so Host must be rewritten BEFORE Odoo sees the
+		# request, and Caddy cannot read Odoo's session cookie to learn which database
+		# that is. A plain cookie naming the database would be editable by the visitor
+		# and would hand back the database selector through the back door. The gateway
+		# signs the route token; that signature is the whole difference.
+		#
+		# A browser with no session is answered with a 303 to the gateway's login page
+		# (login-gateway returns it; forward_auth copies any non-2xx straight through).
+		# A JSON client is answered 401. Only the presentation differs.
+		forward_auth login-gateway:8080 {
+			uri /auth/sso/route
+			# Only this header is copied back onto the request. Copying more would let
+			# the gateway inject arbitrary headers into Odoo.
+			copy_headers X-Athera-Db
+		}
+
+		reverse_proxy odoo:8069 {
+			# BOTH headers, and that is the whole fix. Rewriting Host alone was
+			# measured to leave this route on 303 -> /web/database/selector while a
+			# direct request carrying the same Host answered 200. odoo runs with
+			# proxy_mode=True and prefers X-Forwarded-Host when deciding what %d is,
+			# and Caddy sets X-Forwarded-Host from the ORIGINAL request — so it said
+			# "odoo" and looked for a database of that name. Overriding only the header
+			# a human thinks of is how this fails silently.
+			#
+			# The database is no longer a fixed ATHERA_ADMIN_DB: it comes from the
+			# signed token, which is what lets one hostname serve the console AND each
+			# client's own database.
+			header_up Host "{http.request.header.X-Athera-Db}.{$ATHERA_DOMAIN:athera.localhost}"
+			header_up X-Forwarded-Host "{http.request.header.X-Athera-Db}.{$ATHERA_DOMAIN:athera.localhost}"
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
 	}
 
 	log {
@@ -208,7 +245,8 @@ odoo-admin.{$ATHERA_DOMAIN:athera.localhost} {
 # ----- Client Dashboard (ATHERA Insight) ---------------------------------
 # No dbfilter involvement: the portal is not Odoo. It authenticates through
 # login-gateway and reads figures through semantic-api, both by service name.
-app.{$ATHERA_DOMAIN:athera.localhost} {
+
+insight.{$ATHERA_DOMAIN:athera.localhost} {
 	encode zstd gzip
 	import site_tls
 
