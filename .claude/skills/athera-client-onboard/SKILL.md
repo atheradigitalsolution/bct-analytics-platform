@@ -100,7 +100,7 @@ env.cr.commit()
 EOF
 ```
 
-Store the credential at `/opt/athera-backup/config/<slug>-admin-credential.txt`, mode 600 — the same place `.env` snapshots already live, so it is covered by the daily backup.
+Store the credential in the operator's credential directory alongside the `.env` snapshots, mode 600, so the daily backup already covers it. The path is deployment-local and is recorded in the operator runbook, not here — this file is tracked in a public repository.
 
 ### 6. Masking salt
 
@@ -152,5 +152,5 @@ State alone is enough; nothing needs restarting. `state='suspended'` or a `valid
 
 - No deprovision script. `scripts/tenant-provision.sh` has a TODO where it belongs.
 - `LOGIN_GATEWAY_ALLOWED_DATABASES` must also name the new slug, or the gateway refuses it with the same response it gives bad credentials.
-- Nothing teaches the backup script about a new tenant. `/usr/local/bin/athera-backup.sh` carries a hard-coded list in two places (`for tenant in ...` and the checksum loop `for name in ...`); a tenant missing from either is backed up silently incompletely, or not at all. Add the slug to BOTH and run the script once by hand rather than waiting for 03:30.
+- Nothing teaches the backup script about a new tenant. The backup script carries a hard-coded list in two places (`for tenant in ...` and the checksum loop `for name in ...`); a tenant missing from either is backed up silently incompletely, or not at all. Add the slug to BOTH and run the script once by hand rather than waiting for 03:30.
 - Provisioning does not register the tenant anywhere the operator can see it fail. There is no check that the slug is absent from the reserved set (`insight`, `odoo`, `app`, `admin`, `auth`, `www`, `mail`) — those would hijack a platform route.

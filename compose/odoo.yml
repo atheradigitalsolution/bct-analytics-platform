@@ -285,7 +285,7 @@ services:
       # ke host.docker.internal akan gagal verifikasi nama, sedangkan menyambung ke DNS publiknya
       # memutar trafik keluar-masuk lewat IP publik tanpa alasan. Dipetakan begini, SNI dan
       # sertifikat cocok sementara koneksinya tidak pernah meninggalkan mesin.
-      - "mail.athera-digital.com:host-gateway"
+      - "${ATHERA_MAIL_HOST:-host.docker.internal}:host-gateway"
     networks:
       bct:
         aliases:
