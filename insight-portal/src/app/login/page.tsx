@@ -39,7 +39,7 @@ export default async function LoginPage({
         className="w-full rounded-lg border p-5"
         style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
       >
-        <h1 className="text-base font-semibold text-ink">BCT Insight Portal</h1>
+        <h1 className="text-base font-semibold text-ink">ATHERA Insight Portal</h1>
         <p className="mt-1 text-xs text-ink-3">
           Masuk menggunakan akun Odoo Anda. Sesi diverifikasi terhadap JWKS
           <span className="whitespace-nowrap"> login-gateway</span> dengan algoritma RS256.

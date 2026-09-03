@@ -136,7 +136,7 @@ def create_app(warehouse=None, verifier=None, registry=None, max_limit=None) -> 
     if max_limit is None:
         max_limit = int(os.environ.get("SEMANTIC_API_MAX_LIMIT", "5000"))
 
-    app = FastAPI(title="BCT semantic API", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="ATHERA semantic API", docs_url=None, redoc_url=None, openapi_url=None)
     router = APIRouter()
 
     def _audit(event, session, **fields):

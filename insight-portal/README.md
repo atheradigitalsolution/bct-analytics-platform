@@ -1,6 +1,6 @@
 # insight-portal
 
-The BCT analytics dashboard. Next.js 15.5.21, App Router, TypeScript strict, Tailwind 4.
+The ATHERA Insight analytics dashboard. Next.js 15.5.21, App Router, TypeScript strict, Tailwind 4.
 
 Every number on screen came from `POST /v1/query` on the semantic layer. This application writes no
 SQL, holds no database credential, and never recomputes a metric. Where the brief asks for a figure

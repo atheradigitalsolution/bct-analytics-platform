@@ -3,9 +3,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BCT Insight Portal",
+  title: "ATHERA Insight Portal",
   description:
-    "Dasbor analitik BCT. Setiap angka berasal dari lapisan semantik, dengan cakupan tenant yang ditetapkan di sisi server.",
+    "Dasbor analitik ATHERA Insight. Setiap angka berasal dari lapisan semantik, dengan cakupan tenant yang ditetapkan di sisi server.",
   robots: { index: false, follow: false },
 };
 

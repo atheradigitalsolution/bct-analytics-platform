@@ -22,7 +22,7 @@ What the warehouse depends on:
 """,
     "version": "19.0.1.0.0",
     "category": "Sales",
-    "author": "BCT Analytics Platform",
+    "author": "ATHERA Analytics Platform",
     "website": "https://example.invalid/bct",
     "license": "LGPL-3",
     "depends": [

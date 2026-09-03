@@ -75,8 +75,8 @@ ON CONFLICT (mart_name) DO UPDATE SET
 -- ---------------------------------------------------------------------------
 INSERT INTO warehouse.tenant_registry
   (tenant_id, display_name, source_database, slot_name, publication, mask_salt_env, is_test_tenant, active) VALUES
-  ('bct',    'BCT (primary)',        'bct', 'bct_slot_bct',    'bct_cdc_bct',    'WAREHOUSE_MASK_SALT_BCT',     false, true),
-  ('bct_t2', 'BCT isolation tenant', 'bct', 'bct_slot_bct_t2', 'bct_cdc_bct_t2', 'WAREHOUSE_MASK_SALT_DEFAULT', true,  true)
+  ('bct',    'ATHERA (primary)',        'bct', 'bct_slot_bct',    'bct_cdc_bct',    'WAREHOUSE_MASK_SALT_BCT',     false, true),
+  ('bct_t2', 'ATHERA isolation tenant', 'bct', 'bct_slot_bct_t2', 'bct_cdc_bct_t2', 'WAREHOUSE_MASK_SALT_DEFAULT', true,  true)
 ON CONFLICT (tenant_id) DO UPDATE SET
   display_name    = EXCLUDED.display_name,
   source_database = EXCLUDED.source_database,

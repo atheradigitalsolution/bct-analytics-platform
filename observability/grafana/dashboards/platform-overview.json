@@ -1,6 +1,6 @@
 {
   "uid": "bct-platform-overview",
-  "title": "BCT — Platform overview",
+  "title": "ATHERA — Platform overview",
   "description": "Odoo 19 OLTP platform health. The replication-slot row is the one that matters: max_slot_wal_keep_size is 2GB, and a slot that crosses it is invalidated by Postgres to protect Odoo. See docs/adr/0001-analytics-warehouse.md.",
   "tags": ["platform", "postgres", "odoo19-bct"],
   "timezone": "browser",

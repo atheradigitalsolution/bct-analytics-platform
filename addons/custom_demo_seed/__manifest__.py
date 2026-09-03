@@ -27,7 +27,7 @@ None of that makes it safe to install in production. Do not add it to the produc
 """,
     "version": "19.0.1.0.0",
     "category": "Tools",
-    "author": "BCT Analytics Platform",
+    "author": "ATHERA Analytics Platform",
     "website": "https://example.invalid/bct",
     "license": "LGPL-3",
     "depends": [

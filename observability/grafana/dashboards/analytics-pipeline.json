@@ -1,6 +1,6 @@
 {
   "uid": "bct-analytics-pipeline",
-  "title": "BCT - Analytics pipeline",
+  "title": "ATHERA — Analytics pipeline",
   "description": "CDC pipeline and warehouse health for project odoo19-bct.\n\nOwned by the Data Warehouse agent (contract 04 section 7: observability/grafana/dashboards/analytics-*.json).\n\nEvery panel reads the prometheus datasource. Nothing here queries the warehouse directly: a Grafana datasource is reachable by every user with Editor rights, and business data belongs behind RLS with a tenant scope, which a shared dashboard connection does not have. Row counts, timestamps and test outcomes are operational, and that is all this dashboard shows.",
   "tags": [
     "analytics",

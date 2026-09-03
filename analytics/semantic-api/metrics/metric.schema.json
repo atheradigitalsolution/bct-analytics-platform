@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bct.local/schemas/metric.schema.json",
-  "title": "BCT metric definition",
+  "title": "ATHERA metric definition",
   "description": "Frozen contract 03. A metric that fails this schema fails the build. Two rules the schema cannot express are enforced in app/registry.py instead: tenant_id must appear in grain (contract 03 rule 1), and pdp_class may never be 'secret'.",
   "type": "object",
   "additionalProperties": false,

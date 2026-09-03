@@ -19,7 +19,7 @@ fail-closed behaviour of the rules.
 """,
     "version": "19.0.1.0.0",
     "category": "Productivity",
-    "author": "BCT Analytics Platform",
+    "author": "ATHERA Analytics Platform",
     "website": "https://example.invalid/bct",
     "license": "LGPL-3",
     "depends": [

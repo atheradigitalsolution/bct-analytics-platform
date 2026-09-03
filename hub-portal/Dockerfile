@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# insight-site - the BCT analytics dashboard.
+# hub-portal — the ATHERA super admin console.
 #
 # Multi-stage on the digest pinned in docs/agents/PLAN.md. A digest, not a tag: node:22-alpine moves
 # and a tag would silently change the base of a signed image between two builds of the same commit.

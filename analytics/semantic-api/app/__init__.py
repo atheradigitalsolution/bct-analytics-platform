@@ -1,1 +1,1 @@
-"""BCT semantic API - frozen contract 03 implementation."""
+"""ATHERA semantic API - frozen contract 03 implementation."""

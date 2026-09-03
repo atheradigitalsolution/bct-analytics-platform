@@ -1,4 +1,4 @@
-# Threat model — BCT analytics platform
+# Threat model — ATHERA analytics platform
 
 Owner: Security agent. Status: **living document, reviewed at every gate.**
 Scope: the Odoo 19 CE stack, the CDC pipeline, the warehouse, `login-gateway`,

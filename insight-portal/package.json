@@ -2,7 +2,7 @@
   "name": "insight-portal",
   "version": "0.1.0",
   "private": true,
-  "description": "BCT analytics dashboard. Every number comes from the semantic layer; no SQL and no metric arithmetic lives here.",
+  "description": "ATHERA Insight analytics dashboard. Every number comes from the semantic layer; no SQL and no metric arithmetic lives here.",
   "engines": {
     "node": ">=22 <25"
   },

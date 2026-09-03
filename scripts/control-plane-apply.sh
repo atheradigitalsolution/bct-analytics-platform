@@ -202,7 +202,7 @@ if [ "$SEED_BCT" -eq 1 ]; then
     # is_active() treats as a manually managed account.
     psql_super "$ADMIN_DB" -q -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO tenant_registry.tenants (slug, display_name, db_name, state, plan_code, activated_at)
-VALUES ('$ODOO_DB_NAME', 'BCT (internal)', '$ODOO_DB_NAME', 'active', 'suite', now())
+VALUES ('$ODOO_DB_NAME', 'ATHERA (internal)', '$ODOO_DB_NAME', 'active', 'suite', now())
 ON CONFLICT (slug) DO NOTHING;
 SQL
 else

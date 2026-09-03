@@ -19,7 +19,7 @@ It re-parents existing menu records by XML ID rather than redefining them, so th
 custom accounting modules that hang 75 menu items off `account.menu_finance_*`
 follow their parents automatically and need no change.
 """,
-    "author": "BCT Analytics Platform",
+    "author": "ATHERA Analytics Platform",
     "website": "https://example.invalid/bct",
     "category": "Accounting/Accounting",
     "version": "19.0.1.0.0",

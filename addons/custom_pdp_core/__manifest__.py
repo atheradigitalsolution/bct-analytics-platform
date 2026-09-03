@@ -19,7 +19,7 @@ strings, so it can be installed into any database regardless of which business a
 """,
     "version": "19.0.1.0.0",
     "category": "Productivity/Data Privacy",
-    "author": "BCT Analytics Platform",
+    "author": "ATHERA Analytics Platform",
     "website": "https://example.invalid/bct",
     "license": "LGPL-3",
     "depends": ["base"],
