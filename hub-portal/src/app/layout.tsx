@@ -25,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav>
               <Link href="/">Klien</Link>
               <Link href="/cms">Konten</Link>
+              <Link href="/billing">Penagihan</Link>
               {ODOO_DOOR === "" ? null : (
                 <a href={ODOO_DOOR} rel="noopener noreferrer">Odoo</a>
               )}

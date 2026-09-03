@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <!--
+      Tiga surat, satu tangga. Nadanya menaik dan setiap surat menyebut TANGGAL akses ditutup,
+      bukan sekadar "segera" — klien yang tahu tanggalnya bisa bertindak; klien yang hanya
+      diberi tahu bahwa ia terlambat hanya diberi rasa bersalah.
+
+      `noupdate` supaya teks yang sudah disunting operator tidak dikembalikan saat upgrade.
+    -->
+
+    <record id="mail_template_invoice_issued" model="mail.template">
+      <field name="name">ATHERA Billing: tagihan diterbitkan</field>
+      <field name="model_id" ref="account.model_account_move"/>
+      <field name="subject">Tagihan ATHERA {{ object.name }} — jatuh tempo {{ object.invoice_date_due }}</field>
+      <!-- Tanpa fallback berisi domain: alamat perusahaan adalah konfigurasi deployment, dan
+           sebuah domain produksi yang di-hardcode di sini akan tetap bekerja setelah field yang
+           seharusnya mengendalikannya dikosongkan. Kalau kosong, Odoo memakai mail.default.from. -->
+      <field name="email_from">{{ user.company_id.email }}</field>
+      <field name="partner_to">{{ object.partner_id.id }}</field>
+      <field name="body_html" type="html">
+        <div style="font:14px/1.6 system-ui,sans-serif;color:#16181d">
+          <p>Halo <t t-out="object.partner_id.name or ''"/>,</p>
+          <p>
+            Tagihan langganan ATHERA untuk periode
+            <strong><t t-out="object.athera_period_start or ''"/></strong> s.d.
+            <strong><t t-out="object.athera_period_end or ''"/></strong> sudah terbit.
+          </p>
+          <table style="border-collapse:collapse;margin:1rem 0">
+            <tr><td style="padding:.2rem 1rem .2rem 0">Nomor</td><td><strong><t t-out="object.name or ''"/></strong></td></tr>
+            <tr><td style="padding:.2rem 1rem .2rem 0">Jumlah</td><td><strong><t t-out="format_amount(object.amount_total, object.currency_id)"/></strong></td></tr>
+            <tr><td style="padding:.2rem 1rem .2rem 0">Jatuh tempo</td><td><strong><t t-out="object.invoice_date_due or ''"/></strong></td></tr>
+          </table>
+          <p>Terima kasih.</p>
+        </div>
+      </field>
+      <field name="lang">{{ object.partner_id.lang }}</field>
+      <field name="auto_delete" eval="False"/>
+    </record>
+
+    <record id="mail_template_arrears_reminder" model="mail.template">
+      <field name="name">ATHERA Billing: pengingat tunggakan</field>
+      <field name="model_id" ref="account.model_account_move"/>
+      <field name="subject">Pengingat: tagihan ATHERA {{ object.name }} belum kami terima</field>
+      <!-- Tanpa fallback berisi domain: alamat perusahaan adalah konfigurasi deployment, dan
+           sebuah domain produksi yang di-hardcode di sini akan tetap bekerja setelah field yang
+           seharusnya mengendalikannya dikosongkan. Kalau kosong, Odoo memakai mail.default.from. -->
+      <field name="email_from">{{ user.company_id.email }}</field>
+      <field name="partner_to">{{ object.partner_id.id }}</field>
+      <field name="body_html" type="html">
+        <div style="font:14px/1.6 system-ui,sans-serif;color:#16181d">
+          <p>Halo <t t-out="object.partner_id.name or ''"/>,</p>
+          <p>
+            Tagihan <strong><t t-out="object.name or ''"/></strong> sebesar
+            <strong><t t-out="format_amount(object.amount_residual, object.currency_id)"/></strong>
+            jatuh tempo pada <strong><t t-out="object.invoice_date_due or ''"/></strong> dan belum
+            kami terima.
+          </p>
+          <p>
+            Layanan tetap berjalan sampai
+            <strong><t t-out="object.athera_suspend_on or ''"/></strong>. Setelah tanggal itu akses
+            akan ditangguhkan otomatis sampai pembayaran masuk.
+          </p>
+          <p>Kalau pembayaran sudah dikirim, abaikan pesan ini.</p>
+        </div>
+      </field>
+      <field name="lang">{{ object.partner_id.lang }}</field>
+      <field name="auto_delete" eval="False"/>
+    </record>
+
+    <record id="mail_template_suspended" model="mail.template">
+      <field name="name">ATHERA Billing: akses ditangguhkan</field>
+      <field name="model_id" ref="account.model_account_move"/>
+      <field name="subject">Akses ATHERA ditangguhkan — tagihan {{ object.name }}</field>
+      <!-- Tanpa fallback berisi domain: alamat perusahaan adalah konfigurasi deployment, dan
+           sebuah domain produksi yang di-hardcode di sini akan tetap bekerja setelah field yang
+           seharusnya mengendalikannya dikosongkan. Kalau kosong, Odoo memakai mail.default.from. -->
+      <field name="email_from">{{ user.company_id.email }}</field>
+      <field name="partner_to">{{ object.partner_id.id }}</field>
+      <field name="body_html" type="html">
+        <div style="font:14px/1.6 system-ui,sans-serif;color:#16181d">
+          <p>Halo <t t-out="object.partner_id.name or ''"/>,</p>
+          <p>
+            Akses ATHERA untuk tenant
+            <strong><t t-out="object.athera_subscription_id.tenant_slug or ''"/></strong> kami
+            tangguhkan karena tagihan <strong><t t-out="object.name or ''"/></strong> sebesar
+            <strong><t t-out="format_amount(object.amount_residual, object.currency_id)"/></strong>
+            melewati masa tenggang.
+          </p>
+          <p>
+            <strong>Data Anda tidak dihapus.</strong> Akses terbuka kembali secara otomatis
+            beberapa saat setelah pembayaran kami terima.
+          </p>
+        </div>
+      </field>
+      <field name="lang">{{ object.partner_id.lang }}</field>
+      <field name="auto_delete" eval="False"/>
+    </record>
+  </data>
+</odoo>

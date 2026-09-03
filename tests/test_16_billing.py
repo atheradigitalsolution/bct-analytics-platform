@@ -182,6 +182,83 @@ def test_no_real_client_was_invoiced_under_a_placeholder_npwp(evidence):
 
 
 # ---------------------------------------------------------------------------------------------
+# Dunning — penangguhan yang senyap adalah keluhan, bukan penagihan
+# ---------------------------------------------------------------------------------------------
+
+
+def test_outgoing_mail_is_configured(evidence):
+    """Tanpa `ir.mail_server`, seluruh tangga penagihan mengantre surat yang tidak pernah pergi.
+
+    `from_filter` ikut diperiksa: tanpa itu Odoo menulis ulang pengirim menjadi default-nya, dan
+    surat yang keluar atas nama `noreply@localhost` tidak akan pernah selaras dengan SPF/DKIM.
+    """
+    _has_billing()
+    row = _psql("select smtp_host||' '||smtp_port||' '||coalesce(from_filter,'(kosong)') "
+                "from ir_mail_server order by sequence limit 1")
+    evidence.add("mail server", row or "(belum ada)")
+    assert row, "tidak ada ir_mail_server sama sekali"
+    assert "(kosong)" not in row, "from_filter kosong; pengirim akan ditulis ulang"
+
+
+def test_the_dunning_ladder_has_all_three_notices(evidence):
+    _has_billing()
+    # `name` pada mail_template adalah jsonb ter-translasi; LIKE harus dikenakan pada teksnya.
+    names = _psql(
+        "select name->>'en_US' from mail_template "
+        " where name->>'en_US' like 'ATHERA Billing%' order by 1"
+    )
+    evidence.add("template", names or "(belum ada)")
+    assert len(names.splitlines()) == 3, names
+
+
+def test_no_invoice_climbed_the_ladder_without_sending_anything(evidence):
+    """Tahap penagihan hanya boleh naik kalau suratnya benar-benar diantrikan.
+
+    Menaikkan tahap tanpa mengirim menghasilkan klien yang ditangguhkan tanpa pernah diberi tahu —
+    persis keadaan yang kerja ini dimaksudkan untuk mengakhiri.
+    """
+    _has_billing()
+    rows = _psql(
+        "select m.name, m.athera_dunning_stage, "
+        # `model`/`res_id` hidup di mail_message; mail.mail mewarisinya lewat mail_message_id.
+        "       (select count(*) from mail_mail mm "
+        "          join mail_message msg on msg.id = mm.mail_message_id "
+        "         where msg.model = 'account.move' and msg.res_id = m.id) "
+        "  from account_move m "
+        " where m.athera_subscription_id is not null and m.athera_dunning_stage <> 'none'"
+    )
+    evidence.add("tahap vs surat", rows or "(belum ada yang naik tahap)")
+    if not rows:
+        pytest.skip("belum ada faktur yang menaiki tangga penagihan. NOT RUN.")
+    for line in rows.splitlines():
+        name, stage, mails = line.split("|")
+        assert int(mails) > 0, "%s bertahap %s tapi nol surat pernah diantrikan" % (name, stage)
+
+
+# ---------------------------------------------------------------------------------------------
+# Hub-portal — baca lewat view, bukan lewat grant ke tabel Odoo
+# ---------------------------------------------------------------------------------------------
+
+
+def test_the_portal_role_reads_billing_through_a_view_only(evidence):
+    """hub-portal tersambung sebagai `tenant_orchestrator`. Ia harus bisa membaca ringkasan
+    penagihan, dan TIDAK boleh bisa membaca tabel Odoo yang menjadi sumbernya."""
+    _has_billing()
+    allowed = _psql("select has_table_privilege('tenant_orchestrator',"
+                    "'billing.subscription_overview','SELECT')")
+    evidence.add("SELECT pada view", allowed)
+    assert allowed == "t", "role portal tidak bisa membaca view penagihan"
+
+    for table in ("account_move", "athera_subscription", "res_partner"):
+        leaked = _psql("select has_table_privilege('tenant_orchestrator','%s','SELECT')" % table)
+        evidence.add("SELECT pada %s" % table, leaked)
+        assert leaked == "f", (
+            "role portal punya SELECT pada %s — hak-minimalnya sudah melebar ke basis data Odoo"
+            % table
+        )
+
+
+# ---------------------------------------------------------------------------------------------
 # Harga — satu sumber kebenaran
 # ---------------------------------------------------------------------------------------------
 

@@ -26,6 +26,15 @@
       <field name="value">14</field>
     </record>
 
+    <!--
+      Alamat internal yang menerima salinan setiap surat penagihan. Kosong di repo: alamat operator
+      adalah kenyataan lokal sebuah instalasi, bukan bagian dari produk.
+    -->
+    <record id="param_notify_email" model="ir.config_parameter">
+      <field name="key">athera_billing.notify_email</field>
+      <field name="value"></field>
+    </record>
+
     <record id="param_pilot_tenants" model="ir.config_parameter">
       <field name="key">athera_billing.pilot_tenants</field>
       <field name="value"></field>

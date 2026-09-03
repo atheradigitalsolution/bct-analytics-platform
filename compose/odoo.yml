@@ -50,6 +50,10 @@ services:
   # database. See docs/adr/0001-analytics-warehouse.md.
   # =========================================================================
   postgres:
+    # Plafon container 2026-09-03: sebelumnya tanpa mem_limit, sehingga
+    # OOM killer cenderung memilihnya sebagai korban. shared_buffers 256m.
+    mem_limit: 1g
+    memswap_limit: 1536m
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-postgres
     <<: [*restart-policy, *hardening]
@@ -109,6 +113,8 @@ services:
   # Redis 7 — Odoo session store / cache side-channel.
   # =========================================================================
   redis:
+    mem_limit: 256m
+    memswap_limit: 512m
     image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-redis
     <<: [*restart-policy, *hardening]
@@ -167,6 +173,11 @@ services:
   # Odoo 19 CE.
   # =========================================================================
   odoo:
+    # Plafon container 2026-09-03. workers=2 x limit_memory_hard 1.28 GB
+    # = 2.5 GB worst case; 2g memaksa Odoo menegakkan limit_memory_*-nya sendiri
+    # (recycle worker) sebelum host yang kehabisan.
+    mem_limit: 2g
+    memswap_limit: 3g
     build:
       context: ../odoo
       dockerfile: Dockerfile
@@ -264,6 +275,11 @@ services:
       timeout: 10s
       retries: 6
       start_period: 90s
+    # Postfix Mailcow berjalan di HOST, bukan di jaringan ini. Odoo memakai nama ini untuk
+    # menyerahkan surat penagihan; jangan menulis IP bridge Docker langsung — ia berubah
+    # setiap jaringan dibuat ulang. Pola yang sama sudah dipakai alertmanager.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       bct:
         aliases:

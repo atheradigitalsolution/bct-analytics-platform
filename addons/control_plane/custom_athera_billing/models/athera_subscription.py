@@ -50,6 +50,13 @@ NPWP_RE = re.compile(r"^\d{15,16}$")
 #: yaitu penolakan total, dan itu memang bawaan yang benar untuk instalasi baru.
 PILOT_PARAM = "athera_billing.pilot_tenants"
 
+#: Alamat internal yang menerima salinan setiap surat penagihan. Kosong = tidak ada salinan.
+#: Kosong juga di repo: alamat operator adalah kenyataan lokal sebuah instalasi.
+NOTIFY_PARAM = "athera_billing.notify_email"
+
+#: Berapa hari sebelum akses ditutup peringatan AKHIR dikirim.
+FINAL_NOTICE_DAYS = 3
+
 
 class AtheraSubscription(models.Model):
     _name = "athera.subscription"
@@ -375,6 +382,7 @@ class AtheraSubscription(models.Model):
         )
         invoice.action_post()
         self.next_invoice_date = period_start + relativedelta(months=1)
+        self._send_notice(invoice, "custom_athera_billing.mail_template_invoice_issued")
         self._registry_log(
             "billing_invoice_issued",
             {
@@ -426,6 +434,33 @@ class AtheraSubscription(models.Model):
             "domain": [("athera_subscription_id", "=", self.id)],
             "name": _("Faktur %s") % self.tenant_slug,
         }
+
+    # ------------------------------------------------------------------- surat
+
+    def _send_notice(self, invoice, template_xmlid):
+        """Antrikan satu surat. TIDAK dikirim langsung, dan itu disengaja.
+
+        `force_send=False` menaruh surat di `mail.mail` untuk dikirim cron surat Odoo. Mengirim
+        langsung berarti SMTP yang sedang mati ikut menggagalkan transaksi penagihan — sebuah
+        tagihan yang tidak terbit karena mail server tersendat adalah pertukaran yang salah.
+        """
+        self.ensure_one()
+        template = self.env.ref(template_xmlid, raise_if_not_found=False)
+        if not template:
+            _logger.warning("billing: template %s tidak ada", template_xmlid)
+            return False
+        if not invoice.partner_id.email:
+            _logger.warning(
+                "billing: %s tidak punya alamat surel; surat %s dilewati",
+                invoice.partner_id.display_name, template_xmlid,
+            )
+            return False
+        values = {}
+        notify = (self.env["ir.config_parameter"].sudo().get_param(NOTIFY_PARAM) or "").strip()
+        if notify:
+            values["email_cc"] = notify
+        template.send_mail(invoice.id, force_send=False, email_values=values or None)
+        return True
 
     # -------------------------------------------------------------------- cron
 
@@ -505,9 +540,51 @@ class AtheraSubscription(models.Model):
                     invoice.athera_arrears_enforced = True
                     if suspended:
                         sub.state = "suspended"
+                        sub._send_notice(
+                            invoice, "custom_athera_billing.mail_template_suspended"
+                        )
+                        invoice.athera_dunning_stage = "suspended"
                 _logger.info(
                     "billing: %s nunggak > %s hari -> tenant %s ditangguhkan=%s",
                     invoice.name, sub.grace_days, sub.tenant_slug, suspended,
                 )
             except Exception:  # noqa: BLE001
                 _logger.exception("billing: gagal menangguhkan untuk %s", invoice.name)
+
+    @api.model
+    def _cron_dunning_notices(self):
+        """Tangga penagihan: pengingat saat lewat jatuh tempo, peringatan akhir menjelang penutupan.
+
+        Tahapnya monoton dan disimpan di faktur, jadi menjalankan cron ini dua kali sehari tidak
+        mengirim surat dua kali. Surat penangguhan TIDAK dikirim di sini — ia milik cron yang
+        benar-benar menangguhkan, supaya tidak ada pemberitahuan tanpa perbuatan.
+        """
+        today = fields.Date.context_today(self)
+        open_invoices = self.env["account.move"].search(
+            [
+                ("athera_subscription_id", "!=", False),
+                ("move_type", "=", "out_invoice"),
+                ("state", "=", "posted"),
+                ("payment_state", "not in", ("paid", "in_payment", "reversed")),
+                ("invoice_date_due", "!=", False),
+                ("athera_dunning_stage", "in", ("none", "reminder")),
+            ]
+        )
+        for invoice in open_invoices:
+            sub = invoice.athera_subscription_id
+            suspend_on = invoice.invoice_date_due + relativedelta(days=sub.grace_days)
+            final_on = suspend_on - relativedelta(days=FINAL_NOTICE_DAYS)
+            try:
+                with self.env.cr.savepoint():
+                    if today >= final_on and invoice.athera_dunning_stage != "final":
+                        if sub._send_notice(
+                            invoice, "custom_athera_billing.mail_template_arrears_reminder"
+                        ):
+                            invoice.athera_dunning_stage = "final"
+                    elif today > invoice.invoice_date_due and invoice.athera_dunning_stage == "none":
+                        if sub._send_notice(
+                            invoice, "custom_athera_billing.mail_template_arrears_reminder"
+                        ):
+                            invoice.athera_dunning_stage = "reminder"
+            except Exception:  # noqa: BLE001
+                _logger.exception("billing: gagal mengirim surat penagihan untuk %s", invoice.name)

@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Kaitan faktur ke langganan, plus dua penanda yang membuat cron idempoten."""
 
-from odoo import fields, models
+from dateutil.relativedelta import relativedelta
+
+from odoo import api, fields, models
 
 
 class AccountMove(models.Model):
@@ -22,3 +24,29 @@ class AccountMove(models.Model):
     athera_arrears_enforced = fields.Boolean(
         string="Penangguhan sudah dijalankan", default=False, copy=False, readonly=True,
     )
+
+    #: Sampai di mana tangga penagihan sudah dinaiki. Tersimpan DI FAKTUR supaya satu langganan
+    #: dengan banyak faktur tidak saling menghapus tahap yang lain.
+    athera_dunning_stage = fields.Selection(
+        [
+            ("none", "Belum ada"),
+            ("reminder", "Pengingat terkirim"),
+            ("final", "Peringatan akhir terkirim"),
+            ("suspended", "Pemberitahuan penangguhan terkirim"),
+        ],
+        string="Tahap penagihan", default="none", copy=False, readonly=True,
+    )
+    athera_suspend_on = fields.Date(
+        string="Akses ditutup pada", compute="_compute_athera_suspend_on",
+        help="Jatuh tempo ditambah masa tenggang. Tanggal inilah yang disebut di surat penagihan — "
+             "klien yang tahu tanggalnya bisa bertindak.",
+    )
+
+    @api.depends("invoice_date_due", "athera_subscription_id.grace_days")
+    def _compute_athera_suspend_on(self):
+        for move in self:
+            sub = move.athera_subscription_id
+            if sub and move.invoice_date_due:
+                move.athera_suspend_on = move.invoice_date_due + relativedelta(days=sub.grace_days)
+            else:
+                move.athera_suspend_on = False

@@ -25,6 +25,7 @@ Kedua arah menulis tenant_registry.action_log dalam transaksi yang sama.
         "security/billing_security.xml",
         "security/ir.model.access.csv",
         "data/ir_config_parameter.xml",
+        "data/mail_template.xml",
         "data/ir_cron.xml",
         "views/athera_subscription_views.xml",
         "views/account_move_views.xml",
