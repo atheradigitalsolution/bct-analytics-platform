@@ -280,6 +280,12 @@ services:
     # setiap jaringan dibuat ulang. Pola yang sama sudah dipakai alertmanager.
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # Nama surat dipetakan ke host yang sama, dan itu BUKAN duplikat dari baris di atas.
+      # Submission memakai STARTTLS, dan sertifikat Mailcow diterbitkan untuk nama ini; menyambung
+      # ke host.docker.internal akan gagal verifikasi nama, sedangkan menyambung ke DNS publiknya
+      # memutar trafik keluar-masuk lewat IP publik tanpa alasan. Dipetakan begini, SNI dan
+      # sertifikat cocok sementara koneksinya tidak pernah meninggalkan mesin.
+      - "mail.athera-digital.com:host-gateway"
     networks:
       bct:
         aliases:

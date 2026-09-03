@@ -193,11 +193,26 @@ def test_outgoing_mail_is_configured(evidence):
     surat yang keluar atas nama `noreply@localhost` tidak akan pernah selaras dengan SPF/DKIM.
     """
     _has_billing()
-    row = _psql("select smtp_host||' '||smtp_port||' '||coalesce(from_filter,'(kosong)') "
+    row = _psql("select smtp_host||' '||smtp_port||' '||coalesce(from_filter,'(kosong)')"
+                "||' '||coalesce(smtp_user,'(anonim)') "
                 "from ir_mail_server order by sequence limit 1")
     evidence.add("mail server", row or "(belum ada)")
     assert row, "tidak ada ir_mail_server sama sekali"
     assert "(kosong)" not in row, "from_filter kosong; pengirim akan ditulis ulang"
+    # Tanpa AUTH, Postfix Mailcow hanya menerima surat untuk penerima LOKAL (mynetworks tidak
+    # memuat jaringan stack ini). Artinya seluruh tangga penagihan akan berhenti di gerbang dan
+    # tidak satu pun klien nyata diberi tahu — kegagalan yang paling mudah tidak disadari, karena
+    # surat ke alamat kita sendiri tetap terkirim dengan mulus.
+    assert "(anonim)" not in row, "submission tanpa AUTH; surat ke klien luar tidak akan direlay"
+
+    bounce = _psql("select value from ir_config_parameter where key = 'mail.bounce.alias'")
+    sender = _psql("select smtp_user from ir_mail_server order by sequence limit 1")
+    evidence.add("bounce alias vs akun pengirim", "%s@ vs %s" % (bounce, sender))
+    # Mailcow menolak MAIL FROM yang bukan milik akun yang login (sender-login mismatch), jadi
+    # alias bounce yang berbeda dari akun pengirim membuat SETIAP surat ditolak pada MAIL FROM.
+    assert bounce and sender.startswith(bounce + "@"), (
+        "alias bounce %r bukan milik akun %r — Postfix akan menolak MAIL FROM" % (bounce, sender)
+    )
 
 
 def test_the_dunning_ladder_has_all_three_notices(evidence):
