@@ -144,5 +144,5 @@ export const config = {
    * Everything except the login flow, the health probe, static assets and the Next internals.
    * `/api/auth/login` must stay open or there would be no way to obtain a session.
    */
-  matcher: ["/((?!login|api/auth/login|api/auth/logout|healthz|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|harga|api/auth/login|api/auth/logout|healthz|_next/static|_next/image|favicon.ico).*)"],
 };
