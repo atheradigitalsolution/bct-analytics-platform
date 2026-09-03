@@ -25,6 +25,7 @@ inactive, which is what the rules key off.
 
 from __future__ import annotations
 
+import re
 import time
 
 import pytest
@@ -46,9 +47,19 @@ CRITICAL_BYTES = 1024 ** 3
 def _promtool(args, evidence, label):
     """Run promtool out of the pinned Prometheus image, with the repo mounted read-only."""
     repo = str(env.repo_root()).replace("\\", "/")
-    # `//x/...` is the form Docker Desktop accepts for a Windows path via a POSIX shell, and
+    # `//c/...` is the form Docker Desktop accepts for a Windows path via a POSIX shell, and
     # MSYS_NO_PATHCONV stops Git Bash rewriting the container-side path.
-    mount = "//" + repo[0].lower() + repo[2:] + ":/repo:ro"
+    #
+    # THE TRANSFORM IS CONDITIONAL, and it was not. Applied unconditionally to a POSIX path it
+    # turned a POSIX path such as `/srv/repo` into `///rv/repo` — Docker then created that
+    # non-existent host path as an empty directory and mounted it, so promtool answered
+    # "path does not exist" for every rule file. On Linux that meant these three tests never
+    # validated a single alert rule while looking like ordinary failures. Guard on the shape of
+    # the path instead of assuming the platform.
+    if re.match(r"^[A-Za-z]:/", repo):
+        mount = "//" + repo[0].lower() + repo[2:] + ":/repo:ro"
+    else:
+        mount = repo + ":/repo:ro"
     out = run(
         ["docker", "run", "--rm", "--entrypoint", "/bin/promtool",
          "-e", "MSYS_NO_PATHCONV=1", "-v", mount, PROMETHEUS_IMAGE] + args,

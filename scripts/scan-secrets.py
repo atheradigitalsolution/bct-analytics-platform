@@ -86,9 +86,22 @@ BINARY_SUFFIXES = {
 
 
 def tracked_files(root: Path) -> list[str]:
+    """Tracked files PLUS untracked-but-not-ignored ones.
+
+    `--others --exclude-standard` is the half that was missing, and its absence was a hole in a
+    gate rather than a gap in a report. A new feature's files are UNTRACKED right up to the moment
+    somebody runs `git add`, so a pre-commit scan that reads only the index inspects everything
+    except the code actually being added. This scanner passed clean on 2026-09-04 over a change
+    whose seven new files it had never opened.
+
+    Ignored files stay out, and that is deliberate: `.env` and `*.pem` live there on purpose, they
+    are checked separately by `env_not_tracked()`, and pulling them in would make every run red for
+    the one reason that is not a fault.
+    """
     try:
         out = subprocess.check_output(
-            ["git", "-C", str(root), "ls-files", "-z"], text=True)
+            ["git", "-C", str(root), "ls-files", "-z",
+             "--cached", "--others", "--exclude-standard"], text=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("scan-secrets: not a git repository (or git missing)", file=sys.stderr)
         return []
@@ -168,7 +181,7 @@ def main() -> int:
         return 1
 
     suffix = " (gitleaks + built-in rules)" if used_gitleaks else " (built-in rules; gitleaks not installed)"
-    print(f"scan-secrets: OK - {len(files)} tracked files clean{suffix}")
+    print(f"scan-secrets: OK - {len(files)} tracked + untracked files clean{suffix}")
     print("  .env.example: every secret is the literal string `changeme`")
     return 0
 
