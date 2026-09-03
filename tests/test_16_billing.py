@@ -141,6 +141,47 @@ def test_the_audit_log_refuses_to_be_edited(evidence):
 
 
 # ---------------------------------------------------------------------------------------------
+# NPWP — penjaga yang membuat "lupa mengganti" jadi berisik
+# ---------------------------------------------------------------------------------------------
+
+
+def test_no_real_client_was_invoiced_under_a_placeholder_npwp(evidence):
+    """`res_company.vat` tidak divalidasi apa pun (`base_vat` tidak terpasang), jadi sebuah penanda
+    bisa bertahan diam-diam sampai muncul di tagihan pertama klien sungguhan.
+
+    Invariannya: selama NPWP belum berbentuk 15/16 digit, satu-satunya tenant yang boleh punya
+    faktur terposting adalah yang terdaftar di `athera_billing.pilot_tenants`.
+    """
+    _has_billing()
+    # `vat` bukan kolom di res_company pada Odoo 19 — ia field related ke partner perusahaan.
+    vat = _psql(
+        "select coalesce(p.vat,'') from res_company c "
+        "  join res_partner p on p.id = c.partner_id where c.id = 1"
+    )
+    digits = "".join(c for c in vat if c.isdigit())
+    looks_real = len(digits) in (15, 16) and digits == vat.replace(".", "").replace("-", "")
+    pilots = _psql(
+        "select coalesce(value,'') from ir_config_parameter "
+        "where key = 'athera_billing.pilot_tenants'"
+    )
+    evidence.add("NPWP / daftar percontohan", "%r looks_real=%s / %r" % (vat, looks_real, pilots))
+    if looks_real:
+        pytest.skip("NPWP perusahaan sudah terisi sungguhan; penjaga ini tidak berlaku. NOT RUN.")
+    allowed = {p.strip() for p in pilots.split(",") if p.strip()}
+    invoiced = _psql(
+        "select distinct s.tenant_slug from account_move m "
+        "  join athera_subscription s on s.id = m.athera_subscription_id "
+        " where m.state = 'posted'"
+    )
+    billed = {line for line in invoiced.splitlines() if line}
+    evidence.add("tenant yang punya faktur terposting", str(sorted(billed)))
+    assert billed <= allowed, (
+        "tenant %s ditagih padahal NPWP perusahaan masih penanda %r"
+        % (sorted(billed - allowed), vat)
+    )
+
+
+# ---------------------------------------------------------------------------------------------
 # Harga — satu sumber kebenaran
 # ---------------------------------------------------------------------------------------------
 

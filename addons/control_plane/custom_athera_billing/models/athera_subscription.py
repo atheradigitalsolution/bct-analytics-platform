@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from dateutil.relativedelta import relativedelta
 
@@ -39,6 +40,15 @@ GRACE_PARAM = "athera_billing.grace_days"
 #: tenggang menjadi satu-satunya tempo yang benar-benar diberikan kepada klien.
 DEFAULT_DUE_DAYS = 14
 DUE_PARAM = "athera_billing.due_days"
+
+#: NPWP: 16 digit (berbasis NIK, sejak 2024) atau 15 digit warisan. Titik dan strip diabaikan.
+#: Sama seperti `custom.coretax.config._NPWP_DIGITS_RE`, sengaja — dua pemeriksaan NPWP yang
+#: berbeda bentuk adalah cara satu di antaranya meloloskan yang ditolak lainnya.
+NPWP_RE = re.compile(r"^\d{15,16}$")
+
+#: Tenant yang boleh ditagih SELAMA NPWP perusahaan belum sungguhan. Kosong berarti tidak ada —
+#: yaitu penolakan total, dan itu memang bawaan yang benar untuk instalasi baru.
+PILOT_PARAM = "athera_billing.pilot_tenants"
 
 
 class AtheraSubscription(models.Model):
@@ -247,6 +257,47 @@ class AtheraSubscription(models.Model):
             )
         return product
 
+    def _npwp_state(self):
+        """(terlihat_asli, nilai_mentah). Yang bisa diperiksa hanyalah BENTUKNYA.
+
+        NPWP yang salah tapi berbentuk benar tidak akan ketahuan di sini, dan tidak ada cara untuk
+        mengetahuinya tanpa bertanya ke DJP. Yang dijaga di sini adalah kasus yang bisa dijaga:
+        field yang masih berisi penanda, atau kosong.
+        """
+        raw = (self.env.company.vat or "").strip()
+        digits = re.sub(r"\D", "", raw)
+        return bool(digits and NPWP_RE.match(digits)), raw
+
+    def _pilot_tenants(self):
+        raw = self.env["ir.config_parameter"].sudo().get_param(PILOT_PARAM) or ""
+        return {p.strip() for p in raw.split(",") if p.strip()}
+
+    def _assert_billable(self):
+        """Menolak menagih klien nyata selagi NPWP perusahaan masih penanda.
+
+        KENAPA INI ADA. Faktur yang membawa NPWP salah adalah dokumen komersial yang salah, dan
+        kalau perusahaan sudah PKP ia adalah faktur pajak yang salah. Field `res_company.vat` tidak
+        divalidasi apa pun (`base_vat` tidak terpasang), jadi penanda di sana bisa bertahan diam-diam
+        sampai muncul di tagihan pertama klien sungguhan. Penjaga ini mengubah "lupa mengganti"
+        dari dokumen yang salah kirim menjadi kegagalan yang berisik.
+
+        Bawaannya menolak SEMUA tenant: daftar percontohan sengaja kosong di repo, karena tenant
+        percontohan adalah kenyataan lokal sebuah instalasi, bukan bagian dari produk.
+        """
+        self.ensure_one()
+        is_real, raw = self._npwp_state()
+        if is_real:
+            return
+        if self.tenant_slug in self._pilot_tenants():
+            return
+        raise UserError(_(
+            "NPWP perusahaan belum terisi sungguhan (sekarang: %(npwp)s), jadi faktur untuk tenant "
+            "'%(slug)s' tidak diterbitkan.\n\n"
+            "Isi NPWP di Pengaturan → Perusahaan (15 atau 16 digit), atau — kalau ini memang uji "
+            "coba — tambahkan slug tenant ini ke parameter sistem %(param)s.",
+            npwp=raw or _("kosong"), slug=self.tenant_slug, param=PILOT_PARAM,
+        ))
+
     def _due_days(self):
         param = self.env["ir.config_parameter"].sudo().get_param(DUE_PARAM)
         try:
@@ -283,6 +334,7 @@ class AtheraSubscription(models.Model):
     def _create_invoice(self):
         """Satu faktur untuk satu periode bulanan. Mengembalikan account.move yang sudah diposting."""
         self.ensure_one()
+        self._assert_billable()
         plan = self._registry_plan(self.plan_code)
         if plan is None:
             raise UserError(

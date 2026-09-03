@@ -10,5 +10,25 @@
       <field name="key">athera_billing.grace_days</field>
       <field name="value">14</field>
     </record>
+
+    <!--
+      Tenant yang boleh ditagih selama NPWP perusahaan belum sungguhan. Sengaja KOSONG di repo:
+      daftar percontohan adalah kenyataan lokal sebuah instalasi, bukan bagian dari produk. Kosong
+      berarti menolak semua, dan itu bawaan yang benar — sebuah instalasi baru belum punya NPWP.
+    -->
+    <!--
+      Tempo pembayaran: hari sejak faktur terbit sampai jatuh tempo. Tanpa parameter ini Odoo
+      memakai tanggal faktur itu sendiri, sehingga setiap faktur lahir dalam keadaan jatuh tempo
+      dan masa tenggang menjadi satu-satunya tempo yang benar-benar diberikan kepada klien.
+    -->
+    <record id="param_due_days" model="ir.config_parameter">
+      <field name="key">athera_billing.due_days</field>
+      <field name="value">14</field>
+    </record>
+
+    <record id="param_pilot_tenants" model="ir.config_parameter">
+      <field name="key">athera_billing.pilot_tenants</field>
+      <field name="value"></field>
+    </record>
   </data>
 </odoo>
