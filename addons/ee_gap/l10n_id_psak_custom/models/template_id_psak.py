@@ -295,14 +295,25 @@ class AccountChartTemplate(models.AbstractModel):
         }
 
     # ------------------------------------------------------------------
-    # Taxes — Indonesian PPN at 11% (PMK 58/2022, since 1 April 2022)
+    # Taxes — PPN under PMK-131/2024, in force 1 January 2025.
+    #
+    # `amount` STAYS 11.0 and that is the correct number, not a leftover from the PMK 58/2022 era.
+    # The statutory rate is 12%, but non-luxury goods and services are charged on DPP Nilai Lain =
+    # 11/12 of the price, so 12% x 11/12 = 11% of the selling price. Odoo CE's `account.tax` has no
+    # DPP-ratio field, so the effective rate is what can be modelled here; setting 12 on the full
+    # base would overcharge every client by roughly 0.9%.
+    #
+    # WHAT THIS DOES NOT DO: print DPP Nilai Lain as its own line on the faktur pajak. Coretax
+    # e-Faktur reporting wants that split, and it needs the extension fields custom_coretax refers
+    # to. Verify that before issuing a real faktur pajak — the money is right either way, the
+    # document is what is still open.
     # ------------------------------------------------------------------
 
     @template("id_psak", "account.tax")
     def _get_id_psak_account_tax(self):
         return {
             "account_id_psak_tax_ppn_keluaran_11": {
-                "name": "PPN Keluaran 11%",
+                "name": "PPN 12% DPP Nilai Lain (Keluaran) — efektif 11%",
                 "description": "PPN 11%",
                 "amount": 11.0,
                 "amount_type": "percent",
@@ -330,7 +341,7 @@ class AccountChartTemplate(models.AbstractModel):
                 ],
             },
             "account_id_psak_tax_ppn_masukan_11": {
-                "name": "PPN Masukan 11%",
+                "name": "PPN 12% DPP Nilai Lain (Masukan) — efektif 11%",
                 "description": "PPN 11%",
                 "amount": 11.0,
                 "amount_type": "percent",
@@ -365,15 +376,27 @@ class AccountChartTemplate(models.AbstractModel):
 
     @template("id_psak", "account.journal")
     def _get_id_psak_account_journal(self):
+        """Journals, keyed by the BASE template's own keys so they OVERRIDE rather than duplicate.
+
+        These keys used to be `account_id_psak_journal_*`. `_load()` always merges the base
+        `_get_account_journal()` in, and that base already defines INV, BILL, MISC and EXCH; a
+        second set under different keys carrying the SAME codes made one INSERT that violated
+        `account_journal_code_company_uniq` every time. The template could not be loaded onto any
+        company at all -- measured, not inferred: try_loading('id_psak') raised
+        `duplicate key ... (company_id, code)=(1, INV)` and rolled the whole chart back.
+
+        Keeping the base keys is what makes "Faktur Penjualan" replace "Sales" instead of fighting
+        it for the code. `cash` keeps its own key because the base template defines no cash journal.
+        """
         return {
-            "account_id_psak_journal_sale": {
+            "sale": {
                 "name": "Faktur Penjualan",
                 "code": "INV",
                 "type": "sale",
                 "show_on_dashboard": True,
                 "sequence": 5,
             },
-            "account_id_psak_journal_purchase": {
+            "purchase": {
                 "name": "Tagihan Pembelian",
                 "code": "BILL",
                 "type": "purchase",
@@ -387,21 +410,21 @@ class AccountChartTemplate(models.AbstractModel):
                 "show_on_dashboard": True,
                 "sequence": 7,
             },
-            "account_id_psak_journal_bank": {
+            "bank": {
                 "name": "Bank",
                 "code": "BANK",
                 "type": "bank",
                 "show_on_dashboard": True,
                 "sequence": 8,
             },
-            "account_id_psak_journal_misc": {
+            "general": {
                 "name": "Jurnal Umum",
                 "code": "MISC",
                 "type": "general",
                 "show_on_dashboard": False,
                 "sequence": 9,
             },
-            "account_id_psak_journal_exch": {
+            "exch": {
                 "name": "Selisih Kurs",
                 "code": "EXCH",
                 "type": "general",
@@ -416,35 +439,20 @@ class AccountChartTemplate(models.AbstractModel):
 
     @template("id_psak", "account.fiscal.position")
     def _get_id_psak_account_fiscal_position(self):
-        return {
-            "account_id_psak_fpos_ekspor": {
-                "name": "Ekspor (Tanpa PPN)",
-                "auto_apply": False,
-                "tax_ids": [
-                    Command.create(
-                        {
-                            "tax_src_id": "account_id_psak_tax_ppn_keluaran_11",
-                            "tax_dest_id": False,
-                        }
-                    ),
-                ],
-            },
-            "account_id_psak_fpos_bebas_pajak": {
-                "name": "Pelanggan Bebas Pajak",
-                "auto_apply": False,
-                "tax_ids": [
-                    Command.create(
-                        {
-                            "tax_src_id": "account_id_psak_tax_ppn_keluaran_11",
-                            "tax_dest_id": False,
-                        }
-                    ),
-                    Command.create(
-                        {
-                            "tax_src_id": "account_id_psak_tax_ppn_masukan_11",
-                            "tax_dest_id": False,
-                        }
-                    ),
-                ],
-            },
-        }
+        """No fiscal positions. NOT an omission -- the two this module used to ship cannot load.
+
+        They were written against the Odoo <=18 API: a `tax_ids` one2many of
+        `account.fiscal.position.tax` rows carrying `tax_src_id`/`tax_dest_id`. Odoo 19 deleted
+        that mapping model. `tax_ids` is now a many2many straight to `account.tax` holding the
+        DESTINATION taxes, and each destination tax names what it replaces through
+        `original_tax_ids`. Loading the old shape raises
+        `ValueError: Invalid field 'tax_src_id' in 'account.tax'` and takes the whole chart with
+        it -- which is why this template had never been loaded onto any company.
+
+        Porting them means introducing two 0% destination taxes ("PPN 0% Ekspor", "PPN 0% Bebas")
+        whose `original_tax_ids` point at the PPN keluaran/masukan taxes, then listing those in
+        each position. That is a tax-behaviour change and wants its own verification, so it is left
+        out rather than guessed at: ATHERA bills domestic clients with PPN and needs neither
+        position today.
+        """
+        return {}
