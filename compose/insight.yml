@@ -397,6 +397,23 @@ services:
     depends_on:
       warehouse-db:
         condition: service_healthy
+    # Healthcheck ditambahkan 2026-09-04, bersamaan dengan masuknya cdc ke `make up`.
+    # Tanpa ini `wait_healthy cdc` tidak punya apa pun untuk ditunggu, dan yang lebih penting:
+    # sebuah loader yang mati diam-diam terlihat sama dengan yang tidak pernah dijalankan.
+    # Yang diperiksa adalah port metrik — port yang sama yang di-scrape Prometheus sebagai
+    # `analytics-cdc`, jadi "sehat" di sini berarti hal yang sama dengan "target up" di sana.
+    # `urllib` dan bukan curl/wget: image ini python:3.12-slim dan sengaja tidak memasang
+    # keduanya, jadi healthcheck ber-curl akan gagal selamanya dengan "executable not found".
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:9108/metrics', timeout=3).status==200 else 1)"
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     networks:
       - bct
 

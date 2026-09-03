@@ -43,6 +43,21 @@ if ! printf '%s' "$SLUG" | grep -Eq '^[a-z][a-z0-9_]{1,30}$'; then
 fi
 PUBLICATION="bct_cdc_${SLUG}"
 
+# ISSUE #9. Langkah berikutnya menjalankan image `cdc` untuk mencetak SQL publikasi, sedangkan
+# image itu baru dibangun oleh `make cdc-start` pada baris SESUDAHNYA. Di host yang belum pernah
+# membangunnya, skrip ini mati dengan "pull access denied for odoo19-bct-cdc" — yang terbaca
+# seperti masalah kredensial registry, padahal urutan yang salah. Dibangun di sini dan bukan di
+# Makefile supaya SETIAP pemanggil aman, termasuk up-all.sh yang kini memanggilnya juga.
+#
+# Build hanya kalau image belum ada: `docker compose build` pada setiap provision menambah
+# puluhan detik pada jalur yang sering dijalankan berulang.
+if ! docker image inspect odoo19-bct-cdc:local >/dev/null 2>&1; then
+  echo "==> image odoo19-bct-cdc:local belum ada — membangunnya lebih dulu"
+  docker compose -p odoo19-bct --env-file "$ROOT/.env" \
+    -f "$ROOT/compose/odoo.yml" -f "$ROOT/compose/odoo.dev.yml" -f "$ROOT/compose/insight.yml" \
+    build cdc
+fi
+
 echo "==> generating the publication column list from warehouse.column_policy"
 SQL="$(docker run --rm --network odoo19-bct_bct \
   -e WAREHOUSE_READER_PASSWORD -e WAREHOUSE_LOADER_PASSWORD -e WAREHOUSE_DB -e WAREHOUSE_LOADER_USER \

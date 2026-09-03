@@ -13,17 +13,33 @@
 # THE ORDER, and why each step is where it is:
 #
 #   1. odoo stack      postgres, redis, odoo. Everything else reads one of them.
-#   2. warehouse       the landing zone must exist before a loader can fill it.
-#   3. platform        login-gateway. BEFORE semantic-api, which verifies tokens
+#   2. control-plane   the cluster ROLES. Before anything that authenticates with
+#                      one: login-gateway, the orchestrator, hub-portal and
+#                      marketing-site all connect as roles only this creates.
+#   3. warehouse       the landing zone must exist before a loader can fill it.
+#   4. platform        login-gateway. BEFORE semantic-api, which verifies tokens
 #                      against the gateway's published JWKS.
-#   4. semantic-api    needs the warehouse (step 2) and the gateway (step 3).
-#   5. insight-portal  needs semantic-api healthy to render a single figure.
+#   5. semantic-api    needs the warehouse (step 3) and the gateway (step 4).
+#   6. insight-portal  needs semantic-api healthy to render a single figure.
+#   7. cdc             publication FIRST, then the consumer that creates the slot.
 #
-# `cdc` is deliberately NOT started here. It needs a publication that only
-# `make cdc-start` creates, and starting a consumer before its publication is a
-# startup failure. WAL retention also begins the instant a slot exists and the
-# 2 GB cap (ADR 0001) starts counting immediately, so a slot created before
-# anyone is ready to consume it is the exact failure that cap exists to bound.
+# STEP 2 EXISTS BECAUSE OF ISSUE #4. `control-plane-apply.sh` was reachable only
+# through `make control-plane`, so on a fresh host `make up` reported success and
+# then every service that authenticates as `tenant_orchestrator`,
+# `login_gateway_registry` or `marketing_site_reader` came up unhealthy with
+# "password authentication failed" — a symptom that points at credentials rather
+# than at a step nobody ran. The script is idempotent, so re-running it here on an
+# established host is a no-op.
+#
+# STEP 7 EXISTS BECAUSE THE PREVIOUS COMMENT WAS RIGHT ABOUT THE ORDER AND WRONG
+# ABOUT THE CONCLUSION. It said cdc must not start before its publication, which
+# is true — and then left cdc out entirely, so ingestion stopped permanently on
+# every restart while this script still reported success. Measured cost of that:
+# the loader was down 1.6 days and nothing in `make up` said so. The ordering
+# concern is answered by DOING the provisioning here, not by skipping the step.
+# WAL retention does begin the instant the slot exists (ADR 0001, 2 GB cap) —
+# which is precisely why the consumer is started in the same breath as the slot
+# it creates, rather than left for a human to remember.
 #
 # Observability is also not started here — `make up-obs` is its own step, as
 # before.
@@ -49,7 +65,7 @@ load_env
 BIND="${BIND_ADDRESS:-127.0.0.1}"
 
 # --- 1. odoo ---------------------------------------------------------------
-log "[1/5] odoo stack (postgres, redis, odoo)"
+log "[1/7] odoo stack (postgres, redis, odoo)"
 # up-dev.sh owns database initialisation and the dev password; re-implementing
 # either here would give two places to fix the next time one of them changes.
 # up-dev.sh builds by default and takes --no-build to opt out. That is the
@@ -61,13 +77,17 @@ else
     bash "$REPO_ROOT/scripts/up-dev.sh" --no-build ${SKIP_INIT}
 fi
 
-# --- 2. warehouse ----------------------------------------------------------
-log "[2/5] insight stack: warehouse"
+# --- 2. control-plane ------------------------------------------------------
+log "[2/7] control-plane roles + admin database (issue #4)"
+bash "$REPO_ROOT/scripts/control-plane-apply.sh"
+
+# --- 3. warehouse ----------------------------------------------------------
+log "[3/7] insight stack: warehouse"
 dc_insight up -d ${BUILD_FLAG} warehouse-db warehouse-exporter
 WAIT_TIMEOUT=180 wait_healthy warehouse-db || die "warehouse-db did not become healthy."
 
 # --- 3. platform -----------------------------------------------------------
-log "[3/5] platform stack: login-gateway + caddy"
+log "[4/7] platform stack: login-gateway + caddy"
 # Refuses to overwrite an existing key, so this is safe on every run and
 # removes the one manual step between a fresh clone and a working gateway.
 bash "$REPO_ROOT/scripts/analytics/gen-jwt-keys.sh"
@@ -81,14 +101,27 @@ dc_platform up -d caddy
 WAIT_TIMEOUT=90 wait_healthy caddy || die "caddy did not become healthy."
 
 # --- 4. semantic-api -------------------------------------------------------
-log "[4/5] insight stack: semantic-api"
+log "[5/7] insight stack: semantic-api"
 dc_insight up -d ${BUILD_FLAG} semantic-api
 WAIT_TIMEOUT=120 wait_healthy semantic-api || die "semantic-api did not become healthy."
 
 # --- 5. insight-portal -----------------------------------------------------
-log "[5/5] insight stack: insight-portal"
+log "[6/7] insight stack: insight-portal"
 dc_insight up -d ${BUILD_FLAG} insight-portal
 WAIT_TIMEOUT=180 wait_healthy insight-portal || die "insight-portal did not become healthy."
+
+# --- 7. cdc ----------------------------------------------------------------
+# Publication FIRST, consumer second, and the consumer creates the slot at the
+# end of its own startup checks. Never the reverse.
+#
+# CDC_TENANT_SLUG is what the loader binds to; ODOO_DB_NAME is the historical
+# default and stays the fallback so an install that never set the newer variable
+# keeps the tenant it already had.
+CDC_SLUG="${CDC_TENANT_SLUG:-${ODOO_DB_NAME:-bct}}"
+log "[7/7] cdc loader for tenant '$CDC_SLUG'"
+bash "$REPO_ROOT/scripts/analytics/cdc-provision.sh" --slug "$CDC_SLUG"
+dc_insight up -d ${BUILD_FLAG} cdc
+WAIT_TIMEOUT=120 wait_healthy cdc || warn "cdc did not report healthy — check 'make cdc-status'."
 
 # --- Report ----------------------------------------------------------------
 # Probed, not assumed. A container reporting healthy and an endpoint answering
@@ -124,7 +157,7 @@ probe admin-console  "http://$BIND:${ODOO_HOST_HTTP_PORT:-38069}/web/login"     
 probe caddy          "http://$BIND:${CADDY_HTTP_PORT:-38080}/"                               308 "athera.localhost" || rc=1
 
 echo "" >&2
-info "cdc is not started by this script — run 'make cdc-start' once the"
-info "publication is wanted. 'make up-obs' starts the observability stack."
+info "cdc is started by this script (step 7). 'make cdc-status' shows the slot;"
+info "'make up-obs' starts the observability stack."
 
 exit "$rc"
