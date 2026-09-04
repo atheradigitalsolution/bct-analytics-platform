@@ -163,6 +163,33 @@ else
     db_initialised "$ADMIN_DB" || die "odoo exited 0 but '$ADMIN_DB' has no ir_module_module."
 fi
 
+# --- 1b. the orchestrator's Odoo user must be authorised ------------------
+# Two independent checks stand between a provisioning request and a database:
+# the HMAC signature, which authorises the CALLER, and a group membership, which
+# authorises the ODOO USER the orchestrator authenticates as. Only the first was
+# ever set up here, so provisioning answered "Access Denied" on a platform that
+# was otherwise fully configured -- found by issuing a real request.
+#
+# Skipped silently when the module that defines the group is not installed: on a
+# stack that does not run the super-admin console there is nothing to grant.
+if [ -z "$(missing_modules "$ADMIN_DB" custom_super_admin)" ]; then
+    log "[1b/4] authorising the orchestrator's Odoo login"
+    set +e
+    grp_out="$(dc exec -T -e ORCH_ODOO_LOGIN="${ORCHESTRATOR_ODOO_LOGIN:-admin}" odoo \
+        odoo shell -d "$ADMIN_DB" --no-http \
+        < "$REPO_ROOT/scripts/lib/ensure-orchestrator-group.py" 2>&1)"
+    set -e
+    printf '%s\n' "$grp_out" | grep -E '^ORCHGRP' | sed 's/^/    /' >&2 || true
+    # Assert the OUTCOME. `odoo shell` exits 0 for a program that did nothing at
+    # all, which is the same shape as the defect this step exists to close.
+    if ! printf '%s\n' "$grp_out" | grep -q '^ORCHGRP_OK$'; then
+        printf '%s\n' "$grp_out" >&2
+        die "could not authorise '${ORCHESTRATOR_ODOO_LOGIN:-admin}' in '$ADMIN_DB' - provisioning would answer Access Denied."
+    fi
+else
+    log "[1b/4] custom_super_admin absent - no provisioning group to grant"
+fi
+
 # --- 2. roles, before the schema that grants to them ----------------------
 # Cluster-level, so they are created from the maintenance database. Created
 # before the schema because the GRANT statements in step 3 name them; the
