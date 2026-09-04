@@ -1,0 +1,67 @@
+# ---------------------------------------------------------------------------
+# Public-edge alerts. Owner: Platform-Infra.
+#
+# The internal probes reach services by name and so prove nothing about DNS, TLS
+# or the reverse proxy. These rules watch the path a client actually travels.
+# A green internal board with a dead public edge is the most expensive kind of
+# monitoring failure, because it reassures you at precisely the moment you are
+# wrong.
+# ---------------------------------------------------------------------------
+groups:
+
+  - name: public-edge
+    rules:
+      # Reachability over the real path: public DNS, real certificate, the edge,
+      # and back. `for: 5m` is longer than the internal probes' 3m on purpose --
+      # this leaves the machine, so a transient network blip must not page
+      # anyone, and five minutes of a public surface being down is already worth
+      # knowing about.
+      - alert: PublicSurfaceUnreachable
+        expr: probe_success{job="blackbox-public"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: "{{ $labels.product }}"
+        annotations:
+          summary: "{{ $labels.product }} is unreachable from the public internet"
+          description: >-
+            {{ $labels.instance }} has failed for 5 minutes over the real network path.
+            Unlike the internal probes, this covers DNS, TLS and the reverse proxy, so a
+            failure here with the internal probe still green points at the edge rather
+            than at the application.
+
+      # WHY 14 DAYS AND NOT 30. Certificates here are issued for 90 days and the
+      # edge renews them at roughly 30 days remaining. An alert at 30 would fire
+      # during every normal renewal window and be trained away within a month.
+      # Fourteen means renewal has failed repeatedly for about two weeks, which
+      # is a real fault, and it still leaves two weeks to act. Measured against
+      # the live certificates, which sat at 87-88 days when this was written.
+      - alert: PublicCertificateExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry{job="blackbox-public"} - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+          component: "{{ $labels.product }}"
+        annotations:
+          summary: "TLS certificate for {{ $labels.product }} expires in under 14 days"
+          description: >-
+            {{ $labels.instance }} presents a certificate with
+            {{ $value | printf "%.1f" }} days left. Automatic renewal should have happened
+            around 30 days; that it did not means renewal is failing. Check the edge's
+            ACME log before this becomes an outage every client sees at once.
+
+      # The one that turns a slow failure into a loud one. A certificate that has
+      # ALREADY expired is a total outage for that hostname, and browsers refuse
+      # it before any of our own health checks are consulted.
+      - alert: PublicCertificateExpired
+        expr: probe_ssl_earliest_cert_expiry{job="blackbox-public"} - time() <= 0
+        for: 5m
+        labels:
+          severity: critical
+          component: "{{ $labels.product }}"
+        annotations:
+          summary: "TLS certificate for {{ $labels.product }} has EXPIRED"
+          description: >-
+            {{ $labels.instance }} is serving an expired certificate. Every browser
+            refuses the connection outright; nothing behind it is reachable regardless
+            of how healthy the application is.

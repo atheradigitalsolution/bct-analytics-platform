@@ -127,3 +127,11 @@ desktop.ini
 # Anchored with a leading slash: `addons/ee_gap` at THIS depth only.
 # ---------------------------------------------------------------------------
 /addons/ee_gap/
+
+# Generated blackbox probe targets. The JOB that uses them is tracked
+# (observability/prometheus/scrape.d/blackbox-public.yml); the production
+# hostnames it probes are not. Rendered by scripts/render-probe-targets.py from
+# ATHERA_DOMAIN, so this repository stays portable and carries no deployment's
+# real domain. `.json` rather than `.yml` because prometheus.yml globs the
+# `.yml` files in that directory as full scrape configs.
+observability/prometheus/scrape.d/*.json

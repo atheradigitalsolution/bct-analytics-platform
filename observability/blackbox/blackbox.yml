@@ -37,3 +37,47 @@ modules:
       # starts redirecting is reported rather than silently accepted.
       follow_redirects: false
       preferred_ip_protocol: ip4
+
+  # -------------------------------------------------------------------------
+  # PUBLIC EDGE. Everything above reaches its target by service name on the
+  # compose network, which means it proves the application is alive and proves
+  # nothing about DNS, TLS or the reverse proxy. An expired certificate or a
+  # moved DNS record leaves all of those green while every client sees nothing --
+  # the most expensive kind of monitoring failure, because it reassures you at
+  # exactly the moment you are wrong.
+  #
+  # These two modules go out over the real internet path: public DNS, real TLS,
+  # the edge, and back. They also make `probe_ssl_earliest_cert_expiry` available,
+  # which is the only way certificate expiry gets noticed before a client does.
+  # -------------------------------------------------------------------------
+  http_200_public:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_status_codes: [200]
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      follow_redirects: false
+      preferred_ip_protocol: ip4
+      tls_config:
+        # Verification stays ON, deliberately. A probe that skips it would keep
+        # reporting success through an expired or wrong certificate, which is
+        # the failure this module was added to catch.
+        insecure_skip_verify: false
+
+  # The Odoo hostname answers 401 at the edge: the gateway's forward-auth refuses
+  # anyone without a session, before Odoo is ever reached. That 401 is a HEALTHY
+  # response for this surface -- it proves DNS, TLS, the edge and the auth hop are
+  # all alive. Demanding 200 here would report a working door as broken, and
+  # accepting any status would report a dead one as fine.
+  http_401_public:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_status_codes: [401]
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      follow_redirects: false
+      preferred_ip_protocol: ip4
+      tls_config:
+        insecure_skip_verify: false
