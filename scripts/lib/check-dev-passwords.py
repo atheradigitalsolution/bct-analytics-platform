@@ -8,7 +8,7 @@ by `make check-dev-passwords` and `make verify`), which supplies:
     DEVPW_CHECK_ROWS      one record per served database, newline-separated,
                           TAB-separated fields:
 
-                              <database>  <role>  <credential state>  <demo logins>
+                              <database>  <role>  <credential state>  <demo logins>  <admin login>
 
                           role is `tenant` or `control-plane`; credential state
                           is `ok`, `absent` or `placeholder`; demo logins is a
@@ -143,20 +143,21 @@ def _proxy(database, connect_host, port, domain):
 
 
 def _parse_rows(raw):
-    """Records of (database, role, credential state, demo logins)."""
+    """Records of (database, role, credential state, demo logins, admin login)."""
     rows = []
     for line in raw.splitlines():
         if not line.strip():
             continue
         fields = line.split("\t")
-        while len(fields) < 4:
+        while len(fields) < 5:
             fields.append("")
-        database, role, state, demo = fields[0], fields[1], fields[2], fields[3]
+        database, role, state, demo, admin_login = fields[:5]
         rows.append((
             database.strip(),
             role.strip() or "tenant",
             state.strip() or "absent",
             [x for x in demo.split(",") if x],
+            admin_login.strip() or DEFAULT_LOGIN,
         ))
     return rows
 
@@ -176,7 +177,7 @@ def main():
     def report(ok, text):
         print("  %s  %s" % ("PASS" if ok else "FAIL", text))
 
-    for database, role, state, demo in rows:
+    for database, role, state, demo, admin_login in rows:
         cred_var, b64_var = ROLES.get(role, ROLES["tenant"])
         print("")
         print("  --- %s '%s'  (credential: $%s)" % (role, database, cred_var))
@@ -214,10 +215,14 @@ def main():
             print("  SKIP  negative: $%s is literally '%s'"
                   % (cred_var, DEFAULT_PASSWORD))
         else:
-            got = auth(DEFAULT_LOGIN, DEFAULT_PASSWORD)
+            # Against the RESOLVED administrator, not the literal `admin`. On a
+            # database whose administrator carries a different login, testing
+            # `admin` proves only that no such account exists -- a pass that
+            # examined nothing, which is the failure this gate is here to find.
+            got = auth(admin_login, DEFAULT_PASSWORD)
             ok = got is False
-            report(ok, "authenticate('%s', 'admin', 'admin')  -> %r   (want False)"
-                       % (database, got))
+            report(ok, "authenticate('%s', '%s', 'admin')  -> %r   (want False)"
+                       % (database, admin_login, got))
             if not ok:
                 failures.append(
                     "'%s' still accepts Odoo's DEFAULT password, as uid %r"
@@ -226,13 +231,13 @@ def main():
         # 2. THE POSITIVE. The credential that is supposed to apply here must
         #    work. On its own this catches nothing; without it, a database no
         #    credential opens reads as correctly configured.
-        got = auth(DEFAULT_LOGIN, password)
+        got = auth(admin_login, password)
         ok = isinstance(got, int) and got > 0
-        report(ok, "authenticate('%s', 'admin', $%s)  -> %r   (want a uid)"
-                   % (database, cred_var, got))
+        report(ok, "authenticate('%s', '%s', $%s)  -> %r   (want a uid)"
+                   % (database, admin_login, cred_var, got))
         if not ok:
-            failures.append("$%s does not authenticate as 'admin' in '%s'"
-                            % (cred_var, database))
+            failures.append("$%s does not authenticate as '%s' in '%s'"
+                            % (cred_var, admin_login, database))
 
         # 3. Every demo user the seed created, if the seed has run at all.
         #    Absent is not a failure: `make up-dev` legitimately runs before

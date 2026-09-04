@@ -312,7 +312,22 @@ if [ "$MODE" = "check" ]; then
         _demo="$(psql_super "$_name" -tAc \
             "SELECT login FROM res_users WHERE login LIKE 'demo.%@contoh.invalid' ORDER BY login" \
             2>/dev/null | tr -d '\r' | tr '\n' ',' || true)"
-        ROWS="${ROWS}${_name}"$'\t'"${_role}"$'\t'"${_state}"$'\t'"${_demo}"$'\n'
+        # THE ADMINISTRATOR LOGIN IS RESOLVED, NOT ASSUMED. `admin` is the login
+        # that account carries on a database created the usual way and is not
+        # universal: a tenant provisioned with its own administrator holds a
+        # different login on the same record. Asserting the literal against such
+        # a database makes BOTH assertions meaningless -- the negative passes
+        # because no such account exists, which is a vacuous pass of exactly the
+        # kind this gate exists to catch, and the positive fails for a reason
+        # that has nothing to do with any password. `base.user_admin` is the
+        # same record everywhere; the literal remains only as a fallback for a
+        # database old enough to predate the xmlid.
+        _adminlogin="$(psql_super "$_name" -tAc \
+            "SELECT u.login FROM ir_model_data d JOIN res_users u ON u.id = d.res_id
+             WHERE d.module = 'base' AND d.name = 'user_admin' AND d.model = 'res.users'" \
+            2>/dev/null | tr -d '\r' | head -1 || true)"
+        [ -n "$_adminlogin" ] || _adminlogin="admin"
+        ROWS="${ROWS}${_name}"$'\t'"${_role}"$'\t'"${_state}"$'\t'"${_demo}"$'\t'"${_adminlogin}"$'\n'
     done
 
     DEVPW_CHECK_URL="http://${BIND_ADDRESS:-127.0.0.1}:${ODOO_HOST_HTTP_PORT:-38069}" \

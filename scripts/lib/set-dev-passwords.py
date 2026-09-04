@@ -29,7 +29,21 @@ if not _PW_B64:
     )
 
 PASSWORD = base64.b64decode(_PW_B64).decode("utf-8")
-ADMIN_LOGIN = "admin"
+
+# THE ADMINISTRATOR IS RESOLVED BY XMLID, NOT BY LOGIN STRING.
+#
+# `admin` is Odoo's login for that account on a database created the usual way,
+# and it is NOT universal: a database provisioned with its own administrator
+# carries a different login on the very same record. Searching for the literal
+# string then finds nothing, and this script printed "admin absent" and set no
+# password at all -- while reporting success. Measured on a live tenant whose
+# administrator is an e-mail address.
+#
+# `base.user_admin` is the same record in every case, so resolve it and read the
+# login off it. The literal stays only as a fallback for a database old enough
+# to predate the xmlid.
+_admin = env.ref("base.user_admin", raise_if_not_found=False)  # noqa: F821
+ADMIN_LOGIN = _admin.login if _admin else "admin"
 # `demo.` prefix + the RFC 2606 reserved domain custom_demo_seed uses. `=like`
 # passes the pattern to SQL LIKE unescaped, so `%` is the wildcard and `.` is
 # literal. This cannot match a real account.

@@ -103,12 +103,30 @@ make dbt-run                     # build staging and marts
         "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level','max_slot_wal_keep_size');"
       ```
 - [ ] `make warehouse-reader-check` passes: `SELECT` works, every write is denied.
-- [ ] **`make check-dev-passwords` passes.** It asserts both directions: that
-      `$BCT_DEV_USER_PASSWORD` authenticates *and* that Odoo's default `admin`/`admin` is refused.
+- [ ] **`make check-dev-passwords` passes.** It asserts both directions for **every database
+      the server serves**, not one: that the credential which is supposed to open each database
+      authenticates, *and* that Odoo's default `admin`/`admin` is refused there.
       The second half is the one that matters — a check that only proves the documented credential
-      works passes on a stack that accepts both, which is worse than one accepting only the default,
-      because it looks configured. Verified able to fail: against an uninitialised database it exits
-      **1**, unlike `make check-alerting` (§4).
+      works passes on a stack that accepts both, which is worse than one accepting only the
+      default, because it looks configured. Verified able to fail: against an uninitialised
+      database it exits **1**, unlike `make check-alerting` (§4).
+
+      Two properties of this gate were bought the hard way and should not be traded away:
+
+      - **Scope comes from `ODOO_DB_NAMES`, not from `ODOO_DB_NAME`.** It used to check the single
+        default while the server served three databases. The control plane — tenant registry,
+        billing, administration console — was one of the two it never looked at, and it was still
+        accepting the installer's default password. The gate passed every day throughout.
+      - **The administrator is resolved by xmlid, not by the login string `admin`.** A database
+        provisioned with its own administrator carries a different login on the same record, and
+        asserting the literal there makes BOTH halves meaningless: the negative passes because no
+        such account exists, and the positive fails for a reason that has nothing to do with any
+        password. A gate that passes because it looked for something absent is the failure this
+        section exists to prevent.
+
+      Each database is paired with the credential actually supposed to open it — the service
+      credential for the control plane, the documented development one for a tenant. A run that
+      verifies zero databases fails rather than passes.
       `make up-dev` applies the password as its last step, and `make seed-demo` passwords the demo
       users it creates, so on a fresh clone this should already be true.
 
