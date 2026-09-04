@@ -106,6 +106,10 @@ help: ## Show this help (default target)
 dev-bootstrap: ## One-time setup: generate .env, create addons/, verify ports and line endings
 	@bash scripts/dev-bootstrap.sh
 
+.PHONY: addons-ee-gap
+addons-ee-gap: ## Clone/refresh addons/ee_gap from its own repo (CHECK=1 to assert only)
+	@bash scripts/addons-ee-gap.sh
+
 .PHONY: build
 build: ## Rebuild the Odoo image (pinned digest; no cache reuse for apt layers)
 	@$(DC) build odoo

@@ -14,6 +14,13 @@ Two checks, because the bug has two faces:
      every path in an addon manifest's `data`/`demo` list must be tracked, not
      merely present on disk. This is the failure the pattern bug caused.
 
+  C. EXTERNAL TREE NOT A CLONE. `addons/ee_gap/` is versioned in its own
+     repository and cloned into place, so this repo deliberately ignores it.
+     "Ignored" and "absent on the next host" look identical from here unless
+     something asserts the difference: the directory must exist AND be a real
+     clone, and check B then asks THAT repository what it tracks. A hand-copied
+     tree passes every on-disk test and disappears on a clean host.
+
 `git check-ignore -q` is the authoritative form: with -v it also exits 0 on a
 NEGATION match, which reports a file that ships as if it were ignored.
 """
@@ -50,7 +57,18 @@ MUST_BE_IGNORED = [
     "insight-portal/node_modules/pkg/index.js",
     "tests/fixtures/jwt-private.pem",
     "security/age.key",
+    # ee_gap lives in its own repository and is cloned into this path. If the
+    # anchor ever slips, THIS repo starts tracking 2 112 files again.
+    "addons/ee_gap/l10n_id_psak_custom/__manifest__.py",
 ]
+
+# Addon trees that are versioned in a DIFFERENT repository and cloned into
+# place. Check B still applies to them - a declared data file that nobody
+# tracks anywhere breaks the install just the same - but "tracked" has to be
+# asked of the repository that actually owns the file.
+EXTERNAL_ADDON_TREES = {
+    "addons/ee_gap": "github.com/atheradigitalsolution/athera-odoo-ee-gap",
+}
 
 
 def ignored(path: str) -> bool:
@@ -78,6 +96,30 @@ def main() -> int:
 
     tracked = set(subprocess.run(["git", "ls-files"], cwd=ROOT,
                                  capture_output=True, text=True).stdout.split("\n"))
+
+    # An external tree must be a real clone. A hand-copied directory passes every
+    # "the file is on disk" test and then does not exist on the next host, which
+    # is precisely the clean-clone failure this guard was written for. Ask the
+    # nested repository what IT tracks; refuse to guess.
+    for prefix, origin in EXTERNAL_ADDON_TREES.items():
+        tree = ROOT / prefix
+        if not tree.is_dir():
+            problems.append(
+                f"C. {prefix}/ is missing. It is cloned from {origin}; "
+                f"run `make addons-ee-gap`. Odoo's addons_path still lists it and "
+                f"modules inside it are installed in production.")
+            continue
+        if not (tree / ".git").exists():
+            problems.append(
+                f"C. {prefix}/ exists but is not a git clone of {origin}. "
+                f"A copied tree cannot be reproduced on a clean host.")
+            continue
+        inner = subprocess.run(["git", "ls-files"], cwd=tree,
+                               capture_output=True, text=True)
+        if inner.returncode != 0:
+            problems.append(f"C. {prefix}/: `git ls-files` failed: {inner.stderr.strip()}")
+            continue
+        tracked |= {f"{prefix}/{rel}" for rel in inner.stdout.split("\n") if rel}
     # rglob, not glob("*/..."). ADR 0002 nested the tree as
     # addons/<group>/<module>/, so a one-level glob sees only the five modules
     # written here and is blind to the 149 imported ones - which is exactly the

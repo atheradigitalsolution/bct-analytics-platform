@@ -110,3 +110,20 @@ desktop.ini
 
 # Sisa patch — jangan pernah ter-commit (temuan secret-scan 2026-09-03)
 *.orig
+
+# ---------------------------------------------------------------------------
+# ee_gap: 101 modules that now live in their own repository,
+# github.com/atheradigitalsolution/athera-odoo-ee-gap, and are CLONED back into
+# this path by `make addons-ee-gap`.
+#
+# The path is deliberately unchanged: `odoo/odoo.conf` addons_path still lists
+# /mnt/extra-addons/ee_gap, and eight of those modules are `installed` in
+# production. A module recorded as installed whose code is absent from
+# addons_path is a broken registry at the next restart -- so this is an ignore,
+# never a deletion. `scripts/check-gitignore.py` enforces that the directory is
+# a real clone rather than a hand-copied tree, because only a clone gives the
+# clean-host guarantee the rest of this file exists to protect.
+#
+# Anchored with a leading slash: `addons/ee_gap` at THIS depth only.
+# ---------------------------------------------------------------------------
+/addons/ee_gap/

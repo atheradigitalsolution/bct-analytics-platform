@@ -64,6 +64,17 @@ load_env
 
 BIND="${BIND_ADDRESS:-127.0.0.1}"
 
+# --- 0. ee_gap addon tree --------------------------------------------------
+# Before anything starts Odoo. The 101 ee_gap modules live in their own
+# repository since 2026-09-04 and are CLONED into addons/ee_gap/, which
+# addons_path still points at. Eight of them are `installed` in the live
+# databases; Odoo keeps that state in ir_module_module, not on disk, so a
+# missing directory does not degrade the platform, it stops it at the next
+# registry load. Fail here, with the fix in the message, rather than inside a
+# container start-up log.
+log "[0/7] ee_gap addon tree (cloned from its own repo)"
+bash "$REPO_ROOT/scripts/addons-ee-gap.sh"
+
 # --- 1. odoo ---------------------------------------------------------------
 log "[1/7] odoo stack (postgres, redis, odoo)"
 # up-dev.sh owns database initialisation and the dev password; re-implementing

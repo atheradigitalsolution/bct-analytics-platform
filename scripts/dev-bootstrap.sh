@@ -70,6 +70,18 @@ for d in addons backups postgres/conf.d; do
     fi
 done
 
+# addons/ee_gap is the one exception to "Platform-Infra writes no module": since
+# 2026-09-04 those 101 modules live in their own repository and are cloned into
+# place, so a fresh host has an addons_path entry that resolves to nothing until
+# somebody runs this. Eight of them are `installed` in the live databases, and
+# Odoo keeps that state in ir_module_module rather than on disk -- so an absent
+# directory is a database that will not load, not a smaller feature set.
+if bash "$REPO_ROOT/scripts/addons-ee-gap.sh"; then
+    info "addons/ee_gap/ ready"
+else
+    info "addons/ee_gap/ NOT ready - run 'make addons-ee-gap' before 'make up'"
+fi
+
 # ---------------------------------------------------------------------------
 log "[5/5] line endings"
 # The dev host is Windows with core.autocrlf=true. A CRLF .sh reaching a Linux

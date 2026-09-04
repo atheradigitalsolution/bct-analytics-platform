@@ -103,8 +103,21 @@ repos:
           # module: S311 stays live for any future token or salt generation.
           - --per-file-ignores=addons/custom_demo_seed/**:S311
           # ------------------------------------------------------------------
-          # IMPORTED-ADDON DEBT, 2026-09-01. Scoped to addons/ ONLY, so every rule
-          # below stays live for login-gateway, analytics/, scripts/ and tests/.
+          # IMPORTED-ADDON DEBT, 2026-09-01. NARROWED 2026-09-04.
+          #
+          # It used to say `addons/**`, which also covered the five modules THIS
+          # project wrote and owns - custom_pdp_core, custom_pdp_masking,
+          # custom_operating_unit, custom_ppob, custom_demo_seed, all of which sit
+          # directly under addons/ while every imported module sits one level
+          # deeper under addons/<tier>/. Five rules were therefore dead on our own
+          # code for a debt none of it carries. Measured before narrowing: ruff
+          # with the five ignores REMOVED reports 0 findings across those five
+          # modules, so this costs nothing and buys back the coverage.
+          #
+          # The glob now names the imported tiers explicitly. addons/ee_gap/ is
+          # absent from it on purpose: those 101 modules moved to their own
+          # repository on 2026-09-04 and are gitignored here, so pre-commit never
+          # sees them.
           #
           # ADR 0002 imported 149 modules (239k lines) that had been running in
           # production elsewhere. Linting them for the first time produced 119
@@ -142,13 +155,49 @@ repos:
           #
           # expires: 2027-03-31 - re-review with the addon suite's next audit. This is
           # a dated acceptance of known debt, not a decision that the rules are wrong.
-          # One flag per rule: ruff splits this option's value on commas, so a
-          # single `addons/**:B023,S110,...` is rejected as a malformed mapping.
-          - --per-file-ignores=addons/**:B023
-          - --per-file-ignores=addons/**:S110
-          - --per-file-ignores=addons/**:S112
-          - --per-file-ignores=addons/**:F841
-          - --per-file-ignores=addons/**:B017
+          # One flag per rule PER TIER, and yes that is 35 lines. ruff splits this
+          # option's value on commas, so neither `addons/**:B023,S110,...` nor a
+          # brace alternation `addons/{a,b}/**:B023` parses - the latter fails with
+          # `invalid value 'addons/{_vendor' ... Expected <FilePattern>:<RuleCode>`.
+          # Verified against ruff 0.16.5, the pinned rev above. The tiers are
+          # spelled out rather than globbed by depth because `addons/*/*/**` also
+          # matches addons/custom_pdp_core/models/*.py, which is the code this
+          # narrowing exists to protect.
+          - --per-file-ignores=addons/_vendor/**:B023
+          - --per-file-ignores=addons/core/**:B023
+          - --per-file-ignores=addons/control_plane/**:B023
+          - --per-file-ignores=addons/compliance/**:B023
+          - --per-file-ignores=addons/operations/**:B023
+          - --per-file-ignores=addons/verticals/**:B023
+          - --per-file-ignores=addons/_tenants/**:B023
+          - --per-file-ignores=addons/_vendor/**:S110
+          - --per-file-ignores=addons/core/**:S110
+          - --per-file-ignores=addons/control_plane/**:S110
+          - --per-file-ignores=addons/compliance/**:S110
+          - --per-file-ignores=addons/operations/**:S110
+          - --per-file-ignores=addons/verticals/**:S110
+          - --per-file-ignores=addons/_tenants/**:S110
+          - --per-file-ignores=addons/_vendor/**:S112
+          - --per-file-ignores=addons/core/**:S112
+          - --per-file-ignores=addons/control_plane/**:S112
+          - --per-file-ignores=addons/compliance/**:S112
+          - --per-file-ignores=addons/operations/**:S112
+          - --per-file-ignores=addons/verticals/**:S112
+          - --per-file-ignores=addons/_tenants/**:S112
+          - --per-file-ignores=addons/_vendor/**:F841
+          - --per-file-ignores=addons/core/**:F841
+          - --per-file-ignores=addons/control_plane/**:F841
+          - --per-file-ignores=addons/compliance/**:F841
+          - --per-file-ignores=addons/operations/**:F841
+          - --per-file-ignores=addons/verticals/**:F841
+          - --per-file-ignores=addons/_tenants/**:F841
+          - --per-file-ignores=addons/_vendor/**:B017
+          - --per-file-ignores=addons/core/**:B017
+          - --per-file-ignores=addons/control_plane/**:B017
+          - --per-file-ignores=addons/compliance/**:B017
+          - --per-file-ignores=addons/operations/**:B017
+          - --per-file-ignores=addons/verticals/**:B017
+          - --per-file-ignores=addons/_tenants/**:B017
           - --extend-exclude=addons/*/migrations
           # addons/_vendor/ is third-party code we redistribute unchanged:
           # queue_job and auth_jwt are OCA modules (github.com/OCA/queue,
