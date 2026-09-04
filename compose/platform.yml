@@ -100,10 +100,21 @@ services:
       LOGIN_GATEWAY_RATE_LIMIT_MAX_ATTEMPTS: ${LOGIN_GATEWAY_RATE_LIMIT_MAX_ATTEMPTS:-5}
       LOGIN_GATEWAY_RATE_LIMIT_WINDOW_SECONDS: ${LOGIN_GATEWAY_RATE_LIMIT_WINDOW_SECONDS:-300}
       LOGIN_GATEWAY_RATE_LIMIT_LOCKOUT_SECONDS: ${LOGIN_GATEWAY_RATE_LIMIT_LOCKOUT_SECONDS:-900}
-      # The control-plane read behind the diagram's "Active?" decision. Empty
-      # disables entitlement enforcement entirely and the gateway says so at
-      # WARNING on every boot — it is not a silent default.
-      LOGIN_GATEWAY_REGISTRY_DSN: ${LOGIN_GATEWAY_REGISTRY_DSN:-}
+      # The control-plane read behind the diagram's "Active?" decision.
+      #
+      # `:?` AND NOT `:-`, matching ORCHESTRATOR_REGISTRY_DSN below. It used to
+      # default to empty, and empty is not a milder configuration — it is the
+      # OFF switch for the whole of contract 07: registry.py answers
+      # `Entitlement(active=True, products=all)` for every tenant when the DSN
+      # is blank, so one absent line in .env silently converts every suspended
+      # client back into a paying one. That failure is invisible from the
+      # outside: logins keep working, dashboards keep rendering, and the only
+      # trace is a single WARNING at boot that nobody reads.
+      #
+      # A stack that has genuinely not adopted entitlements yet must now say so
+      # by deleting this line from the compose file, which is a reviewed edit,
+      # rather than by leaving a variable blank, which is a typo.
+      LOGIN_GATEWAY_REGISTRY_DSN: ${LOGIN_GATEWAY_REGISTRY_DSN:?LOGIN_GATEWAY_REGISTRY_DSN is required - an empty value turns OFF subscription enforcement for every tenant. Run `make dev-bootstrap`.}
       LOGIN_GATEWAY_REGISTRY_CACHE_TTL: ${LOGIN_GATEWAY_REGISTRY_CACHE_TTL:-30}
       # The browser-facing address of the Odoo door (brief 08). Derived from
       # ATHERA_DOMAIN rather than spelled out, for the same reason
