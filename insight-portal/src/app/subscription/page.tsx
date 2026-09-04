@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/session";
@@ -81,6 +82,31 @@ export default async function SubscriptionPage() {
           akan otomatis mengembalikan Anda ke dasbor pada login atau penyegaran sesi berikutnya —
           tidak perlu tindakan lain dari sisi Anda.
         </p>
+
+        {/*
+          Satu-satunya halaman yang MASIH bisa dibuka orang ini, dan sampai sekarang tidak pernah
+          disebut di mana pun. Middleware mengecualikan `/billing` dari kedua penolakan contract 07
+          justru supaya klien yang langganannya berhenti tetap bisa melihat tagihan dan mengirim
+          konfirmasi pembayaran — yaitu satu-satunya tindakan yang benar-benar mengakhiri blokir
+          ini. Tanpa tautan ini pengecualian itu ada tetapi tidak bisa ditemukan siapa pun kecuali
+          dengan mengetik URL, dan halaman ini justru berakhir dengan tombol "Keluar" sebagai satu-
+          satunya jalan keluar.
+        */}
+        <div
+          className="mt-5 rounded border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-800/40"
+        >
+          <p className="text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
+            Halaman <strong>Akun &amp; Tagihan</strong> tetap terbuka untuk Anda meskipun akses
+            dasbor sedang dihentikan. Di sana Anda dapat melihat faktur yang belum lunas dan
+            mengirim konfirmasi pembayaran.
+          </p>
+          <Link
+            className="mt-3 inline-block rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            href="/billing"
+          >
+            Buka Akun &amp; Tagihan
+          </Link>
+        </div>
 
         <div className="mt-6 flex gap-3 text-sm">
           <a

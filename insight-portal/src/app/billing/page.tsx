@@ -30,10 +30,29 @@ export default async function BillingPage() {
 
   const outstanding = invoices.filter((i) => i.client_status !== "paid");
 
+  // KE MANA "kembali" itu, dan kenapa ini bukan satu href tetap.
+  //
+  // `Nav.tsx` hanya dirender di bawah `/t/<tenant>/*`, jadi halaman ini tidak mewarisi navigasi
+  // apa pun: tanpa baris di bawah, `/billing` adalah jalan buntu untuk SETIAP pengunjung, bukan
+  // hanya untuk klien yang diblokir.
+  //
+  // Tujuannya harus mengikuti entitlement, bukan diasumsikan. Menautkan tanpa syarat ke
+  // `/t/<tenant>/overview` mengirim klien yang langganannya berhenti ke rute yang middleware
+  // contract 07 langsung pantulkan kembali ke `/subscription` — sebuah tombol yang kelihatan
+  // membawa pulang tetapi selalu mendarat di halaman blokir. Syaratnya persis sama dengan yang
+  // dipakai `/subscription` untuk memutuskan pantulannya, supaya kedua halaman tidak pernah
+  // saling melempar.
+  const entitled = session.subscription_active && session.products.includes("insight");
+  const backHref = entitled ? `/t/${session.tenant_id}/overview` : "/subscription";
+  const backLabel = entitled ? "Kembali ke dasbor" : "Kembali ke status langganan";
+
   return (
     <main id="main" className="mx-auto max-w-4xl px-4 py-8">
       <header className="mb-6">
-        <p className="text-xs uppercase tracking-wide text-ink-3">ATHERA &mdash; Akun &amp; Tagihan</p>
+        <Link className="text-xs text-ink-3 underline hover:text-ink-2" href={backHref}>
+          &larr; {backLabel}
+        </Link>
+        <p className="mt-2 text-xs uppercase tracking-wide text-ink-3">ATHERA &mdash; Akun &amp; Tagihan</p>
         <h1 className="mt-1 text-lg font-semibold text-ink">
           {subscription?.display_name ?? session.tenant_id}
         </h1>
