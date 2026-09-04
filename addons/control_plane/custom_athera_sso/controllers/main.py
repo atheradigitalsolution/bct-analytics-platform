@@ -107,6 +107,20 @@ class AtheraSso(http.Controller):
         env = request.env(user=SUPERUSER_ID)
         user = env["res.users"].browse(uid).exists()
         if not user or not user.active:
+            # LOUD, like the database-mismatch branch above it. This branch used to refuse in
+            # complete silence, and that silence cost a day: the suite reported a 403 with no
+            # trace anywhere on the Odoo side, so the failure looked like a broken SSO door when
+            # the real cause was a ticket naming a uid that had been removed from this database.
+            # A refusal nobody can explain from the logs is a refusal that gets debugged twice.
+            #
+            # NOTHING REUSABLE IS WRITTEN. The uid is an integer and the database name is already
+            # in the sibling line; the ticket, the route token and the exchange payload are not
+            # logged here and must not be - a credential in a log is the defect we are separately
+            # tracking, not one to add to.
+            _logger.warning(
+                "athera sso: refusing handoff, uid=%s is %s on %r",
+                uid, "inactive" if user else "absent", request.db,
+            )
             return _refuse("Pengguna tidak ditemukan pada basis data ini.", 403)
 
         request.session.uid = None
