@@ -153,7 +153,21 @@ step "12. the alerting path is armed, not merely syntactically valid"
 check "alerting armed" python3 "$REPO_ROOT/scripts/check-alerting.py"
 
 # 14 ------------------------------------------------------------------------
-step "13. the dev login credential is applied, and Odoo's default is refused"
+step "13. every container reads the config file this repo actually holds"
+# A bind mount of a FILE is pinned to one inode when the container starts, so
+# replacing that file on the host never reaches a running container -- and the
+# service keeps reporting healthy while `reload` and `validate` both agree the
+# stale bytes are valid. Measured on the edge proxy 2026-09-04: a config change
+# had silently not applied and nothing anywhere said so.
+#
+# The check compares BYTES, not inodes. An inode comparison is the obvious form
+# and it is wrong: a temp+rename write frees an inode number that the
+# replacement is then handed straight back, so inode equality gets reported for
+# a file that is no longer connected. Measured, not assumed.
+check "config mounts match the repo" python3 "$REPO_ROOT/scripts/check-config-mounts.py" --quiet --filter "$COMPOSE_PROJECT_NAME"
+
+# 15 ------------------------------------------------------------------------
+step "14. the dev login credential is applied, and Odoo's default is refused"
 # PLAN.md instance 10. The half of this that matters is the NEGATIVE: a check
 # that only asserts "$BCT_DEV_USER_PASSWORD logs in" is green on a stack that
 # accepts BOTH passwords, which is precisely the defective state. So
