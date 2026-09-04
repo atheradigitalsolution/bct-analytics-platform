@@ -138,7 +138,27 @@
 
 	log {
 		output stdout
-		format json
+		# `filter` wrapping json, NOT plain json. The SSO ticket travels in a query
+		# string, so the edge writes it verbatim into `request>uri` -- and the edge is
+		# the only place that records it on the same line as the client's real address
+		# (`X-Forwarded-For`). Caddy already redacts `Set-Cookie` here, but that is its
+		# built-in default and it does not extend to the URI; this has to be asked for.
+		#
+		# Applied to every site block rather than only the one that receives tickets:
+		# the filter is inert where the parameter never appears, and a route that moves
+		# later must not quietly reopen this.
+		#
+		# This stops the ticket being WRITTEN here. It does not touch the `Referer`
+		# header or the client's browser history, and the Odoo access log keeps its own
+		# copy. Central log shipping is filtered separately, in promtail.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace ticket REDACTED
+				}
+			}
+		}
 		level INFO
 	}
 }
@@ -167,7 +187,27 @@ admin.{$ATHERA_DOMAIN:athera.localhost} {
 
 	log {
 		output stdout
-		format json
+		# `filter` wrapping json, NOT plain json. The SSO ticket travels in a query
+		# string, so the edge writes it verbatim into `request>uri` -- and the edge is
+		# the only place that records it on the same line as the client's real address
+		# (`X-Forwarded-For`). Caddy already redacts `Set-Cookie` here, but that is its
+		# built-in default and it does not extend to the URI; this has to be asked for.
+		#
+		# Applied to every site block rather than only the one that receives tickets:
+		# the filter is inert where the parameter never appears, and a route that moves
+		# later must not quietly reopen this.
+		#
+		# This stops the ticket being WRITTEN here. It does not touch the `Referer`
+		# header or the client's browser history, and the Odoo access log keeps its own
+		# copy. Central log shipping is filtered separately, in promtail.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace ticket REDACTED
+				}
+			}
+		}
 		level INFO
 	}
 }
@@ -237,7 +277,27 @@ odoo.{$ATHERA_DOMAIN:athera.localhost} {
 
 	log {
 		output stdout
-		format json
+		# `filter` wrapping json, NOT plain json. The SSO ticket travels in a query
+		# string, so the edge writes it verbatim into `request>uri` -- and the edge is
+		# the only place that records it on the same line as the client's real address
+		# (`X-Forwarded-For`). Caddy already redacts `Set-Cookie` here, but that is its
+		# built-in default and it does not extend to the URI; this has to be asked for.
+		#
+		# Applied to every site block rather than only the one that receives tickets:
+		# the filter is inert where the parameter never appears, and a route that moves
+		# later must not quietly reopen this.
+		#
+		# This stops the ticket being WRITTEN here. It does not touch the `Referer`
+		# header or the client's browser history, and the Odoo access log keeps its own
+		# copy. Central log shipping is filtered separately, in promtail.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace ticket REDACTED
+				}
+			}
+		}
 		level INFO
 	}
 }
@@ -256,7 +316,27 @@ insight.{$ATHERA_DOMAIN:athera.localhost} {
 
 	log {
 		output stdout
-		format json
+		# `filter` wrapping json, NOT plain json. The SSO ticket travels in a query
+		# string, so the edge writes it verbatim into `request>uri` -- and the edge is
+		# the only place that records it on the same line as the client's real address
+		# (`X-Forwarded-For`). Caddy already redacts `Set-Cookie` here, but that is its
+		# built-in default and it does not extend to the URI; this has to be asked for.
+		#
+		# Applied to every site block rather than only the one that receives tickets:
+		# the filter is inert where the parameter never appears, and a route that moves
+		# later must not quietly reopen this.
+		#
+		# This stops the ticket being WRITTEN here. It does not touch the `Referer`
+		# header or the client's browser history, and the Odoo access log keeps its own
+		# copy. Central log shipping is filtered separately, in promtail.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace ticket REDACTED
+				}
+			}
+		}
 		level INFO
 	}
 }
@@ -299,7 +379,27 @@ bct.{$ATHERA_DOMAIN:athera.localhost} {
 
 	log {
 		output stdout
-		format json
+		# `filter` wrapping json, NOT plain json. The SSO ticket travels in a query
+		# string, so the edge writes it verbatim into `request>uri` -- and the edge is
+		# the only place that records it on the same line as the client's real address
+		# (`X-Forwarded-For`). Caddy already redacts `Set-Cookie` here, but that is its
+		# built-in default and it does not extend to the URI; this has to be asked for.
+		#
+		# Applied to every site block rather than only the one that receives tickets:
+		# the filter is inert where the parameter never appears, and a route that moves
+		# later must not quietly reopen this.
+		#
+		# This stops the ticket being WRITTEN here. It does not touch the `Referer`
+		# header or the client's browser history, and the Odoo access log keeps its own
+		# copy. Central log shipping is filtered separately, in promtail.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace ticket REDACTED
+				}
+			}
+		}
 		level INFO
 	}
 }
@@ -323,7 +423,27 @@ acme.{$ATHERA_DOMAIN:athera.localhost} {
 
 	log {
 		output stdout
-		format json
+		# `filter` wrapping json, NOT plain json. The SSO ticket travels in a query
+		# string, so the edge writes it verbatim into `request>uri` -- and the edge is
+		# the only place that records it on the same line as the client's real address
+		# (`X-Forwarded-For`). Caddy already redacts `Set-Cookie` here, but that is its
+		# built-in default and it does not extend to the URI; this has to be asked for.
+		#
+		# Applied to every site block rather than only the one that receives tickets:
+		# the filter is inert where the parameter never appears, and a route that moves
+		# later must not quietly reopen this.
+		#
+		# This stops the ticket being WRITTEN here. It does not touch the `Referer`
+		# header or the client's browser history, and the Odoo access log keeps its own
+		# copy. Central log shipping is filtered separately, in promtail.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace ticket REDACTED
+				}
+			}
+		}
 		level INFO
 	}
 }

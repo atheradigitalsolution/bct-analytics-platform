@@ -46,6 +46,36 @@ scrape_configs:
         replacement: docker
 
     pipeline_stages:
+      # ---------------------------------------------------------------------
+      # GLOBAL, and deliberately the FIRST stage: it must run before any
+      # per-service `match`, and outside all of them.
+      #
+      # WHY GLOBAL AND NOT UNDER A `match`. The SSO ticket travels in a query
+      # string, so it is written verbatim by every component that logs a URL.
+      # That is at least two services here -- the Odoo access log and the edge
+      # access log -- and the scrape filter above admits every container in the
+      # project, so a stage nested under one service would ship the other one's
+      # copy untouched. The edge is the worse of the two: it is the only place
+      # that records the ticket on the same line as the client's real address.
+      #
+      # WHAT THIS DOES NOT DO, stated so nobody reads more into it. It stops the
+      # ticket reaching central log storage. It does NOT stop the ticket being
+      # written into a container's own log (the edge is separately configured to
+      # redact it there; the Odoo access log still holds it), it does not touch
+      # the `Referer` header, and it does not touch the client's browser
+      # history. Tickets already shipped stay under the configured retention.
+      #
+      # The ticket is single-use and lives 60 seconds, so a captured one is
+      # already spent. That mitigation is not being replaced -- this is a second
+      # layer, not a substitute.
+      - replace:
+          # Only the captured group is rewritten, so `ticket=` survives and the
+          # line stays greppable. The class stops at the query separator, a
+          # quote, whitespace or a backslash, which covers the raw access-log
+          # form and the JSON-encoded form without needing two rules.
+          expression: 'ticket=([^&"\s\\]+)'
+          replace: 'REDACTED'
+
       # Odoo's log line format: "2026-08-31 03:41:08,510 1 INFO bct module: msg"
       # Parsing it gives a `level` label, which is what makes
       # {service="odoo", level="ERROR"} a useful query rather than a grep.
