@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+import secrets
+import string
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -30,6 +32,35 @@ logger = logging.getLogger("orchestrator")
 #: tightest constraint rather than its own.
 SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 
+#: Slugs the platform has already spent on itself. Each one is the first label
+#: of a hostname the edge routes by name, so a tenant holding one would answer
+#: on a URL the platform already owns -- it hijacks a platform route. That is
+#: the entire reason. It is NOT about database names: a colliding database is a
+#: different failure and is already refused by athera.provisioner, which checks
+#: for an existing database before it enqueues anything.
+#:
+#: The SAME set is enforced in two other layers, and the three must stay
+#: identical: the Odoo provisioning wizard (custom_super_admin), so an operator
+#: is told before a call is made, and the CHECK on tenant_registry.tenants.slug,
+#: so a direct INSERT cannot walk past both.
+RESERVED_SLUGS = frozenset({"admin", "app", "auth", "insight", "mail", "odoo", "www"})
+
+#: Alphabet for a generated admin password: letters and digits only. The value
+#: crosses JSON-RPC, then a child process's environment inside Odoo, then an
+#: operator's clipboard and a login form. Characters a shell, an argv parser or
+#: a URL encoder could reinterpret are left out rather than escaped correctly in
+#: each of those places -- entropy is bought with length instead.
+_PASSWORD_ALPHABET = string.ascii_letters + string.digits
+#: 32 characters of a 62-symbol alphabet is ~190 bits of entropy.
+_PASSWORD_LENGTH = 32
+
+#: The only keys of Odoo's job handle that are copied into the audit log. A
+#: whitelist, not a blacklist: the detail column exists so a registry row can be
+#: correlated with a job, and whatever else the far side chose to put in that
+#: dict has not been reviewed for secrets. See the credential note in
+#: `provision` below.
+JOB_LOG_KEYS = ("slug", "job_uuid")
+
 ACTIONS = Counter(
     "athera_orchestrator_actions_total",
     "Control-plane actions, by action and outcome.",
@@ -39,6 +70,50 @@ ACTIONS = Counter(
 
 def _bad_request(detail: str) -> JSONResponse:
     return JSONResponse({"error": "invalid_request", "detail": detail}, status_code=400)
+
+
+def _generate_admin_password() -> str:
+    """A fresh administrator password for a tenant that did not bring one.
+
+    Callers do not send one. The previous code passed "" straight through to
+    ``athera.provisioner``, whose ``if admin_password:`` then skipped setting
+    anything -- so the new tenant's administrator kept the password `odoo -i`
+    gives it, which is the same well-known default in every database it builds.
+    Generating one is not a convenience: there is no safe value for "absent" on
+    this argument.
+    """
+    return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(_PASSWORD_LENGTH))
+
+
+def _redact(text: str, secret: str | None) -> str:
+    """Remove one known credential from text that is about to be persisted.
+
+    The 502 path below writes Odoo's fault string into the append-only action
+    log. That string is composed on the far side, and the far side was just
+    handed the credential -- a fault that quotes its own arguments back would
+    publish it to every super-admin, in a table nothing deletes from.
+
+    Deliberately not a general-purpose scrubber: at this point exactly one
+    secret is known, so exactly that one is removed. It is also not a substitute
+    for Odoo not quoting credentials into errors; it is the half of that problem
+    this side can fix alone.
+    """
+    if secret and secret in text:
+        return text.replace(secret, "[redacted]")
+    return text
+
+
+def _job_detail(job) -> dict:
+    """Audit detail for a provisioning job -- correlation identifiers only.
+
+    The credential MUST NOT pass through here. Odoo returns this dict over RPC;
+    copying it whole into the action log would make any field the far side ever
+    adds -- a credential echoed back, say -- permanently readable by every
+    super-admin.
+    """
+    if not isinstance(job, dict):
+        return {"job": None}
+    return {"job": {key: job[key] for key in JOB_LOG_KEYS if key in job}}
 
 
 def _not_found(slug: str) -> JSONResponse:
@@ -122,6 +197,16 @@ def create_app() -> FastAPI:
                 "no dashes (Postgres replication slot names forbid them)." % (slug, SLUG_RE.pattern)
             )
 
+        if slug in RESERVED_SLUGS:
+            ACTIONS.labels("provision", "rejected").inc()
+            return _bad_request(
+                "Slug %r is reserved. %s are subdomain labels this platform "
+                "already routes to its own services, so a tenant named after one "
+                "would take over that route. This is not about database names -- "
+                "a colliding database is refused separately, by "
+                "athera.provisioner." % (slug, ", ".join(sorted(RESERVED_SLUGS)))
+            )
+
         payload = {
             "slug": slug,
             "display_name": body.get("display_name") or slug,
@@ -147,28 +232,51 @@ def create_app() -> FastAPI:
             registry.log_action(slug, "provision", actor, "success",
                                 {"insight_source_kind": payload["insight_source_kind"]})
             ACTIONS.labels("provision", "success").inc()
-            return {"tenant": tenant, "job": None}
+            # Same response shape as the Odoo path, so the caller reads one
+            # contract. There is no Odoo administrator to give a password to,
+            # and null says that rather than inventing a credential nobody holds.
+            return {"tenant": tenant, "job": None, "admin_password": None}
 
+        # The body key stays `modules`; there is deliberately no
+        # `install_modules` alias. One name means a caller that sends the wrong
+        # one gets the default module set and a visible surprise, instead of an
+        # alias quietly absorbing the mistake.
         modules = body.get("modules") or list(settings.provision_modules)
+
+        # CREDENTIAL BOUNDARY. From here to the return statement, the password
+        # exists in exactly three places: this local, the RPC argument, and the
+        # response body. It MUST NOT reach registry.log_action (the audit detail
+        # goes through _job_detail, which whitelists), any logger call, or any
+        # metric label -- the action log is readable by every super-admin and
+        # /metrics is served unsigned.
+        supplied = body.get("admin_password")
+        admin_password = (
+            supplied if isinstance(supplied, str) and supplied
+            else _generate_admin_password()
+        )
         try:
-            job = odoo.enqueue_provision(
-                slug, modules, body.get("admin_password") or ""
-            )
+            job = odoo.enqueue_provision(slug, modules, admin_password)
         except OdooError as exc:
             # The row stays, in state `provisioning`, and the failure is on the
             # audit log. Rolling it back would lose the only record that anyone
             # tried, and `provisioning` is already the state that means "not
             # usable yet" -- tenant_registry.is_active() answers false for it.
+            # Redacted BEFORE truncation: slicing first could leave half a
+            # credential in the log, which is still a credential with a hint.
+            reason = _redact(str(exc), admin_password)
             registry.set_state(slug, "failed")
-            registry.log_action(slug, "provision", actor, "failure", error=str(exc)[:500])
+            registry.log_action(slug, "provision", actor, "failure", error=reason[:500])
             ACTIONS.labels("provision", "failure").inc()
             return JSONResponse(
-                {"error": "provision_failed", "detail": str(exc)[:300]}, status_code=502
+                {"error": "provision_failed", "detail": reason[:300]}, status_code=502
             )
 
-        registry.log_action(slug, "provision", actor, "success", {"job": job})
+        registry.log_action(slug, "provision", actor, "success", _job_detail(job))
         ACTIONS.labels("provision", "success").inc()
-        return {"tenant": tenant, "job": job}
+        # Handed back ONCE, here, because this is the only moment anyone can
+        # still read it: nothing on this side stores it. No GET route repeats
+        # it, and none can -- there is nothing left to repeat.
+        return {"tenant": tenant, "job": job, "admin_password": admin_password}
 
     def _transition(slug, state, stamp, action, actor, detail=None):
         try:
