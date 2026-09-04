@@ -39,5 +39,22 @@
       <field name="key">athera_billing.pilot_tenants</field>
       <field name="value"></field>
     </record>
+
+    <!--
+      Basis URL portal klien (ATHERA Insight), dipakai surat penagihan untuk memberi tahu klien
+      KE MANA ia harus pergi. Isi dengan skema + host saja, tanpa lintasan dan tanpa garis miring
+      di akhir; `/billing` ditambahkan oleh `account.move._compute_athera_portal_url`.
+
+      Sengaja KOSONG di repo, dengan alasan yang sama seperti `email_from` di mail_template.xml:
+      hostname sebuah instalasi adalah kenyataan lokal, bukan bagian dari produk, dan sebuah
+      domain produksi yang di-hardcode di sini akan tetap bekerja setelah parameter yang
+      seharusnya mengendalikannya dikosongkan — sehingga tidak ada yang pernah tahu bahwa
+      konfigurasinya salah. Kosong berarti surat terkirim tanpa tautan, bukan surat berisi
+      tautan ke tempat yang tidak ada.
+    -->
+    <record id="param_portal_url" model="ir.config_parameter">
+      <field name="key">athera_billing.portal_url</field>
+      <field name="value"></field>
+    </record>
   </data>
 </odoo>

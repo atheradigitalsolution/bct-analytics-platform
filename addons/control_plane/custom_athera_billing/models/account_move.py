@@ -5,6 +5,10 @@ from dateutil.relativedelta import relativedelta
 
 from odoo import api, fields, models
 
+#: Basis URL portal klien (ATHERA Insight). Sengaja sebuah parameter, bukan konstanta —
+#: lihat `_compute_athera_portal_url`.
+PORTAL_URL_PARAM = "athera_billing.portal_url"
+
 
 class AccountMove(models.Model):
     _inherit = "account.move"
@@ -41,6 +45,35 @@ class AccountMove(models.Model):
         help="Jatuh tempo ditambah masa tenggang. Tanggal inilah yang disebut di surat penagihan — "
              "klien yang tahu tanggalnya bisa bertindak.",
     )
+
+    athera_portal_url = fields.Char(
+        string="URL portal tagihan klien", compute="_compute_athera_portal_url",
+        help="Alamat halaman tagihan klien di ATHERA Insight, dirakit dari parameter "
+             "`athera_billing.portal_url`. Kosong kalau parameter itu belum diisi, dan surat "
+             "penagihan menghilangkan tautannya alih-alih mengirim alamat yang salah.",
+    )
+
+    #: TANPA @api.depends, dan itu disengaja. Nilainya tidak berasal dari field mana pun; ia
+    #: berasal dari sebuah parameter konfigurasi. Mendaftarkan dependensi palsu ke `company_id`
+    #: hanya akan berbohong kepada mesin invalidasi. Pola yang sama dipakai `portal.mixin`
+    #: bawaan Odoo untuk `access_url`. Field ini tidak disimpan, jadi ia dihitung saat dibaca.
+    def _compute_athera_portal_url(self):
+        """Alamat portal tagihan — DARI KONFIGURASI, tidak pernah dari konstanta.
+
+        Sebuah hostname produksi yang ditanam di berkas repo akan tetap bekerja setelah
+        parameter yang seharusnya mengendalikannya dikosongkan, sehingga tidak ada yang pernah
+        menemukan bahwa konfigurasinya salah. Alasan yang sama sudah dipakai `email_from` di
+        `data/mail_template.xml`. Repo publik menambahkan satu alasan lagi: hostname pelanggan
+        bukan bagian dari produk.
+
+        Kosong menghasilkan False, dan surat memakai `t-if` sehingga yang dikirim adalah surat
+        tanpa tautan, bukan surat berisi tautan ke tempat yang tidak ada.
+        """
+        base = (
+            self.env["ir.config_parameter"].sudo().get_param(PORTAL_URL_PARAM) or ""
+        ).strip().rstrip("/")
+        for move in self:
+            move.athera_portal_url = (base + "/billing") if base else False
 
     @api.depends("invoice_date_due", "athera_subscription_id.grace_days")
     def _compute_athera_suspend_on(self):

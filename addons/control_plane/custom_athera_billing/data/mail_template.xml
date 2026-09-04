@@ -18,6 +18,22 @@
            seharusnya mengendalikannya dikosongkan. Kalau kosong, Odoo memakai mail.default.from. -->
       <field name="email_from">{{ user.company_id.email }}</field>
       <field name="partner_to">{{ object.partner_id.id }}</field>
+      <!--
+        KE MANA HARUS PERGI. Ketiga surat ini sebelumnya tidak memuat satu pun alamat, jadi klien
+        diberi tahu bahwa ia menunggak dan tidak diberi tahu ke mana harus membayar — pekerjaan
+        mencari diserahkan kepada orang yang justru sedang kita minta bertindak.
+
+        `t-if` di dalam badan surat bukan kehati-hatian kosmetik: `athera_portal_url` bernilai
+        False selama parameter `athera_billing.portal_url` belum diisi, dan tanpa penjaga itu
+        surat akan memuat tautan berbunyi "False". Alamatnya juga ditulis ulang sebagai teks —
+        sebagian klien surel membuang anchor, dan alamat yang bisa disalin tetap berguna.
+
+        Komentar ini ada DI LUAR `body_html`, seperti komentar `email_from` di atasnya. Apa pun
+        yang ditulis di dalam field itu ikut tersimpan sebagai bagian dari badan surat: QWeb
+        memang membuangnya saat render sehingga tidak sampai ke klien, tetapi operator yang
+        membuka template di editor HTML Odoo membacanya, dan satu penyimpanan lewat WYSIWYG cukup
+        untuk mengacaknya.
+      -->
       <field name="body_html" type="html">
         <div style="font:14px/1.6 system-ui,sans-serif;color:#16181d">
           <p>Halo <t t-out="object.partner_id.name or ''"/>,</p>
@@ -31,6 +47,12 @@
             <tr><td style="padding:.2rem 1rem .2rem 0">Jumlah</td><td><strong><t t-out="format_amount(object.amount_total, object.currency_id)"/></strong></td></tr>
             <tr><td style="padding:.2rem 1rem .2rem 0">Jatuh tempo</td><td><strong><t t-out="object.invoice_date_due or ''"/></strong></td></tr>
           </table>
+          <t t-if="object.athera_portal_url">
+            <p style="margin:1rem 0">
+              Rincian tagihan dan pengiriman konfirmasi pembayaran ada di portal ATHERA Anda:<br/>
+              <a t-att-href="object.athera_portal_url" style="color:#2a78d6"><t t-out="object.athera_portal_url"/></a>
+            </p>
+          </t>
           <p>Terima kasih.</p>
         </div>
       </field>
@@ -47,6 +69,7 @@
            seharusnya mengendalikannya dikosongkan. Kalau kosong, Odoo memakai mail.default.from. -->
       <field name="email_from">{{ user.company_id.email }}</field>
       <field name="partner_to">{{ object.partner_id.id }}</field>
+      <!-- Tautan portal; alasannya ada di surat pertama dalam berkas ini. -->
       <field name="body_html" type="html">
         <div style="font:14px/1.6 system-ui,sans-serif;color:#16181d">
           <p>Halo <t t-out="object.partner_id.name or ''"/>,</p>
@@ -61,6 +84,12 @@
             <strong><t t-out="object.athera_suspend_on or ''"/></strong>. Setelah tanggal itu akses
             akan ditangguhkan otomatis sampai pembayaran masuk.
           </p>
+          <t t-if="object.athera_portal_url">
+            <p style="margin:1rem 0">
+              Tagihan ini bisa dilihat, dan konfirmasi pembayaran bisa dikirim, di portal ATHERA Anda:<br/>
+              <a t-att-href="object.athera_portal_url" style="color:#2a78d6"><t t-out="object.athera_portal_url"/></a>
+            </p>
+          </t>
           <p>Kalau pembayaran sudah dikirim, abaikan pesan ini.</p>
         </div>
       </field>
@@ -77,6 +106,7 @@
            seharusnya mengendalikannya dikosongkan. Kalau kosong, Odoo memakai mail.default.from. -->
       <field name="email_from">{{ user.company_id.email }}</field>
       <field name="partner_to">{{ object.partner_id.id }}</field>
+      <!-- Tautan portal; alasannya ada di surat pertama dalam berkas ini. -->
       <field name="body_html" type="html">
         <div style="font:14px/1.6 system-ui,sans-serif;color:#16181d">
           <p>Halo <t t-out="object.partner_id.name or ''"/>,</p>
@@ -91,6 +121,12 @@
             <strong>Data Anda tidak dihapus.</strong> Akses terbuka kembali secara otomatis
             beberapa saat setelah pembayaran kami terima.
           </p>
+          <t t-if="object.athera_portal_url">
+            <p style="margin:1rem 0">
+              Halaman tagihan tetap terbuka selama penangguhan — kirim konfirmasi pembayaran Anda di sana:<br/>
+              <a t-att-href="object.athera_portal_url" style="color:#2a78d6"><t t-out="object.athera_portal_url"/></a>
+            </p>
+          </t>
         </div>
       </field>
       <field name="lang">{{ object.partner_id.lang }}</field>

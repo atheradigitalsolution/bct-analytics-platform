@@ -43,10 +43,27 @@ export function Nav({
         <span className="hidden text-[11px] text-ink-3 sm:inline">
           {subject} - {roles.length === 0 ? "tanpa peran" : roles.join(", ")}
         </span>
+        {/* Akun & Tagihan.
+            Ia ada DI BARIS UTILITAS, bukan di deretan tab di bawah, dan itu bukan selera tata
+            letak. Tab di bawah semuanya `/t/<tenant>/<view>` dan semuanya butuh hak `insight`;
+            halaman tagihan berlaku untuk setiap paket dan tetap terbuka ketika langganan sudah
+            berhenti. Menaruhnya di deretan yang sama akan menjanjikan bahwa ia patuh pada aturan
+            yang sama, padahal tidak.
+
+            Tautan ini menyebut `/billing` tanpa tenant, dan itu disengaja: cakupan tenant
+            diputuskan dari sesi yang terverifikasi di sisi server, bukan dari segmen URL. Tidak
+            ada yang perlu ditempelkan ke sini untuk membuatnya menunjuk ke akun yang benar.
+
+            Ini murni presentasi. `middleware.ts` tidak disentuh — pengecualian `/billing` dari
+            kedua penolakan contract 07 sudah ada sebelum tautan ini, dan tautan tidak memberi
+            akses apa pun yang belum diberikan. */}
+        <Link href="/billing" className="ml-auto text-xs underline text-ink-2">
+          Akun &amp; Tagihan
+        </Link>
         {odooDoor ? (
           <a
             href={odooDoor}
-            className="ml-auto text-xs underline text-ink-2"
+            className="text-xs underline text-ink-2"
             /* Another origin, and one that hands out a session. `noopener` so the opened document
                cannot reach back through window.opener; `noreferrer` so the door is not told which
                view the visitor came from. */
@@ -55,11 +72,9 @@ export function Nav({
             Buka Odoo
           </a>
         ) : null}
-        <form
-          method="post"
-          action="/api/auth/logout"
-          className={odooDoor ? "" : "ml-auto"}
-        >
+        {/* `ml-auto` sekarang dipegang tautan tagihan, yang selalu dirender. Sebelumnya ia
+            berpindah-pindah antara tautan Odoo dan tombol keluar tergantung paket. */}
+        <form method="post" action="/api/auth/logout">
           <button type="submit" className="text-xs underline text-ink-2">
             Keluar
           </button>

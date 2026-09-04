@@ -26,6 +26,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/">Klien</Link>
               <Link href="/cms">Konten</Link>
               <Link href="/billing">Penagihan</Link>
+              {/* Editor harga. Ia sudah berfungsi penuh sejak dibangun tetapi tidak ditautkan
+                  dari mana pun, jadi satu-satunya cara mencapainya adalah mengetik URL — sebuah
+                  fitur yang hanya diketahui orang yang membangunnya bukanlah fitur.
+                  Tidak ada gerbang baru di sini: `middleware.ts` sudah menuntut sesi super admin
+                  untuk setiap lintasan kecuali /login dan /healthz, jadi tautan ini tidak
+                  memperlihatkan apa pun kepada pengunjung yang tidak berhak. */}
+              <Link href="/pricing">Harga</Link>
               {ODOO_DOOR === "" ? null : (
                 <a href={ODOO_DOOR} rel="noopener noreferrer">Odoo</a>
               )}
