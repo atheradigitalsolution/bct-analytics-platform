@@ -1,11 +1,12 @@
 """Remove custom_demo_seed's data from a tenant in an order the foreign keys allow.
 
-WHY NOT `button_immediate_uninstall`. Measured on a clone of bct on 2026-09-04: the
-uninstall reports success and is not one. Odoo deletes ir.model.data owners in its own
-order, hits `account_move_line_partner_id_fkey` on the demo partners, LOGS the failure
-and carries on -- leaving 437 journal items and 120 invoices pointing at sale orders it
-did delete, plus 38 of the 40 demo partners it could not. A half-deleted ledger is worse
-than an untouched one, so this script goes child-first and refuses to guess.
+WHY NOT `button_immediate_uninstall`. Measured on a clone of a real tenant: the uninstall
+reports success and is not one. Odoo deletes ir.model.data owners in its own order, hits
+`account_move_line_partner_id_fkey` on the demo partners, LOGS the failure and carries on
+-- leaving every journal item and invoice whose partner it could not remove pointing at
+sale orders it did remove, and leaving almost all of the demo partners and every demo
+product in place. A half-deleted ledger is worse than an untouched one, so this script
+goes child-first and refuses to guess.
 
 Order, and the reason for each position:
   1. account.move   the invoices come FIRST, because they are what holds the partners,
@@ -23,20 +24,22 @@ USAGE
     make purge-demo-seed TENANT=<slug>              rehearse; rolls back
     make purge-demo-seed TENANT=<slug> COMMIT=1     keep it
 
-REHEARSE ON A CLONE FIRST. This was developed against `bct_del`, a pg_dump/restore copy
-of bct, and it took four attempts to get past stock (`You cannot cancel a stock move
-that has been set to Done`), point of sale (`In order to delete a sale, it must be new
-or cancelled`) and `stock_quant_product_id_fkey` -- the last of which only appears
-AFTER the stock moves are deleted, because unlinking a move makes Odoo recreate the
-quants the earlier sweep removed. None of those are visible by reading the models.
+REHEARSE ON A CLONE FIRST -- a pg_dump/restore copy, never the tenant itself. Getting
+this past the framework took four attempts: stock (`You cannot cancel a stock move that
+has been set to Done`), point of sale (`In order to delete a sale, it must be new or
+cancelled`) and `stock_quant_product_id_fkey`, the last of which only appears AFTER the
+stock moves are deleted, because unlinking a move makes Odoo recreate the quants the
+earlier sweep removed. None of those are visible by reading the models.
 
 Take a backup either way: `make tenant-backup TENANT=<slug>`.
 
 WHAT IT DOES NOT DO. It does not touch anything the demo seeder did not create, and it
-does not go near a tenant's real accounting. On bct every one of the 120 invoices and
-all 437 journal items belonged to demo sale orders, which is why the ledger ends empty;
-on a tenant with real business data the invoice set in step 1 would be a subset and the
-script would leave the rest alone. Read the step-1 count before answering the prompt.
+does not go near a tenant's real accounting: step 1 selects only the moves that belong to
+demo sale orders or carry a demo partner, so on a tenant with real business data the rest
+are left alone. How much of the ledger that leaves behind depends entirely on the tenant.
+READ THE STEP-1 COUNT before you answer the prompt -- it is printed for exactly this
+reason, and it is the number that tells you whether you are about to remove a fixture or
+somebody's books.
 """
 import os
 env = env(su=True)
@@ -181,10 +184,11 @@ for model in ('product.template', 'res.partner', 'res.users', 'operating.unit'):
 # through `Registry.new(update_module=True)`, which COMMITS the transaction from inside
 # Odoo's module machinery. Calling it during a rehearsal makes every deletion above
 # permanent and then prints "ROLLED BACK", because `cr.rollback()` afterwards has
-# nothing left to undo. Measured on a fresh clone on 2026-09-04: a dry run took
-# account_move_line from 437 to 0 and res_partner from 48 to 8, and said it had rolled
-# back. A safety switch that reports success while doing the opposite is worse than no
-# safety switch, so the uninstall is fenced behind the same flag as the commit.
+# nothing left to undo. Measured on a fresh clone: a rehearsal ran every deletion above,
+# committed them, and then printed "ROLLED BACK" over a transaction that no longer
+# existed. A safety switch that reports success while doing the opposite is worse than no
+# safety switch, so the uninstall is fenced behind the same flag as the commit, and the
+# rehearsal proves its own rollback at the end by re-reading each count.
 if COMMIT:
     mod = env['ir.module.module'].search([('name', '=', 'custom_demo_seed')])
     if mod.state == 'installed':

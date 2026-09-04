@@ -49,6 +49,7 @@ import sys
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.sql
 
 # ---------------------------------------------------------------------------
 # The replicated source set.
@@ -185,8 +186,10 @@ def connect_odoo(database: str):
         # 'FATAL: database "bct_fixture" does not exist' with no hint that a REGISTRY
         # row is what asked for it. Say which tenant asked, and how to answer.
         raise SystemExit(
-            f"FATAL: cannot open Odoo database {database!r} as "
-            f"{os.environ['WAREHOUSE_READER_USER']}.\n"
+            # The role name is deliberately NOT interpolated: this message is the kind
+            # that gets pasted into an issue, and $WAREHOUSE_READER_USER is readable by
+            # whoever can act on the advice anyway.
+            f"FATAL: cannot open Odoo database {database!r} as $WAREHOUSE_READER_USER.\n"
             f"  {str(exc).strip()}\n"
             f"  Some row of warehouse.tenant_registry names this database as its\n"
             f"  source_database. Either create/restore it, or repoint the row:\n"
@@ -829,9 +832,31 @@ def cmd_gen_fdw(args) -> int:
                           "dbname": t["source_database"]}
                 drift = {k: (current[k], wanted[k]) for k in wanted if current[k] != wanted[k]}
                 if drift:
-                    sets = ", ".join(f"SET {k} '{v}'" for k, (_, v) in drift.items())
-                    print(f"==> {server}: registry drift {drift}; ALTER SERVER {sets}")
-                    cur.execute(f"ALTER SERVER {server} OPTIONS ({sets})")
+                    # Composed, not f-strung. `host`, `port` and `dbname` come out of
+                    # warehouse.tenant_registry, which is a table an operator edits, and
+                    # a single apostrophe in a source_database would otherwise break the
+                    # statement open. The option NAMES are constrained to the three keys
+                    # built above rather than quoted, because an option name is not a
+                    # literal and psycopg2 has no placeholder for one.
+                    assert set(drift) <= {"host", "port", "dbname"}, drift
+                    sets = psycopg2.sql.SQL(", ").join(
+                        psycopg2.sql.SQL("SET {} {}").format(
+                            psycopg2.sql.SQL(k), psycopg2.sql.Literal(v)
+                        )
+                        for k, (_, v) in drift.items()
+                    )
+                    # Names only, never the values. A drift on `host` or `port` would
+                    # otherwise print the internal hostname and port into stdout, which
+                    # is exactly the output people paste into an issue -- the same
+                    # reason the role name is kept out of the connect_odoo error above.
+                    # Which options moved is what an operator needs; what they moved to
+                    # is already in the registry they can query.
+                    print(f"==> {server}: registry drift on {sorted(drift)}; ALTER SERVER OPTIONS")
+                    cur.execute(
+                        psycopg2.sql.SQL("ALTER SERVER {} OPTIONS ({})").format(
+                            psycopg2.sql.Identifier(server), sets
+                        )
+                    )
             cur.execute(
                 "SELECT 1 FROM pg_user_mappings WHERE srvname = %s AND usename = %s",
                 (server, wh_user),
