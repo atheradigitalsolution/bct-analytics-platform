@@ -1,0 +1,99 @@
+# ---------------------------------------------------------------------------
+# Unit tests for the product-surface rules.
+#
+# These exist because of a specific mistake. Proving one of these rules could
+# fire was done by breaking a probe on the running stack and waiting; the rule
+# crossed its `for` window, reached Alertmanager, and a false critical alert was
+# delivered to a real mailbox. The proof was correct and the method was wrong.
+# These tests establish the same property offline, where the notification path
+# does not exist.
+#
+# Each rule is asserted in BOTH directions: silent while healthy, and silent
+# until its `for` window has actually elapsed. A rule that fires the instant a
+# scrape is missed is a different rule from the one that was written down.
+# ---------------------------------------------------------------------------
+rule_files:
+  - ../rules/product-surface.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # -- entitlement enforcement ---------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'bct_gateway_entitlement_enforcement_enabled{job="login-gateway"}'
+        values: "0+0x15"
+    alert_rule_test:
+      # A restart must not page anyone in the second before the first scrape.
+      - eval_time: 4m
+        alertname: EntitlementEnforcementDisabled
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: EntitlementEnforcementDisabled
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: login-gateway
+              job: login-gateway
+            exp_annotations:
+              summary: "Subscription enforcement is OFF — every tenant is being treated as paid up"
+              description: "The gateway has no control-plane DSN configured, so every authenticated tenant is issued a token claiming every product. Suspended clients keep working dashboards. This is the documented fail-open, not a crash: check that LOGIN_GATEWAY_REGISTRY_DSN is set in the environment the gateway was started with, then recreate it."
+
+  # Armed. This is the state the platform is in, and it must stay silent.
+  - interval: 1m
+    input_series:
+      - series: 'bct_gateway_entitlement_enforcement_enabled{job="login-gateway"}'
+        values: "1+0x15"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: EntitlementEnforcementDisabled
+        exp_alerts: []
+
+  # -- the two liveness rules ----------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'up{job="login-gateway",instance="login-gateway:8080"}'
+        values: "0+0x15"
+      - series: 'up{job="semantic-api",instance="semantic-api:8080"}'
+        values: "1+0x15"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LoginGatewayDown
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: LoginGatewayDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: login-gateway
+              job: login-gateway
+              instance: "login-gateway:8080"
+            exp_annotations:
+              summary: "The login gateway is not answering — no client can sign in"
+              description: "Prometheus has failed to scrape the gateway for 2 minutes. While it is down nobody can obtain a session for the dashboard or for Odoo. Existing sessions keep working until their token expires, so this is quieter than it is severe."
+      # The healthy neighbour must not be dragged in by a shared rule group.
+      - eval_time: 3m
+        alertname: SemanticApiDown
+        exp_alerts: []
+
+  # -- internal surface probe ----------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="blackbox-http",product="odoo",instance="http://odoo:8069/web/health"}'
+        values: "0+0x15"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ProductSurfaceUnreachable
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: ProductSurfaceUnreachable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: odoo
+              job: blackbox-http
+              product: odoo
+              instance: "http://odoo:8069/web/health"
+            exp_annotations:
+              summary: "odoo is not answering its health endpoint"
+              description: "The probe of http://odoo:8069/web/health has failed for 3 minutes. This is measured on the internal network, so DNS, TLS and the reverse proxy are NOT covered by it — a green board here still permits a client seeing nothing."

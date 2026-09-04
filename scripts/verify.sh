@@ -167,7 +167,16 @@ step "13. every container reads the config file this repo actually holds"
 check "config mounts match the repo" python3 "$REPO_ROOT/scripts/check-config-mounts.py" --quiet --filter "$COMPOSE_PROJECT_NAME"
 
 # 15 ------------------------------------------------------------------------
-step "14. the dev login credential is applied, and Odoo's default is refused"
+step "14. every alert rule fires when it should, and stays quiet when it should not"
+# An alert rule that cannot fire is indistinguishable from a healthy system, and
+# this file already carries a list of checks that were green because they tested
+# nothing. Proving a rule fires by breaking production and watching is how a
+# false critical alert reached a real mailbox once; `promtool test rules`
+# establishes the same property offline, with no notification path in existence.
+check "alert rules behave" bash "$REPO_ROOT/scripts/check-alert-rules.sh"
+
+# 15 ------------------------------------------------------------------------
+step "15. the dev login credential is applied, and Odoo's default is refused"
 # PLAN.md instance 10. The half of this that matters is the NEGATIVE: a check
 # that only asserts "$BCT_DEV_USER_PASSWORD logs in" is green on a stack that
 # accepts BOTH passwords, which is precisely the defective state. So

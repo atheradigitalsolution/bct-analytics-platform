@@ -276,6 +276,10 @@ check-gitignore: ## Fail if .gitignore would drop an addon data file or a dbt se
 check-alerting: ## Fail if a scrape target is down, Alertmanager is absent, or a rule can never fire
 	@$(PYTHON) scripts/check-alerting.py
 
+.PHONY: check-alert-rules
+check-alert-rules: ## Fail if an alert rule does not fire (or fires early) in its unit tests
+	@bash scripts/check-alert-rules.sh
+
 .PHONY: check-config-mounts
 check-config-mounts: ## Fail if a container reads a config file that differs from the repo
 	@$(PYTHON) scripts/check-config-mounts.py --filter $(PROJECT)

@@ -1,0 +1,100 @@
+# ---------------------------------------------------------------------------
+# Unit tests for the public-edge rules. Run with:
+#   promtool test rules observability/prometheus/rule-tests/*.test.yml
+#
+# WHY THIS FILE EXISTS, and it is a lesson paid for. The obvious way to prove an
+# alert can fire is to break something and watch it. That was done once, on a
+# rule with `severity: critical` and a live e-mail receiver, and it worked
+# exactly as designed: a false alert reached the operator's mailbox. Proving a
+# rule fires must not require firing it.
+#
+# `promtool test rules` evaluates the same rule files against synthetic series,
+# entirely offline. Alertmanager is not involved and cannot be. It also proves
+# something a live experiment cannot: that the alert is still INACTIVE just
+# before its `for` window elapses, which is what stops a jittery signal from
+# paging anyone.
+#
+# NOTE ON LOCATION: this lives outside `rules/` on purpose. `prometheus.yml`
+# globs `rules/*.yml` as rule files; a test file there would be loaded as one
+# and rejected -- the same shape of trap as naming a file_sd file `.yml` in the
+# scrape directory.
+# ---------------------------------------------------------------------------
+rule_files:
+  - ../rules/public-edge.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # -- reachability ---------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="blackbox-public",product="site",instance="https://example.invalid/"}'
+        values: "0+0x15"
+    alert_rule_test:
+      # `for: 5m` means nothing at 4 minutes. Asserted, because an alert that
+      # fires immediately is a different (and noisier) alert than the one written.
+      - eval_time: 4m
+        alertname: PublicSurfaceUnreachable
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: PublicSurfaceUnreachable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: site
+              job: blackbox-public
+              product: site
+              instance: "https://example.invalid/"
+            exp_annotations:
+              summary: "site is unreachable from the public internet"
+              description: "https://example.invalid/ has failed for 5 minutes over the real network path. Unlike the internal probes, this covers DNS, TLS and the reverse proxy, so a failure here with the internal probe still green points at the edge rather than at the application."
+
+  # -- a healthy surface must never alert -----------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="blackbox-public",product="site",instance="https://example.invalid/"}'
+        values: "1+0x15"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: PublicSurfaceUnreachable
+        exp_alerts: []
+
+  # -- certificate expiry ---------------------------------------------------
+  # 10 days left: inside the 14-day threshold, so it warns. The series is
+  # expressed as an absolute timestamp because that is what blackbox exports.
+  - interval: 1m
+    input_series:
+      - series: 'probe_ssl_earliest_cert_expiry{job="blackbox-public",product="gateway",instance="https://example.invalid/healthz"}'
+        values: "864000+0x120"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: PublicCertificateExpiringSoon
+        exp_alerts: []
+      - eval_time: 65m
+        alertname: PublicCertificateExpiringSoon
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: gateway
+              job: blackbox-public
+              product: gateway
+              instance: "https://example.invalid/healthz"
+            exp_annotations:
+              summary: "TLS certificate for gateway expires in under 14 days"
+              description: "https://example.invalid/healthz presents a certificate with 10.0 days left. Automatic renewal should have happened around 30 days; that it did not means renewal is failing. Check the edge's ACME log before this becomes an outage every client sees at once."
+
+  # -- a certificate with plenty of life left must stay quiet ---------------
+  # 60 days: comfortably outside the threshold, and past the point where the
+  # edge would normally have renewed. This is the case that would fire if the
+  # threshold were set at 30 days, which is why it is asserted.
+  - interval: 1m
+    input_series:
+      - series: 'probe_ssl_earliest_cert_expiry{job="blackbox-public",product="site",instance="https://example.invalid/"}'
+        values: "5184000+0x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: PublicCertificateExpiringSoon
+        exp_alerts: []
+      - eval_time: 90m
+        alertname: PublicCertificateExpired
+        exp_alerts: []
