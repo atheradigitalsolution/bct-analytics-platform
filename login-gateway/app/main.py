@@ -51,6 +51,14 @@ JWKS_KEYS = Gauge(
     "Number of keys published in JWKS. Two is the floor: a single-key JWKS cannot be rotated "
     "without a flag-day outage (security finding T-4).",
 )
+ENTITLEMENT_ENFORCEMENT = Gauge(
+    "bct_gateway_entitlement_enforcement_enabled",
+    "1 when a control-plane DSN is configured and subscription enforcement is ON; 0 when it is "
+    "not, in which case EVERY authenticated tenant is issued a token claiming every product. "
+    "Deliberately a state gauge, in the shape of bct_gateway_jwks_keys: it reports a "
+    "configuration fact, not a rate. Until this existed the only trace of enforcement being off "
+    "was one WARNING at boot, which is a line nobody reads on the day it matters.",
+)
 
 
 class LoginRequest(BaseModel):
@@ -133,6 +141,9 @@ def create_app(settings=None) -> FastAPI:
     # One instance, created at app build time so the WARNING about a missing
     # control plane is emitted once at boot rather than on every login.
     registry = Registry(settings.registry_dsn, settings.registry_cache_ttl)
+    # Set once, here, because the answer cannot change while the process lives: the DSN is read
+    # at construction. No per-request cost, and nothing to keep in sync.
+    ENTITLEMENT_ENFORCEMENT.set(1 if registry.configured else 0)
     spent_tickets = sso_mod.SpentTickets()
     # Credentials are held only for the lifetime of a refresh chain, never logged and never
     # returned. They are needed because Odoo's execute_kw authenticates every call.
