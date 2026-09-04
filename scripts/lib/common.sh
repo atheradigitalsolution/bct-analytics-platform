@@ -236,9 +236,27 @@ validate_slug() {
     local slug="$1"
     [[ "$slug" =~ ^[a-z][a-z0-9_]{1,30}$ ]] || die \
         "invalid tenant slug '$slug'. Must match ^[a-z][a-z0-9_]{1,30}\$ — lowercase, starts with a letter, no dashes (Postgres replication slot names forbid them)."
+    # TWO reservations, for two different reasons, kept apart on purpose.
+    #
+    # The first three are POSTGRES system databases: a slug matching one of them
+    # would have the provisioner try to build a tenant on top of the cluster's
+    # own bookkeeping.
+    #
+    # The rest are SUBDOMAIN LABELS the edge already routes by name. A tenant
+    # holding one answers on a URL the platform already owns -- it hijacks a
+    # platform route. That has nothing to do with database names, and it is the
+    # reason `odoo` appears in both lists for two unrelated causes.
+    #
+    # This is the FOURTH layer enforcing the route-label set. The other three are
+    # the provisioning wizard, the orchestrator, and the CHECK on the registry
+    # table; all four must stay identical. This one covers the shell path
+    # (tenant-provision.sh), which reaches the database without passing through
+    # any of the other three.
     case "$slug" in
-        postgres|template0|template1|odoo)
-            die "tenant slug '$slug' is reserved." ;;
+        postgres|template0|template1)
+            die "tenant slug '$slug' is a Postgres system database." ;;
+        admin|app|auth|insight|mail|odoo|www)
+            die "tenant slug '$slug' is a reserved platform route label. The edge already serves that hostname, so a tenant using it would hijack a platform route." ;;
     esac
 }
 

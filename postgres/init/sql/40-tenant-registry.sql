@@ -132,7 +132,32 @@ CREATE TABLE IF NOT EXISTS tenant_registry.tenants (
   archived_at       TIMESTAMPTZ,
   purge_after       TIMESTAMPTZ,
   last_seen_at      TIMESTAMPTZ,
-  notes             TEXT
+  notes             TEXT,
+
+  -- Slugs that are NOT available to a tenant.
+  --
+  -- A slug becomes a database name AND a hostname label (<slug>.<domain>), so
+  -- a tenant named `mail` or `www` would claim a hostname the platform already
+  -- routes somewhere else, and one named `admin`, `app` or `auth` would sit
+  -- exactly where the console and the login gateway live. `insight` and `odoo`
+  -- are product names, and a client database answering to a product name makes
+  -- every log line about it ambiguous.
+  --
+  -- This list is deliberately duplicated at three layers -- API, provisioning
+  -- and here. This is the copy that still holds when a row is written by
+  -- something that went around the other two, which is the only reason a
+  -- database constraint is worth having.
+  --
+  -- SEPARATE from the format CHECK on the slug column on purpose. "not a legal
+  -- slug" and "a legal slug we refuse to hand out" are different refusals with
+  -- different fixes; merging them into one regex would report both under one
+  -- constraint name and leave the caller guessing which rule it broke.
+  --
+  -- Verified 2026-09-04 against the live control plane: no existing tenant row
+  -- carries any of these names, so adding this constraint validates cleanly.
+  CONSTRAINT tenants_slug_not_reserved CHECK (
+    slug NOT IN ('admin', 'app', 'auth', 'insight', 'mail', 'odoo', 'www')
+  )
 );
 
 CREATE INDEX IF NOT EXISTS tenants_state_idx ON tenant_registry.tenants(state);

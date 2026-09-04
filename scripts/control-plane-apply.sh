@@ -62,16 +62,21 @@ SITE_PASS="${MARKETING_SITE_DB_PASSWORD:?MARKETING_SITE_DB_PASSWORD is required 
 validate_slug "$ADMIN_DB"
 
 # --- 1. the admin Odoo database -------------------------------------------
-if db_initialised "$ADMIN_DB"; then
-    log "[1/4] '$ADMIN_DB' already carries an Odoo schema"
-else
-    log "[1/4] creating '$ADMIN_DB' with: $ADMIN_MODULES"
-    # Odoo creates the database itself so it gets the encoding and collation it
-    # requires from template0; createdb by hand risks a collation the registry
-    # loader then rejects.
-    odoo_was_running=0
+# odoo_install_modules DB MODULES [extra odoo args...]
+#
+# Runs `odoo -d DB -i MODULES` with the worker pool stopped, then brings the
+# pool back. BOTH branches of step 1 go through this, and that is the point:
+# the sequence used to exist only on the branch that CREATES the database, so
+# the "database already exists" branch installed nothing at all.
+#
+# Returns odoo's exit status instead of dying, because "creating" and
+# "installing into" fail for different reasons and deserve different messages.
+odoo_install_modules() {
+    local db="$1" modules="$2"
+    shift 2
+    local was_running=0 rc=0
     if [ "$(docker inspect -f '{{.State.Running}}' "$(container_of odoo)" 2>/dev/null)" = "true" ]; then
-        odoo_was_running=1
+        was_running=1
         # Same deadlock as init-db.sh: module DDL against tables a live worker
         # pool holds open blocks on itself.
         log "stopping odoo: DDL against a database its workers hold will deadlock"
@@ -79,15 +84,82 @@ else
     fi
     set +e
     dc run --rm --no-deps -T odoo \
-        odoo -d "$ADMIN_DB" -i "$ADMIN_MODULES" \
-             --stop-after-init --without-demo=True --load-language=en_US
+        odoo -d "$db" -i "$modules" \
+             --stop-after-init --without-demo=True "$@"
     rc=$?
     set -e
-    if [ "$odoo_was_running" -eq 1 ]; then
+    if [ "$was_running" -eq 1 ]; then
         dc up -d odoo >/dev/null
         wait_healthy odoo || warn "odoo did not come back healthy — check 'make logs'."
     fi
-    [ "$rc" -eq 0 ] || die "odoo exited $rc creating '$ADMIN_DB'. See the traceback above."
+    return "$rc"
+}
+
+# missing_modules DB LIST — the subset of LIST (comma-separated) that DB does
+# not already carry, printed as a comma-separated list.
+#
+# 'to upgrade' counts as PRESENT. It is an installed module with a pending
+# update, and passing it to -i would perform that upgrade: expensive, and a
+# schema migration nobody asked this script for. Only genuinely absent
+# modules are installed here.
+#
+# The membership test is bash pattern matching rather than a pipe into grep.
+# A pipeline is a trap under `set -o pipefail`: if the writer takes SIGPIPE
+# because grep -q exited on the first match, the pipeline reports failure even
+# though the match succeeded, and the module is reinstalled every run.
+missing_modules() {
+    local db="$1" wanted="$2"
+    local present="" m="" missing=""
+    present="$(psql_super "$db" -tAc \
+        "SELECT name FROM ir_module_module WHERE state IN ('installed', 'to upgrade')" \
+        2>/dev/null || true)"
+    for m in ${wanted//,/ }; do
+        [ -n "$m" ] || continue
+        case $'\n'"$present"$'\n' in
+            *$'\n'"$m"$'\n'*) continue ;;
+        esac
+        missing="${missing:+$missing,}$m"
+    done
+    printf '%s' "$missing"
+}
+
+if db_initialised "$ADMIN_DB"; then
+    log "[1/4] '$ADMIN_DB' already carries an Odoo schema"
+    # ATHERA_ADMIN_MODULES states what this database MUST carry. It is not an
+    # argument to the day the database was created, which is all it used to
+    # be: adding a module to .env afterwards changed nothing, so
+    # custom_athera_provisioner sat in ir_module_module as 'uninstalled' while
+    # being listed, and every later addition had to be installed by hand from
+    # the UI. Reconcile the list on every run instead.
+    ADMIN_MISSING="$(missing_modules "$ADMIN_DB" "$ADMIN_MODULES")"
+    if [ -z "$ADMIN_MISSING" ]; then
+        info "every module in ATHERA_ADMIN_MODULES is installed — nothing to do"
+        # Note what did NOT happen: odoo was never stopped. A script people are
+        # told to re-run safely must not bounce the worker pool to discover it
+        # has no work, so the no-work path is a read-only query and nothing
+        # else. Already-installed modules are not touched either — no -u.
+    else
+        log "      installing modules listed but absent: $ADMIN_MISSING"
+        # No --load-language here. en_US is already loaded in a database that
+        # has a schema, and reloading it is minutes of work for no change.
+        odoo_install_modules "$ADMIN_DB" "$ADMIN_MISSING" \
+            || die "odoo exited $? installing '$ADMIN_MISSING' into '$ADMIN_DB'. See the traceback above."
+        # Verify rather than assume. Odoo can exit 0 having left a module in
+        # some state other than 'installed' — an unmet dependency downgraded to
+        # a log line is the usual way — and a silent partial install is worse
+        # than a failure, because the next run reports the same list again with
+        # no hint that it already tried.
+        ADMIN_STILL_MISSING="$(missing_modules "$ADMIN_DB" "$ADMIN_MISSING")"
+        [ -z "$ADMIN_STILL_MISSING" ] || \
+            warn "odoo exited 0 but these remain not installed in '$ADMIN_DB': $ADMIN_STILL_MISSING"
+    fi
+else
+    log "[1/4] creating '$ADMIN_DB' with: $ADMIN_MODULES"
+    # Odoo creates the database itself so it gets the encoding and collation it
+    # requires from template0; createdb by hand risks a collation the registry
+    # loader then rejects.
+    odoo_install_modules "$ADMIN_DB" "$ADMIN_MODULES" --load-language=en_US \
+        || die "odoo exited $? creating '$ADMIN_DB'. See the traceback above."
     db_initialised "$ADMIN_DB" || die "odoo exited 0 but '$ADMIN_DB' has no ir_module_module."
 fi
 

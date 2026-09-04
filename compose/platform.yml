@@ -182,7 +182,25 @@ services:
       ATHERA_ADMIN_DB: ${ATHERA_ADMIN_DB:-athera_admin}
       ORCHESTRATOR_ODOO_LOGIN: ${ORCHESTRATOR_ODOO_LOGIN:-admin}
       ORCHESTRATOR_ODOO_PASSWORD: ${ORCHESTRATOR_ODOO_PASSWORD:-}
-      ORCHESTRATOR_PROVISION_MODULES: ${ODOO_INIT_MODULES:-}
+      # What a CLIENT tenant database is built with. It has its own default
+      # and no longer inherits ODOO_INIT_MODULES.
+      #
+      # The two lists answer different questions and were conflated.
+      # ODOO_INIT_MODULES is the DEV BOOTSTRAP list: what to put in the local
+      # development database so somebody can open a screen and see something.
+      # It therefore contains custom_demo_seed. This list is what a paying
+      # client's brand-new database is built from, and demo data has no place
+      # in it: fake customers, fake invoices and fake stock moves land in the
+      # client's own books, and every one of them has to be found and deleted
+      # again afterwards (scripts/purge-demo-seed.py exists for exactly that
+      # cleanup). Inheriting one list from the other meant every tenant was
+      # provisioned into the state the cleanup script was written to undo.
+      #
+      # Deriving one from the other is what made this invisible: nothing here
+      # named custom_demo_seed, so nothing here looked wrong. Spelled out, an
+      # addition to the dev bootstrap can no longer reach client databases by
+      # accident.
+      ORCHESTRATOR_PROVISION_MODULES: ${ORCHESTRATOR_PROVISION_MODULES:-custom_pdp_core,custom_pdp_masking,custom_operating_unit,custom_ppob,custom_super_admin,custom_hub_console,custom_onboarding_journey,custom_tenant_infra,custom_ai_bridge,custom_ai_features}
       TZ: ${TZ:-UTC}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${ORCHESTRATOR_HOST_PORT:-38300}:8080"
