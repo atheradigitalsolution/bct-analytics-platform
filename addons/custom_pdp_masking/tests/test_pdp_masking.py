@@ -1,7 +1,7 @@
 # Part of custom_pdp_masking. Licence: LGPL-3.
 """Tests for the masking policy, the reference digest, and in-Odoo enforcement."""
 
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import TransactionCase, tagged
 
 from odoo.addons.custom_pdp_masking.models.pdp_hash import (
@@ -364,3 +364,224 @@ class TestPdpExportMasking(TransactionCase):
     def test_id_columns_are_never_masked(self):
         rows = self.partner.with_user(self.exporter).export_data(["id", "ref"])["datas"]
         self.assertFalse(str(rows[0][0]).startswith(UI_MASK_PREFIX))
+
+
+@tagged("post_install", "-at_install", "pdp")
+class TestPdpRpcReadPaths(TransactionCase):
+    """The RPC read paths that `read()` alone never covered.
+
+    Regression for the 2026-09-04 finding. Reproduced over HTTP against the running stack as a
+    real user without `custom_pdp_core.group_pdp_data_viewer`, through
+    `/web/dataset/call_kw` after a legitimate `/web/session/authenticate`. Values are elided: a
+    real mask token beside the plaintext it came from is a known-plaintext pair, and the shape is
+    the whole point::
+
+        web_search_read       -> {"name": "***xxxxxxxx",   "vat": "***xxxxxxxx"} MASKED
+        search_read           -> {"name": "<partner name>",
+                                  "vat": "<tax id>"}                             CLEARTEXT
+        formatted_read_group  -> one row per NPWP, every value verbatim          CLEARTEXT
+          (groupby=["vat"])
+
+    `search_read` does not call `read()` - it calls `search_fetch()` then `_read_format()` - and
+    `formatted_read_group` does not read fields at all, it aggregates them. Both are public,
+    both are reachable with nothing but a valid session, and `vat` on `res.partner` is the
+    Indonesian NPWP, classified `sensitive` under UU 27/2022 Art. 4(3).
+
+    Every test below fails against the pre-fix module and passes against the current one.
+    """
+
+    #: Not a real NPWP. Shaped like one so the assertions are honest about what leaks.
+    NPWP = "0098765432109000"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.partner = cls.env["res.partner"].create({
+            "name": "PT Uji Coretax",
+            "email": "uji.coretax@contoh.invalid",
+            "phone": "+62-800-555-0002",
+            "vat": cls.NPWP,
+            "ref": "RPC-TEST-0001",
+        })
+        cls.other = cls.env["res.partner"].create({
+            "name": "PT Uji Kedua",
+            "vat": "0011223344556000",
+        })
+        cls.plain_user = cls.env["res.users"].create({
+            "name": "PDP RPC Plain User",
+            "login": "pdp_rpc_plain_user",
+            "group_ids": [(6, 0, [cls.env.ref("base.group_user").id])],
+        })
+        cls.viewer_user = cls.env["res.users"].create({
+            "name": "PDP RPC Viewer User",
+            "login": "pdp_rpc_viewer_user",
+            "group_ids": [(6, 0, [
+                cls.env.ref("base.group_user").id,
+                cls.env.ref("custom_pdp_core.group_pdp_data_viewer").id,
+            ])],
+        })
+
+    def _partners(self, user):
+        return self.env["res.partner"].with_user(user)
+
+    # -- search_read ---------------------------------------------------
+
+    def test_search_read_is_masked_for_a_non_viewer(self):
+        """THE finding. `search_read` never calls `read()`, so masking `read()` did nothing here."""
+        rows = self._partners(self.plain_user).search_read(
+            [("id", "=", self.partner.id)], ["name", "email", "phone", "vat"]
+        )
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        for field_name in ("name", "email", "phone", "vat"):
+            with self.subTest(field=field_name):
+                self.assertTrue(
+                    str(row[field_name]).startswith(UI_MASK_PREFIX),
+                    "%s came back unmasked: %r" % (field_name, row[field_name]),
+                )
+        flat = " ".join(str(value) for value in row.values())
+        self.assertNotIn(self.NPWP, flat, "the NPWP leaked through search_read")
+        self.assertNotIn("PT Uji Coretax", flat)
+        self.assertNotIn("uji.coretax@contoh.invalid", flat)
+
+    def test_search_read_agrees_with_read(self):
+        """One record, two RPC methods, one appearance. A difference is a leak in whichever wins."""
+        via_search = self._partners(self.plain_user).search_read(
+            [("id", "=", self.partner.id)], ["vat"]
+        )[0]["vat"]
+        via_read = self.partner.with_user(self.plain_user).read(["vat"])[0]["vat"]
+        self.assertEqual(via_search, via_read)
+
+    def test_search_read_covers_every_masked_column_of_the_plan(self):
+        """Not just the four columns of the reproduction: the whole plan, in one call.
+
+        `fields=None` would be the sharper test, but on `res.partner` it reaches
+        `discuss.channel.rtc.session` through a related field and dies on an unrelated
+        AccessError before reaching anything this module owns. The list below is every char/text
+        column the plan actually carries for a partner.
+        """
+        columns = [
+            "name", "display_name", "email", "phone", "street", "street2", "city", "zip",
+            "vat", "website", "function", "comment", "company_name", "commercial_company_name",
+        ]
+        row = self._partners(self.plain_user).search_read(
+            [("id", "=", self.partner.id)], columns
+        )[0]
+        flat = " ".join(str(value) for value in row.values())
+        self.assertNotIn(self.NPWP, flat)
+        self.assertNotIn("PT Uji Coretax", flat)
+        self.assertNotIn("uji.coretax@contoh.invalid", flat)
+        self.assertNotIn("+62-800-555-0002", flat)
+
+    def test_search_read_excluded_column_survives(self):
+        """`ref` is on res.partner's exclusion list so the search box stays usable."""
+        row = self._partners(self.plain_user).search_read(
+            [("id", "=", self.partner.id)], ["ref"]
+        )[0]
+        self.assertEqual(row["ref"], "RPC-TEST-0001")
+
+    def test_search_read_is_cleartext_for_a_viewer(self):
+        """The legitimate case must keep working, or the control is just an outage."""
+        row = self._partners(self.viewer_user).search_read(
+            [("id", "=", self.partner.id)], ["name", "vat"]
+        )[0]
+        self.assertEqual(row["name"], "PT Uji Coretax")
+        self.assertEqual(row["vat"], self.NPWP)
+
+    def test_search_on_a_masked_column_still_works(self):
+        """Deliberate boundary: filtering is allowed, reading the value is not. Unchanged."""
+        rows = self._partners(self.plain_user).search_read(
+            [("vat", "=", self.NPWP)], ["id"]
+        )
+        self.assertIn(self.partner.id, [row["id"] for row in rows])
+
+    # -- formatted_read_group -----------------------------------------
+
+    def test_formatted_read_group_refuses_a_masked_groupby(self):
+        """Grouping by NPWP listed every NPWP verbatim, once per group, plus once more in
+        `__extra_domain`."""
+        with self.assertRaises(AccessError):
+            self._partners(self.plain_user).formatted_read_group(
+                [], groupby=["vat"], aggregates=["__count"]
+            )
+
+    def test_formatted_read_group_refuses_a_masked_aggregate(self):
+        """`array_agg` on a masked column hands back the whole column under an unmasked groupby."""
+        with self.assertRaises(AccessError):
+            self._partners(self.plain_user).formatted_read_group(
+                [], groupby=["company_id"], aggregates=["vat:array_agg"]
+            )
+
+    def test_the_spec_scanner_is_fail_closed(self):
+        """The guard matches field names ANYWHERE in a spec string, including the `order` channel
+        and the `alias:agg(field)` form. Asserted directly, because Odoo rejects most
+        leak-shaped `order` terms for its own reasons and would hide a regression here behind a
+        ValueError that has nothing to do with this module."""
+        partners = self._partners(self.plain_user)
+        self.assertEqual(partners._pdp_ui_masked_in_specs(["vat"]), ["vat"])
+        self.assertEqual(partners._pdp_ui_masked_in_specs(["vat:array_agg"]), ["vat"])
+        self.assertEqual(partners._pdp_ui_masked_in_specs(["biggest:max(vat)"]), ["vat"])
+        self.assertEqual(partners._pdp_ui_masked_in_specs("name desc"), ["name"])
+        self.assertEqual(partners._pdp_ui_masked_in_specs([["vat"], ["company_id"]]), ["vat"])
+        # `ref` is on res.partner's exclusion list, so grouping by it stays allowed.
+        self.assertEqual(partners._pdp_ui_masked_in_specs(["ref"]), [])
+        self.assertEqual(partners._pdp_ui_masked_in_specs(["company_id", "__count"]), [])
+        # A viewer is never refused, whatever the spec says.
+        self.assertEqual(
+            self._partners(self.viewer_user)._pdp_ui_masked_in_specs(["vat"]), []
+        )
+
+    def test_formatted_read_group_allows_an_unmasked_groupby(self):
+        """The refusal must be about the column, not about grouping. A blanket refusal would
+        break every kanban and list view in the database for every non-viewer."""
+        groups = self._partners(self.plain_user).formatted_read_group(
+            [("id", "in", (self.partner + self.other).ids)],
+            groupby=["company_id"],
+            aggregates=["__count"],
+        )
+        self.assertEqual(sum(group["__count"] for group in groups), 2)
+
+    def test_formatted_read_group_is_allowed_for_a_viewer(self):
+        groups = self._partners(self.viewer_user).formatted_read_group(
+            [("id", "in", (self.partner + self.other).ids)],
+            groupby=["vat"],
+            aggregates=["__count"],
+        )
+        self.assertIn(self.NPWP, [group["vat"] for group in groups])
+
+    def test_formatted_read_grouping_sets_refuses_a_masked_groupby(self):
+        """The multi-groupby sibling shares `_read_group`, not `formatted_read_group`."""
+        with self.assertRaises(AccessError):
+            self._partners(self.plain_user).formatted_read_grouping_sets(
+                [], [["vat"], ["company_id"]], aggregates=["__count"]
+            )
+
+    def test_deprecated_read_group_refuses_a_masked_groupby(self):
+        """`read_group` is deprecated in 19.0 and still callable over RPC. It builds its rows
+        straight from `_read_group`, so guarding `formatted_read_group` alone leaves it open."""
+        with self.assertRaises(AccessError):
+            self._partners(self.plain_user).read_group([], ["__count"], ["vat"])
+
+    def test_read_progress_bar_inherits_the_refusal(self):
+        """It calls `formatted_read_group`, so it must not need its own guard - assert that."""
+        with self.assertRaises(AccessError):
+            self._partners(self.plain_user).read_progress_bar(
+                [], "vat", {"field": "company_id", "colors": {}}
+            )
+
+    def test_grouping_refusal_names_the_column_and_not_a_value(self):
+        """An error message is a response body. It may say which column, never which value."""
+        try:
+            self._partners(self.plain_user).formatted_read_group([], groupby=["vat"])
+        except AccessError as error:
+            self.assertIn("vat", str(error))
+            self.assertNotIn(self.NPWP, str(error))
+        else:
+            self.fail("formatted_read_group on a masked column must raise")
+
+    def test_superuser_grouping_is_untouched(self):
+        """Module install, cron and the demo seeder run as superuser and must not be refused."""
+        groups = self.env["res.partner"].sudo().formatted_read_group(
+            [("id", "=", self.partner.id)], groupby=["vat"], aggregates=["__count"]
+        )
+        self.assertEqual([group["vat"] for group in groups], [self.NPWP])

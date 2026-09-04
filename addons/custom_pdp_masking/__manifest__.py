@@ -24,7 +24,11 @@ same policy.
     "author": "ATHERA Analytics Platform",
     "website": "https://example.invalid/bct",
     "license": "LGPL-3",
-    "depends": ["custom_pdp_core"],
+    # `web` is a real dependency, not decoration: pdp.masked.mixin overrides
+    # `formatted_read_group` and `formatted_read_grouping_sets`, and both are defined by
+    # the `web` addon on `base`. Without web loaded first, those overrides would call a
+    # `super()` that does not exist.
+    "depends": ["custom_pdp_core", "web"],
     "data": [
         "views/generated_search_views.xml",
         "security/ir.model.access.csv",

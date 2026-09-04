@@ -114,13 +114,41 @@ on its digests — treat it as a warehouse migration.**
 A dashboard that hides a customer's name is worth nothing if the same user can open the record in
 Odoo. The mixin closes that.
 
-**Mechanism.** It overrides `read()`. In Odoo 19 the web client funnels everything through it:
-`web_read()` calls `self.read(fields, load=None)` and `web_search_read()` goes through `web_read()`
-(verified in `odoo/addons/web/models/models.py`). So list views, form views, and the `display_name`
-of a many2one pointing at a masked model are all covered.
+**Mechanism (revised 2026-09-04).** It overrides **`_read_format()`**, not `read()`.
+
+It used to override `read()`, on the belief that the web client funnels everything through it. It
+does not. In Odoo 19:
+
+    read()            -> self.fetch(...)        -> self._read_format(...)
+    search_read()     -> self.search_fetch(...) -> records._read_format(...)
+    web_read()        -> self.read(...)         -> ... -> self._read_format(...)
+    web_search_read() -> web_read()             -> ... -> self._read_format(...)
+
+`models.search_read` never calls `read()` (`odoo/orm/models.py:5748`, which ends in
+`records._read_format(fnames=fields, **read_kwargs)`). Measured against the running stack as a real
+user without `group_pdp_data_viewer`, over `/web/dataset/call_kw`. The values below are elided on
+purpose -- a real mask token printed next to the plaintext it was computed from is a known-plaintext
+pair, and publishing one buys the reader nothing the shape does not already say:
+
+    web_search_read -> {"name": "***xxxxxxxx",   "vat": "***xxxxxxxx"} MASKED
+    search_read     -> {"name": "<partner name>", "vat": "<tax id>"}   CLEARTEXT
+
+`_read_format()` is where both meet, and Odoo's own `read()` docstring names it as the supported
+override point. Overriding it covers list views, form views, `search_read`, and the `display_name`
+of a many2one pointing at a masked model, with one override instead of four.
+
+**Grouping is refused, not masked.** `formatted_read_group(domain, groupby=["vat"])` returned one
+row per distinct NPWP and repeated each value in `__extra_domain`; `aggregates=["vat:array_agg"]`
+returned the whole column under an innocent groupby. Masking the group label alone would still leak
+through `__extra_domain` — which has to carry the real value to select the group — so
+`formatted_read_group`, `formatted_read_grouping_sets` and the deprecated-but-still-callable
+`read_group` raise `AccessError` when a masked column appears in `groupby`, `aggregates`, `having`
+or `order`. `web_read_group` and `read_progress_bar` both call `formatted_read_group`, so they
+inherit the refusal without their own guard (asserted in the test suite). Grouping on an unmasked
+column, and searching or filtering on a masked one, are untouched.
 
 **What it deliberately does not touch.** Internal ORM paths — `record.email`, `mapped()`, `search()`
-domains, `_compute` methods — read through the cache, not `read()`. Business logic keeps operating
+domains, `_compute` methods — read through the cache, not `_read_format()`. Business logic keeps operating
 on cleartext, and a non-viewer can still *search* for a customer by e-mail. This is a presentation
 control, not an access control; the access control is the CDC loader never receiving the cleartext
 in the first place.
@@ -212,7 +240,7 @@ class MyModel(models.Model):
 
 ## 5. Test suite
 
-`odoo -d <db> -u custom_pdp_masking --test-enable` runs 22 tests:
+`odoo -d <db> -u custom_pdp_masking --test-enable --test-tags /custom_pdp_masking` runs 45 tests:
 
 * `TestPdpHash` — the four known-answer vectors, output shape, determinism within a tenant,
   separation across tenants, NULL/empty handling, the two negative vectors, `TypeError` on non-text,
@@ -223,6 +251,15 @@ class MyModel(models.Model):
 * `TestPdpUiMasking` — a non-viewer sees masked values; tokens are stable and distinct;
   `display_name` is masked too; the UI token differs from the warehouse digest; a Data Viewer sees
   cleartext; ORM attribute access and `search()` are unaffected.
+* `TestPdpRpcReadPaths` — the 2026-09-04 regression set. `search_read` is masked and agrees with
+  `read()` on the same record; every char/text column of the plan is covered, not just the four in
+  the reproduction; `ref` still exports; a Data Viewer still gets cleartext; a domain on a masked
+  column still searches. On the group side: `formatted_read_group`, `formatted_read_grouping_sets`
+  and the deprecated `read_group` all refuse a masked groupby, aggregate or order; grouping on an
+  unmasked column is untouched; `read_progress_bar` inherits the refusal through
+  `formatted_read_group` rather than needing its own guard; the refusal message names the column
+  and never a value; superuser is never refused. Every one of these fails against the pre-fix
+  module — that was measured, not assumed.
 * `TestPdpExportMasking` — a non-viewer's export of `res.partner` contains **no cleartext e-mail**;
   free text is blanked; an excluded column (`ref`) still exports; a Data Viewer's export is
   cleartext; export and `read()` agree on the same record; a relational path
@@ -237,6 +274,16 @@ It is a **UI-and-RPC-surface** control. It does not, and cannot, stop:
 * anyone with direct database or filestore access;
 * `ir_attachment` contents, which are not classified at all (see `custom_pdp_core`
   MODULE_KNOWLEDGE.md §7).
+
+### RPC read paths still open (2026-09-04)
+
+Closing `search_read` meant walking the whole public read surface, and a small number of paths were
+found still open in the same pass. **They are enumerated in ATHERA's internal notes, not here.** A
+list naming the exact methods that still return unmasked values is a shortcut for anyone attacking
+an installation that has not applied this change, and it gives a reader of this file nothing they
+need in order to use the module correctly. What matters here is the boundary, and the boundary is
+stated above: this is a presentation control over the formatted-read and grouped-read funnels, not
+an access control.
 
 Stating the boundary is what makes the control trustworthy. The control that actually keeps personal
 data out of the warehouse is the CDC loader never selecting it — contract 01, applied at load.
