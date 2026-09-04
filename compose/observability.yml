@@ -257,6 +257,47 @@ services:
   # against WAL growth, but nothing protects against the filestore or the
   # Prometheus TSDB filling the same disk.
   # =========================================================================
+  # =========================================================================
+  # blackbox-exporter — probes the surfaces that expose no metrics of their own.
+  #
+  # WHY A NEW CONTAINER AT ALL. Odoo and the three Next.js front ends answer 404
+  # or 307 on /metrics; they have no endpoint and are not going to grow one as
+  # part of an observability change. Probing them from outside is the only
+  # honest measurement available, and it happens to be the one that matches what
+  # a client experiences: does the page answer.
+  #
+  # mem_limit IS MANDATORY HERE, as it is for every service on this host. The
+  # exporter is stateless and holds one probe at a time; 64m is generous for it
+  # and was measured before being written down, not guessed.
+  # =========================================================================
+  blackbox-exporter:
+    mem_limit: 64m
+    memswap_limit: 128m
+    image: prom/blackbox-exporter:v0.25.0@sha256:b04a9fef4fa086a02fc7fcd8dcdbc4b7b35cc30cdee860fdc6a19dd8b208d63e
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-blackbox-exporter
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    read_only: true
+    # Non-root and numeric, like every other exporter here. It opens no listening
+    # socket below 1024 and writes nothing to disk.
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      # A DIRECTORY mount, not a single file. A bind mount of one file is pinned
+      # to an inode at container start, so replacing it on the host never reaches
+      # the running container -- see scripts/check-config-mounts.py, which exists
+      # because that failure mode already cost a day at the edge.
+      - ../observability/blackbox:/etc/blackbox:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9115/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - bct
+
   node-exporter:
     mem_limit: 128m
     memswap_limit: 256m

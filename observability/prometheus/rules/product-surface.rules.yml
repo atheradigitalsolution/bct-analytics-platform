@@ -1,0 +1,95 @@
+# ---------------------------------------------------------------------------
+# Product-surface alerts. Owner: Platform-Infra.
+#
+# Until 2026-09-05 every scrape job on this stack measured infrastructure and
+# none measured anything a client touches, so a login gateway that died at 02:00
+# produced no signal at all. These are the rules that would have rung.
+#
+# WHAT IS DELIBERATELY *NOT* HERE, because an alert nobody will act on is worse
+# than no alert:
+#
+#   * tenant-orchestrator being down. It is scraped and graphed, but its failure
+#     is invisible to every client until somebody provisions a tenant. That is a
+#     working-hours problem, not a 02:00 phone call.
+#   * request rates, latency percentiles, series counts. Those are dashboards.
+#     A number moving is not, by itself, something to wake a person for.
+#
+# Every expression below references a metric that is actually being scraped;
+# `make check-alerting` fails the build if that stops being true, which is what
+# stops this file from filling up with rules that can never fire.
+# ---------------------------------------------------------------------------
+groups:
+
+  - name: entitlement-enforcement
+    rules:
+      # The one alert here that is about configuration rather than liveness, and
+      # the reason the metric it reads was added at all. With no control-plane
+      # DSN the gateway answers "active, every product" for EVERY tenant: a
+      # suspended client keeps a working dashboard and the billing report is the
+      # thing that eventually notices. Before this, the only trace was a single
+      # WARNING at boot.
+      #
+      # `for: 5m` and not 0m: the gauge is set once at startup, so a restart
+      # must not page anyone in the second before the first scrape lands.
+      - alert: EntitlementEnforcementDisabled
+        expr: bct_gateway_entitlement_enforcement_enabled == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: login-gateway
+        annotations:
+          summary: "Subscription enforcement is OFF — every tenant is being treated as paid up"
+          description: >-
+            The gateway has no control-plane DSN configured, so every authenticated tenant
+            is issued a token claiming every product. Suspended clients keep working
+            dashboards. This is the documented fail-open, not a crash: check that
+            LOGIN_GATEWAY_REGISTRY_DSN is set in the environment the gateway was started
+            with, then recreate it.
+
+  - name: product-surfaces
+    rules:
+      # Nobody can log in to anything. This is the front door for every product.
+      - alert: LoginGatewayDown
+        expr: up{job="login-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: login-gateway
+        annotations:
+          summary: "The login gateway is not answering — no client can sign in"
+          description: >-
+            Prometheus has failed to scrape the gateway for 2 minutes. While it is down
+            nobody can obtain a session for the dashboard or for Odoo. Existing sessions
+            keep working until their token expires, so this is quieter than it is severe.
+
+      # Every dashboard number is compiled here. When it is down the portal
+      # renders empty panels rather than an error, which is the worse failure:
+      # it looks like the business has no data.
+      - alert: SemanticApiDown
+        expr: up{job="semantic-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: semantic-api
+        annotations:
+          summary: "The semantic API is not answering — dashboards will render empty"
+          description: >-
+            Prometheus has failed to scrape the semantic API for 2 minutes. Panels do not
+            show an error when this happens; they show nothing, which reads as "we have no
+            sales" rather than "the service is down".
+
+      # The four surfaces that expose no metrics of their own. `product` comes
+      # from the scrape config, so the alert names which one without a rule per
+      # service.
+      - alert: ProductSurfaceUnreachable
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          component: "{{ $labels.product }}"
+        annotations:
+          summary: "{{ $labels.product }} is not answering its health endpoint"
+          description: >-
+            The probe of {{ $labels.instance }} has failed for 3 minutes. This is measured
+            on the internal network, so DNS, TLS and the reverse proxy are NOT covered by
+            it — a green board here still permits a client seeing nothing.

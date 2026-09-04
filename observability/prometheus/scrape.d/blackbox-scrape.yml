@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# Blackbox probes. Owner: Platform-Infra.
+#
+# These four surfaces expose no /metrics of their own -- Odoo answers 404 there
+# and the three Next.js front ends answer 307. Measured 2026-09-05, not inferred.
+# A scrape job pointed at them would be `down` forever; a probe asks the only
+# question that is actually meaningful for them, which is whether they answer.
+#
+# WHAT THIS DOES NOT COVER, stated so nobody reads more into a green board.
+# Every target here is reached by SERVICE NAME on the compose network, so these
+# probes bypass DNS, TLS and the reverse proxy entirely. A certificate that
+# expired, a DNS record that moved, or an edge that stopped routing would leave
+# all four of these green while every client saw nothing. Probing the public
+# hostnames is the missing half and is deliberately not done here -- Prometheus
+# performs no environment substitution in its config, so it would mean writing
+# production hostnames into a tracked file. That is a decision with its own
+# trade-off and it belongs in its own change, not smuggled into this one.
+#
+# The relabel dance is the standard blackbox pattern: the target travels as a
+# URL parameter, the probed URL becomes the `instance` label, and the scrape
+# itself is addressed to the exporter.
+# ---------------------------------------------------------------------------
+scrape_configs:
+
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_200]
+    static_configs:
+      - targets:
+          - http://odoo:8069/web/health
+        labels:
+          product: odoo
+      - targets:
+          - http://insight-portal:3000/healthz
+        labels:
+          product: insight
+      - targets:
+          - http://hub-portal:3000/healthz
+        labels:
+          product: hub
+      - targets:
+          - http://marketing-site:3000/healthz
+        labels:
+          product: site
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

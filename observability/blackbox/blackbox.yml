@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# blackbox_exporter modules. Owner: Platform-Infra.
+#
+# WHY THIS SERVICE EXISTS. Four of the surfaces a client actually touches --
+# Odoo and the three Next.js front ends -- expose no Prometheus endpoint at all.
+# Measured, not assumed: /metrics answers 404 on Odoo and 307 on the portals.
+# A scrape job for them would sit `down` forever, which teaches everyone to
+# ignore a red target. The honest question for those four is not "what are your
+# internals doing" but "do you answer", and that is what a probe measures.
+#
+# ONE MODULE, AND IT DEMANDS 200. The default `http_2xx` module accepts any 2xx
+# and follows redirects, which would call a login redirect a success. Every
+# target below was measured to return exactly 200 on the path it is probed on,
+# so accepting only 200 is not strictness for its own sake -- it is the actual
+# contract, and anything else is a regression worth seeing.
+#
+# NO HOST HEADER IS SET, deliberately. Odoo's dbfilter normally needs one, but
+# `/web/health` answers `{"status": "pass"}` without it -- measured. That keeps a
+# tenant database name out of this tracked file, which is the same rule the rest
+# of the repository follows.
+# ---------------------------------------------------------------------------
+modules:
+  http_200:
+    prober: http
+    timeout: 8s
+    http:
+      method: GET
+      valid_status_codes: [200]
+      # HTTP/1.0 IS ACCEPTED, and that is not laziness. Odoo answers /web/health
+      # over HTTP/1.0; the default module rejects it and the probe fails with a
+      # 200 in hand, reporting a healthy service as down. Measured against the
+      # running stack. The protocol version is not a health signal here, and a
+      # check that fails on it is a false alarm waiting to be ignored.
+      valid_http_versions: ["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"]
+      # A probe must never change anything it looks at. GET on a health path is
+      # the whole interaction; no redirects are followed, so a surface that
+      # starts redirecting is reported rather than silently accepted.
+      follow_redirects: false
+      preferred_ip_protocol: ip4

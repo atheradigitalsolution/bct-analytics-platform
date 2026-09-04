@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------------------
+# Product and control-plane scrape targets. Owner: Platform-Infra.
+#
+# WHY THIS FILE EXISTS. Until it did, all five scrape jobs measured
+# infrastructure -- Prometheus itself, the two Postgres instances, the node, the
+# CDC loader -- and none measured anything a client touches. The login gateway
+# had been exposing /metrics since it was written and nothing collected it, so a
+# gateway that died overnight produced no signal at all.
+#
+# FORMAT. A file loaded through `scrape_config_files` MUST carry a top-level
+# `scrape_configs:` key. The README beside this directory says otherwise and is
+# wrong; the analytics drop-in next to this one records the exact error that
+# claim produces. Follow the files, not the README.
+#
+# ONLY SERVICES THAT ACTUALLY SERVE /metrics ARE HERE, measured 2026-09-05 and
+# not inferred from names. The client-facing portals and Odoo answer 307/404 on
+# /metrics -- they have no endpoint, so a job for them would sit `down` forever
+# and teach everyone to ignore a red target. They are covered by blackbox probes
+# instead, which measure the thing that actually matters for them: does the page
+# answer.
+#
+# Targets are SERVICE NAMES on the compose network, never published host ports:
+# the scrape must not depend on a port being exposed to the host, and a service
+# name survives being moved to another machine with an .env change.
+# ---------------------------------------------------------------------------
+scrape_configs:
+
+  # The door every client comes through. Also the only place that reports
+  # whether subscription enforcement is armed at all
+  # (bct_gateway_entitlement_enforcement_enabled).
+  - job_name: login-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["login-gateway:8080"]
+        labels:
+          product: gateway
+
+  # Every dashboard number in the platform is compiled here. If this is down the
+  # portal renders empty panels rather than an error, which is worse.
+  - job_name: semantic-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["semantic-api:8080"]
+        labels:
+          product: insight
+
+  # The control plane. Deliberately NOT alerted on -- see the rules file: its
+  # failure is invisible to clients until someone provisions a tenant, so it is
+  # a graph, not a page at 02:00.
+  - job_name: tenant-orchestrator
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["tenant-orchestrator:8080"]
+        labels:
+          product: control-plane
