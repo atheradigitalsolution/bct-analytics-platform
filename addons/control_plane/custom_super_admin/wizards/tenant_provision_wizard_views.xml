@@ -36,6 +36,15 @@
                         <field name="fernet_key_dek" readonly="1" widget="CopyClipboardChar"
                                help="Pass this to ops via the secure channel — Odoo will not be able to retrieve it again."/>
                     </group>
+                    <!-- Provisioning succeeded but the local registry mirror could
+                         not be refreshed. Shown below the credentials on purpose:
+                         the credentials are still the urgent thing to capture,
+                         and this banner only explains why the tenant list may
+                         look empty. -->
+                    <div invisible="not sync_warning" class="alert alert-warning" role="alert">
+                        <h4>⚠ Tenant list could not be refreshed</h4>
+                        <field name="sync_warning" nolabel="1" readonly="1"/>
+                    </div>
                 </sheet>
                 <footer>
                     <button name="action_provision"
