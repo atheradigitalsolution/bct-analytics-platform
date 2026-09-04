@@ -324,6 +324,13 @@ services:
       # ad-hoc psql ~4, margin. warehouse_ctl.py verify checks the total.
       SEMANTIC_API_POOL_MAX: ${SEMANTIC_API_POOL_MAX:-16}
       SEMANTIC_API_POOL_ACQUIRE_TIMEOUT_MS: ${SEMANTIC_API_POOL_ACQUIRE_TIMEOUT_MS:-2000}
+      # INFO, not WARNING, and that is the whole point: the audit trail
+      # (tenant_scope_violation, subscription_inactive, product_not_entitled)
+      # is emitted at INFO. Raising this to WARNING silences it. Until
+      # 2026-09-04 the service configured no logging at all and Python's
+      # lastResort handler discarded every one of those lines — see
+      # analytics/semantic-api/app/logging_config.py.
+      SEMANTIC_API_LOG_LEVEL: ${SEMANTIC_API_LOG_LEVEL:-INFO}
       TZ: ${TZ:-UTC}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${SEMANTIC_API_HOST_PORT:-38200}:8080"

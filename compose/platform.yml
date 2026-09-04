@@ -129,6 +129,13 @@ services:
       # The gateway's OWN public base, used to send a browser to its login page. It cannot be
       # inferred from the request: behind the edge the Host that arrives here is the Odoo host.
       LOGIN_GATEWAY_PUBLIC_BASE: ${LOGIN_GATEWAY_PUBLIC_BASE:-https://auth.${ATHERA_DOMAIN:-athera.localhost}}
+      # INFO, not WARNING. Every audit line this service writes — failed login,
+      # rate-limit lockout, rejected CSRF, refused SSO — is emitted at INFO.
+      # Raising this to WARNING deletes the authentication audit trail. Until
+      # 2026-09-04 the service configured no logging at all and Python's
+      # lastResort handler discarded all of it; see
+      # login-gateway/app/logging_config.py.
+      LOGIN_GATEWAY_LOG_LEVEL: ${LOGIN_GATEWAY_LOG_LEVEL:-INFO}
       TZ: ${TZ:-UTC}
     volumes:
       - ../login-gateway/secrets:/run/secrets:ro
