@@ -167,14 +167,33 @@ def connect_odoo(database: str):
     nothing else (contract 04 §2), so "never write to the Odoo database" is
     guaranteed by the role rather than by this code being careful.
     """
-    return psycopg2.connect(
-        host=os.environ.get("ODOO_PG_HOST", "postgres"),
-        port=int(os.environ.get("ODOO_PG_PORT", "5432")),
-        dbname=database,
-        user=os.environ["WAREHOUSE_READER_USER"],
-        password=os.environ["WAREHOUSE_READER_PASSWORD"],
-        application_name="warehouse_ctl",
-    )
+    try:
+        return psycopg2.connect(
+            host=os.environ.get("ODOO_PG_HOST", "postgres"),
+            port=int(os.environ.get("ODOO_PG_PORT", "5432")),
+            dbname=database,
+            user=os.environ["WAREHOUSE_READER_USER"],
+            password=os.environ["WAREHOUSE_READER_PASSWORD"],
+            application_name="warehouse_ctl",
+        )
+    except psycopg2.OperationalError as exc:
+        # A tenant's source_database is a name in warehouse.tenant_registry, and a
+        # name can outlive the database it points at. `bct_t2` was repointed to the
+        # dedicated fixture database `bct_fixture` on 2026-09-04 so the fixture would
+        # stop being rebuilt out of the production tenant; on a host where that
+        # database was never created, the bare psycopg2 error is
+        # 'FATAL: database "bct_fixture" does not exist' with no hint that a REGISTRY
+        # row is what asked for it. Say which tenant asked, and how to answer.
+        raise SystemExit(
+            f"FATAL: cannot open Odoo database {database!r} as "
+            f"{os.environ['WAREHOUSE_READER_USER']}.\n"
+            f"  {str(exc).strip()}\n"
+            f"  Some row of warehouse.tenant_registry names this database as its\n"
+            f"  source_database. Either create/restore it, or repoint the row:\n"
+            f"    SELECT tenant_id, source_database FROM warehouse.tenant_registry;\n"
+            f"  A fixture tenant's source is a normal Odoo database and is backed up\n"
+            f"  like one: scripts/tenant-backup.sh <slug>."
+        ) from exc
 
 
 def connect_warehouse(admin: bool = False):
@@ -777,9 +796,10 @@ def cmd_gen_fdw(args) -> int:
         odoo = connect_odoo(t["source_database"])
         with wh_admin.cursor() as cur:
             cur.execute(
-                "SELECT 1 FROM pg_foreign_server WHERE srvname = %s", (server,)
+                "SELECT srvoptions FROM pg_foreign_server WHERE srvname = %s", (server,)
             )
-            if not cur.fetchone():
+            row = cur.fetchone()
+            if row is None:
                 cur.execute(
                     f"CREATE SERVER {server} FOREIGN DATA WRAPPER postgres_fdw "
                     f"OPTIONS (host %s, port %s, dbname %s, "
@@ -789,6 +809,29 @@ def cmd_gen_fdw(args) -> int:
                     f"        updatable 'false', fetch_size '10000')",
                     (odoo_host, odoo_port, t["source_database"]),
                 )
+            else:
+                # RECONCILE AN EXISTING SERVER WITH THE REGISTRY.
+                #
+                # This branch used to be `if not exists: create` and nothing else, which
+                # made `source_database` a value the registry could change and the
+                # warehouse would never honour. Moving bct_t2 from `bct` to
+                # `bct_fixture` on 2026-09-04 updated the registry row, re-ran gen-fdw,
+                # reported success, and left `odoo_src_bct_t2` still reading `bct` --
+                # so the fixture would have been rebuilt from the very database it was
+                # supposed to stop depending on, and nothing anywhere would have said so.
+                #
+                # The registry is the source of truth; a foreign server that disagrees
+                # with it is corrected here, loudly.
+                opts = dict(o.split("=", 1) for o in (row[0] or []))
+                current = {"host": opts.get("host"), "port": opts.get("port"),
+                           "dbname": opts.get("dbname")}
+                wanted = {"host": odoo_host, "port": str(odoo_port),
+                          "dbname": t["source_database"]}
+                drift = {k: (current[k], wanted[k]) for k in wanted if current[k] != wanted[k]}
+                if drift:
+                    sets = ", ".join(f"SET {k} '{v}'" for k, (_, v) in drift.items())
+                    print(f"==> {server}: registry drift {drift}; ALTER SERVER {sets}")
+                    cur.execute(f"ALTER SERVER {server} OPTIONS ({sets})")
             cur.execute(
                 "SELECT 1 FROM pg_user_mappings WHERE srvname = %s AND usename = %s",
                 (server, wh_user),

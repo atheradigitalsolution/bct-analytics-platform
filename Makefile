@@ -225,6 +225,12 @@ check-dev-passwords: ## Assert the dev password logs in AND that Odoo's default 
 seed-demo: ## Generate the demo volume (custom_demo_seed) and password its users; idempotent
 	@bash scripts/seed-demo.sh $(if $(TENANT),--db $(TENANT),) $(ARGS)
 
+.PHONY: purge-demo-seed
+purge-demo-seed: ## Remove custom_demo_seed's DATA from a tenant, FK-order (COMMIT=1 to keep)
+	@test -n "$(TENANT)" || { echo "TENANT is required, e.g. TENANT=bct"; exit 1; }
+	@echo "  purging custom_demo_seed data from '$(TENANT)'$(if $(COMMIT), — COMMITTING, — dry run, will roll back)"
+	@$(DC) exec -T $(if $(COMMIT),-e PURGE_COMMIT=1,) odoo odoo shell -d $(TENANT) --no-http < scripts/purge-demo-seed.py
+
 .PHONY: psql
 psql: ## Open a psql shell as the odoo superuser (TENANT=<slug> for another database)
 	@$(DC) exec postgres psql -U odoo -d $(if $(TENANT),$(TENANT),$${ODOO_DB_NAME:-bct})
