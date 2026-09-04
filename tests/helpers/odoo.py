@@ -90,12 +90,38 @@ def unlink_partner(partner_id: int, database=None) -> bool:
     )
 
 
+def odoo_host(database=None) -> str:
+    """The ``Host`` header that makes Odoo select ``database``.
+
+    ``ODOO_DBFILTER`` is ``^%d$``, so Odoo picks the database from the host's first label and
+    nothing else. Both parts come from configuration: spelling either one into this file makes the
+    suite pass on the machine it was written on and fail on any other deployment, and it writes a
+    real tenant database name into a tracked file.
+    """
+    return "%s.%s" % (
+        database or env("ODOO_DB_NAME", "bct"),
+        env("ATHERA_DOMAIN", "athera.localhost"),
+    )
+
+
 def authenticate(login: str, password: str, database=None, url=None):
     """Authenticate over Odoo's JSON-RPC endpoint. Returns the uid, or False.
 
     Deliberately the network path rather than `odoo shell`: a password is only meaningful if the
     thing that accepts logins accepts it. `odoo shell` bypasses authentication entirely, so a check
     made through it would pass on a stack whose credentials were never applied.
+
+    THE ``Host`` HEADER IS LOAD-BEARING, and its absence made this function return 404 for every
+    call since it was written. The request goes to the loopback address, so without an explicit
+    header the ``Host`` is the literal IP; ``ODOO_DBFILTER`` is ``^%d$``, an address matches no
+    database name, and Odoo answers 404 before the payload is ever read. The database in the
+    JSON-RPC ``args`` does not help -- routing happens first.
+
+    Nothing caught it because the only caller was a test that is always skipped, so this function
+    was never executed. Measured on the running stack while fixing it::
+
+        no Host header              -> HTTP 404
+        Host: <db>.<ATHERA_DOMAIN>  -> HTTP 200, {"result": false} for an unknown login
     """
     import json
     import urllib.request
@@ -112,7 +138,10 @@ def authenticate(login: str, password: str, database=None, url=None):
         raise ValueError("refusing a non-loopback Odoo URL: %r" % url)
     request = urllib.request.Request(  # noqa: S310 - scheme checked immediately above
         url, data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}, method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Host": odoo_host(database),
+        }, method="POST",
     )
     with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
         body = json.loads(response.read().decode("utf-8"))
