@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { listClaims, listInvoices, getSubscription } from "@/lib/billing";
+import { claimNotice } from "@/lib/feedback";
+import { NoticeBanner } from "@/components/Notice";
 import { CLAIM_STATE_LABEL, formatDate, formatMoney, STATUS_LABEL } from "@/lib/money";
 import { getSession } from "@/lib/session";
 
@@ -18,9 +20,18 @@ export const dynamic = "force-dynamic";
  * Tidak ada satu pun angka di halaman ini yang berasal dari URL. Tenant diambil dari `Session`,
  * dan `Session` hanya lahir dari token yang sudah diverifikasi terhadap JWKS gateway.
  */
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await getSession();
   if (session === null) redirect("/login?next=/billing");
+
+  // `POST /api/billing/claim` mengalihkan ke sini dengan `?ok=1` atau `?error=faktur`. Sampai
+  // 2026-09-04 tidak ada yang membaca keduanya, jadi halaman ini terlihat identik entah
+  // konfirmasi pembayaran tersimpan atau ditolak. Lihat src/lib/feedback.ts.
+  const notice = claimNotice(await searchParams);
 
   const [subscription, invoices, claims] = await Promise.all([
     getSubscription(session),
@@ -48,6 +59,8 @@ export default async function BillingPage() {
 
   return (
     <main id="main" className="mx-auto max-w-4xl px-4 py-8">
+      {notice !== null ? <NoticeBanner notice={notice} /> : null}
+
       <header className="mb-6">
         <Link className="text-xs text-ink-3 underline hover:text-ink-2" href={backHref}>
           &larr; {backLabel}
@@ -158,9 +171,17 @@ export default async function BillingPage() {
       </section>
 
       {/* ---- Konfirmasi pembayaran yang sudah dikirim ---- */}
-      {claims.length > 0 ? (
-        <section className="mt-6">
-          <h2 className="text-sm font-semibold text-ink">Konfirmasi pembayaran yang Anda kirim</h2>
+      {/* Bagian ini dirender MESKI kosong sejak 2026-09-04. Spanduk sukses di atas berbunyi
+          "konfirmasi Anda muncul di daftar di bawah"; kalau bagiannya menghilang saat daftar
+          kosong, kalimat itu menunjuk ke ruang kosong dan klien menyimpulkan konfirmasinya
+          hilang. */}
+      <section className="mt-6">
+        <h2 className="text-sm font-semibold text-ink">Konfirmasi pembayaran yang Anda kirim</h2>
+        {claims.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-2">
+            Belum ada konfirmasi pembayaran yang Anda kirim lewat portal ini.
+          </p>
+        ) : (
           <ul className="mt-2 space-y-2">
             {claims.map((c) => (
               <li
@@ -178,8 +199,8 @@ export default async function BillingPage() {
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        )}
+      </section>
     </main>
   );
 }

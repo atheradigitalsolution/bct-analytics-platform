@@ -61,5 +61,31 @@ export const config = {
   bankName: env("INSIGHT_PORTAL_BANK_NAME", ""),
   bankAccountNumber: env("INSIGHT_PORTAL_BANK_ACCOUNT", ""),
   bankAccountHolder: env("INSIGHT_PORTAL_BANK_HOLDER", ""),
-  billingContact: env("INSIGHT_PORTAL_BILLING_CONTACT", ""),
+  /**
+   * Ke mana klien bertanya ketika rekening belum terisi.
+   *
+   * NILAI CADANGANNYA BUKAN TEMPELAN. `info@athera-digital.com` adalah alamat yang SUDAH
+   * dipublikasikan di situs perusahaan — `athera-web/src/lib/site.ts:13`, dan tercetak di
+   * https://athera-digital.com/kontak yang menjawab 200. Ia disalin ke sini, bukan dikarang,
+   * justru supaya cabang cadangan tidak menjadi jalan buntu: sampai 2026-09-04 halaman faktur
+   * berbunyi "Hubungi operator ATHERA" tanpa menyebut satu pun cara menghubunginya, dan
+   * INSIGHT_PORTAL_BANK_* akan tetap kosong untuk waktu yang tidak ditentukan — jadi cabang itu
+   * bukan kondisi langka, ia yang dilihat setiap klien yang mau membayar.
+   *
+   * TIDAK ADA NOMOR TELEPON di sini, dan itu bukan kelalaian: `site.ts:15` menyetel
+   * `phone: null` dengan TODO yang masih terbuka. Menuliskan nomor yang tidak ada di sumbernya
+   * akan membuat halaman ini menjanjikan saluran yang tidak dijawab siapa pun.
+   *
+   * Menyetel INSIGHT_PORTAL_BILLING_CONTACT di .env mesin menggantikan nilai ini.
+   */
+  billingContact: env("INSIGHT_PORTAL_BILLING_CONTACT", "info@athera-digital.com"),
+  /**
+   * Halaman kontak publik, dipakai sebagai jalur kedua di samping alamat e-mail. Nyata dan
+   * terverifikasi (HTTP 200 pada 2026-09-04); `athera-web/src/lib/site.ts:35` mendaftarkannya di
+   * navigasi utama situs.
+   */
+  billingContactUrl: env(
+    "INSIGHT_PORTAL_BILLING_CONTACT_URL",
+    "https://athera-digital.com/kontak",
+  ),
 } as const;

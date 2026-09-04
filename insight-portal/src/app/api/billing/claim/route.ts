@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 
 import { getInvoice, recordClaim } from "@/lib/billing";
+import { CLAIM_ERROR, CLAIM_OK } from "@/lib/feedback";
 import { redirectTo } from "@/lib/redirect";
 import { getSession } from "@/lib/session";
 
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
 
   const invoiceId = Number.parseInt(String(form.get("invoice_id") ?? ""), 10);
   const invoice = await getInvoice(session, invoiceId);
-  if (invoice === null) return redirectTo("/billing?error=faktur");
+  if (invoice === null) return redirectTo(`/billing?error=${CLAIM_ERROR.INVOICE}`);
 
   const amount = Number(form.get("amount"));
   const paidOn = String(form.get("paid_on") ?? "");
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
   const validAmount = Number.isFinite(amount) && amount > 0 && amount < 1e15;
   const validDate = /^\d{4}-\d{2}-\d{2}$/.test(paidOn) && !Number.isNaN(Date.parse(paidOn));
   if (!validAmount || !validDate || bankName === "") {
-    return redirectTo(`/billing/${invoice.id}?error=isian`);
+    return redirectTo(`/billing/${invoice.id}?error=${CLAIM_ERROR.INPUT}`);
   }
 
   try {
@@ -68,8 +69,10 @@ export async function POST(request: NextRequest) {
   } catch {
     // Termasuk penolakan trigger saat GUC tidak terpasang. Klien tidak diberi tahu bedanya;
     // yang perlu ia tahu adalah konfirmasinya tidak tercatat dan harus dicoba lagi.
-    return redirectTo(`/billing/${invoice.id}?error=simpan`);
+    return redirectTo(`/billing/${invoice.id}?error=${CLAIM_ERROR.SAVE}`);
   }
 
-  return redirectTo("/billing?ok=1");
+  // Ke `/billing`, bukan kembali ke rincian faktur: yang ingin dilihat orang sesudah
+  // mengirim konfirmasi adalah daftar konfirmasinya, dan daftar itu ada di sana.
+  return redirectTo(`/billing?ok=${CLAIM_OK}`);
 }

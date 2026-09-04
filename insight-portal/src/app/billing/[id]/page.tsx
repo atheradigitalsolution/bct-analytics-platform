@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { getInvoice } from "@/lib/billing";
 import { config } from "@/lib/config";
+import { claimNotice } from "@/lib/feedback";
+import { NoticeBanner } from "@/components/Notice";
 import { formatDate, formatMoney, isoDate, STATUS_LABEL } from "@/lib/money";
 import { getSession } from "@/lib/session";
 
@@ -25,11 +27,18 @@ export const dynamic = "force-dynamic";
  */
 export default async function InvoiceDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await getSession();
   if (session === null) redirect("/login?next=/billing");
+
+  // `POST /api/billing/claim` memantulkan validasi yang gagal ke sini dengan `?error=isian` atau
+  // `?error=simpan`. Sampai 2026-09-04 tidak ada yang membacanya: formulir kembali kosong tanpa
+  // satu kata pun tentang kenapa. Lihat src/lib/feedback.ts.
+  const notice = claimNotice(await searchParams);
 
   const { id } = await params;
   // Segmen URL hanya menjadi ANGKA. Ia tidak pernah menjadi tenant, dan tidak ada parameter lain
@@ -38,10 +47,25 @@ export default async function InvoiceDetailPage({
   if (invoice === null) notFound();
 
   const unpaid = invoice.client_status !== "paid";
-  const hasBank = config.bankName !== "" && config.bankAccountNumber !== "";
+  /**
+   * KETIGANYA, bukan dua. Sebelumnya `bankAccountHolder` tidak ikut diperiksa, jadi konfigurasi
+   * yang setengah terisi menampilkan nomor rekening dengan baris "Atas nama" kosong — instruksi
+   * transfer tanpa nama penerima, yang adalah bentuk yang persis ditiru penipuan faktur. Isi
+   * ketiganya di .env mesin dan halaman ini langsung memakainya; tidak ada perubahan kode lain
+   * yang dibutuhkan.
+   */
+  const hasBank =
+    config.bankName !== "" &&
+    config.bankAccountNumber !== "" &&
+    config.bankAccountHolder !== "";
+  const contact = config.billingContact.trim();
+  const contactIsEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+  const contactUrl = config.billingContactUrl.trim();
 
   return (
     <main id="main" className="mx-auto max-w-2xl px-4 py-8">
+      {notice !== null ? <NoticeBanner notice={notice} /> : null}
+
       <p className="text-xs">
         <Link className="underline text-ink-3" href="/billing">
           &larr; Kembali ke tagihan
@@ -119,14 +143,66 @@ export default async function InvoiceDetailPage({
                   </div>
                 </dl>
               </>
+            ) : contact !== "" ? (
+              /* CABANG YANG SEBENARNYA DILIHAT ORANG.
+                 INSIGHT_PORTAL_BANK_* akan tetap kosong untuk waktu yang tidak ditentukan
+                 (keputusan user 2026-09-04: nomor rekening diisi langsung di .env mesin, dan
+                 datanya belum ada), jadi ini bukan kondisi sementara yang langka — ini yang
+                 dilihat SETIAP klien yang mau membayar. Sebelumnya bunyinya "Hubungi operator
+                 ATHERA" tanpa menyebutkan satu pun cara menghubunginya, yaitu jalan buntu yang
+                 terlihat seperti petunjuk.
+
+                 Alamat di bawah bukan karangan: `config.billingContact` jatuh ke alamat yang
+                 sudah dipublikasikan di situs perusahaan. Tidak ada nomor telepon karena situs
+                 pun belum punya. */
+              <>
+                <p className="mt-2 text-sm text-ink-2">
+                  Rincian rekening belum tersedia di portal ini, jadi transfer belum bisa
+                  dilakukan dari halaman ini.
+                </p>
+                <p className="mt-2 text-sm text-ink-2">
+                  Mintalah instruksi pembayaran dengan menyebut nomor faktur{" "}
+                  <span className="font-mono text-ink">{invoice.invoice_number}</span> ke{" "}
+                  {contactIsEmail ? (
+                    <a
+                      className="underline text-ink"
+                      href={`mailto:${contact}?subject=${encodeURIComponent(
+                        `Instruksi pembayaran faktur ${invoice.invoice_number}`,
+                      )}`}
+                    >
+                      {contact}
+                    </a>
+                  ) : (
+                    <span className="text-ink">{contact}</span>
+                  )}
+                  {contactUrl !== "" ? (
+                    <>
+                      {" "}atau lewat{" "}
+                      <a
+                        className="underline text-ink"
+                        href={contactUrl}
+                        rel="noreferrer noopener"
+                        target="_blank"
+                      >
+                        halaman kontak kami
+                      </a>
+                    </>
+                  ) : null}
+                  .
+                </p>
+                <p className="mt-2 text-xs text-ink-3">
+                  Kalau Anda sudah menerima instruksi transfer lewat jalur lain dan sudah
+                  membayar, konfirmasinya tetap bisa dikirim lewat formulir di bawah.
+                </p>
+              </>
             ) : (
-              /* Kosong bukan halaman kosong. Kalau rekening belum dikonfigurasi, klien diberi
-                 jalan keluar yang nyata, bukan bidang kosong yang membuatnya menebak. */
+              /* Tidak ada rekening DAN tidak ada kontak. Sebuah ajakan membayar yang tidak bisa
+                 diselesaikan lebih buruk daripada tidak ada ajakan sama sekali, jadi halaman
+                 mengatakan apa adanya dan berhenti di situ. */
               <p className="mt-2 text-sm text-ink-2">
-                Rincian rekening belum tersedia di portal.{" "}
-                {config.billingContact !== ""
-                  ? `Hubungi ${config.billingContact} untuk instruksi pembayaran.`
-                  : "Hubungi operator ATHERA untuk instruksi pembayaran."}
+                Instruksi pembayaran untuk faktur ini sedang kami siapkan dan akan muncul di
+                halaman ini begitu siap. Anda tidak melewatkan langkah apa pun; tidak ada yang
+                perlu Anda lakukan sekarang.
               </p>
             )}
           </section>
