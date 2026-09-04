@@ -1,4 +1,10 @@
-"""Set $BCT_DEV_USER_PASSWORD on admin and the custom_demo_seed demo users.
+"""Set one database's dev credential on admin and the custom_demo_seed demo users.
+
+WHICH credential is not decided here. The caller runs this program once per
+database Odoo serves and prepends the value that belongs to THAT database -
+$BCT_DEV_USER_PASSWORD for a tenant, $ORCHESTRATOR_ODOO_PASSWORD for the control
+plane, because tenant-orchestrator authenticates with the latter. This file only
+ever sees `_PW_B64` and never learns, or needs to learn, which one it is.
 
 RUNTIME: this is NOT a host script. It is piped into `odoo shell` inside the
 odoo container by scripts/set-dev-passwords.sh, which prepends one line:

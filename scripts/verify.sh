@@ -176,12 +176,26 @@ step "14. every alert rule fires when it should, and stays quiet when it should 
 check "alert rules behave" bash "$REPO_ROOT/scripts/check-alert-rules.sh"
 
 # 15 ------------------------------------------------------------------------
-step "15. the dev login credential is applied, and Odoo's default is refused"
+step "15. every served database applies its own credential, and Odoo's default is refused"
 # PLAN.md instance 10. The half of this that matters is the NEGATIVE: a check
-# that only asserts "$BCT_DEV_USER_PASSWORD logs in" is green on a stack that
-# accepts BOTH passwords, which is precisely the defective state. So
-# --check requires authenticate('bct','admin','admin') to be False.
-check "dev password applied, default rejected" \
+# that only asserts "the documented credential logs in" is green on a stack that
+# accepts BOTH passwords, which is precisely the defective state. So --check
+# requires authenticate(<db>,'admin','admin') to be False.
+#
+# WIDENED 2026-09-05, and this line is the reason the step was not simply left
+# alone with a second one added beside it. Until now BOTH this step and the
+# script behind it resolved exactly ONE database, while Odoo serves several -
+# and the one neither of them named was the CONTROL PLANE, which holds the
+# tenant registry, billing and the super-admin console. That database accepted
+# `admin`/`admin` for months underneath this very PASS line. The check was not
+# wrong; its NAME was wider than its SCOPE, which is the failure mode this file
+# catalogues. Correcting the scope in place keeps the count of checks honest -
+# a new check next to a misleading one leaves the misleading one running.
+#
+# --check now asserts, for EVERY database in $ODOO_DB_NAMES, that Odoo's default
+# is refused AND that the credential mapped to that database is accepted, and it
+# FAILS if it ends up checking none.
+check "dev password applied to every served database, default rejected" \
     bash "$REPO_ROOT/scripts/set-dev-passwords.sh" --check
 
 # base-stack footprint ------------------------------------------------------

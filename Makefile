@@ -214,11 +214,11 @@ install-modules: ## Install/upgrade modules: make install-modules MODULES=custom
 	@bash scripts/init-db.sh --modules "$(MODULES)" --force
 
 .PHONY: set-dev-passwords
-set-dev-passwords: ## Apply $$BCT_DEV_USER_PASSWORD to admin + the demo users (idempotent)
+set-dev-passwords: ## Apply each served database's own dev credential to admin + demo users (idempotent)
 	@bash scripts/set-dev-passwords.sh $(if $(TENANT),--db $(TENANT),)
 
 .PHONY: check-dev-passwords
-check-dev-passwords: ## Assert the dev password logs in AND that Odoo's default 'admin' is refused
+check-dev-passwords: ## Assert EVERY served database takes its own credential AND refuses Odoo's default 'admin'
 	@bash scripts/set-dev-passwords.sh --check $(if $(TENANT),--db $(TENANT),)
 
 .PHONY: seed-demo
