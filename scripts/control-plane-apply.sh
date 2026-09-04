@@ -279,7 +279,7 @@ GRANT CONNECT ON DATABASE "$ADMIN_DB" TO "$GW_USER";
 GRANT USAGE ON SCHEMA cms TO "$SITE_USER";
 GRANT SELECT ON cms.published_page, cms.published_block TO "$SITE_USER";
 GRANT CONNECT ON DATABASE "$ADMIN_DB" TO "$SITE_USER";
--- Grant pada schema `billing` TIDAK di sini: view-nya dibuat oleh custom_athera_billing
+-- Grant pada schema "billing" TIDAK di sini: view-nya dibuat oleh custom_athera_billing
 -- (models/client_billing.py), dan grant harus mengikuti pembuatnya atau ia menunjuk objek
 -- yang belum ada. Yang harus ada lebih dulu hanyalah izin menyambung.
 GRANT CONNECT ON DATABASE "$ADMIN_DB" TO "$BILL_USER";
