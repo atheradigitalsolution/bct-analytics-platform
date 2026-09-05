@@ -104,3 +104,63 @@ export async function setPlanPrice(
     client.release();
   }
 }
+
+/**
+ * Terbitkan atau tarik sebuah paket dari katalog publik.
+ *
+ * `is_active` MENENTUKAN APA YANG DILIHAT DUNIA. `cms.published_plan` — view yang
+ * dibaca situs publik lewat /api/pricing — adalah `SELECT ... WHERE is_active`.
+ * Sampai fungsi ini ada, docstring di atas menyebut editor ini menyentuh
+ * `is_active`, dan tidak ada satu pun jalan untuk mengubahnya: sebuah klaim tanpa
+ * mekanisme. Akibat terukurnya, 2026-09-05: paket `trial` seharga Rp 0 terbit ke
+ * API publik tanpa ada yang pernah memutuskan kami menawarkan uji coba gratis,
+ * dan tidak ada cara mematikannya selain SQL langsung.
+ *
+ * MENARIK PAKET TIDAK MENGHAPUSNYA. Kode paket dirujuk oleh
+ * `tenant_registry.tenants.plan_code` lewat foreign key, jadi menghapus baris akan
+ * memutus tenant yang memakainya. Menarik dari katalog hanya menyembunyikannya
+ * dari halaman harga; langganan yang berjalan tidak tersentuh.
+ */
+export async function setPlanActive(
+  code: string,
+  isActive: boolean,
+  actor: string,
+): Promise<void> {
+  if (!/^[a-z][a-z0-9_]{1,31}$/.test(code)) throw new PricingError("invalid_plan_code");
+
+  const client = await pool().connect();
+  try {
+    await client.query("BEGIN");
+    const upd = await client.query(
+      `UPDATE tenant_registry.plans
+          SET is_active = $2
+        WHERE code = $1
+      RETURNING code`,
+      [code, isActive],
+    );
+    if (upd.rowCount === 0) {
+      await client.query("ROLLBACK");
+      throw new PricingError("unknown_plan");
+    }
+    // Berapa tenant yang sedang memakainya, direkam BERSAMA perubahannya. Menarik
+    // paket yang masih dipakai bukan kesalahan, tetapi ia hal yang ingin diketahui
+    // orang yang membaca log ini nanti, dan menghitungnya belakangan sudah tidak
+    // menjawab pertanyaan "berapa banyak saat itu".
+    await client.query(
+      `INSERT INTO tenant_registry.action_log (action, actor, outcome, detail)
+       SELECT 'plan_active_set', $1, 'success',
+              jsonb_build_object('plan', $2::text, 'is_active', $3::boolean,
+                                 'tenants_on_plan',
+                                 (SELECT count(*) FROM tenant_registry.tenants t
+                                   WHERE t.plan_code = $2::text),
+                                 'via', 'hub-portal')`,
+      [actor, code, isActive],
+    );
+    await client.query("COMMIT");
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch { /* ignore */ }
+    throw e;
+  } finally {
+    client.release();
+  }
+}

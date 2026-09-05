@@ -26,12 +26,17 @@ export default async function PricingPage() {
         Setiap perubahan tercatat di <code>action_log</code>.
       </p>
       <p className="lede">
+        Kolom <strong>Katalog publik</strong> menentukan apakah sebuah paket muncul di
+        halaman harga. Menarik paket tidak menghapusnya dan tidak menyentuh langganan
+        yang sedang berjalan — ia hanya berhenti ditawarkan kepada pengunjung baru.
+      </p>
+      <p className="lede">
         <strong>Biaya implementasi</strong> sengaja tidak berangka di mana pun — ia
         selalu tampil sebagai &quot;menyesuaikan kebutuhan — Hubungi kami&quot; di landing.
       </p>
       <table>
         <thead>
-          <tr><th>Plan</th><th>Produk</th><th>Harga / bln</th><th>Ubah</th></tr>
+          <tr><th>Plan</th><th>Produk</th><th>Harga / bln</th><th>Katalog publik</th><th>Ubah</th></tr>
         </thead>
         <tbody>
           {plans.map((p) => (
@@ -39,6 +44,25 @@ export default async function PricingPage() {
               <td><code>{p.code}</code><br /><small>{p.display_name}</small></td>
               <td>{p.products.join(", ")}</td>
               <td>{fmtIDR(p.price_month, p.currency)}</td>
+              <td>
+                {/* KOLOM INI MENENTUKAN APA YANG DILIHAT DUNIA, dan sampai hari ini
+                    tidak punya sakelar sama sekali: `cms.published_plan` menyaring
+                    `WHERE is_active`, tetapi editor ini hanya bisa mengubah harga.
+                    Akibatnya paket `trial` seharga Rp 0 terbit ke API harga publik
+                    tanpa ada yang pernah memutuskan kami menawarkan uji coba gratis,
+                    dan tanpa ada cara mematikannya selain SQL langsung.
+
+                    Menarik paket TIDAK menghapusnya: kodenya dirujuk foreign key dari
+                    tenant yang memakainya, dan langganan yang berjalan tidak tersentuh. */}
+                <span className={p.is_active ? "pill ok" : "pill warn"}>
+                  {p.is_active ? "terbit" : "ditarik"}
+                </span>
+                <form className="inline" method="POST" action={`/api/pricing/${p.code}`}>
+                  <input type="hidden" name="intent" value="active" />
+                  <input type="hidden" name="is_active" value={p.is_active ? "false" : "true"} />
+                  <button type="submit">{p.is_active ? "Tarik" : "Terbitkan"}</button>
+                </form>
+              </td>
               <td>
                 <form className="inline" method="POST" action={`/api/pricing/${p.code}`}>
                   <input
@@ -50,6 +74,7 @@ export default async function PricingPage() {
                     placeholder="kosong = custom"
                     aria-label={`Harga bulanan ${p.code}`}
                   />
+                  <input type="hidden" name="intent" value="price" />
                   <input type="hidden" name="currency" value={p.currency} />
                   <label>
                     <input type="checkbox" name="custom" value="true" defaultChecked={p.price_month === null} />{" "}

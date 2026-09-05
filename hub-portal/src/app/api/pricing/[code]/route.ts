@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { absolute } from "@/lib/redirect";
-import { setPlanPrice, PricingError } from "@/lib/pricing";
+import { setPlanActive, setPlanPrice, PricingError } from "@/lib/pricing";
 import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ cod
 
   const { code } = await params;
   const form = await request.formData();
+
+  // Dua perbuatan, satu route, dipisahkan oleh sebuah field dan bukan oleh URL
+  // yang bisa dipilih peramban. Menerbitkan/menarik paket tidak menyentuh harga,
+  // dan menyunting harga tidak menyentuh keterbitan; menggabungkan keduanya dalam
+  // satu formulir berarti satu klik mengubah dua hal yang tidak selalu ingin
+  // diubah bersamaan.
+  const intent = String(form.get("intent") ?? "price");
+  if (intent === "active") {
+    const isActive = String(form.get("is_active") ?? "") === "true";
+    try {
+      await setPlanActive(code, isActive, session.sub);
+    } catch (e) {
+      if (e instanceof PricingError) {
+        return NextResponse.json({ error: e.message }, { status: 400 });
+      }
+      throw e;
+    }
+    return NextResponse.redirect(await absolute("/pricing"), { status: 303 });
+  }
 
   // "custom" checkbox => null price ("Hubungi kami"). Otherwise parse a number.
   const custom = String(form.get("custom") ?? "") === "true";
