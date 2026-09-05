@@ -117,16 +117,55 @@
 	import site_tls
 
 	handle /onboarding/* {
-		# The public intake controller already exists in Odoo
-		# (custom_onboarding_journey, with Turnstile and a per-IP rate limit),
-		# so the marketing site's form has a live endpoint before the site
-		# itself does.
+		# The public intake controller lives in Odoo (custom_onboarding_journey),
+		# so the marketing site's form has a live endpoint before the site does.
+		#
+		# THE HOST'S FIRST LABEL IS THE CONTROL-PLANE DATABASE, NOT ${ODOO_DB_NAME}.
+		# It used to be the latter, which resolved to a CLIENT's database, and that
+		# is where every lead submitted through this URL landed. Three things were
+		# wrong with it, in ascending order of how hard they are to undo:
+		#
+		#   1. ATHERA's own sales leads sat inside a client's database - a database
+		#      that gets backed up, restored, and one day handed over.
+		#   2. Nothing could read them. hub-portal's DSN points at the control
+		#      plane and nowhere else, so those rows had no route to a human.
+		#   3. The website's own form already posts to the control plane. Two
+		#      destinations means half the leads vanish with nobody noticing that
+		#      half of them are missing.
+		#
+		# ${ATHERA_ADMIN_MODULES} lists custom_onboarding_journey; the control
+		# plane was always the declared home. This line was the one that strayed.
 		reverse_proxy odoo:8069 {
-			header_up Host "{$ODOO_DB_NAME:bct}.{$ATHERA_DOMAIN:athera.localhost}"
-			header_up X-Forwarded-Host "{$ODOO_DB_NAME:bct}.{$ATHERA_DOMAIN:athera.localhost}"
-			header_up X-Real-IP {remote_host}
-			header_up X-Forwarded-For {remote_host}
+			header_up Host "{$ATHERA_ADMIN_DB:athera_admin}.{$ATHERA_DOMAIN:athera.localhost}"
+			header_up X-Forwarded-Host "{$ATHERA_ADMIN_DB:athera_admin}.{$ATHERA_DOMAIN:athera.localhost}"
+			# X-FORWARDED-FOR IS PASSED THROUGH, NOT REWRITTEN.
+			#
+			# It used to be `{remote_host}`, and `{remote_host}` here is not the
+			# visitor: it is the previous hop, the host-level Caddy, identical for
+			# every request that has ever arrived. Odoo runs behind ProxyFix with
+			# x_for=1, and werkzeug's ProxyFix takes `values[-1]` -- the RIGHTMOST
+			# entry, i.e. whatever this line writes. So the per-IP rate limit was
+			# reading one constant address for the entire internet: not five
+			# submissions per hour per visitor, but five per hour for everyone
+			# together, and the sixth honest visitor of the hour was turned away.
+			#
+			# The visitor's address is already in the header when it gets here.
+			# The host-level Caddy SETS it from its own {remote_host}, discarding
+			# anything the client tried to supply, so this value is not forgeable
+			# and this hop must leave it exactly as it found it. Letting Caddy
+			# append its own peer would be just as wrong -- the appended entry
+			# becomes the rightmost, and we are back to one bucket.
+			header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+			header_up X-Real-IP {http.request.header.X-Forwarded-For}
 			header_up X-Forwarded-Proto {scheme}
+		}
+
+		# An unauthenticated writer does not get to choose how many bytes the
+		# control plane parses. Odoo caps the STORED payload, but only after
+		# deserialising whatever arrived; this cap happens before the request
+		# reaches a Python process at all.
+		request_body {
+			max_size 256KB
 		}
 	}
 

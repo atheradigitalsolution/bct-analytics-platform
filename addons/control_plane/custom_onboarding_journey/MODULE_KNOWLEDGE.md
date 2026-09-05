@@ -88,3 +88,69 @@ Single state machine that walks every prospective tenant from first intake to li
 - **Marketing-site UI / lead capture form** — only the receiving endpoint is here.
 - **Email notifications to prospects** — chatter only.
 - **Conversion analytics / funnel metrics** — none built-in.
+
+## Seam intake publik (2026-09-05)
+
+### Tujuannya adalah control plane, dan hanya itu
+
+Ada dua jalur menuju `onboarding.public.submission`, dan sampai hari ini keduanya
+berakhir di database yang BERBEDA:
+
+| Jalur | Rute | Mendarat di |
+|---|---|---|
+| URL publik `/onboarding/*` | browser → Caddy host → Caddy platform → `odoo:8069` | `bct` (salah) |
+| Formulir `/kontak` | browser → Caddy host → Next.js → loopback → Odoo | `athera_admin` |
+
+Keduanya sekarang menuju `athera_admin`. `bct` adalah database KLIEN; lead penjualan
+ATHERA sendiri tidak boleh ada di sana, dan tidak ada yang bisa membacanya di sana
+karena DSN hub-portal hanya menunjuk control plane. Satu-satunya baris yang pernah
+mendarat lewat jalur pertama adalah `{}` — payload kosong, 2 byte.
+
+### Yang menjaga kolom sensitif adalah daftar-putih, bukan view
+
+`PUBLIC_FIELD_LIMITS` di controller menentukan kunci apa saja yang boleh masuk.
+`npwp`, `bank_name`, `bank_account`, dan unggahan berkas base64 TIDAK ada di sana,
+jadi nilainya tidak pernah tersimpan. View `onboarding.public_submission_overview`
+bersih bukan karena kolomnya dipilih hati-hati, melainkan karena datanya tidak
+pernah ada. Kalau suatu hari kunci itu ditambahkan kembali, view ikut bocor.
+
+### Batas laju ada di Postgres, dan alasannya
+
+`ODOO_WORKERS=2`. Penghitung berbasis dict proses berarti batas efektifnya dua kali
+lipat dari yang tertulis, dan nol lagi setiap restart. `onboarding_intake_throttle`
+dibuat lazy oleh `onboarding.intake.throttle`, diserialisasi per-IP dengan
+`pg_advisory_xact_lock`, dan dipangkas di dalam pemeriksaan yang sama.
+
+### Jebakan: X-Forwarded-For runtuh menjadi satu alamat
+
+Odoo memakai ProxyFix `x_for=1`, dan werkzeug mengambil `values[-1]` — entri PALING
+KANAN. Caddy platform dulu menulis `header_up X-Forwarded-For {remote_host}`, yang
+di titik itu berarti alamat hop sebelumnya, sama untuk semua pengunjung. Terukur:
+seluruh lalu lintas jalur publik masuk ke satu `source_ip_hash`
+(sha256 dari alamat gateway Docker), sehingga "5 per jam per IP" sesungguhnya
+adalah 5 per jam untuk seluruh internet.
+
+Perbaikannya berpasangan dan harus tetap berpasangan:
+* Caddy **host** (tepi publik) MENYETEL `X-Forwarded-For` dari `{remote_host}`,
+  membuang apa pun yang dikarang klien. Ini batas kepercayaannya.
+* Caddy **platform** MENERUSKAN nilai itu apa adanya. Menambah entri baru di sini
+  membuat entri itu menjadi yang paling kanan, dan kita kembali ke satu bucket.
+
+Jalur `/kontak` membaca entri paling KIRI di Next.js, jadi tanpa penyetelan di tepi
+ia membaca angka yang ditentukan pengirim.
+
+### Jebakan: `ir.config_parameter` tidak terbaca worker sampai restart
+
+Mengubah parameter lewat SQL mentah melewati ormcache `get_param` seluruhnya.
+Bahkan `set_param` dari `odoo shell` telanjang tidak sampai ke worker yang sedang
+berjalan — terukur: batas ukuran payload diturunkan ke 512 byte dan payload 5 KB
+tetap diterima dua kali, sampai container di-restart. Ubah parameter lewat UI Odoo,
+atau restart setelahnya.
+
+### Jebakan: batas ukuran yang tidak pernah bisa menyala
+
+`DEFAULT_MAX_PAYLOAD_BYTES` semula 64 KB, sementara jumlah seluruh batas kolom di
+daftar-putih hanya ~5,6 KB. Batas itu tidak akan pernah tercapai oleh payload apa
+pun yang lolos penyaringan — penjagaan yang ada di kode tetapi tidak menguji apa
+pun. Sekarang 8 KB, dan `test_size_cap_is_reachable` menjaga hubungan itu tetap
+benar kalau daftar-putihnya tumbuh.

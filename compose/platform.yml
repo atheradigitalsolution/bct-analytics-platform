@@ -362,9 +362,12 @@ services:
       # hour, so a Caddy that starts early spends that budget and is locked out
       # at the moment DNS becomes correct.
       ATHERA_TLS: ${ATHERA_TLS:-internal}
-      # The public site proxies /onboarding/* into Odoo, which needs a Host
-      # whose first label is a real database.
-      ODOO_DB_NAME: ${ODOO_DB_NAME:-bct}
+      # NO ODOO_DB_NAME HERE, DELIBERATELY. The public site proxies /onboarding/*
+      # into Odoo and needs a Host whose first label is a real database - but the
+      # right database is the control plane above, not the default tenant. Passing
+      # ODOO_DB_NAME in would put a working default within reach of anyone editing
+      # the Caddyfile, and the last time that value was reachable it sent every
+      # public lead into a client's database.
       TZ: ${TZ:-UTC}
     cap_add:
       # Caddy binds 80 and 443 INSIDE the container. Both are below 1024, and

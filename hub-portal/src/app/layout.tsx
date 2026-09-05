@@ -24,6 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link className="brand" href="/">ATHERA · Super Admin</Link>
             <nav>
               <Link href="/">Klien</Link>
+              {/* Kiriman formulir publik. Ditautkan sejak halamannya lahir, dengan
+                  alasan yang sama seperti /pricing di bawah: fitur yang hanya bisa
+                  dicapai dengan mengetik URL bukan fitur. */}
+              <Link href="/leads">Kiriman</Link>
               <Link href="/cms">Konten</Link>
               <Link href="/billing">Penagihan</Link>
               {/* Editor harga. Ia sudah berfungsi penuh sejak dibangun tetapi tidak ditautkan
