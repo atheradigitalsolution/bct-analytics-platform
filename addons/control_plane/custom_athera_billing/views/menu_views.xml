@@ -10,4 +10,10 @@
        payment_claim_views.xml dimuat lebih dulu. -->
   <menuitem id="menu_athera_payment_claim" name="Klaim pembayaran"
             parent="menu_athera_billing_root" action="action_athera_payment_claim" sequence="20"/>
+  <!-- Ringkasan diletakkan TERAKHIR dalam urutan, bukan pertama: yang dikerjakan
+       operator setiap hari adalah langganan dan klaim, sedangkan ringkasan adalah
+       tempat ia memeriksa akibatnya. Modelnya sudah ada berbulan-bulan lengkap
+       dengan ACL-nya; yang tidak pernah ada hanyalah baris ini. -->
+  <menuitem id="menu_athera_billing_overview" name="Ringkasan"
+            parent="menu_athera_billing_root" action="action_athera_billing_overview" sequence="30"/>
 </odoo>

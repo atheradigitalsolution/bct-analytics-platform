@@ -1,6 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
 
+    <!-- BOTH CRONS BELOW ARE INACTIVE, AND THAT IS THE FIX, NOT A REGRESSION.
+         Each one called an orchestrator route that cannot do the work:
+         `_cron_scheduled_backup` POSTs to a route that answers 501 by design,
+         and `_cron_enforce_retention` POSTed to a route that did not exist at
+         all and returned 404. They ran every 15 minutes and every day
+         respectively, failing every time into a WARNING nobody reads, and the
+         console showed no backups either way.
+
+         Backups are real; they run from `scripts/tenant-backup.sh` on the host,
+         which is the only place with pg_dump and the filestore. That script now
+         records each backup in `tenant_registry.backups`, so the mirror and the
+         console list genuine rows — see `ir_cron_sync_backups` in
+         ir_cron_sync.xml, which is ACTIVE because reading is something this side
+         can actually do.
+
+         DISABLED RATHER THAN DELETED, deliberately. A deleted cron is a cron the
+         next person writes again from scratch, without this note. When backup
+         execution moves inside Odoo — where the filestore already is, the same
+         way provisioning went — flip `active` and delete this comment.
+         `noupdate="1"` means the flag survives module upgrades, so re-enabling
+         it is a decision someone makes once and keeps. -->
+
     <record id="ir_cron_scheduled_backup" model="ir.cron">
         <field name="name">Tenant: Scheduled Backups</field>
         <field name="model_id" ref="model_tenant_backup"/>
@@ -8,7 +30,7 @@
         <field name="code">model._cron_scheduled_backup()</field>
         <field name="interval_number">15</field>
         <field name="interval_type">minutes</field>
-        <field name="active" eval="True"/>
+        <field name="active" eval="False"/>
     </record>
 
     <record id="ir_cron_enforce_retention" model="ir.cron">
@@ -18,7 +40,7 @@
         <field name="code">model._cron_enforce_retention()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="active" eval="True"/>
+        <field name="active" eval="False"/>
     </record>
 
 </odoo>

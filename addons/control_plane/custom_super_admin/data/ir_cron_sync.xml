@@ -16,4 +16,45 @@
         <field name="active" eval="True"/>
     </record>
 
+    <!-- THE MIRROR HAD NO SCHEDULE AT ALL, AND IT SHOWED.
+         `tenant.action.log._cron_sync` was written, tested by hand once, and
+         never given an ir.cron. Measured on 2026-09-05: the source
+         `tenant_registry.action_log` held 19 rows, the mirror held 4, and the
+         newest mirrored row was two days old. Everything billing had ever done
+         and every `provision` row was missing. The super-admin console reads the
+         mirror, so the console was not showing a delayed history — it was
+         showing a wrong one, with no sign that anything was absent.
+
+         Fifteen minutes matches the registry sync above. The mirror is monotonic
+         (`id > max(master_id)`), so a run that finds nothing new costs one
+         indexed query, and a run that finds a hundred rows costs one insert
+         each — there is no reason to space it further apart. -->
+    <record id="ir_cron_sync_action_log" model="ir.cron">
+        <field name="name">Tenant: Sync Action Log Mirror</field>
+        <field name="model_id" ref="model_tenant_action_log"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_sync()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <!-- Same omission, same model family. `tenant.backup._cron_sync_all` mirrors
+         `tenant_registry.backups` per tenant.
+
+         ONE HOUR, NOT FIFTEEN MINUTES, and deliberately: this one issues an HTTP
+         call to the orchestrator PER TENANT, so its cost grows with the client
+         list while the action-log sync stays a single query no matter how many
+         tenants exist. Backups are also a daily-scale event; a mirror an hour
+         behind a nightly backup is not behind in any way a human notices. -->
+    <record id="ir_cron_sync_backups" model="ir.cron">
+        <field name="name">Tenant: Sync Backup Mirror</field>
+        <field name="model_id" ref="model_tenant_backup"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_sync_all()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
 </odoo>

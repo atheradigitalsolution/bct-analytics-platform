@@ -17,6 +17,10 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+#: A slug the fake registry does not know, so a handler's not-found branch can
+#: be reached without inventing a second fixture.
+MISSING_SLUG = "no_such_tenant"
+
 #: Long enough and unremarkable enough to satisfy settings_from_env, which
 #: refuses to start on a short or placeholder secret.
 # The `example-` prefix is not decoration: scripts/scan-secrets.py exempts values
@@ -37,6 +41,9 @@ class FakeRegistry:
         self.log_calls: list[tuple[tuple, dict]] = []
         self.states: list[tuple[str, str]] = []
         self.created: list[dict] = []
+        self.extended: list[tuple[str, int]] = []
+        #: Lets a test say "this tenant is suspended" without a database.
+        self.state_for: dict[str, str] = {}
         self.create_error: Exception | None = None
 
     # --- reads ---
@@ -62,6 +69,23 @@ class FakeRegistry:
     def set_state(self, slug: str, state: str, stamp=None) -> dict:
         self.states.append((slug, state))
         return {"id": 1, "slug": slug, "state": state}
+
+    def extend_validity(self, slug: str, days: int) -> dict:
+        if slug == MISSING_SLUG:
+            # THE REAL CLASS, not a look-alike. The handler catches
+            # app.registry.TenantNotFound by identity; a same-named exception
+            # declared here would sail straight past that except clause and the
+            # test would prove the opposite of what it claims. Imported inside
+            # the method so collection still does not touch app.registry.
+            from app.registry import TenantNotFound as _RealTenantNotFound
+
+            raise _RealTenantNotFound(slug)
+        self.extended.append((slug, days))
+        # The real query returns the row AFTER the update; the state is echoed
+        # unchanged on purpose, because a manual extension must not resume a
+        # suspended tenant and the test asserts exactly that.
+        return {"id": 1, "slug": slug, "state": self.state_for.get(slug, "active"),
+                "valid_until": "2026-12-31T00:00:00+00:00"}
 
     def log_action(self, *args, **kwargs) -> None:
         self.log_calls.append((args, kwargs))
@@ -127,6 +151,17 @@ def signed_post(client, path: str, body: dict | None = None):
     than mocked away so the middleware stays in the path being tested.
     """
     raw = b"" if body is None else json.dumps(body).encode()
+    return signed_post_raw(client, path, raw)
+
+
+def signed_post_raw(client, path: str, raw: bytes):
+    """Same signature, arbitrary bytes.
+
+    Exists so a test can send a body that is NOT valid JSON. Going through
+    `signed_post` would serialise it first, which is precisely the case that
+    cannot be reached that way -- and the case where the old hand-rolled parser
+    silently produced an empty dict.
+    """
     ts = str(int(time.time()))
     mac = hmac.new(SECRET.encode(), ts.encode() + b"." + raw, hashlib.sha256).hexdigest()
     return client.post(

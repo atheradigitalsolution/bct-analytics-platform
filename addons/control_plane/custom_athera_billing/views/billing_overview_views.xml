@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!--
+    Ringkasan penagihan — SATU tampilan, dan ia baca-saja.
+
+    Modelnya (`athera.billing.overview`) dan ACL-nya sudah ada sejak modul ini
+    lahir; yang tidak pernah ada adalah view, aksi, dan menunya, dan berkas ini
+    tidak terdaftar di `__manifest__.py`. Akibatnya persis: satu-satunya cara
+    melihatnya adalah lewat view Postgres `billing.subscription_overview` dari
+    hub-portal. Operator yang duduk di konsol Odoo — tempat ia menerbitkan faktur
+    dan mencatat pembayaran — tidak bisa melihat akibat perbuatannya sendiri.
+
+    `create="false" edit="false" delete="false"` bukan kehati-hatian berlebih:
+    modelnya `_auto = False`, sebuah VIEW Postgres. Tombol simpan pada view yang
+    tidak punya tabel gagal dengan galat yang tidak menjelaskan apa pun.
+  -->
+  <record id="view_athera_billing_overview_list" model="ir.ui.view">
+    <field name="name">athera.billing.overview.list</field>
+    <field name="model">athera.billing.overview</field>
+    <field name="arch" type="xml">
+      <list create="false" edit="false" delete="false"
+            decoration-danger="open_invoice_count &gt; 0"
+            decoration-muted="subscription_state == 'cancelled'">
+        <field name="tenant_slug"/>
+        <field name="display_name" string="Nama tampilan"/>
+        <field name="plan_code"/>
+        <field name="subscription_state" string="Langganan" widget="badge"
+               decoration-success="subscription_state == 'active'"
+               decoration-danger="subscription_state == 'suspended'"/>
+        <field name="tenant_state" string="Tenant" widget="badge"
+               decoration-success="tenant_state == 'active'"
+               decoration-danger="tenant_state == 'suspended'"/>
+        <field name="invoice_count" string="Faktur"/>
+        <field name="open_invoice_count" string="Terbuka"/>
+        <field name="outstanding" string="Belum dibayar" widget="monetary"/>
+        <field name="currency" string="Mata uang" optional="hide"/>
+        <field name="oldest_due_date" string="Tertua jatuh tempo"/>
+        <field name="next_invoice_date" string="Faktur berikutnya"/>
+        <field name="valid_until" string="Akses sampai"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_athera_billing_overview_search" model="ir.ui.view">
+    <field name="name">athera.billing.overview.search</field>
+    <field name="model">athera.billing.overview</field>
+    <field name="arch" type="xml">
+      <search>
+        <field name="tenant_slug"/>
+        <field name="plan_code"/>
+        <!-- Filter pertama adalah pertanyaan yang paling sering diajukan orang
+             yang membuka halaman ini: siapa yang belum membayar. -->
+        <filter name="filter_arrears" string="Punya tagihan terbuka" domain="[('open_invoice_count', '&gt;', 0)]"/>
+        <filter name="filter_suspended" string="Tenant ditangguhkan" domain="[('tenant_state', '=', 'suspended')]"/>
+        <filter name="filter_active_sub" string="Langganan aktif" domain="[('subscription_state', '=', 'active')]"/>
+        <group>
+          <filter name="group_plan" string="Paket" domain="" context="{'group_by': 'plan_code'}"/>
+          <filter name="group_sub_state" string="Status langganan" domain="" context="{'group_by': 'subscription_state'}"/>
+          <filter name="group_tenant_state" string="Status tenant" domain="" context="{'group_by': 'tenant_state'}"/>
+        </group>
+      </search>
+    </field>
+  </record>
+
+  <record id="action_athera_billing_overview" model="ir.actions.act_window">
+    <field name="name">Ringkasan penagihan</field>
+    <field name="res_model">athera.billing.overview</field>
+    <field name="view_mode">list</field>
+    <field name="search_view_id" ref="view_athera_billing_overview_search"/>
+    <field name="context">{'search_default_filter_arrears': 1}</field>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">Belum ada langganan untuk diringkas.</p>
+      <p>
+        Halaman ini adalah view Postgres di atas langganan, tenant, paket, dan faktur.
+        Ia baca-saja: perbuatannya ada di <b>Langganan</b> dan di faktur itu sendiri.
+      </p>
+    </field>
+  </record>
+</odoo>

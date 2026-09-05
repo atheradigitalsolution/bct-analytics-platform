@@ -18,7 +18,7 @@ class TenantRestoreWizard(models.TransientModel):
         domain="[('tenant_id', '=', tenant_id), ('outcome', '=', 'success')]",
         required=True,
     )
-    s3_key = fields.Char(related="backup_id.s3_key", readonly=True)
+    path = fields.Char(related="backup_id.path", readonly=True, string="Lokasi")
     target_db = fields.Char(
         help="Target DB name. Defaults to '<slug>_staging' which is safe (non-destructive against live tenant).",
     )
@@ -35,6 +35,40 @@ class TenantRestoreWizard(models.TransientModel):
                 rec.target_db = f"{rec.tenant_id.slug}_staging"
 
     def action_restore(self):
+        """Refuses here, on the form, instead of after a round trip.
+
+        THIS BUTTON CALLED A ROUTE THAT DID NOT EXIST. `restore_backup` POSTs to
+        `/v1/tenants/<slug>/backups/restore`, and the orchestrator had no such
+        route: the call came back 404 and the operator was shown "Restore
+        failed: Orchestrator POST ... 404", which reads like an outage and sends
+        the next hour into a routing investigation.
+
+        The route now answers 501 and names the host script, which is honest --
+        but making the operator sign an HTTP request to be told the feature does
+        not exist is still the wrong shape. The refusal belongs where the button
+        is, before anything is sent, with the command that actually works.
+
+        Restore is deliberately not an unattended HTTP operation in any case: it
+        replaces a live database, and it needs the dump, the filestore and the
+        SHA256SUMS, all of which live on the host and none of which this service
+        can see. Delete this guard when restore genuinely runs from here.
+        """
+        self.ensure_one()
+        raise UserError(_(
+            "Restore does not run from the console.\n\n"
+            "It needs the dump, the filestore and the SHA256SUMS, which are on "
+            "the host; and it replaces a live database, which is not something "
+            "to trigger from a form and walk away from.\n\n"
+            "Run on the host:\n"
+            "    scripts/tenant-restore.sh %(slug)s <backup-directory>\n\n"
+            "The backup directory is the one named in the console listing, and "
+            "the script verifies SHA256SUMS before it touches anything."
+        ) % {"slug": self.slug or "<slug>"})
+
+    def _action_restore_unreachable(self):
+        # Kept, unreferenced, so the shape of the call that WOULD be made is
+        # still visible to whoever wires this up for real. Deleting it would
+        # mean rediscovering the argument names from the client module.
         self.ensure_one()
         if not self.backup_id:
             raise UserError(_("Pick a backup to restore."))
@@ -48,7 +82,7 @@ class TenantRestoreWizard(models.TransientModel):
             )
         client = self.env["custom.super.admin.orchestrator.client"].sudo()
         try:
-            result = client.restore_backup(self.slug, s3_key=self.s3_key, target_db=target)
+            result = client.restore_backup(self.slug, s3_key=self.path, target_db=target)
         except Exception as e:
             raise UserError(_("Restore failed: %s") % e) from e
         return {

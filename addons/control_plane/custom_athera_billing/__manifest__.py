@@ -30,6 +30,11 @@ Kedua arah menulis tenant_registry.action_log dalam transaksi yang sama.
         "views/athera_subscription_views.xml",
         "views/account_move_views.xml",
         "views/payment_claim_views.xml",
+        # SEBELUM menu_views.xml. Odoo menyelesaikan rujukan xml_id saat memuat,
+        # jadi menuitem yang menunjuk aksi yang belum dimuat gagal dengan galat
+        # yang menyerupai salah ketik -- catatan yang sama sudah ada di
+        # menu_views.xml untuk klaim pembayaran, dan berlaku persis sama di sini.
+        "views/billing_overview_views.xml",
         "views/menu_views.xml",
     ],
     "installable": True,

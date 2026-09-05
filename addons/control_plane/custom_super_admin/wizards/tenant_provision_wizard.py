@@ -59,11 +59,46 @@ class TenantProvisionWizard(models.TransientModel):
         "subdomain (e.g. acme → acme.platform.localhost).",
     )
     display_name = fields.Char(required=True)
-    plan_tier = fields.Selection(
-        [("trial", "Trial"), ("standard", "Standard"), ("enterprise", "Enterprise")],
-        default="standard",
+    #: THE PLAN IS A REGISTRY CODE, NOT A TIER INVENTED HERE.
+    #:
+    #: This field used to be a Selection of `trial / standard / enterprise`, and
+    #: it was sent to the orchestrator under the key `plan_tier`. The orchestrator
+    #: reads `plan_code`, so the value was dropped on arrival and every tenant
+    #: provisioned from this wizard landed with `plan_code = NULL`. Measured
+    #: 2026-09-05: `tenant_registry.plans` holds `insight, odoo_care,
+    #: odoo_insight, suite, trial` -- only `trial` overlapped, and
+    #: `tenants.plan_code` carries a FOREIGN KEY to that table, so the other two
+    #: could never have been stored even if the key had matched.
+    #:
+    #: A tenant with a null plan has no price. `billing.subscription_overview`
+    #: joins plans on plan_code, so such a tenant is unbillable and shows an
+    #: empty price to whoever opens the console.
+    #:
+    #: The options are therefore READ FROM THE REGISTRY rather than declared, so
+    #: a plan added in hub-portal's pricing editor appears here without a code
+    #: change, and a tier that does not exist cannot be offered.
+    plan_code = fields.Selection(
+        selection="_selection_plan_code",
         required=True,
+        string="Paket",
     )
+
+    @api.model
+    def _selection_plan_code(self):
+        """Plans as they exist in the registry, or an empty list if invisible.
+
+        The registry schema lives in the control-plane database only. Guarding on
+        `information_schema` rather than catching an exception keeps a wizard
+        opened in a tenant database from filling the log with UndefinedTable, and
+        is the same guard `tenant.action.log._cron_sync` already uses.
+        """
+        self.env.cr.execute(
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = 'tenant_registry'"
+        )
+        if not self.env.cr.fetchone():
+            return []
+        self.env.cr.execute("SELECT code, COALESCE(name, code) FROM tenant_registry.plans ORDER BY code")
+        return [(row[0], row[1]) for row in self.env.cr.fetchall()]
     contact_email = fields.Char()
     contact_phone = fields.Char()
     csm_user_id = fields.Many2one("res.users", string="CSM", default=lambda self: self.env.user)
@@ -120,7 +155,7 @@ class TenantProvisionWizard(models.TransientModel):
         payload = {
             "slug": self.slug,
             "display_name": self.display_name,
-            "plan_tier": self.plan_tier,
+            "plan_code": self.plan_code,
             "contact_email": self.contact_email or None,
             "contact_phone": self.contact_phone or None,
             "csm_user_id": self.csm_user_id.id if self.csm_user_id else None,

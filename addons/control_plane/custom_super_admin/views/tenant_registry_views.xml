@@ -13,7 +13,7 @@
                 <field name="slug"/>
                 <field name="display_name"/>
                 <field name="state" widget="badge"/>
-                <field name="plan_tier"/>
+                <field name="plan_code"/>
                 <field name="contact_email"/>
                 <field name="csm_user_id"/>
                 <field name="last_backup_at"/>
@@ -30,7 +30,7 @@
                 <field name="slug"/>
                 <field name="display_name"/>
                 <field name="state"/>
-                <field name="plan_tier"/>
+                <field name="plan_code"/>
                 <field name="last_backup_at"/>
                 <field name="contact_email"/>
                 <templates>
@@ -44,7 +44,7 @@
                             </div>
                             <div>
                                 <span class="badge text-bg-info">
-                                    <field name="plan_tier"/>
+                                    <field name="plan_code"/>
                                 </span>
                             </div>
                         </div>
@@ -125,7 +125,7 @@
                     <group>
                         <group>
                             <field name="db_name"/>
-                            <field name="plan_tier"/>
+                            <field name="plan_code"/>
                             <field name="csm_user_id"/>
                             <field name="features" widget="json"/>
                         </group>
@@ -183,7 +183,7 @@
                 <filter name="failed" string="Failed" domain="[('state','=','failed')]"/>
                 <group>
                     <filter name="by_state" string="State" context="{'group_by': 'state'}"/>
-                    <filter name="by_plan" string="Plan" context="{'group_by': 'plan_tier'}"/>
+                    <filter name="by_plan" string="Plan" context="{'group_by': 'plan_code'}"/>
                     <filter name="by_csm" string="CSM" context="{'group_by': 'csm_user_id'}"/>
                 </group>
             </search>

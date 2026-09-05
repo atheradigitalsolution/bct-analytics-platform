@@ -22,7 +22,13 @@ import string
 import pytest
 
 from app.main import RESERVED_SLUGS, OdooError, _generate_admin_password
-from tests.conftest import DEFAULT_MODULES, signed_get, signed_post
+from tests.conftest import (
+    DEFAULT_MODULES,
+    MISSING_SLUG,
+    signed_get,
+    signed_post,
+    signed_post_raw,
+)
 
 VALID_SLUG = "tenant_alpha"
 
@@ -190,16 +196,30 @@ def test_modules_is_the_only_accepted_key(wiring):
 
 
 def test_install_modules_is_not_an_alias(wiring):
-    """Deliberate. An alias would absorb a caller's mistake instead of showing it.
+    """Still deliberate, and now stricter than it was.
 
-    A caller that sends `install_modules` gets the environment's default set,
-    which is wrong in a way the operator can see, rather than silently correct.
+    THE EXPECTATION HERE CHANGED ON PURPOSE, 2026-09-05. It used to assert that
+    `install_modules` was ignored and the tenant was built with the environment's
+    default set -- "wrong in a way the operator can see". That reasoning was
+    right about aliases and wrong about timing: the operator saw it only after a
+    tenant existed with the wrong modules installed, and had to infer the cause
+    from the module list.
+
+    The request body is a Pydantic model with `extra="forbid"`, so the same
+    mistake is now named in the reply and NOTHING IS CREATED. That is the same
+    principle arriving earlier, not a different one.
     """
     client, registry, odoo = wiring
-    signed_post(
+    resp = signed_post(
         client, "/v1/tenants", {"slug": VALID_SLUG, "install_modules": ["custom_x"]}
     )
-    assert odoo.calls[0]["modules"] == list(DEFAULT_MODULES)
+    assert resp.status_code == 400
+    assert "install_modules" in resp.json()["detail"]
+    # The refusal must come BEFORE anything is written. A registry row for a
+    # tenant whose provisioning call was rejected is the exact debris this
+    # ordering exists to avoid.
+    assert registry.created == []
+    assert odoo.calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -323,3 +343,192 @@ def test_the_leak_scan_can_actually_fail(wiring):
     registry.log_calls.clear()
     registry.log_action("s", "provision", needle, "success")
     assert needle in registry.audit_text(), "a leak through `actor` would be missed"
+
+
+# ---------------------------------------------------------------------------
+# A malformed body is a named refusal, not an empty one
+# ---------------------------------------------------------------------------
+
+def test_body_that_is_not_json_is_refused_by_name(wiring):
+    """The parser this replaces could not fail.
+
+    It read the raw body and returned `{}` on any decode error, so `POST
+    /v1/tenants` with a body of garbage reached the slug check as an ABSENT
+    slug -- a 400 that named the wrong problem and sent the reader looking at
+    the caller's slug logic instead of at the body.
+    """
+    client, registry, odoo = wiring
+    resp = signed_post_raw(client, "/v1/tenants", b"this is not json at all")
+    assert resp.status_code == 400
+    # Names the body, not a character offset. Pydantic's `loc` for a decode
+    # failure is ("body", 0), and rendering that verbatim produced
+    # "0: JSON decode error" -- an offset presented as though it were a field.
+    assert resp.json()["detail"] == "request body is not valid JSON"
+    assert registry.created == []
+    assert odoo.calls == []
+
+
+def test_body_that_is_a_json_list_is_refused(wiring):
+    """Valid JSON, wrong shape. The old parser turned this into `{}` as well."""
+    client, registry, odoo = wiring
+    resp = signed_post_raw(client, "/v1/tenants", b'["slug"]')
+    assert resp.status_code == 400
+    assert registry.created == []
+
+
+def test_validation_failure_keeps_the_services_error_shape(wiring):
+    """One error contract, whoever raised it.
+
+    FastAPI's own answer is 422 with `detail` as a LIST of dicts. Every other
+    refusal here is 400 with `detail` as a sentence, and the only consumer logs
+    `resp.text[:300]` for a human. Two shapes would mean the most common failure
+    reads the worst.
+    """
+    client, _registry, _odoo = wiring
+    resp = signed_post(client, "/v1/tenants", {"slug": "Bad Slug"})
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"
+    assert isinstance(resp.json()["detail"], str)
+    assert "replication slot" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# The fields that were arriving and being thrown away
+# ---------------------------------------------------------------------------
+
+def test_csm_features_and_backup_schedule_reach_the_registry(wiring):
+    """These three have columns, are sent on every wizard call, and were dropped.
+
+    The INSERT did not name them and the hand-rolled parser did not read them,
+    so a tenant created from the console had no CSM, no backup schedule and no
+    feature flags -- with nothing anywhere reporting the loss.
+    """
+    client, registry, _odoo = wiring
+    signed_post(client, "/v1/tenants", {
+        "slug": VALID_SLUG,
+        "csm_user_id": 7,
+        "features": {"pajakku": True, "marketplace": False},
+        "backup_schedule_cron": "0 2 * * *",
+    })
+    created = registry.created[0]
+    assert created["csm_user_id"] == 7
+    assert created["backup_schedule_cron"] == "0 2 * * *"
+    # Serialised for a jsonb column, so the assertion reads the value back.
+    assert json.loads(created["features"]) == {"pajakku": True, "marketplace": False}
+
+
+# ---------------------------------------------------------------------------
+# extend: the grant that had no button
+# ---------------------------------------------------------------------------
+
+def test_extend_without_a_reason_is_refused(wiring):
+    """`reason` is the whole design.
+
+    Extending access without payment is legitimate, and it is exactly the action
+    someone will need explained six months from now. The only person who can
+    explain it is the one clicking the button.
+    """
+    client, registry, _odoo = wiring
+    resp = signed_post(client, f"/v1/tenants/{VALID_SLUG}/extend", {"days": 30})
+    assert resp.status_code == 400
+    assert "reason" in resp.json()["detail"]
+    assert registry.extended == []
+
+
+def test_extend_with_a_token_reason_is_refused(wiring):
+    """"ok" is not a reason. A field nobody can read later is decoration."""
+    client, registry, _odoo = wiring
+    resp = signed_post(
+        client, f"/v1/tenants/{VALID_SLUG}/extend", {"days": 30, "reason": "ok"}
+    )
+    assert resp.status_code == 400
+    assert registry.extended == []
+
+
+def test_extend_beyond_the_ceiling_is_refused(wiring):
+    """A slipped keystroke on a field measured in days must not grant a decade."""
+    from app.main import MAX_EXTEND_DAYS
+
+    client, registry, _odoo = wiring
+    resp = signed_post(client, f"/v1/tenants/{VALID_SLUG}/extend", {
+        "days": MAX_EXTEND_DAYS + 1, "reason": "annual contract renewal 2027",
+    })
+    assert resp.status_code == 400
+    assert registry.extended == []
+
+
+def test_extend_of_zero_or_negative_days_is_refused(wiring):
+    client, registry, _odoo = wiring
+    for days in (0, -30):
+        resp = signed_post(client, f"/v1/tenants/{VALID_SLUG}/extend", {
+            "days": days, "reason": "should never be applied",
+        })
+        assert resp.status_code == 400
+    assert registry.extended == []
+
+
+def test_extend_applies_and_is_written_to_the_audit_log(wiring):
+    client, registry, _odoo = wiring
+    resp = signed_post(client, f"/v1/tenants/{VALID_SLUG}/extend", {
+        "days": 30, "reason": "pilot extended by agreement, see ticket 412",
+    })
+    assert resp.status_code == 200
+    assert registry.extended == [(VALID_SLUG, 30)]
+    audit = registry.audit_text()
+    assert "extend" in audit
+    assert "ticket 412" in audit
+
+
+def test_extend_does_not_resume_a_suspended_tenant(wiring):
+    """Suspension has its own reason and its own button.
+
+    Payment-driven extension resumes a tenant because paying the invoice removes
+    the reason for the suspension. A manual grant carries no such proof, and one
+    click must not forgive two different things.
+    """
+    client, registry, _odoo = wiring
+    registry.state_for[VALID_SLUG] = "suspended"
+    resp = signed_post(client, f"/v1/tenants/{VALID_SLUG}/extend", {
+        "days": 14, "reason": "invoice under dispute, access continues meanwhile",
+    })
+    assert resp.status_code == 200
+    assert resp.json()["state"] == "suspended"
+    assert registry.states == []
+
+
+def test_extend_of_an_unknown_tenant_is_404(wiring):
+    client, registry, _odoo = wiring
+    resp = signed_post(client, f"/v1/tenants/{MISSING_SLUG}/extend", {
+        "days": 30, "reason": "this tenant does not exist",
+    })
+    assert resp.status_code == 404
+    assert registry.extended == []
+
+
+# ---------------------------------------------------------------------------
+# Backups: four write paths, one refusal, no 404s
+# ---------------------------------------------------------------------------
+
+BACKUP_WRITE_PATHS = (
+    "/v1/tenants/acme/backups",
+    "/v1/tenants/acme/backups/restore",
+    "/v1/backups/1/replicate",
+    "/v1/backups/enforce-retention",
+)
+
+
+@pytest.mark.parametrize("path", BACKUP_WRITE_PATHS)
+def test_backup_write_paths_answer_501_not_404(wiring, path):
+    """Three of these had no route at all, and custom_super_admin calls all four.
+
+    A 404 tells the caller it typed the URL wrong and sends whoever reads the
+    log hunting for a routing bug. 501 with a body naming the real path answers
+    the question instead.
+    """
+    client, _registry, _odoo = wiring
+    resp = signed_post(client, path, {})
+    assert resp.status_code == 501, f"{path} answered {resp.status_code}"
+    payload = resp.json()
+    assert payload["error"] == "not_implemented"
+    assert payload["implemented_by"] == "scripts/tenant-backup.sh (host)"
+    assert "host" in payload["detail"]

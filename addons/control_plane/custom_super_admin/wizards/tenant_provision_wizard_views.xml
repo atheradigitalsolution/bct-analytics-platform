@@ -15,7 +15,7 @@
                         <group string="Identity">
                             <field name="slug" placeholder="acme"/>
                             <field name="display_name" placeholder="Acme Corporation"/>
-                            <field name="plan_tier"/>
+                            <field name="plan_code"/>
                             <field name="csm_user_id"/>
                         </group>
                         <group string="Contact">

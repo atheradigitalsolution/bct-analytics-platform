@@ -72,7 +72,7 @@ log "backing up tenant '$SLUG' -> $DEST"
 # --no-owner / --no-acl: privileges are re-applied from
 # scripts/lib/database-baseline.sql on restore, so the dump never carries a
 # stale grant for a role that may have been renamed or rotated.
-log "[1/4] pg_dump (custom format)"
+log "[1/5] pg_dump (custom format)"
 dc exec -T postgres pg_dump \
     -U "$POSTGRES_USER" -d "$DB" \
     --format=custom --compress=9 --no-owner --no-acl \
@@ -85,7 +85,7 @@ dc exec -T postgres pg_dump \
 # large filestore cannot fill the container's writable layer.
 # `|| true` on the tar is deliberate for the empty case only — a brand new
 # database has no filestore directory at all, and that is not an error.
-log "[2/4] filestore tar"
+log "[2/5] filestore tar"
 if dc exec -T odoo test -d "/var/lib/odoo/filestore/$DB" 2>/dev/null; then
     dc exec -T odoo tar -C /var/lib/odoo/filestore -czf - "$DB" > "$DEST/filestore.tar.gz"
     [ -s "$DEST/filestore.tar.gz" ] || die "filestore tar produced an empty file."
@@ -97,7 +97,7 @@ fi
 # --- 3. manifest ------------------------------------------------------------
 # python3, not jq: jq is not installed on the target host and never will be a
 # dependency of this repository.
-log "[3/4] manifest"
+log "[3/5] manifest"
 python3 - "$DEST" "$SLUG" "$DB" "$STAMP" <<'PY'
 import hashlib, json, os, subprocess, sys
 
@@ -150,7 +150,7 @@ print(f"    manifest written; {total / 1024 / 1024:.1f} MiB total", file=sys.std
 PY
 
 # --- 4. prune ---------------------------------------------------------------
-log "[4/4] retention"
+log "[4/5] retention"
 if [ "${KEEP_DAYS:-0}" -gt 0 ] 2>/dev/null; then
     # -mindepth/-maxdepth 1 so this can only ever match this tenant's dated
     # directories, never the tenant directory itself and never anything above
@@ -167,5 +167,82 @@ else
     info "retention disabled (--keep-days 0)"
 fi
 
+# --- 5. record in the registry ----------------------------------------------
+# WITHOUT THIS STEP THE WHOLE BACKUP SURFACE IS A FACADE, and it was one.
+# `tenant_registry.backups` has existed since 40-tenant-registry.sql created it,
+# the orchestrator reads it, `tenant.backup` mirrors it, and the console lists
+# it -- and NOTHING IN THIS REPOSITORY HAS EVER WRITTEN A ROW TO IT. Measured
+# 2026-09-05: zero rows, no writer anywhere, and a grep for an INSERT finding
+# only the CREATE TABLE. Every read above that table was reading an emptiness
+# that no amount of running backups was ever going to fill.
+#
+# The backup on disk is the valuable artefact and it already exists by the time
+# we get here, so a registry failure must not delete it. But it must not be
+# swallowed either: a backup the console cannot see is, from the console's point
+# of view, a backup that did not happen -- which is precisely the state this step
+# exists to end. So the files stay, and the script exits 3 saying exactly that.
+log "[5/5] registry"
+# THROUGH `dc exec postgres psql`, THE SAME WAY EVERY OTHER STEP HERE TALKS TO
+# THE DATABASE. The first version of this step used python3 + psycopg2 against
+# ORCHESTRATOR_REGISTRY_DSN, and neither half was available: psycopg2 is not
+# installed on the host, and that DSN names `host=postgres`, a Docker network
+# alias the host cannot resolve. It would have exited 3 on every run on the very
+# machine it was written for.
+#
+# The row goes into the CONTROL-PLANE database, not the tenant's. That is where
+# tenant_registry lives.
+#
+# Values are passed as psql variables and interpolated with :'name', so psql
+# does the quoting. The slug reaches this script from the command line.
+RECORD_RC=0
+_ADMIN_DB="${ATHERA_ADMIN_DB:-athera_admin}"
+_TOTAL_BYTES="$(python3 - "$DEST" <<'SIZEPY'
+import json, sys
+m = json.load(open(sys.argv[1] + "/manifest.json", encoding="utf-8"))
+print(sum(f["bytes"] for f in m["files"].values()))
+SIZEPY
+)"
+# The DATABASE dump's sum, not a combined one. A restore cannot proceed without
+# that half, and the filestore's own sum stays in SHA256SUMS beside it rather
+# than being averaged into a number that verifies nothing.
+_DB_SHA="$(awk '$2 == "database.dump" { print $1 }' "$DEST/SHA256SUMS")"
+
+# THE SQL ARRIVES ON STDIN, NOT VIA -c. psql performs :'variable' interpolation
+# in its own lexer, and a string handed to -c is passed to the server without
+# going through it -- measured here as `syntax error at or near ":"`, with the
+# backup already on disk and the operator correctly told the row was not written.
+# Reading from stdin puts the lexer back in the path.
+_SQL=$(cat <<'SQL'
+INSERT INTO tenant_registry.backups
+    (tenant_id, tenant_slug, kind, started_at, finished_at,
+     size_bytes, path, checksum_sha256, outcome)
+SELECT t.id, t.slug, 'manual',
+       to_timestamp(:'stamp', 'YYYYMMDD"T"HH24MISS"Z"'), now(),
+       :'total'::bigint, :'path', :'sha', 'success'
+  FROM tenant_registry.tenants t
+ WHERE t.slug = :'slug'
+RETURNING id;
+SQL
+)
+
+if _ROW_ID="$(printf '%s\n' "$_SQL" | dc exec -T postgres psql \
+        -U "$POSTGRES_USER" -d "$_ADMIN_DB" -tAq -v ON_ERROR_STOP=1 \
+        -v slug="$SLUG" -v stamp="$STAMP" -v path="$DEST" \
+        -v total="${_TOTAL_BYTES:-0}" -v sha="${_DB_SHA:-}" 2>&1)" \
+        && [ -n "$_ROW_ID" ]; then
+    info "recorded in tenant_registry.backups as row $_ROW_ID"
+else
+    warn "registry insert did not return a row id: ${_ROW_ID:-<no output>}"
+    RECORD_RC=3
+fi
+
 log "backup complete: $DEST"
 ls -la "$DEST" >&2
+
+if [ "$RECORD_RC" -ne 0 ]; then
+    warn "The backup IS on disk at $DEST and is complete."
+    warn "It was NOT recorded in tenant_registry.backups, so the super-admin"
+    warn "console will not list it. Fix the registry connection and re-run, or"
+    warn "record it by hand; do not delete this directory."
+    exit 3
+fi

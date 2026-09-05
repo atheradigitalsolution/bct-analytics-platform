@@ -1,6 +1,11 @@
+import Link from "next/link";
+
 import { listBilling } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
+
+/** See the note on the same constant in tenants/[slug]/page.tsx. */
+const ODOO_DOOR = process.env.HUB_PORTAL_ODOO_DOOR_URL ?? "";
 
 /**
  * Kolom `date` Postgres tidak membawa zona waktu, tetapi driver mengembalikannya sebagai `Date`
@@ -58,6 +63,19 @@ export default async function BillingPage() {
       <p className="lede">
         Halaman ini <strong>baca-saja</strong>. Menerbitkan faktur, mencatat pembayaran, dan
         menangguhkan klien dilakukan di konsol Odoo, tempat jurnal, pajak, dan jejak auditnya hidup.
+        {ODOO_DOOR ? (
+          <>
+            {" "}
+            {/* Halaman ini menampilkan langganan berbulan-bulan tanpa satu pun tautan
+                menuju tempat ia bisa disunting, jadi "ada di konsol Odoo" adalah kalimat
+                yang benar dan tidak berguna. Fitur yang hanya bisa dicapai oleh orang
+                yang sudah tahu jalannya bukan fitur — alasan yang sama dipakai untuk
+                menautkan /pricing dari nav. */}
+            <a href={ODOO_DOOR} rel="noopener noreferrer">Buka konsol Odoo</a> lalu{" "}
+            <code>ATHERA Billing → Langganan</code> untuk membuat atau mengubah, dan{" "}
+            <code>ATHERA Billing → Ringkasan</code> untuk tampilan yang sama dengan halaman ini.
+          </>
+        ) : null}
       </p>
       <table>
         <thead>
@@ -79,7 +97,10 @@ export default async function BillingPage() {
             return (
               <tr key={r.tenant_slug}>
                 <td>
-                  <strong>{r.tenant_slug}</strong>
+                  {/* Ke halaman tenant, tempat tombol perpanjang akses berada. Dari
+                      daftar tagihan menuju satu-satunya perbuatan yang bisa dilakukan
+                      di portal ini adalah lompatan yang paling sering dibutuhkan. */}
+                  <Link href={`/tenants/${r.tenant_slug}`}><strong>{r.tenant_slug}</strong></Link>
                   {r.display_name ? <div className="lede">{r.display_name}</div> : null}
                 </td>
                 <td>{r.plan_code ?? "—"}</td>

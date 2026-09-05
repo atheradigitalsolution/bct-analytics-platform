@@ -11,7 +11,7 @@
                         <field name="tenant_id" readonly="1"/>
                         <field name="slug" readonly="1"/>
                         <field name="backup_id"/>
-                        <field name="s3_key" readonly="1"/>
+                        <field name="path" readonly="1"/>
                         <field name="target_db"/>
                         <field name="confirm_destructive"
                                invisible="target_db != tenant_id.db_name"/>

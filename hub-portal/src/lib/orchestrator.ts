@@ -43,6 +43,15 @@ export interface Tenant {
   entitlement?: { active: boolean; products: string[] };
 }
 
+/**
+ * Mirrors MAX_EXTEND_DAYS in the orchestrator, which is the limit that actually
+ * binds — this copy only shapes the form. Kept here rather than in the page or
+ * the route handler so there is ONE mirror to keep in step, not two: a route
+ * file cannot export it (Next.js types forbid non-handler exports), and two
+ * literals in two files is how a ceiling drifts.
+ */
+export const MAX_EXTEND_DAYS = 400;
+
 export async function call<T>(
   method: string,
   path: string,

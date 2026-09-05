@@ -85,6 +85,26 @@ class TenantReplicateWizard(models.TransientModel):
         return self.backup_id
 
     def action_replicate(self):
+        """Same refusal as restore, for the same reason.
+
+        `replicate_backup` POSTs to `/v1/backups/<id>/replicate`, a route that
+        did not exist and answered 404. Replication IS a restore into a different
+        database, so it needs everything restore needs and can no more run from
+        here than restore can.
+        """
+        self.ensure_one()
+        raise UserError(_(
+            "Replicating a backup into another tenant does not run from the "
+            "console.\n\n"
+            "It is a restore into a different database, so it needs the dump and "
+            "the filestore on the host.\n\n"
+            "Run on the host:\n"
+            "    scripts/tenant-restore.sh %(target)s <backup-directory>\n\n"
+            "against the target tenant's database."
+        ) % {"target": (self.target_tenant_id.slug if self.target_tenant_id else "<target-slug>")})
+
+    def _action_replicate_unreachable(self):
+        # See the note on tenant.restore.wizard._action_restore_unreachable.
         self.ensure_one()
         backup = self._resolve_backup()
         client = self.env["custom.super.admin.orchestrator.client"].sudo()
@@ -104,7 +124,7 @@ class TenantReplicateWizard(models.TransientModel):
                 "title": _("Replication complete"),
                 "message": _("Restored backup %s into '%s' (%s env).")
                 % (
-                    backup.s3_key or backup.master_id,
+                    backup.path or backup.master_id,
                     (result or {}).get("restored_to_db") or self.target_tenant_id.slug,
                     self.target_env_type,
                 ),

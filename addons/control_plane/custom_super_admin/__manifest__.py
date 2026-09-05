@@ -31,7 +31,7 @@ the ORM otherwise — the source of truth is the master DB registry.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/Operations",
-    "version": "19.0.0.2.0",
+    "version": "19.0.0.3.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "mail"],
     "capability_tags": ["multi-tenant", "audit-trail", "approval-workflow"],

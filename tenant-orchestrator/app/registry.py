@@ -89,18 +89,60 @@ class Registry:
 
     # --- writes --------------------------------------------------------
     def create_tenant(self, payload: dict) -> dict:
+        """Insert the registry row.
+
+        THE COLUMN LIST HERE IS A CONTRACT, and it was three columns short.
+        `csm_user_id`, `features` and `backup_schedule_cron` exist on this table
+        and are sent by the provisioning wizard on every call; the INSERT did not
+        name them, so every tenant created from the console arrived with no CSM
+        assigned, no backup schedule and no feature flags -- and nothing reported
+        it, because dropping a key silently is exactly what a hand-rolled body
+        parser does. The API layer now refuses unknown keys outright, which is
+        what keeps this list and that model honest with each other.
+        """
         with self._cursor() as cur:
             cur.execute(
                 "INSERT INTO tenant_registry.tenants "
                 "(slug, display_name, db_name, state, plan_code, valid_until, "
-                " insight_source_kind, contact_email, contact_phone, notes) "
+                " insight_source_kind, contact_email, contact_phone, "
+                " csm_user_id, features, backup_schedule_cron, notes) "
                 "VALUES (%(slug)s, %(display_name)s, %(db_name)s, 'provisioning', "
                 "        %(plan_code)s, %(valid_until)s, %(insight_source_kind)s, "
-                "        %(contact_email)s, %(contact_phone)s, %(notes)s) "
+                "        %(contact_email)s, %(contact_phone)s, "
+                "        %(csm_user_id)s, %(features)s, %(backup_schedule_cron)s, "
+                "        %(notes)s) "
                 f"RETURNING {TENANT_COLUMNS}",  # noqa: S608
                 payload,
             )
             return dict(cur.fetchone())
+
+    def extend_validity(self, slug: str, days: int) -> dict:
+        """Push `valid_until` forward by `days`, and never backward.
+
+        GREATEST, and from the LATER of now and the current expiry. A tenant
+        whose access lapsed a month ago must not receive thirty days counted from
+        that lapsed date -- that would hand back an extension that has already
+        expired, and the operator would have no way to tell from the response
+        that nothing happened.
+
+        A SUSPENDED TENANT STAYS SUSPENDED. Payment-driven extension resumes a
+        tenant because paying the invoice removes the reason for the suspension;
+        a manual grant carries no such proof. Suspension has its own reason and
+        its own button, and one click must not forgive two different things.
+        """
+        with self._cursor() as cur:
+            cur.execute(
+                "UPDATE tenant_registry.tenants "
+                "   SET valid_until = GREATEST(COALESCE(valid_until, now()), now()) "
+                "                     + (%s || ' days')::interval "
+                " WHERE slug = %s "
+                f"RETURNING {TENANT_COLUMNS}",  # noqa: S608
+                (days, slug),
+            )
+            row = cur.fetchone()
+        if row is None:
+            raise TenantNotFound(slug)
+        return dict(row)
 
     def set_state(self, slug: str, state: str, stamp_column: str | None = None) -> dict:
         """Move a tenant's lifecycle state, stamping the matching timestamp.

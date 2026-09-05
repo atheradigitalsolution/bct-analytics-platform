@@ -36,7 +36,18 @@ class TenantBackup(models.Model):
     finished_at = fields.Datetime()
     size_bytes = fields.Integer()
     size_human = fields.Char(compute="_compute_size_human")
-    s3_key = fields.Char()
+    #: `path`, matching the registry column and the orchestrator's JSON.
+    #:
+    #: It was `s3_key`, and the orchestrator has never returned a key by that
+    #: name -- `registry.list_backups` selects `path`. So `r.get("s3_key")` was
+    #: None on every sync, and `action_restore` -- which refuses when this field
+    #: is empty -- would have refused every backup that ever appeared here. The
+    #: table held zero rows, so nothing surfaced it.
+    #:
+    #: The old name also described an architecture that does not exist: there is
+    #: no S3 here. The value is a directory on the host, written by
+    #: scripts/tenant-backup.sh.
+    path = fields.Char(string="Lokasi")
     checksum_sha256 = fields.Char()
     outcome = fields.Selection(
         [("pending", "Pending"), ("success", "Success"), ("failure", "Failure")],
@@ -98,7 +109,7 @@ class TenantBackup(models.Model):
                 "started_at": self._to_dt(r["started_at"]),
                 "finished_at": self._to_dt(r.get("finished_at")),
                 "size_bytes": r.get("size_bytes") or 0,
-                "s3_key": r.get("s3_key"),
+                "path": r.get("path"),
                 "checksum_sha256": r.get("checksum_sha256"),
                 "outcome": r["outcome"],
                 "error": r.get("error"),
@@ -171,7 +182,7 @@ class TenantBackup(models.Model):
                 _logger.info(
                     "tenant.backup.scheduled.ok slug=%s key=%s",
                     tenant.slug,
-                    (result or {}).get("s3_key"),
+                    (result or {}).get("path"),
                 )
             except Exception as e:
                 _logger.exception("tenant.backup.scheduled.failed slug=%s", tenant.slug)
@@ -263,7 +274,7 @@ class TenantBackup(models.Model):
 
     def action_restore_to_staging(self):
         self.ensure_one()
-        if self.outcome != "success" or not self.s3_key:
+        if self.outcome != "success" or not self.path:
             raise UserError(_("Cannot restore: backup did not complete successfully."))
         return {
             "type": "ir.actions.act_window",
@@ -274,6 +285,6 @@ class TenantBackup(models.Model):
             "context": {
                 "default_tenant_id": self.tenant_id.id,
                 "default_slug": self.tenant_slug,
-                "default_s3_key": self.s3_key,
+                "default_path": self.path,
             },
         }

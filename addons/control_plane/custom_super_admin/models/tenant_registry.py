@@ -49,7 +49,15 @@ class TenantRegistry(models.Model):
         default="provisioning",
         index=True,
     )
-    plan_tier = fields.Char()
+    #: `plan_code`, matching the registry column and the orchestrator's JSON.
+    #: It was `plan_tier` here, and the orchestrator has never returned a key by
+    #: that name -- `TENANT_COLUMNS` publishes `plan_code`. `r.get("plan_tier")`
+    #: therefore evaluated to None on every sync since this mirror was written,
+    #: so the console's Plan column was blank for every tenant and its
+    #: "Group by Plan" put all of them in one nameless bucket. Measured
+    #: 2026-09-05: three tenants, three empty values, three real plan codes
+    #: sitting in the registry the whole time.
+    plan_code = fields.Char(string="Paket")
     contact_email = fields.Char()
     contact_phone = fields.Char()
     csm_user_id = fields.Many2one("res.users", string="CSM")
@@ -118,7 +126,7 @@ class TenantRegistry(models.Model):
                 "display_name": r["display_name"],
                 "db_name": r["db_name"],
                 "state": r["state"],
-                "plan_tier": r.get("plan_tier"),
+                "plan_code": r.get("plan_code"),
                 "contact_email": r.get("contact_email"),
                 "last_backup_at": self._to_dt(r.get("last_backup_at")),
                 "activated_at": self._to_dt(r.get("activated_at")),
@@ -194,6 +202,34 @@ class TenantRegistry(models.Model):
         return self._notify("Archived", f"Tenant '{self.slug}' archived (purge in 30d).")
 
     def action_trigger_backup(self):
+        """Refuses here rather than after a signed round trip.
+
+        `run_backup` POSTs to a route that answers 501 by design: the
+        orchestrator has neither pg_dump nor the filestore, both deliberately.
+        The operator used to see "Backup failed: Orchestrator POST ... 501",
+        which reads like an outage rather than an answer.
+
+        Backups are real. They run on the host, where the filestore is, and
+        since 2026-09-05 the script records each one in
+        `tenant_registry.backups`, so the list on this form fills in on the next
+        mirror sync.
+        """
+        self.ensure_one()
+        raise UserError(_(
+            "Backups do not run from the console.\n\n"
+            "A backup is pg_dump plus the filestore, and this platform's API "
+            "service has neither -- on purpose: a service that could dump any "
+            "client's database on request is a target, not a convenience.\n\n"
+            "Run on the host:\n"
+            "    make tenant-backup TENANT=%(slug)s\n\n"
+            "It takes the database AND the filestore, writes a manifest and "
+            "SHA256SUMS, and records the result here. The list on this form "
+            "fills in at the next mirror sync (hourly)."
+        ) % {"slug": self.slug or "<slug>"})
+
+    def _action_trigger_backup_unreachable(self):
+        # See tenant.restore.wizard._action_restore_unreachable: kept so the
+        # shape of the call that WOULD be made stays visible.
         self.ensure_one()
         client = self.env["custom.super.admin.orchestrator.client"].sudo()
         try:
@@ -204,7 +240,7 @@ class TenantRegistry(models.Model):
         self.env["tenant.backup"].sudo()._cron_sync_for(self.slug)
         return self._notify(
             "Backup OK",
-            f"Backup completed: {result.get('s3_key')} ({result.get('size_bytes')} bytes)",
+            f"Backup completed: {result.get('path')} ({result.get('size_bytes')} bytes)",
         )
 
     def action_open_restore_wizard(self):

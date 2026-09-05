@@ -15,7 +15,7 @@
                 <field name="kind"/>
                 <field name="size_human"/>
                 <field name="checksum_sha256" optional="hide"/>
-                <field name="s3_key" optional="show"/>
+                <field name="path" optional="show"/>
                 <field name="outcome" widget="badge"/>
                 <field name="expires_at"/>
                 <button name="action_restore_to_staging"
@@ -53,7 +53,7 @@
                             <field name="size_human"/>
                         </group>
                         <group>
-                            <field name="s3_key"/>
+                            <field name="path"/>
                             <field name="checksum_sha256"/>
                             <field name="expires_at"/>
                         </group>

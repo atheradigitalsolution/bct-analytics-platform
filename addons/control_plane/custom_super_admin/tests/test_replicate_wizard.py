@@ -42,7 +42,7 @@ class TestReplicateWizard(TransactionCase):
                     "kind": "manual",
                     "started_at": "2026-01-01 00:00:00",
                     "outcome": "success",
-                    "s3_key": "acme_prod/2026/01/01/x.dump",
+                    "path": "/opt/athera-backup/acme/20260101T000000Z",
                 }
             )
         )
