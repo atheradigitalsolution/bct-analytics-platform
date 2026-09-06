@@ -48,8 +48,28 @@ export function Card({
  * why the number is not produced here. The alternative - quietly dropping the panel, or filling it
  * with something adjacent - is how a dashboard ends up asserting a figure nobody computed.
  */
+/**
+ * The three reasons, spelled out.
+ *
+ * `no_data` used to render the `no_metric` wording, because the component tested one reason and
+ * treated everything else as the same thing. That is exactly backwards for the case it now has to
+ * carry: "the metric exists, this tenant has no rows behind it" and "nobody has declared this
+ * metric" are different facts, they are fixed by different people, and only one of them is a
+ * request to Backend.
+ */
+const REASON_HEADING: Record<MetricGap["reason"], string> = {
+  not_in_build: "Tidak tersedia pada build ini",
+  no_metric: "Belum ada metrik yang dideklarasikan",
+  no_data: "Metriknya ada, datanya belum",
+};
+
+const REASON_FOOTER: Record<MetricGap["reason"], string> = {
+  not_in_build: "Sumber data tidak ada",
+  no_metric: "Perlu metrik",
+  no_data: "Perlu data untuk",
+};
+
 export function Unavailable({ gap }: { gap: MetricGap }) {
-  const notInBuild = gap.reason === "not_in_build";
   return (
     <section
       className="rounded-lg border border-dashed p-3 sm:p-4"
@@ -62,11 +82,11 @@ export function Unavailable({ gap }: { gap: MetricGap }) {
         <div>
           <h3 className="text-sm font-semibold text-ink">{gap.panel}</h3>
           <p className="mt-1 text-xs font-medium" style={{ color: "var(--status-warning)" }}>
-            {notInBuild ? "Tidak tersedia pada build ini" : "Belum ada metrik yang dideklarasikan"}
+            {REASON_HEADING[gap.reason]}
           </p>
           <p className="mt-1 text-xs text-ink-2">{gap.detail}</p>
           <p className="mt-2 text-[11px] text-ink-3">
-            {notInBuild ? "Sumber data tidak ada" : "Perlu metrik"}:{" "}
+            {REASON_FOOTER[gap.reason]}:{" "}
             <code className="rounded px-1" style={{ background: "var(--surface-2)" }}>
               {gap.requires}
             </code>

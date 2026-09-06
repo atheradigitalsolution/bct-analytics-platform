@@ -6,6 +6,7 @@ import { Card, MetricSection } from "@/components/Panel";
 import { PanelSkeleton } from "@/components/PanelSkeleton";
 import { ViewShell } from "@/components/ViewShell";
 import { toQueryFilters, type PortalFilters } from "@/lib/filters";
+import { loadShell } from "@/lib/capabilities";
 import { loadOuOptions } from "@/lib/ou";
 import type { PanelQuery } from "@/lib/panel";
 import { catalogue, query } from "@/lib/semantic";
@@ -37,7 +38,10 @@ export default async function DrillPage({
   const session = await getSession();
   if (session === null) redirect("/login");
   const filters = await loadFilters();
-  const ouOptions = await loadOuOptions(session, filters);
+  const { ouOptions, views } = await loadShell(
+    session,
+    loadOuOptions(session, filters),
+  );
   const search = await searchParams;
 
   const metric = typeof search.metric === "string" ? search.metric : "";
@@ -59,6 +63,7 @@ export default async function DrillPage({
       intro="Baris tingkat detail untuk metrik yang dipilih, dengan filter yang sama seperti tampilan asalnya."
       filters={filters}
       ouOptions={ouOptions}
+      views={views}
       formNext={formNext}
     >
       <Suspense fallback={<PanelSkeleton />}>

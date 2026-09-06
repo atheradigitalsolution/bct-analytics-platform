@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { config } from "@/lib/config";
 import type { PortalFilters } from "@/lib/filters";
 import type { Session } from "@/lib/jwt";
+import type { ViewDef } from "@/lib/view";
 
 import { FilterBar } from "./FilterBar";
 import { Nav } from "./Nav";
@@ -10,10 +11,16 @@ import { Nav } from "./Nav";
 /**
  * The frame every view renders inside: navigation, the persistent filter, then the panels.
  *
- * The frame is deliberately cheap to render - it needs no warehouse query - so it can stream to
- * the browser immediately while the panel grid is still being fetched. That is where the perceived
- * load time of this dashboard actually goes: the shell paints, the filter is usable, and the
- * figures arrive into it.
+ * The frame renders from values the page has already resolved - it issues no query of its own - so
+ * it can stream to the browser while the panel grid is still being fetched. That is where the
+ * perceived load time of this dashboard actually goes: the shell paints, the filter is usable, and
+ * the figures arrive into it.
+ *
+ * TWO OF THOSE VALUES COST A QUERY UPSTREAM, and pretending otherwise is how the note here used to
+ * read. `loadOuOptions` has always asked the semantic layer which Operating Units an `all_ou`
+ * session may narrow to, and `loadCapabilities` now asks which optional views this tenant's data
+ * can fill. `loadShell` joins them so the page awaits the slower of the two rather than their sum,
+ * and the capability answer is cached for far longer than any figure - see CAPABILITY_TTL_SECONDS.
  */
 export function ViewShell({
   session,
@@ -22,6 +29,7 @@ export function ViewShell({
   intro,
   filters,
   ouOptions,
+  views,
   formNext,
   children,
 }: {
@@ -31,6 +39,8 @@ export function ViewShell({
   intro: string;
   filters: PortalFilters;
   ouOptions: number[];
+  /** The tabs this session is offered, from `loadShell`. */
+  views: readonly ViewDef[];
   /** Where the filter form returns to. Defaults to this view; a drill passes its full query. */
   formNext?: string;
   children: ReactNode;
@@ -43,6 +53,7 @@ export function ViewShell({
         active={active}
         roles={session.roles}
         subject={session.sub}
+        views={views}
         odooDoor={
           config.odooDoorUrl !== "" && session.products.includes("odoo")
             ? config.odooDoorUrl

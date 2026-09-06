@@ -44,3 +44,29 @@ test("a percent metric is rendered as a percentage, not as a bare fraction", () 
   assert.match(formatMeasure(0.12, { unit: null, type: "percent" }, { signed: true }), /^\+12/);
   assert.match(formatMeasure(-0.249, { unit: null, type: "percent" }, { signed: true }), /^-24,9/);
 });
+
+/**
+ * Price-tier rendering.
+ *
+ * A missing tier is the case that matters. `sales_by_price_tier` keeps rows whose tier was never
+ * recorded rather than discarding them, so the NULL group is part of the total on screen; rendering
+ * it as an em dash would make a real and countable group look like a rendering fault. This
+ * deployment's rows all carry a tier today, so no live assertion reaches the branch.
+ */
+test("a sale with no recorded price tier is labelled, not shown as a missing value", () => {
+  assert.equal(formatDimension("hj_level", null), "Tanpa tingkat tercatat");
+  assert.equal(formatDimension("hj_level_label", null), "Tanpa tingkat tercatat");
+  assert.equal(formatDimension("hj_level", 3), "3");
+  assert.equal(formatDimension("hj_level_label", "HJ3"), "HJ3");
+});
+
+test("slug dimension members are rendered as words, and unknown members still render", () => {
+  assert.equal(formatDimension("customer_type", "poultry_shop"), "Poultry Shop");
+  assert.equal(formatDimension("sales_region", "kediri_raya"), "Kediri Raya");
+  assert.equal(formatDimension("sales_channel", "pos"), "Pos");
+  // A member nobody has seen before is the common case for these dimensions: the rule must handle
+  // it rather than fall back to the raw slug, which is what a lookup table would have done.
+  assert.equal(formatDimension("customer_type", "koperasi_ternak_baru"), "Koperasi Ternak Baru");
+  // The rule is scoped. A dimension that is not a slug keeps its value untouched.
+  assert.equal(formatDimension("product_key", "prod_a_b"), "prod_a_b");
+});

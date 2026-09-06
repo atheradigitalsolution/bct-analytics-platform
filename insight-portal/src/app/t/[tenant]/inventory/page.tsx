@@ -7,6 +7,7 @@ import { PanelSkeleton } from "@/components/PanelSkeleton";
 import { ViewShell } from "@/components/ViewShell";
 import { toQueryFilters, type PortalFilters } from "@/lib/filters";
 import { gapsFor } from "@/lib/gaps";
+import { loadShell } from "@/lib/capabilities";
 import { loadOuOptions } from "@/lib/ou";
 import type { PanelQuery } from "@/lib/panel";
 import { metasOf, runPanels } from "@/lib/panels";
@@ -37,7 +38,10 @@ export default async function InventoryPage({
   const session = await getSession();
   if (session === null) redirect("/login");
   const filters = await loadFilters();
-  const ouOptions = await loadOuOptions(session, filters);
+  const { ouOptions, views } = await loadShell(
+    session,
+    loadOuOptions(session, filters),
+  );
 
   return (
     <ViewShell
@@ -47,6 +51,7 @@ export default async function InventoryPage({
       intro="Posisi dan nilai stok per produk dan Operating Unit. Filter tanggal tidak berlaku di sini: mart_stock_position adalah posisi, bukan deret harian, sehingga metrik ini tidak mendeklarasikan filter rentang tanggal."
       filters={filters}
       ouOptions={ouOptions}
+      views={views}
     >
       <Suspense fallback={<PanelSkeleton />}>
         <InventoryBody filters={filters} tenant={session.tenant_id} />

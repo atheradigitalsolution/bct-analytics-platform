@@ -26,10 +26,18 @@ export function credentials(): { login: string; password: string } {
   return { login, password };
 }
 
-/** Log in through the PORTAL (not the gateway) and return the session cookie header. */
-export async function portalSession(): Promise<string> {
+/**
+ * Log in through the PORTAL (not the gateway) and return the session cookie header.
+ *
+ * `db` is the client code the login form takes, and it is also the tenant slug. Omitting it uses
+ * the portal's configured default, which is what every test wrote before a second Odoo tenant
+ * existed. Passing it is how a test reaches a tenant whose data differs - which is the only way to
+ * prove that anything on screen depends on the tenant rather than on the code.
+ */
+export async function portalSession(db?: string): Promise<string> {
   const { login, password } = credentials();
   const body = new URLSearchParams({ login, password, next: "" });
+  if (db !== undefined) body.set("db", db);
   const response = await fetch(PORTAL + "/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },

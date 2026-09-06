@@ -173,14 +173,24 @@ describe("freshness: a frozen pipeline stops the timestamp advancing, and it is 
   assert.ok(age > 0, "the pipeline timestamp is not in the past: " + second);
 });
 
+/**
+ * The mart read here used to be `mart_ppob_transaction`, via the PPOB view.
+ *
+ * That view is now conditional - a tenant with no PPOB rows is shown an explanation instead of a
+ * grid of zeroes - and an explanation carries no freshness badge, so the test failed for a reason
+ * that had nothing to do with freshness. `mart_sales_daily` is behind an unconditional view, so
+ * the badge is there for every tenant and the assertion keeps meaning what it says.
+ *
+ * The verdict still comes from the warehouse and is still compared in both directions.
+ */
 describe("freshness: the stale flag is the warehouse's verdict, not ours", async () => {
   const stale = warehouse(
     "select is_stale from warehouse.mart_freshness " +
-      "where tenant_id = 'bct' and mart_name = 'mart_ppob_transaction'",
+      "where tenant_id = 'bct' and mart_name = 'mart_sales_daily'",
   );
   assert.ok(stale === "t" || stale === "f", "unreadable is_stale: " + stale);
   const cookie = await portalSession();
-  const html = await (await fetch(PORTAL + "/t/bct/ppob", { headers: { cookie } })).text();
+  const html = await (await fetch(PORTAL + "/t/bct/sales", { headers: { cookie } })).text();
   if (stale === "t") {
     assert.ok(html.includes("Basi"), "the warehouse says stale and the page does not");
   } else {

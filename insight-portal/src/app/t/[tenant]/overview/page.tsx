@@ -7,6 +7,7 @@ import { PanelSkeleton } from "@/components/PanelSkeleton";
 import { ViewShell } from "@/components/ViewShell";
 import { toQueryFilters, type PortalFilters } from "@/lib/filters";
 import { gapsFor } from "@/lib/gaps";
+import { capabilityOf, loadShell } from "@/lib/capabilities";
 import { loadOuOptions } from "@/lib/ou";
 import type { PanelQuery } from "@/lib/panel";
 import { metasOf, runPanels } from "@/lib/panels";
@@ -24,8 +25,15 @@ export const dynamic = "force-dynamic";
  * is commission only; `pass_through_amount` is money owed to the biller, is not revenue, and no
  * metric in the registry will sum it.
  *
- * Margin, receivables ageing and cash position have no declared metric and are rendered as
- * explicit unavailable panels naming what each would need.
+ * Receivables ageing and cash position have no declared metric and are rendered as explicit
+ * unavailable panels naming what each would need.
+ *
+ * THE HEADLINE ROW IS NOT FIXED, and it used to be. Every tenant got "Komisi PPOB" and
+ * "Keberhasilan PPOB" whether or not they had ever sold a PPOB product, so a feed mill opened its
+ * executive summary to two zeroes labelled with someone else's line of business. The two PPOB
+ * tiles now appear only for a tenant whose own `mart_ppob_transaction` rows exist, and a tenant
+ * with price-tier data gets its margin tiles in the same slot instead. Both conditions come from
+ * `lib/capabilities.ts`, which asks the warehouse rather than a list of client names.
  */
 export default async function OverviewPage({
   params,
@@ -36,7 +44,10 @@ export default async function OverviewPage({
   const session = await getSession();
   if (session === null) redirect("/login");
   const filters = await loadFilters();
-  const ouOptions = await loadOuOptions(session, filters);
+  const { ouOptions, capabilities, views } = await loadShell(
+    session,
+    loadOuOptions(session, filters),
+  );
 
   return (
     <ViewShell
@@ -46,9 +57,15 @@ export default async function OverviewPage({
       intro="Pendapatan neto lintas tiga kanal, pertumbuhan bulanan, dan sebaran per Operating Unit. Setiap panel menyertakan waktu pembaruan pipeline dan SLA kesegarannya sendiri."
       filters={filters}
       ouOptions={ouOptions}
+      views={views}
     >
       <Suspense fallback={<PanelSkeleton />}>
-        <OverviewBody filters={filters} tenant={session.tenant_id} />
+        <OverviewBody
+          filters={filters}
+          tenant={session.tenant_id}
+          ppob={capabilityOf(capabilities, "ppob").available}
+          pricing={capabilityOf(capabilities, "pricing").available}
+        />
       </Suspense>
     </ViewShell>
   );
@@ -57,16 +74,20 @@ export default async function OverviewPage({
 async function OverviewBody({
   filters,
   tenant,
+  ppob,
+  pricing,
 }: {
   filters: PortalFilters;
   tenant: string;
+  /** This tenant has PPOB rows. False also suppresses the two queries, not just the two tiles. */
+  ppob: boolean;
+  /** This tenant has price-tier rows, so margin is answerable from a declared metric. */
+  pricing: boolean;
 }) {
   const range = toQueryFilters(filters);
   const specs = {
     totalRevenue: { metric: "revenue_net", dimensions: [], filters: range },
     totalSales: { metric: "sales_total", dimensions: [], filters: range },
-    ppobCommission: { metric: "ppob_commission_revenue", dimensions: [], filters: range },
-    successRate: { metric: "ppob_success_rate", dimensions: [], filters: range },
     revenueByMonth: {
       metric: "revenue_net",
       dimensions: ["date_month"],
@@ -93,9 +114,40 @@ async function OverviewBody({
     },
   } satisfies Record<string, PanelQuery>;
 
-  const results = await runPanels(specs);
-  const { metas } = metasOf(Object.values(results));
-  const gaps = gapsFor("overview");
+  /**
+   * The vertical tiles, in their own spec objects.
+   *
+   * Separate objects rather than conditional keys in one, so each `runPanels` call keeps its exact
+   * result type and no panel is read off a record that might not hold it. A suppressed set is not
+   * queried at all - the saving is real, but the reason is the screen: a tile that is not rendered
+   * must not be fetched, or the page would be paying for a figure it has decided not to assert.
+   */
+  const ppobSpecs = {
+    ppobCommission: { metric: "ppob_commission_revenue", dimensions: [], filters: range },
+    successRate: { metric: "ppob_success_rate", dimensions: [], filters: range },
+  } satisfies Record<string, PanelQuery>;
+
+  const pricingSpecs = {
+    grossMarginPct: { metric: "gross_margin_pct", dimensions: [], filters: range },
+    belowDefaultTier: {
+      metric: "sales_below_default_tier_pct",
+      dimensions: [],
+      filters: range,
+    },
+  } satisfies Record<string, PanelQuery>;
+
+  const [results, ppobResults, pricingResults] = await Promise.all([
+    runPanels(specs),
+    ppob ? runPanels(ppobSpecs) : null,
+    pricing ? runPanels(pricingSpecs) : null,
+  ]);
+
+  const { metas } = metasOf([
+    ...Object.values(results),
+    ...(ppobResults === null ? [] : Object.values(ppobResults)),
+    ...(pricingResults === null ? [] : Object.values(pricingResults)),
+  ]);
+  const gaps = gapsFor("overview", { pricing });
   const drillBase = "/t/" + tenant + "/drill";
 
   return (
@@ -105,12 +157,30 @@ async function OverviewBody({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Pendapatan neto (3 kanal)" result={results.totalRevenue} />
         <Kpi label="Total penjualan" result={results.totalSales} />
-        <Kpi
-          label="Komisi PPOB"
-          result={results.ppobCommission}
-          hint="Komisi saja - pass-through milik biller bukan pendapatan"
-        />
-        <Kpi label="Keberhasilan PPOB" result={results.successRate} />
+        {ppobResults === null ? null : (
+          <>
+            <Kpi
+              label="Komisi PPOB"
+              result={ppobResults.ppobCommission}
+              hint="Komisi saja - pass-through milik biller bukan pendapatan"
+            />
+            <Kpi label="Keberhasilan PPOB" result={ppobResults.successRate} />
+          </>
+        )}
+        {pricingResults === null ? null : (
+          <>
+            <Kpi
+              label="Margin kotor"
+              result={pricingResults.grossMarginPct}
+              hint="gross_margin_pct: rasio dari dua jumlah, dihitung di lapisan semantik"
+            />
+            <Kpi
+              label="Penjualan di bawah tingkat default"
+              result={pricingResults.belowDefaultTier}
+              hint="Indikator disiplin harga, bukan tuduhan - sebagian adalah diskon yang disetujui"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">

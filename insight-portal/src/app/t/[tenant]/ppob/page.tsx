@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 
 import { FreshnessSummary } from "@/components/Freshness";
 import { Kpi, MetricSection } from "@/components/Panel";
+import { NotApplicable } from "@/components/NotApplicable";
 import { PanelSkeleton } from "@/components/PanelSkeleton";
 import { ViewShell } from "@/components/ViewShell";
 import { toQueryFilters, type PortalFilters } from "@/lib/filters";
+import { capabilityOf, loadShell } from "@/lib/capabilities";
 import { loadOuOptions } from "@/lib/ou";
 import type { PanelQuery } from "@/lib/panel";
 import { metasOf, runPanels } from "@/lib/panels";
@@ -29,13 +31,24 @@ export const dynamic = "force-dynamic";
  *
  * The success rate is `ppob_success_rate`, a declared ratio metric. It is not computed here from
  * the state breakdown, even though the state breakdown is on the same page.
+ *
+ * NOT EVERY TENANT SELLS PPOB, and this page used to behave as though every tenant did. It was in
+ * the navigation for all of them, and a client with no PPOB rows got four zeroes and four empty
+ * charts under a heading naming a line of business they are not in - which is how it came to be
+ * reported as the dashboard "showing PPOB data" to a feed mill. The view is now offered only to a
+ * tenant whose own `mart_ppob_transaction` rows exist, and reaching the URL without them explains
+ * that rather than rendering the zeroes.
  */
 export default async function PpobPage({ params }: { params: Promise<{ tenant: string }> }) {
   await params;
   const session = await getSession();
   if (session === null) redirect("/login");
   const filters = await loadFilters();
-  const ouOptions = await loadOuOptions(session, filters);
+  const { ouOptions, capabilities, views } = await loadShell(
+    session,
+    loadOuOptions(session, filters),
+  );
+  const capability = capabilityOf(capabilities, "ppob");
 
   return (
     <ViewShell
@@ -45,10 +58,26 @@ export default async function PpobPage({ params }: { params: Promise<{ tenant: s
       intro="Volume, keberhasilan biller, komisi dan pelanggaran SLA. SLA kesegaran 60 detik - paling ketat di platform ini, karena pelanggaran SLA adalah inti tampilan ini."
       filters={filters}
       ouOptions={ouOptions}
+      views={views}
     >
-      <Suspense fallback={<PanelSkeleton />}>
-        <PpobBody filters={filters} tenant={session.tenant_id} />
-      </Suspense>
+      {capability.available ? (
+        <Suspense fallback={<PanelSkeleton />}>
+          <PpobBody filters={filters} tenant={session.tenant_id} />
+        </Suspense>
+      ) : (
+        <NotApplicable
+          id="ppob-not-applicable"
+          view="Operasi PPOB"
+          mart="mart_ppob_transaction"
+          decided={capability.decided}
+        >
+          <p>
+            PPOB adalah layanan pembayaran tagihan &mdash; token listrik, pulsa, air. Pendapatannya
+            komisi, bukan nilai tagihan yang dibayarkan pelanggan, dan hanya klien yang menjualnya
+            memiliki barisnya.
+          </p>
+        </NotApplicable>
+      )}
     </ViewShell>
   );
 }

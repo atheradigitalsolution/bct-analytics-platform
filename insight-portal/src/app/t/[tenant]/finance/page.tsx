@@ -7,6 +7,7 @@ import { PanelSkeleton } from "@/components/PanelSkeleton";
 import { ViewShell } from "@/components/ViewShell";
 import { toQueryFilters, type PortalFilters } from "@/lib/filters";
 import { gapsFor } from "@/lib/gaps";
+import { loadShell } from "@/lib/capabilities";
 import { loadOuOptions } from "@/lib/ou";
 import type { PanelQuery } from "@/lib/panel";
 import { metasOf, runPanels } from "@/lib/panels";
@@ -37,7 +38,10 @@ export default async function FinancePage({ params }: { params: Promise<{ tenant
   const session = await getSession();
   if (session === null) redirect("/login");
   const filters = await loadFilters();
-  const ouOptions = await loadOuOptions(session, filters);
+  const { ouOptions, views } = await loadShell(
+    session,
+    loadOuOptions(session, filters),
+  );
 
   return (
     <ViewShell
@@ -47,6 +51,7 @@ export default async function FinancePage({ params }: { params: Promise<{ tenant
       intro="Saldo buku besar dari fct_account_move_line: debit dikurangi kredit pada baris jurnal yang sudah diposting, dipecah menurut jenis akun. SLA kesegaran 60 menit, paling longgar di platform ini."
       filters={filters}
       ouOptions={ouOptions}
+      views={views}
     >
       <Suspense fallback={<PanelSkeleton />}>
         <FinanceBody filters={filters} tenant={session.tenant_id} />

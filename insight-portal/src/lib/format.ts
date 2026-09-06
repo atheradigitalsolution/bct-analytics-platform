@@ -146,8 +146,35 @@ const DIMENSION_LABELS: Record<string, string> = {
   has_unit_cost: "Punya Harga Pokok",
   account_type: "Jenis Akun",
   is_profit_and_loss: "Laba Rugi",
+  hj_level: "Tingkat Harga",
+  hj_level_label: "Tingkat Harga",
+  sales_channel: "Kanal Penjualan",
+  customer_type: "Jenis Pelanggan",
+  sales_region: "Wilayah Penjualan",
   value: "Nilai",
 };
+
+/**
+ * Dimensions whose members are slugs from the source system, rendered with the underscores turned
+ * into spaces and each word capitalised.
+ *
+ * PRESENTATION, and deliberately kept to a rule rather than a lookup table. A table of
+ * `poultry_shop -> "Poultry Shop"` would have to be extended every time a client adds a customer
+ * type, and the failure of forgetting is a screen that shows some members translated and others
+ * raw. The rule handles a member nobody has seen before, which is the common case for these two.
+ *
+ * It changes no value: the export carries the slug the warehouse stores, and a drill-down filter
+ * still round-trips the raw member.
+ */
+const SLUG_DIMENSIONS = new Set(["customer_type", "sales_region", "sales_channel"]);
+
+function humaniseSlug(value: string): string {
+  return value
+    .split("_")
+    .filter((word) => word !== "")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 /**
  * Odoo journal entry types, spelled out. The raw codes are what the warehouse stores and what the
@@ -193,8 +220,19 @@ export function formatDimension(
    * such rows, which is not evidence that they cannot occur.
    */
   if (dimension === "is_profit_and_loss" && value === null) return "Bukan keduanya (NULL)";
+  /**
+   * A sale whose price tier was never recorded. `sales_by_price_tier` keeps these rows rather than
+   * dropping them - the mart snapshots ndi_hj_level when the price is computed, and Odoo 19 stores
+   * no pricelist_item_id on the line, so a tier that was not captured cannot be reconstructed
+   * afterwards. Labelled, because an em dash in a tier column reads as a rendering fault and this
+   * group is a real and countable part of the total.
+   */
+  if ((dimension === "hj_level" || dimension === "hj_level_label") && value === null) {
+    return "Tanpa tingkat tercatat";
+  }
   if (value === null) return "—";
   if (dimension === "operating_unit_id" && value === -1) return "Tanpa Operating Unit";
+  if (SLUG_DIMENSIONS.has(dimension) && typeof value === "string") return humaniseSlug(value);
   if (dimension === "date_month" && typeof value === "string") return formatMonth(value);
   if (dimension === "date_day" && typeof value === "string") return formatDay(value);
   if (dimension === "move_type" && typeof value === "string") {

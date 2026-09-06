@@ -7,6 +7,7 @@ import { PanelSkeleton } from "@/components/PanelSkeleton";
 import { ViewShell } from "@/components/ViewShell";
 import { toQueryFilters, type PortalFilters } from "@/lib/filters";
 import { gapsFor } from "@/lib/gaps";
+import { loadShell } from "@/lib/capabilities";
 import { loadOuOptions } from "@/lib/ou";
 import type { PanelQuery } from "@/lib/panel";
 import { metasOf, runPanels } from "@/lib/panels";
@@ -31,7 +32,10 @@ export default async function SalesPage({ params }: { params: Promise<{ tenant: 
   const session = await getSession();
   if (session === null) redirect("/login");
   const filters = await loadFilters();
-  const ouOptions = await loadOuOptions(session, filters);
+  const { ouOptions, views } = await loadShell(
+    session,
+    loadOuOptions(session, filters),
+  );
 
   return (
     <ViewShell
@@ -41,6 +45,7 @@ export default async function SalesPage({ params }: { params: Promise<{ tenant: 
       intro="Nilai pesanan penjualan per bulan, produk, mitra dan Operating Unit, dari mart_sales_daily. Pertumbuhan ditampilkan bulan-ke-bulan."
       filters={filters}
       ouOptions={ouOptions}
+      views={views}
     >
       <Suspense fallback={<PanelSkeleton />}>
         <SalesBody filters={filters} tenant={session.tenant_id} />

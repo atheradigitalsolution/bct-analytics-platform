@@ -39,10 +39,10 @@ export const GAPS: Record<string, MetricGap[]> = {
   overview: [
     {
       panel: "Marjin kotor",
-      requires: "gross_margin",
-      reason: "no_metric",
+      requires: "gross_margin_pct",
+      reason: "no_data",
       detail:
-        "Marjin adalah pendapatan dikurangi harga pokok penjualan, dan tidak ada metrik yang memuat biaya. Membagi pendapatan dengan angka lain yang kebetulan tersedia di sini adalah rasio yang dihitung di klien.",
+        "Metriknya SUDAH ADA - gross_margin_pct membaca mart_sales_price_tier_daily, yang membawa HPP yang disnapshot pada baris saat transaksi. Yang belum ada adalah barisnya untuk tenant ini: mart itu terisi dari data tingkat harga, dan tanpa satu baris pun di sana pembilang maupun penyebutnya kosong. Tenant yang memiliki barisnya melihat kartu marjin di baris KPI, bukan panel ini.",
     },
     {
       panel: "Umur piutang",
@@ -101,14 +101,46 @@ export const GAPS: Record<string, MetricGap[]> = {
     },
   ],
   ppob: [],
+  pricing: [
+    {
+      panel: "Cakupan HPP dan tingkat harga",
+      requires: "price_tier_coverage_pct",
+      reason: "no_metric",
+      detail:
+        "mart_sales_price_tier_daily membawa lines_without_hpp, lines_without_hj_level dan lines_default_tier_unknown justru agar bagian yang tidak terhitung bisa dinyatakan, tetapi tidak ada metrik yang mengikatnya. Menghitungnya di sini berarti membagi dua kolom di React, dan porsi yang tidak terhitung adalah tepat angka yang paling berbahaya untuk dikarang.",
+    },
+    {
+      panel: "Volume dalam kilogram",
+      requires: "sales_qty_base",
+      reason: "not_in_build",
+      detail:
+        "Kolomnya tidak ada: sale.order.line pada skema tenant ini tidak menyimpan qty base. Mengikat metrik ke product_uom_qty akan menjumlahkan SAK, TON dan KG lalu menyebut hasilnya kilogram - satu-satunya kesalahan pada halaman ini yang tidak akan terlihat salah.",
+    },
+  ],
 };
 
-export function gapsFor(view: string): MetricGap[] {
-  return GAPS[view] ?? [];
+/** Gaps that stop being gaps once a tenant has the data behind them. Keyed by view, then panel. */
+const RESOLVED_BY_PRICING: Readonly<Record<string, readonly string[]>> = {
+  overview: ["gross_margin_pct"],
+};
+
+/**
+ * The unavailable panels for a view.
+ *
+ * `options.pricing` removes the entries that a tenant with price-tier data can actually answer.
+ * This is not cosmetic tidying: an "unavailable" panel is an assertion that the number is not
+ * produced, and leaving it on a page that shows the number two rows above would make the strongest
+ * statement on the screen the false one.
+ */
+export function gapsFor(view: string, options: { pricing?: boolean } = {}): MetricGap[] {
+  const all = GAPS[view] ?? [];
+  if (options.pricing !== true) return [...all];
+  const resolved = RESOLVED_BY_PRICING[view] ?? [];
+  return all.filter((gap) => !resolved.includes(gap.requires));
 }
 
 /**
- * Every metric this application queries, for the Lead to check against contract 03. All eleven are
+ * Every metric this application queries, for the Lead to check against contract 03. All fifteen are
  * declared in the live registry; the portal queries no figure that is not on this list.
  */
 export const METRICS_CONSUMED: ReadonlyArray<string> = [
@@ -123,4 +155,8 @@ export const METRICS_CONSUMED: ReadonlyArray<string> = [
   "ppob_commission_revenue",
   "ppob_sla_breach_count",
   "ppob_success_rate",
+  "sales_by_price_tier",
+  "gross_margin_by_price_tier",
+  "gross_margin_pct",
+  "sales_below_default_tier_pct",
 ];

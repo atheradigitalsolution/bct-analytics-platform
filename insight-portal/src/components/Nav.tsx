@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { VIEWS } from "@/lib/view";
+import type { ViewDef } from "@/lib/view";
 
 /**
  * The view switcher.
@@ -9,21 +9,29 @@ import { VIEWS } from "@/lib/view";
  * the current URL. A viewer therefore cannot navigate themselves into another tenant by editing an
  * address bar and following a link that helpfully preserved the edit.
  *
- * It scrolls horizontally on a phone rather than collapsing into a menu behind a button: five
- * items is not enough to justify hiding four of them behind a tap, and a hamburger would need
+ * It scrolls horizontally on a phone rather than collapsing into a menu behind a button: a handful
+ * of items is not enough to justify hiding most of them behind a tap, and a hamburger would need
  * client JavaScript for a list that fits.
+ *
+ * The tab list is a PARAMETER, not a constant this file reads. Which views a tenant is offered is
+ * decided in `lib/capabilities.ts` from that tenant's own data; a navigation bar that imported a
+ * fixed list would re-assert the thing that decision exists to stop — every client being shown
+ * every other client's vertical.
  */
 export function Nav({
   tenant,
   active,
   roles,
   subject,
+  views,
   odooDoor,
 }: {
   tenant: string;
   active: string;
   roles: string[];
   subject: string;
+  /** The views to offer, already filtered for this session. Catalogue order is preserved. */
+  views: readonly ViewDef[];
   /** Absolute URL of the SSO door, or null when this plan does not include Odoo. */
   odooDoor?: string | null;
 }) {
@@ -82,7 +90,7 @@ export function Nav({
       </div>
       <nav aria-label="Tampilan" className="mx-auto max-w-6xl px-3 sm:px-4">
         <ul className="-mb-px flex gap-1 overflow-x-auto">
-          {VIEWS.map((view) => {
+          {views.map((view) => {
             const current = view.slug === active;
             return (
               <li key={view.slug} className="shrink-0">
