@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Dua dimensi pelanggan dari addendum K-2 dan K-3 dipasang bersebelahan dengan
+    `category_id` justru supaya kontrasnya terlihat: tag di sebelahnya adalah bentuk
+    yang TIDAK bisa direplikasi, dan itulah alasan dua field ini ada.
+-->
+<odoo>
+    <record id="view_partner_form_ndi_master" model="ir.ui.view">
+        <field name="name">res.partner.form.ndi.master</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <field name="category_id" position="after">
+                <field name="ndi_customer_type"/>
+                <field name="ndi_sales_region"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_partner_tree_ndi_master" model="ir.ui.view">
+        <field name="name">res.partner.list.ndi.master</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <field name="country_id" position="after">
+                <field name="ndi_customer_type" optional="show"/>
+                <field name="ndi_sales_region" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_ndi_master" model="ir.ui.view">
+        <field name="name">res.partner.search.ndi.master</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <filter name="group_country" position="after">
+                <filter name="ndi_group_customer_type" string="Tipe Pelanggan NDI"
+                        context="{'group_by': 'ndi_customer_type'}"/>
+                <filter name="ndi_group_sales_region" string="Wilayah Pemasaran NDI"
+                        context="{'group_by': 'ndi_sales_region'}"/>
+            </filter>
+        </field>
+    </record>
+</odoo>

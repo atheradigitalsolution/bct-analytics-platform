@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_product_template_form_ndi" model="ir.ui.view">
+        <field name="name">product.template.form.ndi</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="NDI Feed Mill" name="ndi_feedmill">
+                    <group>
+                        <group string="Klasifikasi (Pasal 5)" name="ndi_classification">
+                            <field name="ndi_jenis_produk"/>
+                            <field name="ndi_divisi_id"/>
+                            <field name="ndi_kategori_id"/>
+                        </group>
+                        <group string="Batas Stok" name="ndi_stock_bounds">
+                            <field name="ndi_stok_min"/>
+                            <field name="ndi_stok_maks"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Komponen Pembentuk Harga (Pasal 13)" name="ndi_price_components">
+                            <field name="ndi_hpp_dasar"/>
+                            <field name="ndi_profit_pct"/>
+                            <field name="ndi_risiko_pct"/>
+                            <field name="ndi_pajak_pct"/>
+                            <field name="ndi_ongkir_rp"/>
+                            <field name="ndi_pembulatan_rp"/>
+                            <field name="ndi_insentif_kwartal_rp"/>
+                            <field name="ndi_insentif_bulanan_rp"/>
+                            <field name="ndi_margin_het_rp"/>
+                        </group>
+                        <group string="Tingkat Harga Jual HJ1-HJ9" name="ndi_hj_levels">
+                            <field name="ndi_hj1"/>
+                            <field name="ndi_hj2"/>
+                            <field name="ndi_hj3"/>
+                            <field name="ndi_hj4"/>
+                            <field name="ndi_hj5"/>
+                            <field name="ndi_hj6"/>
+                            <field name="ndi_hj7"/>
+                            <field name="ndi_hj8"/>
+                            <field name="ndi_hj9"/>
+                        </group>
+                    </group>
+                    <separator string="Berat Gross per Tingkat Satuan (Pasal 17/18)"/>
+                    <field name="ndi_uom_weight_ids" context="{'default_product_tmpl_id': id}">
+                        <list editable="bottom">
+                            <field name="uom_id"/>
+                            <field name="gross_weight"/>
+                            <field name="net_weight"/>
+                            <field name="tare_weight"/>
+                        </list>
+                    </field>
+                    <p class="text-muted">
+                        Berat gross adalah berat kotor 1 satuan termasuk kemasan. Satuan yang
+                        boleh dipakai adalah satuan dasar produk atau satuan pada tab Satuan.
+                    </p>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+    <record id="view_product_template_list_ndi" model="ir.ui.view">
+        <field name="name">product.template.list.ndi</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="ndi_jenis_produk" optional="hide"/>
+                <field name="ndi_divisi_id" optional="hide"/>
+                <field name="ndi_kategori_id" optional="hide"/>
+                <field name="ndi_hpp_dasar" optional="hide"/>
+                <field name="ndi_hj1" optional="hide"/>
+                <field name="ndi_hj9" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_product_template_search_ndi" model="ir.ui.view">
+        <field name="name">product.template.search.ndi</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_search_view"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="ndi_divisi_id"/>
+                <field name="ndi_kategori_id"/>
+            </field>
+            <search position="inside">
+                <group name="ndi_group_by">
+                    <filter name="ndi_group_jenis" string="Jenis Produk NDI"
+                            context="{'group_by': 'ndi_jenis_produk'}"/>
+                    <filter name="ndi_group_divisi" string="Divisi NDI"
+                            context="{'group_by': 'ndi_divisi_id'}"/>
+                    <filter name="ndi_group_kategori" string="Kategori NDI"
+                            context="{'group_by': 'ndi_kategori_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

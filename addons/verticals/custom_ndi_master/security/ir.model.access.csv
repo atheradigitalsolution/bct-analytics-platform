@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ndi_division_user,ndi.division user,model_ndi_division,base.group_user,1,0,0,0
+access_ndi_division_manager,ndi.division manager,model_ndi_division,group_ndi_master_manager,1,1,1,1
+access_ndi_product_category_user,ndi.product.category user,model_ndi_product_category,base.group_user,1,0,0,0
+access_ndi_product_category_manager,ndi.product.category manager,model_ndi_product_category,group_ndi_master_manager,1,1,1,1
+access_ndi_product_uom_weight_user,ndi.product.uom.weight user,model_ndi_product_uom_weight,base.group_user,1,0,0,0
+access_ndi_product_uom_weight_manager,ndi.product.uom.weight manager,model_ndi_product_uom_weight,group_ndi_master_manager,1,1,1,1

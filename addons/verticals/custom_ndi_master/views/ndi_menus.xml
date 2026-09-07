@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_ndi_root"
+              name="NDI Feed Mill"
+              web_icon="stock,static/description/icon.png"
+              sequence="88"
+              groups="group_ndi_master_user"/>
+
+    <menuitem id="menu_ndi_master"
+              name="Master Data"
+              parent="menu_ndi_root"
+              sequence="10"/>
+
+    <menuitem id="menu_ndi_division"
+              name="Divisi Produk"
+              parent="menu_ndi_master"
+              action="action_ndi_division"
+              sequence="10"/>
+
+    <menuitem id="menu_ndi_product_category"
+              name="Kategori Produk"
+              parent="menu_ndi_master"
+              action="action_ndi_product_category"
+              sequence="20"/>
+
+    <menuitem id="menu_ndi_product_uom_weight"
+              name="Berat Gross per Satuan"
+              parent="menu_ndi_master"
+              action="action_ndi_product_uom_weight"
+              sequence="30"/>
+</odoo>

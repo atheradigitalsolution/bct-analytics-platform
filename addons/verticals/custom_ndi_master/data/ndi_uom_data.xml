@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Pohon UoM pabrik pakan NDI (requirement pasal 5, keputusan desain D2).
+
+    Odoo 19 menghapus `uom.category` dan `product.packaging`. Yang tersisa adalah
+    satu pohon rekursif: `relative_uom_id` menunjuk induk, `relative_factor` berisi
+    "berapa induk di dalam satu satuan ini", dan `factor` dihitung otomatis sampai
+    akar. Konversi antar dua satuan hanya mungkin bila keduanya berbagi akar
+    (`_has_common_reference` membandingkan prefix `parent_path`).
+
+    DUA KONSEKUENSI YANG TIDAK BISA DIHINDARI, dan keduanya terlihat di data ini:
+
+    1. `uom.uom` GLOBAL, bukan per produk. "SAK" bukan satu record — pabrik memakai
+       karung 50 kg, 30 kg dan 25 kg. Masing-masing record tersendiri, semuanya
+       beranak ke kg. Nama record karenanya menyebut isinya, bukan sekadar "SAK".
+
+    2. "TON" pada data NDI berarti "20 sak", bukan tonne metrik. Untuk sak 50 kg itu
+       memang 1.000 kg, tetapi untuk sak 30 kg (puyuh, kambing) 20 sak = 600 kg, dan
+       untuk sekam 50 sak x 20 kg = 1.000 kg dengan satuan dasar SAK bukan KG. Tiga
+       arti berbeda tidak muat dalam satu record, jadi ada tiga record TON.
+       Ini bukan pilihan gaya: satu record TON akan membuat surat jalan puyuh salah
+       400 kg.
+
+    Cabang timbang menumpang `uom.product_uom_kgm` bawaan supaya tetap kompatibel
+    dengan Ton/gram bawaan dan dengan field berat produk. Cabang hitung (PCS, BTL,
+    JRG, SCH, CONE, SAK sekam) memakai akar sendiri: memaksanya ke bawah "Units"
+    bawaan akan membuat "DUS isi 12 botol" bisa dikonversi ke "Units" seolah 12
+    barang generik, yang tidak punya arti.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <!-- ============ Cabang timbang: kg (bawaan) -> sak -> ton ============ -->
+
+        <record id="uom_sak_50kg" model="uom.uom">
+            <field name="name">SAK 50 KG</field>
+            <field name="relative_uom_id" ref="uom.product_uom_kgm"/>
+            <field name="relative_factor">50</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="uom_sak_30kg" model="uom.uom">
+            <field name="name">SAK 30 KG</field>
+            <field name="relative_uom_id" ref="uom.product_uom_kgm"/>
+            <field name="relative_factor">30</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">51</field>
+        </record>
+
+        <record id="uom_sak_25kg" model="uom.uom">
+            <field name="name">SAK 25 KG</field>
+            <field name="relative_uom_id" ref="uom.product_uom_kgm"/>
+            <field name="relative_factor">25</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">52</field>
+        </record>
+
+        <record id="uom_drum_200kg" model="uom.uom">
+            <field name="name">DRUM 200 KG</field>
+            <field name="relative_uom_id" ref="uom.product_uom_kgm"/>
+            <field name="relative_factor">200</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">55</field>
+        </record>
+
+        <record id="uom_drum_250kg" model="uom.uom">
+            <field name="name">DRUM 250 KG</field>
+            <field name="relative_uom_id" ref="uom.product_uom_kgm"/>
+            <field name="relative_factor">250</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">56</field>
+        </record>
+
+        <!-- TON = 20 SAK. Tingkat 3 pada pohon timbang. -->
+        <record id="uom_ton_20sak_50kg" model="uom.uom">
+            <field name="name">TON (20 SAK 50 KG)</field>
+            <field name="relative_uom_id" ref="uom_sak_50kg"/>
+            <field name="relative_factor">20</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="uom_ton_20sak_30kg" model="uom.uom">
+            <field name="name">TON (20 SAK 30 KG)</field>
+            <field name="relative_uom_id" ref="uom_sak_30kg"/>
+            <field name="relative_factor">20</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">61</field>
+        </record>
+
+        <!-- ============ Cabang hitung: akar sendiri per satuan dasar ============ -->
+
+        <record id="uom_pcs" model="uom.uom">
+            <field name="name">PCS</field>
+            <field name="relative_factor">1</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="uom_bal_1000pcs" model="uom.uom">
+            <field name="name">BAL 1000 PCS</field>
+            <field name="relative_uom_id" ref="uom_pcs"/>
+            <field name="relative_factor">1000</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">70</field>
+        </record>
+
+        <record id="uom_roll_500pcs" model="uom.uom">
+            <field name="name">ROLL 500 PCS</field>
+            <field name="relative_uom_id" ref="uom_pcs"/>
+            <field name="relative_factor">500</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">71</field>
+        </record>
+
+        <record id="uom_dus_100pcs" model="uom.uom">
+            <field name="name">DUS 100 PCS</field>
+            <field name="relative_uom_id" ref="uom_pcs"/>
+            <field name="relative_factor">100</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">72</field>
+        </record>
+
+        <record id="uom_btl" model="uom.uom">
+            <field name="name">BTL</field>
+            <field name="relative_factor">1</field>
+            <field name="sequence">11</field>
+        </record>
+
+        <record id="uom_dus_12btl" model="uom.uom">
+            <field name="name">DUS 12 BTL</field>
+            <field name="relative_uom_id" ref="uom_btl"/>
+            <field name="relative_factor">12</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">73</field>
+        </record>
+
+        <record id="uom_jrg" model="uom.uom">
+            <field name="name">JRG</field>
+            <field name="relative_factor">1</field>
+            <field name="sequence">12</field>
+        </record>
+
+        <record id="uom_dus_4jrg" model="uom.uom">
+            <field name="name">DUS 4 JRG</field>
+            <field name="relative_uom_id" ref="uom_jrg"/>
+            <field name="relative_factor">4</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">74</field>
+        </record>
+
+        <record id="uom_sch" model="uom.uom">
+            <field name="name">SCH</field>
+            <field name="relative_factor">1</field>
+            <field name="sequence">13</field>
+        </record>
+
+        <record id="uom_dus_50sch" model="uom.uom">
+            <field name="name">DUS 50 SCH</field>
+            <field name="relative_uom_id" ref="uom_sch"/>
+            <field name="relative_factor">50</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">75</field>
+        </record>
+
+        <record id="uom_cone" model="uom.uom">
+            <field name="name">CONE</field>
+            <field name="relative_factor">1</field>
+            <field name="sequence">14</field>
+        </record>
+
+        <record id="uom_dus_12cone" model="uom.uom">
+            <field name="name">DUS 12 CONE</field>
+            <field name="relative_uom_id" ref="uom_cone"/>
+            <field name="relative_factor">12</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">76</field>
+        </record>
+
+        <!-- Sekam dijual per karung utuh; karung itulah satuan dasarnya, bukan kg. -->
+        <record id="uom_sak_hitung" model="uom.uom">
+            <field name="name">SAK</field>
+            <field name="relative_factor">1</field>
+            <field name="sequence">15</field>
+        </record>
+
+        <record id="uom_ton_50sak" model="uom.uom">
+            <field name="name">TON (50 SAK)</field>
+            <field name="relative_uom_id" ref="uom_sak_hitung"/>
+            <field name="relative_factor">50</field>
+            <field name="ndi_is_packaging" eval="True"/>
+            <field name="sequence">77</field>
+        </record>
+
+        <!-- ============ Divisi dan kategori dasar (pasal 5) ============ -->
+
+        <record id="division_bahan_baku" model="ndi.division">
+            <field name="name">Bahan Baku</field>
+            <field name="code">RM</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="division_kemasan" model="ndi.division">
+            <field name="name">Kemasan</field>
+            <field name="code">PK</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="division_pakan_unggas" model="ndi.division">
+            <field name="name">Pakan Unggas</field>
+            <field name="code">FGU</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="division_pakan_ruminansia" model="ndi.division">
+            <field name="name">Pakan Ruminansia</field>
+            <field name="code">FGR</field>
+            <field name="sequence">40</field>
+        </record>
+        <record id="division_barang_dagangan" model="ndi.division">
+            <field name="name">Barang Dagangan</field>
+            <field name="code">TR</field>
+            <field name="sequence">50</field>
+        </record>
+
+    </data>
+</odoo>

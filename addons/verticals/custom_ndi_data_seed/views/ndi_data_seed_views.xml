@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ndi_data_seed_form" model="ir.ui.view">
+        <field name="name">ndi.data.seed.form</field>
+        <field name="model">ndi.data.seed</field>
+        <field name="arch" type="xml">
+            <form string="Sample Data NDI">
+                <div class="alert alert-warning" role="alert">
+                    Modul fixture. Jangan dijalankan di database produksi klien:
+                    jurnal yang sudah diposting dan stock move yang sudah done tidak
+                    bisa dihapus tanpa menembus audit trail Odoo, jadi tidak ada tombol
+                    reset.
+                </div>
+                <group>
+                    <group string="Jendela waktu">
+                        <field name="start_date"/>
+                        <field name="months"/>
+                        <field name="seed"/>
+                        <field name="dataset"/>
+                    </group>
+                    <group string="Volume per bulan">
+                        <field name="po_per_month"/>
+                        <field name="mo_per_month"/>
+                        <field name="so_per_month"/>
+                        <field name="transfers_per_month"/>
+                        <field name="pos_orders"/>
+                    </group>
+                    <group string="Kasus uji yang disengaja">
+                        <field name="draft_mo"/>
+                        <field name="waste_mo"/>
+                        <field name="partial_receipts"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_generate" type="object" string="Buat Sample Data"
+                            class="btn-primary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ndi_data_seed" model="ir.actions.act_window">
+        <field name="name">Sample Data NDI</field>
+        <field name="res_model">ndi.data.seed</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_ndi_data_seed"
+              name="Sample Data NDI (Fixture)"
+              parent="base.menu_administration"
+              action="action_ndi_data_seed"
+              groups="base.group_system"
+              sequence="90"/>
+</odoo>

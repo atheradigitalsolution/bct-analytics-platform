@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ndi_price_matrix_user,ndi.price.matrix user,model_ndi_price_matrix,base.group_user,1,0,0,0
+access_ndi_price_matrix_owner,ndi.price.matrix owner,model_ndi_price_matrix,ndi_group_price_1_9,1,1,1,1
+access_ndi_price_matrix_log_user,ndi.price.matrix.log user,model_ndi_price_matrix_log,base.group_user,1,0,0,0
+access_ndi_price_matrix_log_owner,ndi.price.matrix.log owner,model_ndi_price_matrix_log,ndi_group_price_1_9,1,0,1,0

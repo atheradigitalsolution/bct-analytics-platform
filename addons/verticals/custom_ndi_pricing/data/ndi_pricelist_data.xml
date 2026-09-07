@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Sembilan pricelist tingkat HJ. Dibuat sekali (noupdate) supaya penyesuaian
+    operasional di lapangan tidak ditimpa setiap kali modul di-upgrade.
+
+    Urutan penamaan mengikuti requirement: Harga 1 adalah HET (tertinggi, harga
+    eceran tertinggi ke peternak) dan Harga 9 adalah HPP dasar (terendah, praktis
+    harga transfer internal). Ini kebalikan dari intuisi "1 = termurah", dan
+    justru karena itu ditulis eksplisit di nama pricelist.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="pricelist_hj1" model="product.pricelist">
+            <field name="name">Harga 1 — HET</field>
+            <field name="ndi_hj_level">1</field>
+            <field name="sequence">1</field>
+        </record>
+        <record id="pricelist_hj2" model="product.pricelist">
+            <field name="name">Harga 2</field>
+            <field name="ndi_hj_level">2</field>
+            <field name="sequence">2</field>
+        </record>
+        <record id="pricelist_hj3" model="product.pricelist">
+            <field name="name">Harga 3</field>
+            <field name="ndi_hj_level">3</field>
+            <field name="sequence">3</field>
+        </record>
+        <record id="pricelist_hj4" model="product.pricelist">
+            <field name="name">Harga 4</field>
+            <field name="ndi_hj_level">4</field>
+            <field name="sequence">4</field>
+        </record>
+        <record id="pricelist_hj5" model="product.pricelist">
+            <field name="name">Harga 5</field>
+            <field name="ndi_hj_level">5</field>
+            <field name="sequence">5</field>
+        </record>
+        <record id="pricelist_hj6" model="product.pricelist">
+            <field name="name">Harga 6</field>
+            <field name="ndi_hj_level">6</field>
+            <field name="sequence">6</field>
+        </record>
+        <record id="pricelist_hj7" model="product.pricelist">
+            <field name="name">Harga 7</field>
+            <field name="ndi_hj_level">7</field>
+            <field name="sequence">7</field>
+        </record>
+        <record id="pricelist_hj8" model="product.pricelist">
+            <field name="name">Harga 8</field>
+            <field name="ndi_hj_level">8</field>
+            <field name="sequence">8</field>
+        </record>
+        <record id="pricelist_hj9" model="product.pricelist">
+            <field name="name">Harga 9 — HPP Dasar</field>
+            <field name="ndi_hj_level">9</field>
+            <field name="sequence">9</field>
+        </record>
+
+    </data>
+</odoo>

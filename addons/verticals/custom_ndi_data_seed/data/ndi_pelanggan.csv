@@ -1,0 +1,41 @@
+kode,nama,tipe,kota,default_harga,limit_kredit,termin_hari,insentif_bulanan,insentif_kuartal
+CUS-001,PT Sentra Niaga Unggas Jatim,distributor,Surabaya,HJ5,500000000,30,T,Y
+CUS-002,CV Mitra Pakan Nusantara,distributor,Malang,HJ5,350000000,30,T,Y
+CUS-003,PT Delta Agro Distribusi,distributor,Sidoarjo,HJ5,400000000,30,T,Y
+CUS-004,CV Bumi Ternak Sejahtera,distributor,Kediri,HJ5,300000000,30,T,Y
+CUS-005,UD Karya Ternak Mandiri,distributor,Jember,HJ6,250000000,45,T,Y
+CUS-006,Poultry Shop Sumber Rejeki,poultry_shop,Sidoarjo,HJ3,80000000,21,Y,Y
+CUS-007,Poultry Shop Barokah Unggas,poultry_shop,Sidoarjo,HJ3,60000000,21,Y,Y
+CUS-008,UD Sinar Ternak Makmur,poultry_shop,Mojokerto,HJ4,75000000,21,T,Y
+CUS-009,Toko Sapronak Amanah,poultry_shop,Pasuruan,HJ3,50000000,14,Y,T
+CUS-010,Poultry Shop Tani Jaya,poultry_shop,Malang,HJ3,65000000,21,Y,Y
+CUS-011,UD Griya Unggas Sentosa,poultry_shop,Malang,HJ4,70000000,21,T,Y
+CUS-012,Toko Pakan Berkah Tani,poultry_shop,Gresik,HJ3,45000000,14,Y,T
+CUS-013,Poultry Shop Cahaya Ternak,poultry_shop,Lamongan,HJ3,40000000,14,Y,T
+CUS-014,UD Rejeki Unggas Abadi,poultry_shop,Jombang,HJ3,55000000,21,Y,T
+CUS-015,Toko Sapronak Mekar Jaya,poultry_shop,Nganjuk,HJ4,35000000,14,T,T
+CUS-016,Poultry Shop Anugerah Ternak,poultry_shop,Blitar,HJ3,50000000,21,Y,Y
+CUS-017,UD Ternak Subur Makmur,poultry_shop,Tulungagung,HJ3,30000000,14,Y,T
+CUS-018,Peternakan Ayam Mandiri Wijaya,peternak,Sidoarjo,HJ2,40000000,14,Y,T
+CUS-019,Peternakan Broiler Sumber Hidup,peternak,Sidoarjo,HJ2,35000000,14,Y,T
+CUS-020,Peternakan Layer Telur Emas,peternak,Mojokerto,HJ2,45000000,14,Y,Y
+CUS-021,Kandang Broiler Putra Tani,peternak,Pasuruan,HJ2,30000000,14,Y,T
+CUS-022,Peternakan Unggas Harapan Baru,peternak,Malang,HJ2,25000000,7,Y,T
+CUS-023,Peternakan Layer Sinar Pagi,peternak,Malang,HJ2,38000000,14,Y,Y
+CUS-024,Kandang Ayam Berkah Sentosa,peternak,Batu,HJ3,20000000,7,Y,T
+CUS-025,Peternakan Itik Tirta Unggas,peternak,Sidoarjo,HJ3,15000000,7,T,T
+CUS-026,Peternakan Puyuh Sumber Telur,peternak,Gresik,HJ3,12000000,7,T,T
+CUS-027,Peternakan Broiler Karya Muda,peternak,Lamongan,HJ2,28000000,14,Y,T
+CUS-028,Kandang Layer Anugerah Jaya,peternak,Jombang,HJ2,33000000,14,Y,Y
+CUS-029,Peternakan Ayam Petelur Mulia,peternak,Kediri,HJ2,42000000,14,Y,Y
+CUS-030,Peternakan Broiler Tani Sejahtera,peternak,Blitar,HJ2,26000000,14,Y,T
+CUS-031,Kandang Unggas Bina Ternak,peternak,Nganjuk,HJ3,18000000,7,T,T
+CUS-032,Peternakan Sapi Perah Lembah Hijau,peternak,Batu,HJ3,22000000,14,T,T
+CUS-033,Peternakan Kambing Etawa Rahayu,peternak,Malang,HJ3,10000000,7,T,T
+CUS-034,Warung Pakan Ibu Sulastri,retail,Sidoarjo,HJ1,0,0,T,T
+CUS-035,Bapak Hendra Wibowo,retail,Sidoarjo,HJ1,0,0,T,T
+CUS-036,Ibu Ratna Puspitasari,retail,Sidoarjo,HJ1,0,0,T,T
+CUS-037,Bapak Slamet Riyadi,retail,Malang,HJ1,0,0,T,T
+CUS-038,Kios Ternak Ibu Wahyuni,retail,Malang,HJ1,0,0,T,T
+CUS-039,Bapak Agus Purnomo,retail,Malang,HJ1,0,0,T,T
+CUS-040,Pelanggan Umum Tunai,retail,Sidoarjo,HJ1,0,0,T,T

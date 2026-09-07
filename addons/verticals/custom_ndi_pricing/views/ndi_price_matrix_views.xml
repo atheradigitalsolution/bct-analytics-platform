@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_ndi_price_matrix_list" model="ir.ui.view">
+        <field name="name">ndi.price.matrix.list</field>
+        <field name="model">ndi.price.matrix</field>
+        <field name="arch" type="xml">
+            <list string="Matriks Harga NDI" create="false"
+                  decoration-muted="state == 'draft'">
+                <field name="product_tmpl_id"/>
+                <field name="hpp_dasar" optional="show"/>
+                <field name="hj9" string="Harga 9"/>
+                <field name="hj8" string="Harga 8" optional="hide"/>
+                <field name="hj7" string="Harga 7" optional="hide"/>
+                <field name="hj6" string="Harga 6" optional="show"/>
+                <field name="hj5" string="Harga 5" optional="hide"/>
+                <field name="hj4" string="Harga 4" optional="hide"/>
+                <field name="hj3" string="Harga 3" optional="show"/>
+                <field name="hj2" string="Harga 2" optional="hide"/>
+                <field name="hj1" string="Harga 1"/>
+                <field name="item_count" string="Aturan"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'applied'"
+                       decoration-warning="state == 'draft'"/>
+                <field name="applied_on_date" optional="hide"/>
+                <button name="action_apply" type="object" string="Terapkan"
+                        icon="fa-refresh" title="Tulis ulang 9 aturan harga produk ini"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ndi_price_matrix_form" model="ir.ui.view">
+        <field name="name">ndi.price.matrix.form</field>
+        <field name="model">ndi.price.matrix</field>
+        <field name="arch" type="xml">
+            <form string="Matriks Harga NDI">
+                <header>
+                    <button name="action_apply" type="object" string="Terapkan ke Pricelist"
+                            class="btn-primary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,applied"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_items" type="object" class="oe_stat_button"
+                                icon="fa-list-ul">
+                            <field name="item_count" widget="statinfo" string="Aturan Harga"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="product_tmpl_id" options="{'no_create': True}"/></h1>
+                    </div>
+                    <group>
+                        <group string="Komponen Pembentuk (dari Master Produk)">
+                            <field name="hpp_dasar"/>
+                            <field name="profit_pct"/>
+                            <field name="risiko_pct"/>
+                            <field name="pajak_pct"/>
+                            <field name="ongkir_rp"/>
+                            <field name="pembulatan_rp"/>
+                            <field name="insentif_kwartal_rp"/>
+                            <field name="insentif_bulanan_rp"/>
+                            <field name="margin_het_rp"/>
+                        </group>
+                        <group string="Hasil Waterfall">
+                            <field name="hj1" string="Harga 1 — HET"/>
+                            <field name="hj2" string="Harga 2"/>
+                            <field name="hj3" string="Harga 3"/>
+                            <field name="hj4" string="Harga 4"/>
+                            <field name="hj5" string="Harga 5"/>
+                            <field name="hj6" string="Harga 6"/>
+                            <field name="hj7" string="Harga 7"/>
+                            <field name="hj8" string="Harga 8"/>
+                            <field name="hj9" string="Harga 9 — HPP Dasar"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Komponen disunting di Master Produk, tab <b>NDI Feed Mill</b>.
+                        Matriks hanya membacanya supaya tidak ada dua sumber kebenaran.
+                    </div>
+                    <notebook>
+                        <page string="Riwayat Penerapan" name="logs">
+                            <field name="log_ids" readonly="1">
+                                <list>
+                                    <field name="applied_on_date"/>
+                                    <field name="user_id"/>
+                                    <field name="values" widget="json" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ndi_price_matrix_search" model="ir.ui.view">
+        <field name="name">ndi.price.matrix.search</field>
+        <field name="model">ndi.price.matrix</field>
+        <field name="arch" type="xml">
+            <search string="Matriks Harga NDI">
+                <field name="product_tmpl_id"/>
+                <filter name="draft" string="Belum Diterapkan" domain="[('state', '=', 'draft')]"/>
+                <filter name="applied" string="Diterapkan" domain="[('state', '=', 'applied')]"/>
+                <group>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ndi_price_matrix" model="ir.actions.act_window">
+        <field name="name">Matriks Harga HJ1-HJ9</field>
+        <field name="res_model">ndi.price.matrix</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_ndi_price_matrix_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Matriks harga masih kosong</p>
+            <p>Jalankan <b>Sinkronkan &amp; Terapkan Semua</b> untuk membuat satu baris
+            per produk berkomponen harga, lalu menulis sembilan aturan harga per produk.</p>
+        </field>
+    </record>
+
+    <record id="action_ndi_price_matrix_apply_all" model="ir.actions.server">
+        <field name="name">Sinkronkan &amp; Terapkan Semua</field>
+        <field name="model_id" ref="model_ndi_price_matrix"/>
+        <field name="state">code</field>
+        <field name="code">model.action_apply_all()</field>
+    </record>
+
+    <!-- Riwayat penerapan, terpisah agar bisa diaudit tanpa membuka matriks. -->
+    <record id="view_ndi_price_matrix_log_list" model="ir.ui.view">
+        <field name="name">ndi.price.matrix.log.list</field>
+        <field name="model">ndi.price.matrix.log</field>
+        <field name="arch" type="xml">
+            <list string="Riwayat Penerapan Harga" create="false">
+                <field name="applied_on_date"/>
+                <field name="product_tmpl_id"/>
+                <field name="user_id"/>
+                <field name="values" widget="json" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ndi_price_matrix_log_search" model="ir.ui.view">
+        <field name="name">ndi.price.matrix.log.search</field>
+        <field name="model">ndi.price.matrix.log</field>
+        <field name="arch" type="xml">
+            <search string="Riwayat Penerapan Harga">
+                <field name="product_tmpl_id"/>
+                <field name="user_id"/>
+                <group>
+                    <filter name="group_product" string="Produk" context="{'group_by': 'product_tmpl_id'}"/>
+                    <filter name="group_user" string="Oleh" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_date" string="Tanggal" context="{'group_by': 'applied_on_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ndi_price_matrix_log" model="ir.actions.act_window">
+        <field name="name">Riwayat Penerapan Harga</field>
+        <field name="res_model">ndi.price.matrix.log</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_ndi_price_matrix_log_search"/>
+    </record>
+
+</odoo>

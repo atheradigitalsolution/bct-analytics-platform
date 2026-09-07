@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ===================== Divisi ===================== -->
+    <record id="view_ndi_division_list" model="ir.ui.view">
+        <field name="name">ndi.division.list</field>
+        <field name="model">ndi.division</field>
+        <field name="arch" type="xml">
+            <list string="Divisi NDI" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="category_count" string="Kategori"/>
+                <field name="product_count" string="Produk"/>
+                <field name="active" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ndi_division_form" model="ir.ui.view">
+        <field name="name">ndi.division.form</field>
+        <field name="model">ndi.division</field>
+        <field name="arch" type="xml">
+            <form string="Divisi NDI">
+                <sheet>
+                    <widget name="web_ribbon" title="Diarsipkan" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Kategori" name="categories">
+                            <field name="category_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="product_count"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Catatan" name="note">
+                            <field name="note" placeholder="Catatan internal divisi..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ndi_division_search" model="ir.ui.view">
+        <field name="name">ndi.division.search</field>
+        <field name="model">ndi.division</field>
+        <field name="arch" type="xml">
+            <search string="Divisi NDI">
+                <field name="name"/>
+                <field name="code"/>
+                <filter name="inactive" string="Diarsipkan" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ndi_division" model="ir.actions.act_window">
+        <field name="name">Divisi Produk</field>
+        <field name="res_model">ndi.division</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_ndi_division_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Belum ada divisi</p>
+            <p>Divisi adalah sumbu komersial produk (Bahan Baku, Pakan Unggas,
+            Pakan Ruminansia, Kemasan, Barang Dagangan). Terpisah dari kategori
+            produk Odoo yang membawa konfigurasi akuntansi persediaan.</p>
+        </field>
+    </record>
+
+    <!-- ===================== Kategori ===================== -->
+    <record id="view_ndi_product_category_list" model="ir.ui.view">
+        <field name="name">ndi.product.category.list</field>
+        <field name="model">ndi.product.category</field>
+        <field name="arch" type="xml">
+            <list string="Kategori NDI" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="division_id"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="product_count" string="Produk"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ndi_product_category_search" model="ir.ui.view">
+        <field name="name">ndi.product.category.search</field>
+        <field name="model">ndi.product.category</field>
+        <field name="arch" type="xml">
+            <search string="Kategori NDI">
+                <field name="name"/>
+                <field name="division_id"/>
+                <group>
+                    <filter name="group_division" string="Divisi" context="{'group_by': 'division_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ndi_product_category" model="ir.actions.act_window">
+        <field name="name">Kategori Produk</field>
+        <field name="res_model">ndi.product.category</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_ndi_product_category_search"/>
+    </record>
+
+    <!-- ===================== Berat gross per UoM ===================== -->
+    <record id="view_ndi_product_uom_weight_list" model="ir.ui.view">
+        <field name="name">ndi.product.uom.weight.list</field>
+        <field name="model">ndi.product.uom.weight</field>
+        <field name="arch" type="xml">
+            <list string="Berat Gross per Satuan" editable="bottom">
+                <field name="product_tmpl_id"/>
+                <field name="uom_id"/>
+                <field name="gross_weight" sum="Total"/>
+                <field name="net_weight" optional="show"/>
+                <field name="tare_weight" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ndi_product_uom_weight_search" model="ir.ui.view">
+        <field name="name">ndi.product.uom.weight.search</field>
+        <field name="model">ndi.product.uom.weight</field>
+        <field name="arch" type="xml">
+            <search string="Berat Gross per Satuan">
+                <field name="product_tmpl_id"/>
+                <field name="uom_id"/>
+                <group>
+                    <filter name="group_product" string="Produk" context="{'group_by': 'product_tmpl_id'}"/>
+                    <filter name="group_uom" string="Satuan" context="{'group_by': 'uom_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ndi_product_uom_weight" model="ir.actions.act_window">
+        <field name="name">Berat Gross per Satuan</field>
+        <field name="res_model">ndi.product.uom.weight</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_ndi_product_uom_weight_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Belum ada berat gross</p>
+            <p>Berat kotor per satuan transaksi, termasuk karung dan benang jahit.
+            Inilah angka "BERAT T. BARANG" pada surat jalan — bukan berat netto isi.</p>
+        </field>
+    </record>
+
+    <!-- ===================== uom.uom: kolom NDI ===================== -->
+    <record id="view_uom_uom_list_ndi" model="ir.ui.view">
+        <field name="name">uom.uom.list.ndi</field>
+        <field name="model">uom.uom</field>
+        <field name="inherit_id" ref="uom.product_uom_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="relative_uom_id" position="after">
+                <field name="ndi_tier" optional="show"/>
+                <field name="ndi_is_packaging" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>
