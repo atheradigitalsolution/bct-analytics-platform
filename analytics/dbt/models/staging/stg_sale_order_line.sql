@@ -30,6 +30,14 @@ select
     price_subtotal,
     price_total,
     is_downpayment,
+
+    -- NDI (custom_ndi_pricing). Absent from every other tenant's schema, so
+    -- NULL here means "this tenant does not price in HJ tiers" and not "the
+    -- tier was not recorded". raw.sale_order_line carries the column for every
+    -- tenant because raw.* is generated from the UNION policy; the values are
+    -- NULL wherever the source table has no such column.
+    ndi_hj_level,
+    ndi_hpp_snapshot,
     create_date,
     write_date
 from latest

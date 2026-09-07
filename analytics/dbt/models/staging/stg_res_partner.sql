@@ -35,6 +35,16 @@ select
     company_id,
     parent_id,
     commercial_partner_id,
+
+    -- NDI (custom_ndi_master). All three are `internal`, and that is the point:
+    -- name, city and ref are `personal` and arrive as digests, so a commercial
+    -- dashboard cannot segment on them at all. These three exist precisely so
+    -- segmentation by customer type and sales region stays possible WITHOUT
+    -- weakening the classification of the identifying columns.
+    ndi_customer_type,
+    ndi_default_hj_level,
+    ndi_sales_region,
+
     lang,
     tz,
     create_date,

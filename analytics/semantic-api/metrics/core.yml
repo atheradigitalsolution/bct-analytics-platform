@@ -405,3 +405,179 @@
 # The rule this file keeps: an empty panel that names its missing metric is worth more than a
 # populated one that is wrong. Nothing above is declared against a substituted column.
 # ----------------------------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------------------------
+# NDI (pabrik pakan ternak) — penjualan per tingkat harga HJ1–HJ9.
+#
+# Source: mart_sales_price_tier_daily, which UNIONs the Sales Order and POS channels. Declared
+# only where the built mart already carries the data, exactly as the Phase 3 block above.
+#
+# THE ONE THAT IS DELIBERATELY MISSING: `sales_qty_base` (Qty Base Jual, in KG). It is designed
+# in 40-insight/03-metrik-semantic-api.md §1 and is NOT declared here, because the column it
+# would bind to — sale.order.line.ndi_qty_base — does not exist in the `ndi` schema. Binding it
+# to product_uom_qty instead would answer the question in whatever unit the line happened to use
+# (SAK, TON or KG) and present the sum as kilograms. An absent metric that names what it needs is
+# worth more than a plausible number in the wrong unit.
+# ----------------------------------------------------------------------------------------------
+- name: sales_by_price_tier
+  label: "Penjualan per Tingkat Harga"
+  description: >-
+    Nilai penjualan sebelum pajak, dipecah menurut tingkat harga HJ1-HJ9 yang benar-benar dipakai
+    pada baris transaksi. Sumbernya field ndi_hj_level yang disnapshot saat harga dihitung; Odoo 19
+    TIDAK menyimpan pricelist_item_id pada sale.order.line, sehingga tingkat harga tidak bisa
+    direkonstruksi belakangan. Baris tanpa tingkat tercatat masuk ke grup hj_level NULL dan TIDAK
+    dibuang - kelompokkan berdasarkan hj_level untuk melihatnya. Ukurannya price_subtotal (sebelum
+    pajak), bukan price_total: memakai price_total menaikkan angka sebesar PPN 11% dan tetap
+    terlihat wajar.
+  channel_note: >-
+    mart_sales_price_tier_daily meng-UNION sales_channel in (sale, pos). Menjumlahkan keduanya
+    DISENGAJA di sini: pasal 4 menanyakan total penjualan per tingkat harga apa pun kanalnya.
+    JANGAN menjumlahkan metrik ini dengan revenue_net - mart_revenue_daily sudah memuat kanal pos,
+    sehingga POS akan terhitung dua kali.
+  grain: [date_day, tenant_id, operating_unit_id, hj_level]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - hj_level
+    - hj_level_label
+    - sales_channel
+    - product_key
+    - partner_key
+    - customer_type
+    - sales_region
+    - company_id
+  derived_dimensions:
+    date_month: {from: date_day, grain: month}
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    hj_level: {type: "int[]", required: false}
+    sales_channel: {type: "string[]", required: false}
+    customer_type: {type: "string[]", required: false}
+    product_key: {type: "string[]", required: false}
+  type: decimal
+  unit: IDR
+  aggregation: sum
+  source_model: mart_sales_price_tier_daily
+  measure: amount_untaxed
+  refresh_sla_seconds: 300
+  pdp_class: internal
+
+- name: gross_margin_by_price_tier
+  label: "Margin Kotor per Tingkat Harga"
+  description: >-
+    Penjualan sebelum pajak dikurangi HPP yang disnapshot pada baris saat transaksi - bukan
+    standard_price hari ini, yang akan menilai penjualan Januari dengan biaya September. Baris
+    tanpa snapshot HPP menyumbang NULL, bukan nol, sehingga marginnya tidak sama dengan seluruh
+    pendapatannya; mart membawa lines_without_hpp agar bagian yang tidak terhitung bisa dinyatakan.
+  channel_note: >-
+    UNION sales_channel in (sale, pos); penjumlahan lintas kanal disengaja, alasan sama dengan
+    sales_by_price_tier.
+  grain: [date_day, tenant_id, operating_unit_id, hj_level]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - hj_level
+    - hj_level_label
+    - sales_channel
+    - product_key
+    - partner_key
+    - customer_type
+    - sales_region
+    - company_id
+  derived_dimensions:
+    date_month: {from: date_day, grain: month}
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    hj_level: {type: "int[]", required: false}
+    sales_channel: {type: "string[]", required: false}
+    customer_type: {type: "string[]", required: false}
+    product_key: {type: "string[]", required: false}
+  type: decimal
+  unit: IDR
+  aggregation: sum
+  source_model: mart_sales_price_tier_daily
+  measure: gross_margin
+  refresh_sla_seconds: 300
+  pdp_class: internal
+
+- name: gross_margin_pct
+  label: "Persentase Margin Kotor"
+  description: >-
+    Margin kotor dibagi penjualan sebelum pajak. Rasio dari dua jumlah, bukan rata-rata dari rasio
+    per baris: rata-rata rasio memberi bobot sama pada penjualan 10 SAK dan 10 TON. Pembagian
+    dijaga NULLIF, sehingga penyebut nol menghasilkan NULL - bukan nol, bukan pembagian gagal.
+  channel_note: >-
+    UNION sales_channel in (sale, pos); penjumlahan lintas kanal disengaja.
+  grain: [date_day, tenant_id, operating_unit_id, hj_level]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - hj_level
+    - hj_level_label
+    - sales_channel
+    - product_key
+    - customer_type
+    - sales_region
+    - company_id
+  derived_dimensions:
+    date_month: {from: date_day, grain: month}
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    hj_level: {type: "int[]", required: false}
+    product_key: {type: "string[]", required: false}
+  type: percent
+  aggregation: ratio
+  numerator: {measure: gross_margin, agg: sum}
+  denominator: {measure: amount_untaxed, agg: sum}
+  source_model: mart_sales_price_tier_daily
+  refresh_sla_seconds: 300
+  pdp_class: internal
+
+- name: sales_below_default_tier_pct
+  label: "Penjualan di Bawah Tingkat Default Pelanggan"
+  description: >-
+    Bagian baris penjualan yang memakai tingkat harga lebih murah daripada tingkat default
+    pelanggannya (res.partner.ndi_default_hj_level). Ini indikator disiplin harga, bukan tuduhan -
+    sebagian selisih adalah diskon yang disetujui. ARAH PERBANDINGAN SUDAH DIVERIFIKASI TERHADAP
+    DATA, bukan diasumsikan: pelanggan `distributor` memegang tingkat default 5-6 dan `retail`
+    memegang 1, dan rata-rata price_unit TURUN saat nomor tingkat NAIK. Jadi nomor tingkat yang
+    lebih besar berarti harga lebih murah, dan "di bawah default" adalah hj_level > default.
+    Penyebutnya line_count, jadi baris yang tingkat atau defaultnya tidak diketahui ikut menekan
+    rasio ke bawah; mart membawa lines_default_tier_unknown untuk menyatakan berapa banyak.
+  channel_note: >-
+    UNION sales_channel in (sale, pos); penjumlahan lintas kanal disengaja.
+  grain: [date_day, tenant_id, operating_unit_id, hj_level]
+  dimensions:
+    - date_day
+    - date_month
+    - tenant_id
+    - operating_unit_id
+    - hj_level
+    - sales_channel
+    - customer_type
+    - sales_region
+    - partner_key
+    - product_key
+    - company_id
+  derived_dimensions:
+    date_month: {from: date_day, grain: month}
+  filters:
+    date_range: {type: daterange, required: true, column: date_day}
+    operating_unit_id: {type: "int[]", required: false}
+    customer_type: {type: "string[]", required: false}
+  type: percent
+  aggregation: ratio
+  numerator: {measure: lines_below_default_tier, agg: sum}
+  denominator: {measure: line_count, agg: sum}
+  source_model: mart_sales_price_tier_daily
+  refresh_sla_seconds: 300
+  pdp_class: internal

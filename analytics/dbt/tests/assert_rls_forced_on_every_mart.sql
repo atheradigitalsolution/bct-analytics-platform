@@ -28,6 +28,8 @@
 -- depends_on: {{ ref('mart_revenue_daily') }}
 -- depends_on: {{ ref('mart_stock_position') }}
 -- depends_on: {{ ref('mart_ppob_transaction') }}
+-- depends_on: {{ ref('fct_sales_price_tier_line') }}
+-- depends_on: {{ ref('mart_sales_price_tier_daily') }}
 -- depends_on: {{ ref('recon_daily') }}
 
 select

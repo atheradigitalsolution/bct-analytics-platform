@@ -524,6 +524,110 @@ models:
           arguments:
               combination_of_columns: [tenant_id, date_day, operating_unit_id, biller_key, state]
 
+  - name: fct_sales_price_tier_line
+    description: >-
+      "GRAIN: one sold line from either channel. The HJ1-HJ9 price-tier fact:
+      which tier a line actually went out at, what it cost, and whether it was
+      below the customer's default tier. Sales Orders and POS are UNIONed here
+      once so no consumer has to decide how to combine them."
+    columns:
+      - name: sales_price_tier_line_key
+        data_tests: [not_null, unique]
+      - name: tenant_id
+        data_tests: [not_null]
+      - name: sales_channel
+        description: >-
+          The channel the line was sold through. Part of the grain, and a
+          declared dimension, so a total can always be split back apart.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [sale, pos]}
+      - name: source_line_id
+        data_tests: [not_null]
+      - name: date_day
+        data_tests: [not_null]
+      - name: hj_level
+        description: >-
+          1-9, snapshotted by custom_ndi_pricing when the price was computed.
+          NULLABLE ON PURPOSE - Odoo 19 keeps no pricelist_item_id on the line,
+          so a tier that was not snapshotted cannot be recovered and must not be
+          invented. is_hj_recorded reports it.
+        data_tests:
+          - accepted_values:
+              arguments:
+                  values: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+                  quote: false
+      - name: is_hj_recorded
+        data_tests: [not_null]
+      - name: is_below_default_tier
+        description: >-
+          hj_level > partner_default_hj_level, because a HIGHER tier number is a
+          CHEAPER price on NDI's waterfall. Verified against the data before the
+          model was written, not assumed from the name. NULL where either side
+          is unknown.
+      - name: has_hpp
+        description: >-
+          False where no cost was snapshotted, in which case hpp_amount and
+          gross_margin are NULL rather than 0. Same reason as
+          mart_stock_position.has_unit_cost: sum() skips NULL without comment,
+          and an unqualified margin total reads like a finished number.
+        data_tests: [not_null]
+      - name: partner_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_partner'), field: partner_key}
+      - name: product_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_product'), field: product_key}
+      - name: operating_unit_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_operating_unit'), field: operating_unit_key}
+    data_tests:
+      - unique_combination:
+          arguments:
+              combination_of_columns: [tenant_id, sales_channel, source_line_id]
+
+  - name: mart_sales_price_tier_daily
+    description: >-
+      "GRAIN: (tenant_id, date_day, operating_unit_id, company_id, hj_level,
+      sales_channel, product_key, partner_key). Turnover and gross margin per
+      price tier - pasal 4 and 24 of the NDI requirement. Do NOT sum with
+      revenue_net: mart_revenue_daily already carries a `pos` channel and the
+      two together double-count every POS line."
+    columns:
+      - name: tenant_id
+        data_tests: [not_null]
+      - name: date_day
+        data_tests: [not_null]
+      - name: sales_channel
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [sale, pos]}
+      - name: line_count
+        data_tests: [not_null]
+      - name: amount_untaxed
+        description: >-
+          price_subtotal, BEFORE tax. Not price_total: using it would lift every
+          figure by 11 % VAT and still look entirely reasonable.
+        data_tests: [not_null]
+      - name: lines_without_hpp
+        data_tests: [not_null]
+      - name: lines_without_hj_level
+        data_tests: [not_null]
+    data_tests:
+      - unique_combination:
+          arguments:
+              combination_of_columns:
+                  [tenant_id, date_day, operating_unit_id, company_id, hj_level,
+                   sales_channel, product_key, partner_key]
+
   - name: recon_daily
     description: >-
       Per-tenant per-day comparison of the warehouse against a LIVE read of the

@@ -62,6 +62,14 @@ pdp_account_move__invoice_user_id,account.move,invoice_user_id,internal,Not pers
 pdp_account_move__is_manually_modified,account.move,is_manually_modified,internal,Not personal data - business record,,False
 pdp_account_move__is_move_sent,account.move,is_move_sent,internal,Not personal data - business record,,False
 pdp_account_move__journal_id,account.move,journal_id,internal,Not personal data - business record,,False
+pdp_account_move__l10n_id_coretax_add_info_07,account.move,l10n_id_coretax_add_info_07,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
+pdp_account_move__l10n_id_coretax_add_info_08,account.move,l10n_id_coretax_add_info_08,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
+pdp_account_move__l10n_id_coretax_custom_doc,account.move,l10n_id_coretax_custom_doc,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
+pdp_account_move__l10n_id_coretax_custom_doc_month_year,account.move,l10n_id_coretax_custom_doc_month_year,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
+pdp_account_move__l10n_id_coretax_document,account.move,l10n_id_coretax_document,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
+pdp_account_move__l10n_id_coretax_facility_info_07,account.move,l10n_id_coretax_facility_info_07,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
+pdp_account_move__l10n_id_coretax_facility_info_08,account.move,l10n_id_coretax_facility_info_08,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
+pdp_account_move__l10n_id_kode_transaksi,account.move,l10n_id_kode_transaksi,internal,Not personal data - business record,"Kode transaksi faktur pajak (01-09). Kode dokumen, bukan atribut orang.",False
 pdp_account_move__l10n_ou_analytic_id,account.move,l10n_ou_analytic_id,internal,Not personal data - business record,,False
 pdp_account_move__l10n_purchase_type,account.move,l10n_purchase_type,internal,Not personal data - business record,,False
 pdp_account_move__made_sequence_gap,account.move,made_sequence_gap,internal,Not personal data - business record,,False
@@ -196,6 +204,9 @@ pdp_account_move_line__write_date,account.move.line,write_date,internal,Not pers
 pdp_account_move_line__write_uid,account.move.line,write_uid,internal,Not personal data - business record,,False
 pdp_account_move_line__x_custom_tax_label,account.move.line,x_custom_tax_label,internal,Not personal data - business record,,False
 pdp_account_move_line__x_custom_withholding_category_id,account.move.line,x_custom_withholding_category_id,internal,Not personal data - business record,,False
+pdp_mrp_bom__ndi_batch_standar_kg,mrp.bom,ndi_batch_standar_kg,internal,Not personal data - business record,NDI pasal 7: jejak formulasi berbasis persen di balik product_qty per batch.,False
+pdp_mrp_bom__ndi_formula_note,mrp.bom,ndi_formula_note,internal,Not personal data - business record,NDI pasal 7: jejak formulasi berbasis persen di balik product_qty per batch.,False
+pdp_mrp_bom_line__ndi_persen,mrp.bom.line,ndi_persen,internal,Not personal data - business record,NDI pasal 7: jejak formulasi berbasis persen di balik product_qty per batch.,False
 pdp_operating_unit__active,operating.unit,active,internal,Not personal data - business record,,False
 pdp_operating_unit__code,operating.unit,code,internal,Not personal data - business record,,False
 pdp_operating_unit__company_id,operating.unit,company_id,internal,Not personal data - business record,,False
@@ -285,6 +296,9 @@ pdp_pos_order_line__id,pos.order.line,id,internal,Not personal data - business r
 pdp_pos_order_line__is_edited,pos.order.line,is_edited,internal,Not personal data - business record,,False
 pdp_pos_order_line__is_total_cost_computed,pos.order.line,is_total_cost_computed,internal,Not personal data - business record,,False
 pdp_pos_order_line__name,pos.order.line,name,internal,Not personal data - business record,,False
+pdp_pos_order_line__ndi_hj_components,pos.order.line,ndi_hj_components,internal,Not personal data - business record,"NDI pasal 4/24: snapshot tingkat harga pada baris transaksi, sumbu laporan omset per Harga 1-9.",False
+pdp_pos_order_line__ndi_hj_level,pos.order.line,ndi_hj_level,internal,Not personal data - business record,"NDI pasal 4/24: snapshot tingkat harga pada baris transaksi, sumbu laporan omset per Harga 1-9.",False
+pdp_pos_order_line__ndi_hpp_snapshot,pos.order.line,ndi_hpp_snapshot,internal,Not personal data - business record,"NDI pasal 4/24: snapshot tingkat harga pada baris transaksi, sumbu laporan omset per Harga 1-9.",False
 pdp_pos_order_line__note,pos.order.line,note,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,Free text - may contain any category of personal data; dropped to NULL at load.,True
 pdp_pos_order_line__notice,pos.order.line,notice,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,Free text - may contain any category of personal data; dropped to NULL at load.,True
 pdp_pos_order_line__order_id,pos.order.line,order_id,internal,Not personal data - business record,,False
@@ -349,6 +363,7 @@ pdp_ppob_transaction__state,ppob.transaction,state,internal,Not personal data - 
 pdp_ppob_transaction__total_amount,ppob.transaction,total_amount,internal,Not personal data - business record,,False
 pdp_ppob_transaction__write_date,ppob.transaction,write_date,internal,Not personal data - business record,,False
 pdp_ppob_transaction__write_uid,ppob.transaction,write_uid,internal,Not personal data - business record,,False
+pdp_product_pricelist__ndi_hj_level,product.pricelist,ndi_hj_level,internal,Not personal data - business record,"NDI pasal 13/22: nomor tingkat harga pricelist, kunci ir.rule kasir dan sumbu laporan.",False
 pdp_product_product__abc_class,product.product,abc_class,internal,Not personal data - business record,,False
 pdp_product_product__active,product.product,active,internal,Not personal data - business record,,False
 pdp_product_product__barcode,product.product,barcode,public,Not personal data - published to counterparties,,False
@@ -422,6 +437,7 @@ pdp_product_template__is_rentable,product.template,is_rentable,internal,Not pers
 pdp_product_template__is_rental_asset,product.template,is_rental_asset,internal,Not personal data - business record,,False
 pdp_product_template__is_seo_optimized,product.template,is_seo_optimized,internal,Not personal data - business record,,False
 pdp_product_template__is_storable,product.template,is_storable,internal,Not personal data - business record,,False
+pdp_product_template__l10n_id_product_code,product.template,l10n_id_product_code,internal,Not personal data - business record,"Kode klasifikasi barang/jasa untuk e-Faktur. Atribut produk.",False
 pdp_product_template__list_price,product.template,list_price,public,Not personal data - published to counterparties,,False
 pdp_product_template__lot_sequence_id,product.template,lot_sequence_id,internal,Not personal data - business record,,False
 pdp_product_template__lot_valuated,product.template,lot_valuated,internal,Not personal data - business record,,False
@@ -445,6 +461,29 @@ pdp_product_template__mdm_template_code,product.template,mdm_template_code,inter
 pdp_product_template__mdm_vendor_code,product.template,mdm_vendor_code,internal,Not personal data - business record,,False
 pdp_product_template__mdm_width,product.template,mdm_width,internal,Not personal data - business record,,False
 pdp_product_template__name,product.template,name,public,Not personal data - published to counterparties,,False
+pdp_product_template__ndi_divisi_id,product.template,ndi_divisi_id,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_hj1,product.template,ndi_hj1,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hj2,product.template,ndi_hj2,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hj3,product.template,ndi_hj3,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hj4,product.template,ndi_hj4,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hj5,product.template,ndi_hj5,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hj6,product.template,ndi_hj6,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hj7,product.template,ndi_hj7,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hj8,product.template,ndi_hj8,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hj9,product.template,ndi_hj9,internal,Not personal data - business record,"NDI pasal 13: hasil waterfall harga jual, angka rupiah per produk.",False
+pdp_product_template__ndi_hpp_dasar,product.template,ndi_hpp_dasar,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_insentif_bulanan_rp,product.template,ndi_insentif_bulanan_rp,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_insentif_kwartal_rp,product.template,ndi_insentif_kwartal_rp,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_jenis_produk,product.template,ndi_jenis_produk,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_kategori_id,product.template,ndi_kategori_id,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_margin_het_rp,product.template,ndi_margin_het_rp,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_ongkir_rp,product.template,ndi_ongkir_rp,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_pajak_pct,product.template,ndi_pajak_pct,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_pembulatan_rp,product.template,ndi_pembulatan_rp,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_profit_pct,product.template,ndi_profit_pct,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_risiko_pct,product.template,ndi_risiko_pct,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_stok_maks,product.template,ndi_stok_maks,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
+pdp_product_template__ndi_stok_min,product.template,ndi_stok_min,internal,Not personal data - business record,NDI master produk pasal 5/13: klasifikasi komersial dan komponen pembentuk harga. Bukan data orang.,False
 pdp_product_template__out_of_stock_message,product.template,out_of_stock_message,internal,Not personal data - business record,,False
 pdp_product_template__pos_sequence,product.template,pos_sequence,internal,Not personal data - business record,,False
 pdp_product_template__product_properties,product.template,product_properties,internal,Not personal data - business record,,False
@@ -740,9 +779,18 @@ pdp_res_partner__is_company,res.partner,is_company,internal,Not personal data - 
 pdp_res_partner__is_pickup_location,res.partner,is_pickup_location,internal,Not personal data - business record,,False
 pdp_res_partner__is_published,res.partner,is_published,internal,Not personal data - business record,,False
 pdp_res_partner__is_seo_optimized,res.partner,is_seo_optimized,internal,Not personal data - business record,,False
+pdp_res_partner__l10n_id_buyer_document_number,res.partner,l10n_id_buyer_document_number,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"Nomor dokumen identitas pembeli (paspor/identitas lain) untuk e-Faktur. Sejajar res.partner.vat: di-hash saat load, tidak di-NULL-kan supaya join lintas dokumen tetap hidup.",False
+pdp_res_partner__l10n_id_buyer_document_type,res.partner,l10n_id_buyer_document_type,internal,Not personal data - business record,"Jenis dokumen identitas (domain enum sangat kecil). Sengaja BUKAN personal: HMAC atas enum tiga nilai bukan masking - ia terbalik dalam tiga percobaan - sekaligus mematikan nilai analitiknya.",False
+pdp_res_partner__l10n_id_kode_transaksi,res.partner,l10n_id_kode_transaksi,internal,Not personal data - business record,"Kode transaksi faktur pajak default pelanggan. Atribut komersial.",False
+pdp_res_partner__l10n_id_nik,res.partner,l10n_id_nik,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"NIK. Preseden langsung: res.partner.vat (NPWP/NIK) sudah sensitive dan di-hash saat load.",False
+pdp_res_partner__l10n_id_pkp,res.partner,l10n_id_pkp,internal,Not personal data - business record,"Status Pengusaha Kena Pajak. Status badan usaha, boolean.",False
+pdp_res_partner__l10n_id_tku,res.partner,l10n_id_tku,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"Nomor Identitas Tempat Kegiatan Usaha, bagian dari identitas NPWP16 lawan transaksi. Diperlakukan sejajar res.partner.vat.",False
 pdp_res_partner__lang,res.partner,lang,internal,Not personal data - business record,,False
 pdp_res_partner__message_bounce,res.partner,message_bounce,internal,Not personal data - business record,,False
 pdp_res_partner__name,res.partner,name,personal,UU 27/2022 Art. 4(2) - data pribadi umum,Direct identifier of a natural person; hashed at load so joins survive.,False
+pdp_res_partner__ndi_customer_type,res.partner,ndi_customer_type,internal,Not personal data - business record,"Addendum K-2: tipe pelanggan sebagai kolom skalar justru supaya bisa direplikasi; res.partner.category tidak bisa. Kategori usaha, bukan atribut pribadi.",False
+pdp_res_partner__ndi_default_hj_level,res.partner,ndi_default_hj_level,internal,Not personal data - business record,"NDI pasal 14: tingkat harga default pelanggan, angka 1-9. Atribut komersial.",False
+pdp_res_partner__ndi_sales_region,res.partner,ndi_sales_region,internal,Not personal data - business record,"Addendum K-3: dimensi wilayah pemasaran. Sengaja terpisah dari res_partner.city yang diklasifikasi personal dan di-hash saat load, sehingga dashboard wilayah tetap terbaca.",False
 pdp_res_partner__parent_id,res.partner,parent_id,internal,Not personal data - business record,,False
 pdp_res_partner__partner_latitude,res.partner,partner_latitude,sensitive,UU 27/2022 Art. 4(3) huruf g - data pribadi lainnya,Precise geolocation of a natural person; dropped to NULL - a digest of a coordinate has no analytic value.,True
 pdp_res_partner__partner_longitude,res.partner,partner_longitude,sensitive,UU 27/2022 Art. 4(3) huruf g - data pribadi lainnya,Precise geolocation of a natural person; dropped to NULL - a digest of a coordinate has no analytic value.,True
@@ -953,6 +1001,9 @@ pdp_sale_order_line__is_service,sale.order.line,is_service,internal,Not personal
 pdp_sale_order_line__linked_line_id,sale.order.line,linked_line_id,internal,Not personal data - business record,,False
 pdp_sale_order_line__linked_virtual_id,sale.order.line,linked_virtual_id,internal,Not personal data - business record,,False
 pdp_sale_order_line__name,sale.order.line,name,internal,Not personal data - business record,,False
+pdp_sale_order_line__ndi_hj_components,sale.order.line,ndi_hj_components,internal,Not personal data - business record,"NDI pasal 4/24: snapshot tingkat harga pada baris transaksi, sumbu laporan omset per Harga 1-9.",False
+pdp_sale_order_line__ndi_hj_level,sale.order.line,ndi_hj_level,internal,Not personal data - business record,"NDI pasal 4/24: snapshot tingkat harga pada baris transaksi, sumbu laporan omset per Harga 1-9.",False
+pdp_sale_order_line__ndi_hpp_snapshot,sale.order.line,ndi_hpp_snapshot,internal,Not personal data - business record,"NDI pasal 4/24: snapshot tingkat harga pada baris transaksi, sumbu laporan omset per Harga 1-9.",False
 pdp_sale_order_line__order_id,sale.order.line,order_id,internal,Not personal data - business record,,False
 pdp_sale_order_line__order_partner_id,sale.order.line,order_partner_id,internal,Not personal data - business record,,False
 pdp_sale_order_line__price_reduce_taxexcl,sale.order.line,price_reduce_taxexcl,internal,Not personal data - business record,,False
@@ -1104,3 +1155,5 @@ pdp_stock_picking__x_custom_ic_source_picking_id,stock.picking,x_custom_ic_sourc
 pdp_stock_picking__x_custom_ppob_bucket_id,stock.picking,x_custom_ppob_bucket_id,internal,Not personal data - business record,,False
 pdp_stock_picking__x_custom_ppob_dp_invoice_id,stock.picking,x_custom_ppob_dp_invoice_id,internal,Not personal data - business record,,False
 pdp_stock_picking__x_custom_ppob_transaction_id,stock.picking,x_custom_ppob_transaction_id,internal,Not personal data - business record,,False
+pdp_uom_uom__ndi_is_packaging,uom.uom,ndi_is_packaging,internal,Not personal data - business record,"NDI pasal 5: peran dan kedalaman satuan pada pohon UoM. Atribut kemasan, bukan data orang.",False
+pdp_uom_uom__ndi_tier,uom.uom,ndi_tier,internal,Not personal data - business record,"NDI pasal 5: peran dan kedalaman satuan pada pohon UoM. Atribut kemasan, bukan data orang.",False

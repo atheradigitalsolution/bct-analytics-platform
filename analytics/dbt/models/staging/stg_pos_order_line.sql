@@ -24,6 +24,13 @@ select
     price_subtotal,
     price_subtotal_incl,
     total_cost,
+
+    -- NDI (custom_ndi_pricing), same shape as on sale_order_line. Pasal 4/24
+    -- requires POS to answer the price-tier question too, so the tier and the
+    -- cost snapshot are carried on both channels or the question is only half
+    -- answered.
+    ndi_hj_level,
+    ndi_hpp_snapshot,
     create_date,
     write_date
 from latest
