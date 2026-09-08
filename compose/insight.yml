@@ -247,13 +247,44 @@ services:
       # because the role cannot, not because the code is careful.
       ODOO_PG_HOST: ${POSTGRES_HOST:-postgres}
       ODOO_PG_PORT: "5432"
-      ODOO_DB_NAME: ${ODOO_DB_NAME:-bct}
+      # ------------------------------------------------------------------
+      # NOT ${ODOO_DB_NAME}, and only for THIS service.
+      #
+      # warehouse_ctl.py `sync-policy` sweeps warehouse.column_policy globally:
+      # every (source_table, source_column) pair NOT produced by this run is
+      # DELETEd (warehouse_ctl.py:427-429). The table has no tenant dimension
+      # (analytics/warehouse/init/sql/30-metadata.sql:37, frozen in contract 05),
+      # so with two Odoo tenants there is no single tenant database that
+      # satisfies both: measured on this deployment, syncing from `ndi` would
+      # delete 29 `bct` rows, and syncing from `bct` leaves 62 `ndi` columns
+      # unclassified — which the loader correctly refuses to start on.
+      #
+      # `policy_master` is an Odoo database holding the UNION of every served
+      # tenant's schema and NO DATA. A sync from it is a true superset, so the
+      # global sweep deletes nothing from anybody. Proven read-only before it
+      # was ever run: 840 rows produced, 0 lost, 0 reclassified, 62 added.
+      #
+      # ODOO_DB_NAME stays `bct` in .env on purpose — `make shell`,
+      # cdc-provision.sh, `make cdc-status`, the CDC_TENANT_DB fallback and the
+      # whole test suite all read it. Overriding it here and nowhere else is
+      # what keeps that true.
+      #
+      # WHEN A TENANT IS ADDED: rebuild policy_master's union, then re-prove the
+      # superset BEFORE running sync-policy.
+      # ------------------------------------------------------------------
+      ODOO_DB_NAME: ${WAREHOUSE_POLICY_DB:-policy_master}
       WAREHOUSE_READER_USER: ${WAREHOUSE_READER_USER:-warehouse_reader}
       WAREHOUSE_READER_PASSWORD: ${WAREHOUSE_READER_PASSWORD:?WAREHOUSE_READER_PASSWORD is required}
       # Per-tenant HMAC salts. SOPS-managed, `changeme` in .env.example, never
       # in a tracked file. warehouse.tenant_registry stores only the NAME.
       WAREHOUSE_MASK_SALT_DEFAULT: ${WAREHOUSE_MASK_SALT_DEFAULT:?WAREHOUSE_MASK_SALT_DEFAULT is required}
       WAREHOUSE_MASK_SALT_BCT: ${WAREHOUSE_MASK_SALT_BCT:?WAREHOUSE_MASK_SALT_BCT is required}
+      # `:?` and not `:-`. warehouse_ctl.salt_for() falls back to
+      # WAREHOUSE_MASK_SALT_DEFAULT without logging, so an absent per-tenant
+      # salt is not an error here — it is a silent downgrade to a salt shared
+      # with every other tenant. Required-variable interpolation turns that
+      # into a startup failure, which is the only form of it anybody notices.
+      WAREHOUSE_MASK_SALT_NDI: ${WAREHOUSE_MASK_SALT_NDI:?WAREHOUSE_MASK_SALT_NDI is required}
       DBT_PROFILES_DIR: /dbt
       DBT_THREADS: ${DBT_THREADS:-4}
       # Not used by dbt. Read by warehouse_ctl.py verify, whose connection
@@ -417,6 +448,101 @@ services:
     # `analytics-cdc`, jadi "sehat" di sini berarti hal yang sama dengan "target up" di sana.
     # `urllib` dan bukan curl/wget: image ini python:3.12-slim dan sengaja tidak memasang
     # keduanya, jadi healthcheck ber-curl akan gagal selamanya dengan "executable not found".
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:9108/metrics', timeout=3).status==200 else 1)"
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - bct
+
+  # =========================================================================
+  # cdc-ndi — the SECOND loader. Tenant `ndi` (pabrik pakan ternak).
+  #
+  # This is what "WHAT MULTIPLIES PER CLIENT: only `cdc`" at the top of this
+  # file means in practice: a second copy of the service, not a bigger one.
+  # Its own container, its own publication `bct_cdc_ndi`, its own slot
+  # `bct_slot_ndi` and its own salt. It shares the warehouse, where the
+  # boundary is FORCE ROW LEVEL SECURITY on tenant_id.
+  #
+  # WHY NOT REUSE `cdc` WITH CDC_TENANT_DB=ndi. That service's container_name
+  # is pinned and its defaults chain to ${ODOO_DB_NAME}. Pointing it at `ndi`
+  # would not add a tenant, it would MOVE the bct loader — and the way that
+  # shows up is the bct slot going idle while its WAL retention keeps counting
+  # against the 2 GB cap of ADR 0001.
+  #
+  # ORDERING is the same as for `cdc`: publication FIRST, then this consumer,
+  # which creates the slot at the end of its own startup checks.
+  #     bash scripts/analytics/cdc-provision.sh --slug ndi
+  #     docker compose ... up -d --build cdc-ndi
+  # =========================================================================
+  cdc-ndi:
+    build:
+      context: ../analytics/cdc
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-cdc:local
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-cdc-ndi
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    read_only: true
+    mem_limit: ${CDC_MEM_LIMIT:-512m}
+    environment:
+      WAREHOUSE_READER_USER: ${WAREHOUSE_READER_USER:-warehouse_reader}
+      WAREHOUSE_READER_PASSWORD: ${WAREHOUSE_READER_PASSWORD:?WAREHOUSE_READER_PASSWORD is required}
+      WAREHOUSE_DB: ${WAREHOUSE_DB:-warehouse}
+      WAREHOUSE_LOADER_USER: ${WAREHOUSE_LOADER_USER:-warehouse_loader}
+      WAREHOUSE_LOADER_PASSWORD: ${WAREHOUSE_LOADER_PASSWORD:?WAREHOUSE_LOADER_PASSWORD is required}
+      # THE POINT OF THIS SERVICE EXISTING SEPARATELY.
+      #
+      # config.py resolve_salt() reads WAREHOUSE_MASK_SALT_NDI and, if it is
+      # absent, falls back to WAREHOUSE_MASK_SALT_DEFAULT — with no log line.
+      # The `cdc` service above forwards only ..._DEFAULT and ..._BCT, so a
+      # second tenant started from it would hash with the SAME key as every
+      # other tenant, and hmac(name, DEFAULT) is then a join key across
+      # tenants: RLS still holds the rows apart, but anyone holding two
+      # tenants' output can link the same natural person. Forwarded here
+      # explicitly, and with `:?` so an unset salt is a startup failure
+      # instead of a silent downgrade.
+      #
+      # ..._DEFAULT is still passed because `resolve_salt` reads it as the
+      # documented second step; it must never be the one that wins for ndi.
+      WAREHOUSE_MASK_SALT_DEFAULT: ${WAREHOUSE_MASK_SALT_DEFAULT:?WAREHOUSE_MASK_SALT_DEFAULT is required}
+      WAREHOUSE_MASK_SALT_NDI: ${WAREHOUSE_MASK_SALT_NDI:?WAREHOUSE_MASK_SALT_NDI is required}
+      # Literals, never ${ODOO_DB_NAME}. Every one of these MUST NOT follow the
+      # default tenant; that is the whole difference between this service and
+      # the one above.
+      ODOO_DB_NAME: ndi
+      CDC_TENANT_DB: ndi
+      CDC_TENANT_SLUG: ndi
+      CDC_PUBLICATION: bct_cdc_ndi
+      CDC_SLOT: bct_slot_ndi
+      CDC_WAREHOUSE_HOST: ${CDC_WAREHOUSE_HOST:-warehouse-db}
+      CDC_SOURCE_HOST: ${CDC_SOURCE_HOST:-postgres}
+      CDC_ODOO_URL: http://ndi.${ATHERA_DOMAIN:-athera.localhost}:8069
+      CDC_ODOO_DB: ndi
+      CDC_ODOO_LOGIN: ${CDC_NDI_ODOO_LOGIN:-}
+      CDC_ODOO_PASSWORD: ${CDC_NDI_ODOO_PASSWORD:-}
+      CDC_VERIFY_DIGEST_SPEC: ${CDC_VERIFY_DIGEST_SPEC:-1}
+      CDC_BATCH_SIZE: ${CDC_BATCH_SIZE:-2000}
+      # EXPLICIT, where `cdc` leaves it empty and takes every table in the
+      # policy. warehouse.column_policy is now the UNION of both tenants'
+      # schemas, so "every table in the policy" is no longer the same set for
+      # every tenant. Naming them here means a table added to the policy for
+      # some future tenant cannot silently widen what is replicated out of ndi.
+      # It can only ever NARROW the policy, never widen it (config.py).
+      CDC_SOURCE_TABLES: >-
+        res_company,res_partner,product_template,product_product,operating_unit,
+        sale_order,sale_order_line,account_move,account_move_line,account_account,
+        stock_picking,stock_move,pos_order,pos_order_line,ppob_biller,ppob_transaction
+      TZ: ${TZ:-UTC}
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
     healthcheck:
       test:
         - CMD

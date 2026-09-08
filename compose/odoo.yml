@@ -308,6 +308,12 @@ services:
           - ${ODOO_DB_NAME:-bct}.${ATHERA_DOMAIN:-athera.localhost}
           - ${ATHERA_ADMIN_DB:-athera_admin}.${ATHERA_DOMAIN:-athera.localhost}
           - acme.${ATHERA_DOMAIN:-athera.localhost}
+          # ndi — tenant Insight kedua, ditambahkan 2026-09-05. Literal dan bukan
+          # ${VAR}: ODOO_DB_NAME tetap `bct` dan harus tetap begitu, jadi tidak ada
+          # variabel yang boleh menamai database ini. Tanpa alias ini login-gateway
+          # memanggil http://ndi.athera-digital.com:8069, DNS embedded Docker tidak
+          # menemukannya, dan sebuah password yang BENAR dijawab upstream_unavailable.
+          - ndi.${ATHERA_DOMAIN:-athera.localhost}
 
 # --- Networks --------------------------------------------------------------
 # One explicit network. Named `bct` inside the file; the actual docker network
