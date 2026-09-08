@@ -135,3 +135,22 @@ desktop.ini
 # real domain. `.json` rather than `.yml` because prometheus.yml globs the
 # `.yml` files in that directory as full scrape configs.
 observability/prometheus/scrape.d/*.json
+
+# ---------------------------------------------------------------------------
+# Deliverable operator: dokumen klien, tangkapan layar, dan arsip yang dibangun
+# untuk sebuah pekerjaan. Bukan bagian dari produk.
+#
+# Alasannya bukan kerapian, melainkan satu temuan konkret. Arsip deliverable
+# dibangun dari database contoh yang berjalan, sehingga ia membawa dump
+# `pg_dump` berisi `database.secret` yang aktif, hash kata sandi, dan katalog
+# `ir_module_module` yang menguraikan ~160 modul internal. Sebelum baris ini
+# ada, arsip 13 MB itu tidak dilacak DAN tidak diabaikan -- satu `git add -A`
+# akan mendorongnya ke repo. Larangan di CLAUDE.md soal `git add -A` benar,
+# tetapi larangan yang hanya bergantung pada ingatan bukan kontrol.
+#
+# Berjangkar dengan garis miring di depan: `.claude/deliverables` pada
+# kedalaman INI saja, mengikuti konvensi berkas ini. Agent, skill, dan dokumen
+# operator lain di `.claude/` sengaja TIDAK ikut diabaikan -- yang berbahaya
+# adalah artefak yang dibangun dari sistem berjalan, bukan konfigurasinya.
+# ---------------------------------------------------------------------------
+/.claude/deliverables/
