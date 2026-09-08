@@ -196,6 +196,33 @@ log "[5/5] registry"
 # does the quoting. The slug reaches this script from the command line.
 RECORD_RC=0
 _ADMIN_DB="${ATHERA_ADMIN_DB:-athera_admin}"
+
+# THE CONTROL PLANE IS NOT A TENANT, and this step spent four nights insisting it
+# was. `tenant_registry.backups.tenant_id` is a NOT NULL foreign key into
+# `tenant_registry.tenants`; the INSERT below is a SELECT out of that table, so for
+# `athera_admin` -- the database the registry itself lives in, which correctly has
+# no row describing itself as a client -- it matched nothing, returned no id, and
+# exited 3. Measured: 2026-09-05 through 2026-09-08, four consecutive nights where
+# the dump was complete on disk, its checksum verified, and the cron job still
+# reported failure.
+#
+# That is worse than the gap it was reporting. A backup job that is red every
+# single night carries no information: the one night it goes red for a reason that
+# matters looks exactly like the four hundred before it. The fix is not to give the
+# control plane a fake tenant row -- that row would then appear in the tenant list,
+# in entitlement, and in billing, all of which read this table -- but to say plainly
+# that there is nothing here to record.
+#
+# What the control plane gets instead is the same proof a tenant gets, minus the
+# console row: the host job verifies the checksums of the newest set under every
+# backup root on every run, and that verification covers `athera_admin` already.
+if [ "$SLUG" = "$_ADMIN_DB" ]; then
+    info "control plane: not a tenant, so nothing to record in tenant_registry.backups"
+    info "(its evidence is the checksum verification the host job runs over this set)"
+    log "backup complete: $DEST"
+    ls -la "$DEST" >&2
+    exit 0
+fi
 _TOTAL_BYTES="$(python3 - "$DEST" <<'SIZEPY'
 import json, sys
 m = json.load(open(sys.argv[1] + "/manifest.json", encoding="utf-8"))
