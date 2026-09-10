@@ -46,7 +46,7 @@
 # at the moment DNS becomes correct.
 #
 # EVERY HOSTNAME BELOW NEEDS A DNS RECORD in production. Currently:
-#   @  www  insight  admin  odoo  auth  bct  acme
+#   @  www  insight  admin  odoo  auth
 #
 # HOSTS FILE, workstation only. Windows does not resolve *.localhost
 # automatically. Add:
@@ -54,8 +54,6 @@
 #     127.0.0.1  admin.athera.localhost
 #     127.0.0.1  odoo.athera.localhost
 #     127.0.0.1  insight.athera.localhost
-#     127.0.0.1  bct.athera.localhost
-#     127.0.0.1  <slug>.athera.localhost      per provisioned client
 # Anything scripted can skip that with `curl -H 'Host: ...'`, which is how the
 # verification in scripts/ tests these routes without touching the host file.
 #
@@ -389,100 +387,5 @@ auth.{$ATHERA_DOMAIN:athera.localhost} {
 
 	reverse_proxy login-gateway:8080 {
 		import app_headers
-	}
-}
-
-# ----- Tenants -----------------------------------------------------------
-# One block per provisioned client. `bct` is the internal tenant. Adding a
-# client adds a block here; scripts/tenant-provision.sh prints the snippet.
-# Written out rather than wildcarded — see the header.
-bct.{$ATHERA_DOMAIN:athera.localhost} {
-	encode zstd gzip
-	import site_tls
-
-	# Long-polling has its own port in Odoo and must not go to the HTTP
-	# workers, or every bus subscription occupies a worker for its full
-	# timeout and the instance stops answering ordinary requests.
-	@longpoll path /longpolling/* /websocket
-	handle @longpoll {
-		reverse_proxy odoo:8072 {
-			import odoo_headers
-		}
-	}
-
-	handle {
-		reverse_proxy odoo:8069 {
-			import odoo_headers
-		}
-	}
-
-	log {
-		output stdout
-		# `filter` wrapping json, NOT plain json. The SSO ticket travels in a query
-		# string, so the edge writes it verbatim into `request>uri` -- and the edge is
-		# the only place that records it on the same line as the client's real address
-		# (`X-Forwarded-For`). Caddy already redacts `Set-Cookie` here, but that is its
-		# built-in default and it does not extend to the URI; this has to be asked for.
-		#
-		# Applied to every site block rather than only the one that receives tickets:
-		# the filter is inert where the parameter never appears, and a route that moves
-		# later must not quietly reopen this.
-		#
-		# This stops the ticket being WRITTEN here. It does not touch the `Referer`
-		# header or the client's browser history, and the Odoo access log keeps its own
-		# copy. Central log shipping is filtered separately, in promtail.
-		format filter {
-			wrap json
-			fields {
-				request>uri query {
-					replace ticket REDACTED
-				}
-			}
-		}
-		level INFO
-	}
-}
-
-acme.{$ATHERA_DOMAIN:athera.localhost} {
-	encode zstd gzip
-	import site_tls
-
-	@longpoll path /longpolling/* /websocket
-	handle @longpoll {
-		reverse_proxy odoo:8072 {
-			import odoo_headers
-		}
-	}
-
-	handle {
-		reverse_proxy odoo:8069 {
-			import odoo_headers
-		}
-	}
-
-	log {
-		output stdout
-		# `filter` wrapping json, NOT plain json. The SSO ticket travels in a query
-		# string, so the edge writes it verbatim into `request>uri` -- and the edge is
-		# the only place that records it on the same line as the client's real address
-		# (`X-Forwarded-For`). Caddy already redacts `Set-Cookie` here, but that is its
-		# built-in default and it does not extend to the URI; this has to be asked for.
-		#
-		# Applied to every site block rather than only the one that receives tickets:
-		# the filter is inert where the parameter never appears, and a route that moves
-		# later must not quietly reopen this.
-		#
-		# This stops the ticket being WRITTEN here. It does not touch the `Referer`
-		# header or the client's browser history, and the Odoo access log keeps its own
-		# copy. Central log shipping is filtered separately, in promtail.
-		format filter {
-			wrap json
-			fields {
-				request>uri query {
-					replace ticket REDACTED
-				}
-			}
-		}
-		level INFO
 	}
 }
