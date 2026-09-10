@@ -546,7 +546,12 @@ _CLASS_TRANSFORM = {
     "public":    ("none", False),
     "internal":  ("none", False),
     "personal":  ("hmac_sha256", False),
-    "sensitive": ("hmac_sha256", False),
+    # Contract 05: sensitive maps to hmac_sha256_nullable, NEVER hmac_sha256 —
+    # the CDC loader's Policy validator hard-rejects the (sensitive,
+    # hmac_sha256) pair. Mirrors CLASS_TO_TRANSFORM above; the `nullable`
+    # CSV flag only decides mask_null, not the transform.
+    # Disetujui user 2026-09-11 saat onboarding tenant expomedia.
+    "sensitive": ("hmac_sha256_nullable", False),
     "secret":    ("drop", False),
 }
 

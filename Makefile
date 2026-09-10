@@ -382,6 +382,16 @@ import-policy: ## Load a non-Odoo client's column classification: make import-po
 	@test -n "$(FILE)" || { echo "FILE is required, e.g. FILE=policies/acme.csv (relative to analytics/warehouse/)"; exit 1; }
 	@$(WCTL) import-policy --file /warehouse/$(FILE)
 
+.PHONY: warehouse-raw-ddl
+warehouse-raw-ddl: ## Regenerate raw.* landing DDL from warehouse.column_policy
+	@# The CDC loader's drift error message has always pointed here
+	@# ("DWH regenerates it with `make warehouse-raw-ddl`") but the target
+	@# never existed — gen-raw-ddl only ran inside up-analytics, whose
+	@# sync-policy step also rebuilds the policy from the default tenant and
+	@# so drops import-policy rows. This target regenerates the landing DDL
+	@# without touching the policy.
+	@$(WCTL) gen-raw-ddl
+
 .PHONY: dbt-docs
 dbt-docs: ## Generate the dbt catalogue into analytics/dbt/target
 	@$(DBT) docs generate

@@ -65,7 +65,13 @@ SQL="$(docker run --rm --network odoo19-bct_bct \
   -e CDC_TENANT_DB="$SLUG" -e CDC_TENANT_SLUG="$SLUG" \
   -e CDC_WAREHOUSE_HOST="${CDC_WAREHOUSE_HOST:-warehouse-db}" \
   -e CDC_VERIFY_DIGEST_SPEC=0 \
+  ${CDC_SOURCE_TABLES:+-e CDC_SOURCE_TABLES="$CDC_SOURCE_TABLES"} \
   odoo19-bct-cdc:local --print-publication-sql --log-level WARNING)"
+# CDC_SOURCE_TABLES di atas: kosong = perilaku lama (semua tabel policy). Wajib
+# diisi untuk tenant yang TIDAK punya semua tabel policy (mis. tenant jasa tanpa
+# pos_*/ppob_*) — tanpanya generator mati dengan "Source table public.X does not
+# exist". Isi dengan daftar yang sama dengan CDC_SOURCE_TABLES service loadernya
+# di compose/insight.yml supaya publication dan konsumen sepakat.
 
 if [ "$DRY_RUN" = "1" ]; then
   printf '%s\n' "$SQL"

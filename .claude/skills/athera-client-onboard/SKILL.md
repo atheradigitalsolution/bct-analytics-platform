@@ -154,3 +154,27 @@ State alone is enough; nothing needs restarting. `state='suspended'` or a `valid
 - `LOGIN_GATEWAY_ALLOWED_DATABASES` must also name the new slug, or the gateway refuses it with the same response it gives bad credentials.
 - Nothing teaches the backup script about a new tenant. The backup script carries a hard-coded list in two places (`for tenant in ...` and the checksum loop `for name in ...`); a tenant missing from either is backed up silently incompletely, or not at all. Add the slug to BOTH and run the script once by hand rather than waiting for 03:30.
 - Provisioning does not register the tenant anywhere the operator can see it fail. There is no check that the slug is absent from the reserved set (`insight`, `odoo`, `app`, `admin`, `auth`, `www`, `mail`) — those would hijack a platform route.
+
+## Pelajaran onboarding `expomedia` (2026-09-11) — tenant dengan modul di luar set bct
+
+Tenant jasa (crm/hr_expense/PPh/coretax-bupot terpasang, tanpa ppob) menabrak empat hal
+yang tidak terlihat dari onboarding bct/ndi:
+
+- **Klasifikasi PDP**: modul baru membawa kolom baru di tabel bersama (sale_order,
+  account_move, res_partner, …). `sync-policy` HANYA membaca skema fisik `bct`, jadi kolom
+  yang tidak ada di bct tak akan pernah termaterialisasi darinya — jalurnya
+  `make import-policy FILE=policies/expomedia-extra.csv`. File itu **otoritatif per tabel**
+  (menghapus baris lain di tabel yang disebut!), maka WAJIB berisi SEMUA baris tabel tsb,
+  bukan hanya kolom baru. Ekspor dulu isi policy tabel terkait, gabungkan, baru import.
+- **`sync-policy` menghapus baris import**: setiap `make up-analytics` (yang memanggil
+  sync-policy) membuang lagi baris kolom-khusus-expomedia. Sesudahnya SELALU jalankan ulang
+  `make import-policy FILE=policies/expomedia-extra.csv` lalu `make warehouse-raw-ddl`.
+- **`cdc-provision.sh` butuh `CDC_SOURCE_TABLES`** (env) untuk tenant yang tidak punya semua
+  tabel policy — tanpa itu generator mati di `ppob_biller does not exist`. Samakan daftarnya
+  dengan blok service loader di `compose/insight.yml`.
+- **Backup**: catatan lama "hard-coded dua tempat" sudah tidak berlaku —
+  `/usr/local/bin/athera-backup.sh` kini membaca daftar tenant dari registry.
+- Keputusan kepatuhan 2026-09-11: kolom identitas orang (NIK, paspor, KITAS, NPWP, NITKU,
+  TIN, PTKP, tempat lahir, NPWP penandatangan) = **sensitive** (HMAC) di policy expomedia,
+  `x_custom_birth_date` (DATE, tak bisa HMAC) = **secret** (drop). Lebih ketat dari seed
+  `custom_pdp_core` yang menulis `internal` — jangan diturunkan tanpa keputusan user.

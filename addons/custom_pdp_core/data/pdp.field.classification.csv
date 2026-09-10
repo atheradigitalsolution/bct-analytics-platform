@@ -1157,3 +1157,23 @@ pdp_stock_picking__x_custom_ppob_dp_invoice_id,stock.picking,x_custom_ppob_dp_in
 pdp_stock_picking__x_custom_ppob_transaction_id,stock.picking,x_custom_ppob_transaction_id,internal,Not personal data - business record,,False
 pdp_uom_uom__ndi_is_packaging,uom.uom,ndi_is_packaging,internal,Not personal data - business record,"NDI pasal 5: peran dan kedalaman satuan pada pohon UoM. Atribut kemasan, bukan data orang.",False
 pdp_uom_uom__ndi_tier,uom.uom,ndi_tier,internal,Not personal data - business record,"NDI pasal 5: peran dan kedalaman satuan pada pohon UoM. Atribut kemasan, bukan data orang.",False
+pdp_product_template__can_be_expensed,product.template,can_be_expensed,internal,Not personal data - business record,,False
+pdp_product_template__service_upsell_threshold,product.template,service_upsell_threshold,internal,Not personal data - business record,,False
+pdp_product_template__x_custom_withholding_category_id,product.template,x_custom_withholding_category_id,internal,Not personal data - business record,,False
+pdp_sale_order__custom_credit_check_log_id,sale.order,custom_credit_check_log_id,internal,Not personal data - business record,,False
+pdp_sale_order__opportunity_id,sale.order,opportunity_id,internal,Not personal data - business record,,False
+pdp_sale_order_line__has_displayed_warning_upsell,sale.order.line,has_displayed_warning_upsell,internal,Not personal data - business record,,False
+pdp_sale_order_line__remaining_hours,sale.order.line,remaining_hours,internal,Not personal data - business record,,False
+pdp_account_move__custom_match_result_id,account.move,custom_match_result_id,internal,Not personal data - business record,,False
+pdp_account_move__custom_match_status,account.move,custom_match_status,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_coretax_kode_status,account.move,x_custom_coretax_kode_status,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_coretax_replaced_by_id,account.move,x_custom_coretax_replaced_by_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_coretax_replacement_of_id,account.move,x_custom_coretax_replacement_of_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_ic_mirror_id,account.move,x_custom_ic_mirror_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_ic_rule_id,account.move,x_custom_ic_rule_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_ic_source_id,account.move,x_custom_ic_source_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_total_withheld,account.move,x_custom_total_withheld,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_withholding_move_id,account.move,x_custom_withholding_move_id,internal,Not personal data - business record,,False
+pdp_account_move_line__expense_id,account.move.line,expense_id,internal,Not personal data - business record,,False
+pdp_account_move_line__x_custom_tax_label,account.move.line,x_custom_tax_label,internal,Not personal data - business record,,False
+pdp_account_move_line__x_custom_withholding_category_id,account.move.line,x_custom_withholding_category_id,internal,Not personal data - business record,,False

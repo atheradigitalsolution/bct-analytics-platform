@@ -314,6 +314,9 @@ services:
           # memanggil http://ndi.athera-digital.com:8069, DNS embedded Docker tidak
           # menemukannya, dan sebuah password yang BENAR dijawab upstream_unavailable.
           - ndi.${ATHERA_DOMAIN:-athera.localhost}
+          # expomedia — tenant demo/proposal (PT Expomedia Indo Karya, jasa event),
+          # ditambahkan 2026-09-11. Literal dengan alasan yang sama seperti ndi.
+          - expomedia.${ATHERA_DOMAIN:-athera.localhost}
 
 # --- Networks --------------------------------------------------------------
 # One explicit network. Named `bct` inside the file; the actual docker network

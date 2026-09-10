@@ -557,6 +557,76 @@ services:
       - bct
 
   # =========================================================================
+  # cdc-expomedia — the THIRD loader. Tenant `expomedia` (PT Expomedia Indo
+  # Karya, jasa event/pameran; tenant demo/proposal, 2026-09-11).
+  #
+  # Same shape as cdc-ndi and for the same reasons: its own container, its
+  # own publication `bct_cdc_expomedia`, its own slot `bct_slot_expomedia`,
+  # its own salt — never reuse `cdc`, that MOVES the bct loader.
+  #
+  # ORDERING: publication FIRST, then this consumer.
+  #     bash scripts/analytics/cdc-provision.sh --slug expomedia
+  #     docker compose ... up -d --build cdc-expomedia
+  # =========================================================================
+  cdc-expomedia:
+    build:
+      context: ../analytics/cdc
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-cdc:local
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-bct}-cdc-expomedia
+    <<: [*restart-policy, *hardening]
+    logging: *default-logging
+    read_only: true
+    mem_limit: ${CDC_MEM_LIMIT:-512m}
+    environment:
+      WAREHOUSE_READER_USER: ${WAREHOUSE_READER_USER:-warehouse_reader}
+      WAREHOUSE_READER_PASSWORD: ${WAREHOUSE_READER_PASSWORD:?WAREHOUSE_READER_PASSWORD is required}
+      WAREHOUSE_DB: ${WAREHOUSE_DB:-warehouse}
+      WAREHOUSE_LOADER_USER: ${WAREHOUSE_LOADER_USER:-warehouse_loader}
+      WAREHOUSE_LOADER_PASSWORD: ${WAREHOUSE_LOADER_PASSWORD:?WAREHOUSE_LOADER_PASSWORD is required}
+      # Per-tenant salt, `:?` so an unset salt is a startup failure instead of
+      # a silent downgrade to ..._DEFAULT (see the cdc-ndi comment above).
+      WAREHOUSE_MASK_SALT_DEFAULT: ${WAREHOUSE_MASK_SALT_DEFAULT:?WAREHOUSE_MASK_SALT_DEFAULT is required}
+      WAREHOUSE_MASK_SALT_EXPOMEDIA: ${WAREHOUSE_MASK_SALT_EXPOMEDIA:?WAREHOUSE_MASK_SALT_EXPOMEDIA is required}
+      # Literals, never ${ODOO_DB_NAME} — same rule as cdc-ndi.
+      ODOO_DB_NAME: expomedia
+      CDC_TENANT_DB: expomedia
+      CDC_TENANT_SLUG: expomedia
+      CDC_PUBLICATION: bct_cdc_expomedia
+      CDC_SLOT: bct_slot_expomedia
+      CDC_WAREHOUSE_HOST: ${CDC_WAREHOUSE_HOST:-warehouse-db}
+      CDC_SOURCE_HOST: ${CDC_SOURCE_HOST:-postgres}
+      CDC_ODOO_URL: http://expomedia.${ATHERA_DOMAIN:-athera.localhost}:8069
+      CDC_ODOO_DB: expomedia
+      CDC_ODOO_LOGIN: ${CDC_EXPOMEDIA_ODOO_LOGIN:-}
+      CDC_ODOO_PASSWORD: ${CDC_EXPOMEDIA_ODOO_PASSWORD:-}
+      CDC_VERIFY_DIGEST_SPEC: ${CDC_VERIFY_DIGEST_SPEC:-1}
+      CDC_BATCH_SIZE: ${CDC_BATCH_SIZE:-2000}
+      # EXPLICIT list: the column_policy intersection WITHOUT pos_*/ppob_* —
+      # expomedia is a services business; a table added to the policy for a
+      # future tenant must not silently widen what is replicated out of here.
+      CDC_SOURCE_TABLES: >-
+        res_company,res_partner,product_template,product_product,operating_unit,
+        sale_order,sale_order_line,account_move,account_move_line,account_account,
+        stock_picking,stock_move
+      TZ: ${TZ:-UTC}
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:9108/metrics', timeout=3).status==200 else 1)"
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - bct
+
+  # =========================================================================
   # insight-portal — ATHERA Insight's browser surface. Next.js, standalone.
   #
   # Folded in from insight-portal/docker-compose.portal.yml on 2026-09-01.
