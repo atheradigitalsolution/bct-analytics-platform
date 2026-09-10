@@ -87,6 +87,7 @@ with source_totals as (
     join src_{{ t }}.pos_order as o on l.order_id = o.id
     group by 1, 2, 3
 
+    {% if src_has_table(t, 'ppob_transaction') %}
     union all
     select
         '{{ t }}'::text as tenant_id,
@@ -95,6 +96,7 @@ with source_totals as (
         sum(p.commission) as source_value
     from src_{{ t }}.ppob_transaction as p
     group by 1, 2, 3
+    {% endif %}
     {% if not loop.last %}
     union all
     {% endif %}

@@ -168,3 +168,24 @@ select warehouse.apply_tenant_rls('{{ this.schema }}', '{{ this.identifier }}')
 select 1
 {%- endif -%}
 {%- endmacro %}
+
+
+{#- --------------------------------------------------------------------------
+    src_has_table — does tenant t's src_ schema expose this foreign table?
+
+    gen-fdw skips tables the tenant's source database does not have (a
+    services tenant carries no ppob_*), so SOURCE_TABLES being a cross-tenant
+    union means absence here is a normal condition. Models that reconcile a
+    per-vertical table must guard the arm with this instead of assuming every
+    tenant has every table. Ditambahkan 2026-09-11 (onboarding expomedia).
+--------------------------------------------------------------------------- #}
+{% macro src_has_table(t, tbl) -%}
+{%- if execute -%}
+        {%- set r = run_query(
+            "select 1 from information_schema.tables where table_schema = 'src_" ~ t ~ "' and table_name = '" ~ tbl ~ "'"
+        ) -%}
+        {{ return(r | length > 0) }}
+    {%- else -%}
+{{ return(False) }}
+{%- endif -%}
+{%- endmacro %}

@@ -160,15 +160,17 @@ State alone is enough; nothing needs restarting. `state='suspended'` or a `valid
 Tenant jasa (crm/hr_expense/PPh/coretax-bupot terpasang, tanpa ppob) menabrak empat hal
 yang tidak terlihat dari onboarding bct/ndi:
 
-- **Klasifikasi PDP**: modul baru membawa kolom baru di tabel bersama (sale_order,
-  account_move, res_partner, …). `sync-policy` HANYA membaca skema fisik `bct`, jadi kolom
-  yang tidak ada di bct tak akan pernah termaterialisasi darinya — jalurnya
-  `make import-policy FILE=policies/expomedia-extra.csv`. File itu **otoritatif per tabel**
-  (menghapus baris lain di tabel yang disebut!), maka WAJIB berisi SEMUA baris tabel tsb,
-  bukan hanya kolom baru. Ekspor dulu isi policy tabel terkait, gabungkan, baru import.
-- **`sync-policy` menghapus baris import**: setiap `make up-analytics` (yang memanggil
-  sync-policy) membuang lagi baris kolom-khusus-expomedia. Sesudahnya SELALU jalankan ulang
-  `make import-policy FILE=policies/expomedia-extra.csv` lalu `make warehouse-raw-ddl`.
+- **Klasifikasi PDP — jalur yang BENAR adalah `policy_master`** (koreksi atas versi awal
+  catatan ini yang menyebut bct): sync-policy membaca database `policy_master` — union
+  skema semua tenant TANPA data (lihat blok komentar service dbt di `compose/insight.yml`).
+  Tenant baru dengan modul di luar union = jalankan rebuild: ALTER ADD COLUMN untuk kolom
+  baru di 16 tabel sumber + baris `pdp_field_classification` yang hilang. Template lengkap:
+  `analytics/warehouse/policies/pm-rebuild-expomedia.sql`. Buktikan superset dulu
+  (setiap baris warehouse.column_policy punya kolom di policy_master), baru
+  `make up-analytics` — sweep-nya lalu tidak menghapus apa pun.
+- **`import-policy` BUKAN untuk kolom ekstra di tabel Odoo bersama** — ia otoritatif per
+  tabel (menghapus baris lain di tabel yang disebut file; insiden 339 baris, 2026-09-11).
+  Ia untuk klien non-Odoo dengan tabel sendiri.
 - **`cdc-provision.sh` butuh `CDC_SOURCE_TABLES`** (env) untuk tenant yang tidak punya semua
   tabel policy — tanpa itu generator mati di `ppob_biller does not exist`. Samakan daftarnya
   dengan blok service loader di `compose/insight.yml`.

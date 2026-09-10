@@ -888,7 +888,18 @@ def cmd_gen_fdw(args) -> int:
                     (table,),
                 )
                 allowed = {r[0] for r in cur.fetchall()}
-                cols = [c for c in source_columns(odoo, table) if c["column_name"] in allowed]
+                src_cols = source_columns(odoo, table)
+                if not src_cols:
+                    # The tenant simply does not have this table (e.g. a
+                    # services tenant without ppob_*). SOURCE_TABLES is the
+                    # union across tenants, so absence here is expected, not
+                    # an error — but say so loudly and drop any stale foreign
+                    # table so nothing points at a remote that is not there.
+                    # Disetujui user 2026-09-11 (onboarding expomedia).
+                    print(f"==> {schema}.{table}: absent in {t['source_database']}; skipped")
+                    cur.execute(f"DROP FOREIGN TABLE IF EXISTS {schema}.{table} CASCADE")
+                    continue
+                cols = [c for c in src_cols if c["column_name"] in allowed]
                 if not cols:
                     raise SystemExit(f"FATAL: no policy rows for {table}; run sync-policy first")
                 coldef = ",\n".join(f'  "{c["column_name"]}" {c["col_type"]}' for c in cols)

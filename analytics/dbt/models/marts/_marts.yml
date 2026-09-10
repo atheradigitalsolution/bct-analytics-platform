@@ -142,8 +142,15 @@ models:
       # Exactly one current version per partner. This is the test that catches a
       # broken SCD2 close-out, which otherwise shows up as double-counting in
       # every report that joins the dimension without an as-of predicate.
+      #
+      # `where: is_current` and NOT is_current in the combination: a partner
+      # with three or more versions legitimately carries several
+      # is_current=false rows, and the unfiltered form fired the first time a
+      # partner reached its third version (bct partner 1, 2026-09-10). The
+      # invariant worth asserting is one CURRENT row per key.
       - unique_combination:
-          arguments: {combination_of_columns: [tenant_id, partner_key, is_current]}
+          arguments: {combination_of_columns: [tenant_id, partner_key]}
+          config: {where: "is_current"}
 
   - name: dim_product
     description: SCD Type 2 product dimension at the variant grain.
@@ -161,8 +168,11 @@ models:
       - name: is_current
         data_tests: [not_null]
     data_tests:
+      # Same shape as dim_partner above: assert one CURRENT row per key, not
+      # uniqueness across the SCD history.
       - unique_combination:
-          arguments: {combination_of_columns: [tenant_id, product_key, is_current]}
+          arguments: {combination_of_columns: [tenant_id, product_key]}
+          config: {where: "is_current"}
 
   # --------------------------------------------------------------------- facts
   - name: fct_sale_order_line
