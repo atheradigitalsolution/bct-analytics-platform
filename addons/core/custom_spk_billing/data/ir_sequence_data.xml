@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="seq_billing_plan" model="ir.sequence">
+        <field name="name">Rencana Penagihan</field>
+        <field name="code">custom.spk.billing.plan</field>
+        <field name="prefix">BILL/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="use_date_range" eval="True"/>
+    </record>
+
+    <record id="cron_warn_uninvoiced" model="ir.cron">
+        <field name="name">SPK: pekerjaan selesai belum ditagih</field>
+        <field name="model_id" ref="model_custom_spk_billing_plan"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_warn_uninvoiced()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="cron_spk_followup" model="ir.cron">
+        <field name="name">SPK: follow-up penagihan</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_spk_followup()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_billing" name="Penagihan" parent="custom_spk.menu_spk_root"
+              sequence="50" groups="custom_spk.group_spk_price_viewer"/>
+    <menuitem id="menu_spk_billing_plan" name="Rencana Penagihan" parent="menu_spk_billing"
+              action="action_billing_plan" sequence="10"/>
+    <menuitem id="menu_spk_followup_level" name="Level Follow-up" parent="custom_spk.menu_spk_config"
+              action="action_followup_level" sequence="30"
+              groups="custom_spk.group_spk_price_viewer"/>
+</odoo>

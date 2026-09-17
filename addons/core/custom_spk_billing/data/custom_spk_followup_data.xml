@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Levels as data. The first one fires BEFORE the due date, which costs nothing and
+        removes a whole class of "we never received the invoice". The sequence ends at the
+        owner rather than emailing politely forever.
+    -->
+    <record id="followup_level_pre" model="custom.spk.followup.level">
+        <field name="name">H-3 sebelum jatuh tempo</field>
+        <field name="days_overdue">-3</field>
+        <field name="action">email</field>
+        <field name="mail_template_id" ref="mail_template_followup"/>
+    </record>
+    <record id="followup_level_1" model="custom.spk.followup.level">
+        <field name="name">H+1 lewat jatuh tempo</field>
+        <field name="days_overdue">1</field>
+        <field name="action">email</field>
+        <field name="mail_template_id" ref="mail_template_followup"/>
+    </record>
+    <record id="followup_level_7" model="custom.spk.followup.level">
+        <field name="name">H+7 — telepon</field>
+        <field name="days_overdue">7</field>
+        <field name="action">call</field>
+    </record>
+    <record id="followup_level_14" model="custom.spk.followup.level">
+        <field name="name">H+14 — WhatsApp PIC</field>
+        <field name="days_overdue">14</field>
+        <field name="action">whatsapp</field>
+    </record>
+    <record id="followup_level_30" model="custom.spk.followup.level">
+        <field name="name">H+30 — eskalasi ke Owner</field>
+        <field name="days_overdue">30</field>
+        <field name="action">escalate</field>
+    </record>
+</odoo>

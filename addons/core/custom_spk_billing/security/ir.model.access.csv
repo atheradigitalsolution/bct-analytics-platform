@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_billing_plan_price,spk.billing.plan.price,model_custom_spk_billing_plan,custom_spk.group_spk_price_viewer,1,1,1,1
+access_billing_plan_pm,spk.billing.plan.pm,model_custom_spk_billing_plan,custom_spk.group_spk_pm,1,0,0,0
+access_milestone_price,spk.billing.milestone.price,model_custom_spk_billing_milestone,custom_spk.group_spk_price_viewer,1,1,1,1
+access_milestone_pm,spk.billing.milestone.pm,model_custom_spk_billing_milestone,custom_spk.group_spk_pm,1,0,0,0
+access_followup_price,spk.followup.level.price,model_custom_spk_followup_level,custom_spk.group_spk_price_viewer,1,1,1,1
+access_followup_all,spk.followup.level.read,model_custom_spk_followup_level,base.group_user,1,0,0,0
