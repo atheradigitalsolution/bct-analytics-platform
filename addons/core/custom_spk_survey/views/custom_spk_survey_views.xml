@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_survey_form" model="ir.ui.view">
+        <field name="name">custom.spk.survey.form</field>
+        <field name="model">custom.spk.survey</field>
+        <field name="arch" type="xml">
+            <form string="Survey Lokasi">
+                <header>
+                    <button name="action_done" type="object" string="Tandai Selesai"
+                            class="btn-primary" invisible="state == 'done'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="spk_id"/>
+                            <field name="venue_name"/>
+                            <field name="survey_date"/>
+                            <field name="surveyed_by"/>
+                            <field name="photo_url" widget="url"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Ruang" name="space">
+                            <group>
+                                <group string="Dimensi">
+                                    <field name="ceiling_height_m"/>
+                                    <field name="floor_area_m2"/>
+                                </group>
+                                <group string="Akses">
+                                    <field name="access_width_m"/>
+                                    <field name="max_panel_length_m"/>
+                                    <field name="has_loading_dock"/>
+                                    <field name="lift_required"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Izin &amp; Jam Kerja" name="rules">
+                            <group>
+                                <group>
+                                    <field name="work_hours_from" widget="float_time"/>
+                                    <field name="work_hours_to" widget="float_time"/>
+                                    <field name="night_work_only"/>
+                                </group>
+                                <group>
+                                    <field name="permit_required"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Daya" name="power">
+                            <group>
+                                <group>
+                                    <field name="power_available_kw"/>
+                                    <field name="power_points"/>
+                                </group>
+                                <group>
+                                    <field name="power_by_venue"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Biaya Venue" name="cost"
+                              groups="custom_spk.group_spk_cost_viewer">
+                            <group>
+                                <group>
+                                    <field name="venue_cost_power"/>
+                                    <field name="venue_cost_permit"/>
+                                    <field name="venue_cost_security"/>
+                                    <field name="venue_cost_other"/>
+                                </group>
+                                <group>
+                                    <field name="venue_cost_total" readonly="1"/>
+                                    <field name="currency_id" invisible="1"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Risiko" name="risk">
+                            <field name="risk_note"
+                                   placeholder="Hanya untuk hal yang belum ditanyakan checklist di atas..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_survey_list" model="ir.ui.view">
+        <field name="name">custom.spk.survey.list</field>
+        <field name="model">custom.spk.survey</field>
+        <field name="arch" type="xml">
+            <list string="Survey Lokasi" decoration-warning="night_work_only">
+                <field name="spk_id"/>
+                <field name="venue_name"/>
+                <field name="survey_date"/>
+                <field name="ceiling_height_m" string="Plafon"/>
+                <field name="access_width_m" string="Akses"/>
+                <field name="night_work_only" string="Malam"/>
+                <field name="venue_cost_total" sum="Biaya Venue"
+                       groups="custom_spk.group_spk_cost_viewer"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_survey" model="ir.actions.act_window">
+        <field name="name">Survey Lokasi</field>
+        <field name="res_model">custom.spk.survey</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

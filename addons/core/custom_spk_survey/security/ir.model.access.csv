@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_survey_ae,spk.survey.ae,model_custom_spk_survey,custom_spk.group_spk_ae,1,1,1,0
+access_survey_supervisor,spk.survey.supervisor,model_custom_spk_survey,custom_spk.group_spk_supervisor,1,1,1,0
+access_survey_pm,spk.survey.pm,model_custom_spk_survey,custom_spk.group_spk_pm,1,1,1,1
