@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="seq_material_request" model="ir.sequence">
+        <field name="name">Permintaan Material</field>
+        <field name="code">custom.spk.material.request</field>
+        <field name="prefix">MR/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="use_date_range" eval="True"/>
+    </record>
+    <record id="seq_material_return" model="ir.sequence">
+        <field name="name">Retur Material</field>
+        <field name="code">custom.spk.material.return</field>
+        <field name="prefix">RET/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="use_date_range" eval="True"/>
+    </record>
+</odoo>

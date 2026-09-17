@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_material" name="Material" parent="custom_spk.menu_spk_root"
+              sequence="30"
+              groups="custom_spk.group_spk_supervisor,custom_spk.group_spk_pm"/>
+    <menuitem id="menu_spk_material_request" name="Permintaan Material"
+              parent="menu_spk_material" action="action_spk_material_request" sequence="10"/>
+    <menuitem id="menu_spk_material_return" name="Retur / Sisa Material"
+              parent="menu_spk_material" action="action_spk_material_return" sequence="20"/>
+</odoo>

@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mr_supervisor,spk.mr.supervisor,model_custom_spk_material_request,custom_spk.group_spk_supervisor,1,1,1,0
+access_mr_pm,spk.mr.pm,model_custom_spk_material_request,custom_spk.group_spk_pm,1,1,1,1
+access_mr_line_supervisor,spk.mr.line.supervisor,model_custom_spk_material_request_line,custom_spk.group_spk_supervisor,1,1,1,1
+access_mr_line_pm,spk.mr.line.pm,model_custom_spk_material_request_line,custom_spk.group_spk_pm,1,1,1,1
+access_ret_supervisor,spk.ret.supervisor,model_custom_spk_material_return,custom_spk.group_spk_supervisor,1,1,1,0
+access_ret_pm,spk.ret.pm,model_custom_spk_material_return,custom_spk.group_spk_pm,1,1,1,1
+access_ret_line_supervisor,spk.ret.line.supervisor,model_custom_spk_material_return_line,custom_spk.group_spk_supervisor,1,1,1,1
+access_ret_line_pm,spk.ret.line.pm,model_custom_spk_material_return_line,custom_spk.group_spk_pm,1,1,1,1
