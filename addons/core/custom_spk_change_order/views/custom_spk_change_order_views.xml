@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_change_order_form" model="ir.ui.view">
+        <field name="name">custom.spk.change.order.form</field>
+        <field name="model">custom.spk.change.order</field>
+        <field name="arch" type="xml">
+            <form string="Change Order">
+                <header>
+                    <button name="action_quote" type="object" string="Hitung Dampak"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_client_approve" type="object"
+                            string="Disetujui Klien" class="btn-primary"
+                            invisible="state != 'quoted'"/>
+                    <button name="action_apply" type="object" string="Terapkan"
+                            class="btn-primary" invisible="state != 'client_approved'"/>
+                    <button name="action_reject" type="object" string="Tolak"
+                            invisible="state in ('applied', 'rejected')"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="state in ('client_approved', 'applied', 'rejected')">
+                        Workshop belum boleh bekerja berbeda sampai persetujuan klien
+                        tercatat di sini. Pekerjaan atas permintaan lisan adalah
+                        pekerjaan yang diperdebatkan saat invoice datang.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="spk_id"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="origin"/>
+                            <field name="is_billable"/>
+                        </group>
+                        <group>
+                            <field name="cost_impact" groups="custom_spk.group_spk_cost_viewer"/>
+                            <field name="price_impact" groups="custom_spk.group_spk_price_viewer"/>
+                            <field name="schedule_impact_days"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="Apa yang berubah..."/>
+                    <group string="Persetujuan Klien">
+                        <group>
+                            <field name="client_approved_by"/>
+                            <field name="client_approved_on" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="applied_on" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_change_order_list" model="ir.ui.view">
+        <field name="name">custom.spk.change.order.list</field>
+        <field name="model">custom.spk.change.order</field>
+        <field name="arch" type="xml">
+            <list string="Change Order" decoration-danger="schedule_impact_days > 0">
+                <field name="name"/>
+                <field name="spk_id"/>
+                <field name="origin"/>
+                <field name="is_billable"/>
+                <field name="schedule_impact_days" string="Hari"/>
+                <field name="cost_impact" sum="Biaya" groups="custom_spk.group_spk_cost_viewer"/>
+                <field name="price_impact" sum="Harga" groups="custom_spk.group_spk_price_viewer"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_design_revision_list" model="ir.ui.view">
+        <field name="name">custom.spk.design.revision.list</field>
+        <field name="model">custom.spk.design.revision</field>
+        <field name="arch" type="xml">
+            <list string="Revisi Design" editable="bottom"
+                  decoration-warning="is_chargeable">
+                <field name="spk_id"/>
+                <field name="revision_no"/>
+                <field name="date"/>
+                <field name="reason"/>
+                <field name="is_chargeable" string="Berbayar" readonly="1"/>
+                <field name="design_url" widget="url" optional="show"/>
+                <field name="change_order_id" readonly="1" optional="hide"/>
+                <field name="note" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_change_order" model="ir.actions.act_window">
+        <field name="name">Change Order</field>
+        <field name="res_model">custom.spk.change.order</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_design_revision" model="ir.actions.act_window">
+        <field name="name">Revisi Design</field>
+        <field name="res_model">custom.spk.design.revision</field>
+        <field name="view_mode">list</field>
+    </record>
+</odoo>

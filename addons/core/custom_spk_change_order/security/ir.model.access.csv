@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_co_ae,spk.co.ae,model_custom_spk_change_order,custom_spk.group_spk_ae,1,1,1,0
+access_co_pm,spk.co.pm,model_custom_spk_change_order,custom_spk.group_spk_pm,1,1,1,1
+access_co_price,spk.co.price,model_custom_spk_change_order,custom_spk.group_spk_price_viewer,1,1,1,1
+access_rev_ae,spk.rev.ae,model_custom_spk_design_revision,custom_spk.group_spk_ae,1,1,1,0
+access_rev_pm,spk.rev.pm,model_custom_spk_design_revision,custom_spk.group_spk_pm,1,1,1,1

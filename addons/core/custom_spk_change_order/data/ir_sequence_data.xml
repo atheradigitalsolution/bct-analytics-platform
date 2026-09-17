@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        No sequence record: change order numbers are derived from the SPK
+        (CO/SPK/2026/0001/01), because the client quotes "CO 2 on SPK 0001" and a global
+        running number would tell them nothing. Kept as a file so the manifest shape
+        matches the other modules and a real sequence has somewhere to go later.
+    -->
+</odoo>

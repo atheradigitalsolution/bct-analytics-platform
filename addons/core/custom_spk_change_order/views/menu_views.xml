@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_change_order" name="Change Order"
+              parent="custom_spk.menu_spk_operations"
+              action="action_change_order" sequence="40"/>
+    <menuitem id="menu_spk_design_revision" name="Revisi Design"
+              parent="custom_spk.menu_spk_operations"
+              action="action_design_revision" sequence="50"/>
+</odoo>
