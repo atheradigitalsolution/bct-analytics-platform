@@ -5,12 +5,15 @@ Inventory and grouping of the 154 custom Odoo 19 addons in
 
 > **Status per 2026-09-17.** Everything below is the *import-time assessment* and is
 > left as written — it records what was decided and why. It is no longer a
-> description of `addons/` today. The tree now holds **162 modules**, and several
-> were renamed in place when client names were scrubbed (`custom_arka_show_date` →
-> `custom_sale_show_date`, `custom_arka_aim_numbering` → `custom_doc_numbering`,
-> `custom_levis_*` → `custom_retail_*`, `l10n_erajaya` → `l10n_id_coa_10d`, and
-> nine more). Two were promoted out of `_tenants/` once a second client needed
-> them: `custom_doc_numbering` → `core/`, `custom_sale_show_date` → `verticals/`.
+> description of `addons/` today. The tree now holds **162 modules**, and thirteen
+> were renamed in place when client names were scrubbed from the source. The
+> old-to-new pairs are not repeated here — re-listing them would put the scrubbed
+> names back into a document, which is what the scrub was for. They are held where
+> they are actually needed: the `RENAMES` map in `tools/refresh_module_catalog.py`
+> (so the refresher can carry judgement columns across a rename) and
+> `scripts/migrate-client-renames.py`. Two modules were also promoted out of
+> `_tenants/` once a second client needed them: `custom_doc_numbering` → `core/`,
+> `custom_sale_show_date` → `verticals/`.
 >
 > `module-catalog.csv` has been refreshed against the tree by
 > **`tools/refresh_module_catalog.py`** (in THIS repo). That refresher recomputes
