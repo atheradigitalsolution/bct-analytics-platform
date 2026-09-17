@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_delivery" name="Delivery &amp; Instalasi"
+              parent="custom_spk.menu_spk_operations"
+              action="action_spk_delivery" sequence="30"/>
+</odoo>

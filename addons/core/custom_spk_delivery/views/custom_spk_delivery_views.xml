@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_spk_delivery_form" model="ir.ui.view">
+        <field name="name">custom.spk.delivery.form</field>
+        <field name="model">custom.spk.delivery</field>
+        <field name="arch" type="xml">
+            <form string="Delivery &amp; Instalasi">
+                <header>
+                    <button name="action_create_bast" type="object" string="Buat BAST"
+                            invisible="bast_id != False"/>
+                    <button name="action_mark_installed" type="object" string="Terpasang"
+                            class="btn-primary"
+                            invisible="state in ('installed', 'bast_signed', 'dismantled')"/>
+                    <button name="action_confirm_handover" type="object" string="Konfirmasi BAST"
+                            class="btn-primary" invisible="state != 'installed'"/>
+                    <button name="action_mark_dismantled" type="object" string="Sudah Dibongkar"
+                            invisible="state != 'bast_signed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group string="Job">
+                            <field name="spk_id"/>
+                            <field name="sequence_no"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="picking_id"/>
+                        </group>
+                        <group string="Venue">
+                            <field name="venue_name"/>
+                            <field name="venue_partner_id"/>
+                            <field name="venue_contact"/>
+                            <field name="venue_address"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Jadwal">
+                            <field name="loading_in" required="venue_name != False"/>
+                            <field name="installation_start"/>
+                            <field name="installation_end"/>
+                            <field name="dismantle_at"/>
+                        </group>
+                        <group string="Crew">
+                            <field name="crew_ids" widget="many2many_tags"/>
+                            <field name="driver_id"/>
+                            <field name="vehicle_note"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Biaya" groups="custom_spk.group_spk_cost_viewer">
+                            <field name="delivery_cost"/>
+                            <field name="cost_posted" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Serah Terima">
+                            <field name="bast_id" readonly="1"/>
+                            <field name="bast_signed" readonly="1"/>
+                            <field name="photo_url" widget="url"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_spk_delivery_list" model="ir.ui.view">
+        <field name="name">custom.spk.delivery.list</field>
+        <field name="model">custom.spk.delivery</field>
+        <field name="arch" type="xml">
+            <list string="Delivery &amp; Instalasi">
+                <field name="name"/>
+                <field name="spk_id"/>
+                <field name="venue_name"/>
+                <field name="loading_in"/>
+                <field name="dismantle_at" optional="show"/>
+                <field name="bast_signed" string="BAST"/>
+                <field name="delivery_cost" sum="Biaya"
+                       groups="custom_spk.group_spk_cost_viewer" optional="hide"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_spk_delivery_search" model="ir.ui.view">
+        <field name="name">custom.spk.delivery.search</field>
+        <field name="model">custom.spk.delivery</field>
+        <field name="arch" type="xml">
+            <search string="Delivery">
+                <field name="spk_id"/>
+                <field name="venue_name"/>
+                <filter name="unsigned" string="BAST Belum Ditandatangani"
+                        domain="[('bast_signed', '=', False), ('state', 'in', ('installed',))]"/>
+                <filter name="no_dismantle" string="Bongkar Belum Dijadwalkan"
+                        domain="[('dismantle_at', '=', False), ('state', 'in', ('installed', 'bast_signed'))]"/>
+                <group expand="0" string="Group By">
+                    <filter name="by_spk" string="SPK" context="{'group_by': 'spk_id'}"/>
+                    <filter name="by_venue" string="Venue" context="{'group_by': 'venue_name'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_spk_delivery" model="ir.actions.act_window">
+        <field name="name">Delivery &amp; Instalasi</field>
+        <field name="res_model">custom.spk.delivery</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
