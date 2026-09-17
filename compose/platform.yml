@@ -219,7 +219,30 @@ services:
       # named custom_demo_seed, so nothing here looked wrong. Spelled out, an
       # addition to the dev bootstrap can no longer reach client databases by
       # accident.
-      ORCHESTRATOR_PROVISION_MODULES: ${ORCHESTRATOR_PROVISION_MODULES:-custom_pdp_core,custom_pdp_masking,custom_operating_unit,custom_ppob,custom_super_admin,custom_hub_console,custom_onboarding_journey,custom_tenant_infra,custom_ai_bridge,custom_ai_features}
+      #
+      # THE CONTROL PLANE IS NOT PART OF THIS LIST, corrected 2026-09-16.
+      # custom_super_admin, custom_hub_console, custom_onboarding_journey and
+      # custom_tenant_infra were all in here. Every one of them is operator
+      # surface: the super-admin console, the SaaS management UI, the public
+      # lead intake, and a VPS deployer whose six endpoints do not exist on the
+      # orchestrator. Handing a client database the console that administers
+      # every OTHER client is not a convenience, it is a tenant-boundary hole
+      # waiting for someone to notice the menu. No client has been born through
+      # this path yet -- the only provisions on record are six zz_prov_probe*
+      # throwaways from 2026-09-04 -- so this is a hole closed before it was
+      # ever fallen into, not damage repaired. `bct` carries these modules for
+      # a different reason: it predates the control plane and was the database
+      # they were developed in. Cleaning THAT up is a separate, entangled job
+      # (custom_onboarding_journey depends on custom_tenant_infra, and five
+      # installed modules depend on custom_super_admin) and is not done here.
+      #
+      # custom_athera_sso IS part of this list, added in the same pass. It
+      # serves /athera/sso in the tenant's own database, which is the door
+      # login-gateway sends a person through; a tenant provisioned without it
+      # has no SSO entrance at all. Every one of the four tenants that exist
+      # today carries it, and none of them got it from here -- which is how a
+      # list that could not produce a usable tenant went unnoticed.
+      ORCHESTRATOR_PROVISION_MODULES: ${ORCHESTRATOR_PROVISION_MODULES:-custom_pdp_core,custom_pdp_masking,custom_operating_unit,custom_ppob,custom_athera_sso,custom_ai_bridge,custom_ai_features}
       TZ: ${TZ:-UTC}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${ORCHESTRATOR_HOST_PORT:-38300}:8080"
