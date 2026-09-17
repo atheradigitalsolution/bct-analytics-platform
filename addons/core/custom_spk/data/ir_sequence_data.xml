@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Yearly, not monthly. The number is quoted back by the client for months after
+        the event, so it has to stay unambiguous across a whole season; a monthly reset
+        would put two SPK/0001 in the same year. Item and delivery sub-numbers hang off
+        this one (SPK/2026/0001-01, SPK/2026/0001/D1) and are formed by the records that
+        own them, not by a second sequence.
+    -->
+    <record id="seq_custom_spk" model="ir.sequence">
+        <field name="name">Surat Perintah Kerja</field>
+        <field name="code">custom.spk</field>
+        <field name="prefix">SPK/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+        <field name="implementation">standard</field>
+        <field name="use_date_range" eval="True"/>
+    </record>
+</odoo>

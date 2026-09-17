@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_root" name="SPK" sequence="24"
+              groups="group_spk_ae,group_spk_supervisor,group_spk_pm"/>
+    <menuitem id="menu_spk_operations" name="Operasional" parent="menu_spk_root" sequence="10"/>
+    <menuitem id="menu_spk_list" name="SPK" parent="menu_spk_operations"
+              action="action_custom_spk" sequence="10"/>
+    <menuitem id="menu_spk_config" name="Konfigurasi" parent="menu_spk_root" sequence="90"
+              groups="group_spk_pm"/>
+    <menuitem id="menu_spk_shift" name="Shift Kerja" parent="menu_spk_config"
+              action="action_custom_spk_shift" sequence="10"/>
+</odoo>

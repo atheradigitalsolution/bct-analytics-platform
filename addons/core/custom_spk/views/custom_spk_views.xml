@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_custom_spk_list" model="ir.ui.view">
+        <field name="name">custom.spk.list</field>
+        <field name="model">custom.spk</field>
+        <field name="arch" type="xml">
+            <list string="SPK" decoration-danger="risk_level == 'late'"
+                  decoration-warning="risk_level == 'watch'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="event_name"/>
+                <field name="event_date_start"/>
+                <field name="days_to_event" string="Sisa Hari"/>
+                <field name="progress" widget="progressbar"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="state" widget="badge"/>
+                <field name="risk_level" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_custom_spk_form" model="ir.ui.view">
+        <field name="name">custom.spk.form</field>
+        <field name="model">custom.spk</field>
+        <field name="arch" type="xml">
+            <form string="SPK">
+                <header>
+                    <button name="action_confirm" type="object" string="Setujui SPK"
+                            class="btn-primary"
+                            invisible="state not in ('draft', 'sent', 'negotiation')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,confirmed,design_approved,production,handover,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="risk_level != 'late'">
+                        Deadline event kurang dari 7 hari dan progres di bawah 70%.
+                    </div>
+                    <group>
+                        <group string="Klien">
+                            <field name="partner_id"/>
+                            <field name="partner_contact_id"/>
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                            <field name="source_type"/>
+                        </group>
+                        <group string="Event">
+                            <field name="event_name"/>
+                            <field name="event_venue"/>
+                            <field name="event_date_start"/>
+                            <field name="event_date_end"/>
+                            <field name="days_to_event" readonly="1"/>
+                            <field name="risk_level" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Booth">
+                            <field name="booth_size"/>
+                            <field name="booth_type"/>
+                        </group>
+                        <group string="Pelaksanaan">
+                            <field name="progress" widget="progressbar"/>
+                            <field name="project_id" readonly="1"/>
+                            <field name="analytic_account_id" readonly="1"
+                                   groups="custom_spk.group_spk_cost_viewer"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Catatan" name="note">
+                            <field name="note" placeholder="Brief, batasan venue, catatan survey..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_custom_spk_search" model="ir.ui.view">
+        <field name="name">custom.spk.search</field>
+        <field name="model">custom.spk</field>
+        <field name="arch" type="xml">
+            <search string="SPK">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="event_name"/>
+                <field name="user_id"/>
+                <filter name="at_risk" string="At Risk" domain="[('risk_level', '=', 'late')]"/>
+                <filter name="open" string="Berjalan"
+                        domain="[('state', 'not in', ('paid', 'closed', 'lost'))]"/>
+                <separator/>
+                <filter name="my_spk" string="SPK Saya" domain="[('user_id', '=', uid)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="by_ae" string="Account Executive" context="{'group_by': 'user_id'}"/>
+                    <filter name="by_partner" string="Klien" context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_custom_spk" model="ir.actions.act_window">
+        <field name="name">SPK</field>
+        <field name="res_model">custom.spk</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Terbitkan SPK pertama</p>
+            <p>Satu nomor SPK mengikat penawaran, design, produksi, pengiriman dan tagihan.</p>
+        </field>
+    </record>
+</odoo>

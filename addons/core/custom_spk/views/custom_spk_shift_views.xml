@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_custom_spk_shift_list" model="ir.ui.view">
+        <field name="name">custom.spk.shift.list</field>
+        <field name="model">custom.spk.shift</field>
+        <field name="arch" type="xml">
+            <list string="Shift" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="time_start" widget="float_time"/>
+                <field name="time_stop" widget="float_time"/>
+                <field name="crosses_midnight" readonly="1"/>
+                <field name="rate_multiplier"/>
+                <field name="meal_allowance" groups="custom_spk.group_spk_cost_viewer"/>
+                <field name="currency_id" column_invisible="True"
+                       groups="custom_spk.group_spk_cost_viewer"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_custom_spk_shift" model="ir.actions.act_window">
+        <field name="name">Shift Kerja</field>
+        <field name="res_model">custom.spk.shift</field>
+        <field name="view_mode">list</field>
+    </record>
+</odoo>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        The three shifts the workshop actually runs, with the premiums the business
+        process document specifies. Seeded as data so a rate change is a data change;
+        multipliers are ratios and stay readable to whoever schedules, while the meal
+        allowance is money and is fenced on the field itself.
+
+        Shift 3 crosses midnight. That is computed, not declared, so nobody has to keep
+        a boolean in step with the hours.
+    -->
+    <record id="shift_1" model="custom.spk.shift">
+        <field name="name">Shift 1 (Pagi)</field>
+        <field name="code">S1</field>
+        <field name="sequence">10</field>
+        <field name="time_start">7.0</field>
+        <field name="time_stop">15.0</field>
+        <field name="rate_multiplier">1.0</field>
+    </record>
+    <record id="shift_2" model="custom.spk.shift">
+        <field name="name">Shift 2 (Sore)</field>
+        <field name="code">S2</field>
+        <field name="sequence">20</field>
+        <field name="time_start">15.0</field>
+        <field name="time_stop">23.0</field>
+        <field name="rate_multiplier">1.1</field>
+    </record>
+    <record id="shift_3" model="custom.spk.shift">
+        <field name="name">Shift 3 (Malam)</field>
+        <field name="code">S3</field>
+        <field name="sequence">30</field>
+        <field name="time_start">23.0</field>
+        <field name="time_stop">7.0</field>
+        <field name="rate_multiplier">1.3</field>
+    </record>
+</odoo>

@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_custom_spk_ae,custom.spk.ae,model_custom_spk,group_spk_ae,1,1,1,0
+access_custom_spk_supervisor,custom.spk.supervisor,model_custom_spk,group_spk_supervisor,1,1,0,0
+access_custom_spk_pm,custom.spk.pm,model_custom_spk,group_spk_pm,1,1,1,1
+access_custom_spk_shift_read,custom.spk.shift.read,model_custom_spk_shift,base.group_user,1,0,0,0
+access_custom_spk_shift_pm,custom.spk.shift.pm,model_custom_spk_shift,group_spk_pm,1,1,1,1
