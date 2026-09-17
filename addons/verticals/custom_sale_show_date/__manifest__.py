@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "the tenant Show Date",
+    "name": "Sale Show Date (Events & Exhibitions)",
     "version": "19.0.1.5.0",
     "summary": "Show-date, event and DP fields on quotation/SO/customer invoice, "
-    "with payment terms anchored to the show date. PT the tenant only.",
+    "with payment terms anchored to the show date.",
     "description": """
 the tenant Show Date
 ==============
@@ -51,16 +51,20 @@ line because the trailing marker already states the down payment. The journal it
 down payment stays identifiable in the GL through account 2108100001 and the
 order's "Down Payments" section.
 
-TENANT-SCOPED: built for the PT the tenant company on the tenant DBs
-(uat_tenant, rnd_tenant, prd_EAL_Tenant). The behaviour is gated by the
-``res.company`` boolean flag, NOT by company name and NOT merely by install, so
-the module is safe to install on a multi-company DB (e.g. the tenant + the tenant): only the
-company with the flag ticked (PT the tenant) is affected. Until the flag is ticked the
-module is inert.
+SCOPE: verticals tier — event, exhibition and booth businesses, where the show
+date rather than the invoice date is what the customer pays against. The
+behaviour is gated by a ``res.company`` boolean flag, NOT by company name and
+NOT merely by install, so the module is safe on a multi-company DB: only a
+company with the flag ticked is affected, and until it is ticked the module is
+inert.
+
+Sits in ``verticals/`` and not ``core/`` because it is one industry's vocabulary,
+and because its Profit & Loss "by Show" extension depends on
+``custom_accounting_reports`` (ee_gap) — a dependency ``core/`` should not carry.
 """,
     "author": "Platform",
     "website": "https://example.com/custom-platform",
-    "category": "Tenants/the tenant",
+    "category": "Verticals/Events",
     "depends": ["sale_management", "account", "custom_core", "custom_accounting_reports"],
     "data": [
         "views/res_company_views.xml",

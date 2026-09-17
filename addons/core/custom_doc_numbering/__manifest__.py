@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "the tenant Document Numbering",
+    "name": "Document Numbering",
     "version": "19.0.1.0.0",
-    "summary": "Per-company document numbering (SQ/SO/PO/INV/DO/BAST) with monthly reset for the tenant.",
+    "summary": "Per-company document numbering (SQ/SO/PO/INV/DO/BAST) with monthly reset.",
     "description": """
 the tenant Document Numbering
 ===========================
@@ -30,13 +30,14 @@ Mechanism
 * Customer invoices use a monthly ``_get_starting_sequence`` (gated to companies
   that have ``x_doc_code`` set), so other tenants/companies are untouched.
 
-TENANT-SCOPED: install only on the tenant DBs (e.g. prd_tenant,
-trn_tenant). Behaviour is gated by ``res.company.x_doc_code`` so the module is
-inert for any company without a code.
+SCOPE: core tier — any tenant that numbers documents this way. Behaviour is
+gated by ``res.company.x_doc_code``, so installing it changes nothing until a
+company is given a code; a multi-company database can adopt it per company.
+Promoted from ``_tenants/`` once a second client needed the same numbering.
 """,
     "author": "Platform",
     "website": "https://example.com/custom-platform",
-    "category": "Tenants/the tenant",
+    "category": "Core/Document Numbering",
     "depends": [
         "sale_management",
         "purchase",

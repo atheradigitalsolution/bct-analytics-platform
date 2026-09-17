@@ -279,7 +279,14 @@ WAVES: dict[int, tuple[str, range]] = {
 
 def load_catalog() -> dict[str, dict]:
     if not CATALOG.exists():
-        sys.exit(f"catalogue not found: {CATALOG}\nRun tools/module_inventory.py first.")
+        sys.exit(
+            f"catalogue not found: {CATALOG}\n"
+            "The original 23-column row set came from tools/module_inventory.py in the "
+            "upstream odoo-platform repo, which is not available here.\n"
+            "To rebuild the measured columns from this tree instead, run "
+            "tools/refresh_module_catalog.py -- but it needs an existing CSV to carry "
+            "the judgement columns forward, so recover the file from git first."
+        )
     with CATALOG.open(encoding="utf-8", newline="") as fh:
         return {r["module"]: r for r in csv.DictReader(fh)}
 
