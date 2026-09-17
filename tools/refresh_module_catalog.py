@@ -88,6 +88,11 @@ TIER_ORDER = [
 # column earned on the old row would be thrown away. Each pair below was confirmed
 # by diffing the catalogue summary against the manifest summary on disk: identical
 # text, client name removed.
+#
+# The old keys necessarily carry the client names — that is what makes the lookup
+# work — so this map is load-bearing and is NOT a scrubbing oversight. The same
+# information already exists in scripts/migrate-client-renames.py. Do not "clean"
+# it: a renamed module would silently lose its judgement columns on the next run.
 RENAMES = {
     "custom_arka_show_date": "custom_sale_show_date",
     "custom_arka_aim_numbering": "custom_doc_numbering",
@@ -179,10 +184,14 @@ def prune_stale_models(listed: str, mod_dir: Path) -> str:
     ``models_without_search`` is a judgement (which models lack a search view) over
     a set that is NOT a judgement at all — the model names themselves come from the
     code. Carrying the whole string forward preserved names that had been renamed,
-    and in this tree those stale names were the client names that a scrubbing pass
-    had already removed from the code: ``levis.categ.reclass``,
-    ``custom.ppob.eraspace.*``. The catalogue kept publishing them after the source
-    stopped. So the judgement survives, but only for models that still exist.
+    and in this tree the stale entries were client-derived model names that a
+    scrubbing pass had already removed from the source; the catalogue went on
+    publishing them afterwards. They are not quoted here: naming them in a
+    docstring would move them out of the data and into the documentation, which is
+    the opposite of the point. Look at the diff that introduced this function if
+    you need to see which ones they were.
+
+    So the judgement survives, but only for models that still exist.
     """
     if not listed:
         return listed
