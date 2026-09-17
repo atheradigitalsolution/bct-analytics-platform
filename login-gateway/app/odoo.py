@@ -182,6 +182,38 @@ class OdooClient:
             raise OdooError("Odoo JSON-RPC %s.%s failed" % (service, method))
         return parsed.get("result")
 
+    def call_route(self, db: str, path: str, params: dict, headers: dict | None = None):
+        """POST to a custom `type="jsonrpc"` controller route in a tenant's Odoo.
+
+        Separate from `_call` because that one speaks to `/jsonrpc`, the SERVICE endpoint, whose
+        body names a service and a method. A controller route declared `type="jsonrpc"` is a
+        different shape: the path is the method, and `params` is unpacked into the handler's
+        keyword arguments. Sharing `_url_for` and the http-only opener matters more than sharing
+        the body, so those are reused and the envelope is not.
+
+        The same redaction discipline applies: an HTTPError's body is never read and OSError is
+        re-raised `from None`, because these calls carry a shared secret in a header and, on the
+        completion route, a plaintext password in the body.
+        """
+        payload = {"jsonrpc": "2.0", "method": "call", "params": params, "id": 1}
+        request_headers = {"Content-Type": "application/json"}
+        request_headers.update(headers or {})
+        try:
+            body = json.dumps(payload).encode("utf-8")
+            request = urllib.request.Request(
+                self._url_for(db) + path, data=body, headers=request_headers, method="POST",
+            )
+            response = _HTTP_ONLY_OPENER.open(request, timeout=self.timeout)
+            with response:
+                parsed = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise OdooError("Odoo returned HTTP %s for %s" % (exc.code, path)) from None
+        except OSError as exc:
+            raise OdooError("Odoo is unreachable: %s" % exc.__class__.__name__) from None
+        if "error" in parsed:
+            raise OdooError("Odoo route %s failed" % path)
+        return parsed.get("result")
+
     def authenticate(self, db: str, login: str, password: str) -> int:
         uid = self._call(db, "common", "authenticate", [db, login, password, {}])
         if not uid:

@@ -46,6 +46,26 @@ class Settings:
     #: menyimpulkannya dari permintaan: di belakang dua lapis proxy, Host yang
     #: sampai ke sini adalah host Odoo, bukan host gerbang.
     public_base: str
+    #: Rahasia bersama untuk dua rute reset di `custom_athera_sso`. Kosong berarti
+    #: reset password MATI — bukan terbuka. Sisi Odoo memakai aturan yang sama, jadi
+    #: keduanya harus dikonfigurasi sebelum fitur ini ada sama sekali.
+    reset_shared_secret: str
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    smtp_starttls: bool
+    mail_from: str
+
+    @property
+    def reset_enabled(self) -> bool:
+        """Reset hanya ada kalau KEDUA belah jalannya lengkap.
+
+        Rahasia tanpa SMTP berarti token yang tidak pernah sampai ke siapa pun; SMTP tanpa
+        rahasia berarti Odoo menolak setiap panggilan. Keduanya gagal, dan keduanya gagal dengan
+        cara yang terlihat seperti "formulirnya rusak". Satu sakelar yang jujur lebih baik.
+        """
+        return bool(self.reset_shared_secret and self.smtp_host and self.mail_from)
 
     def key_paths(self) -> list:
         return [
@@ -108,4 +128,14 @@ def settings_from_env(environ: dict | None = None) -> Settings:
         public_base=env.get(
             "LOGIN_GATEWAY_PUBLIC_BASE", "https://auth.athera.localhost"
         ).rstrip("/"),
+        # No default. An empty secret disables the reset routes on both sides rather than
+        # enabling them with a guessable value, which is the only safe direction for a default
+        # on an unauthenticated password-reset API.
+        reset_shared_secret=env.get("LOGIN_GATEWAY_RESET_SECRET", ""),
+        smtp_host=env.get("LOGIN_GATEWAY_SMTP_HOST", ""),
+        smtp_port=int(env.get("LOGIN_GATEWAY_SMTP_PORT", "587")),
+        smtp_user=env.get("LOGIN_GATEWAY_SMTP_USER", ""),
+        smtp_password=env.get("LOGIN_GATEWAY_SMTP_PASSWORD", ""),
+        smtp_starttls=env.get("LOGIN_GATEWAY_SMTP_STARTTLS", "1") not in ("0", "false", "no"),
+        mail_from=env.get("LOGIN_GATEWAY_MAIL_FROM", ""),
     )

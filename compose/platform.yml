@@ -129,6 +129,25 @@ services:
       # The gateway's OWN public base, used to send a browser to its login page. It cannot be
       # inferred from the request: behind the edge the Host that arrives here is the Odoo host.
       LOGIN_GATEWAY_PUBLIC_BASE: ${LOGIN_GATEWAY_PUBLIC_BASE:-https://auth.${ATHERA_DOMAIN:-athera.localhost}}
+      # ---- Reset password swalayan ----------------------------------------------------
+      # NO DEFAULTS, on purpose. Settings.reset_enabled requires the secret AND an SMTP host
+      # AND a from-address; any one of them missing turns the feature off and the form says so.
+      # A default here would be a guessable shared secret on an unauthenticated password-reset
+      # API, which is the one thing this flow must never have.
+      #
+      # `LOGIN_GATEWAY_RESET_SECRET` must equal the Odoo parameter `athera.sso.reset_secret`
+      # in EVERY tenant database that should offer reset. A tenant whose parameter is unset
+      # refuses every call, and the visitor sees the same page as everyone else.
+      #
+      # The relay credential lives here rather than in an ir_mail_server row inside each client
+      # database, where a client administrator could read it and send mail as ATHERA.
+      LOGIN_GATEWAY_RESET_SECRET: ${LOGIN_GATEWAY_RESET_SECRET:-}
+      LOGIN_GATEWAY_SMTP_HOST: ${LOGIN_GATEWAY_SMTP_HOST:-}
+      LOGIN_GATEWAY_SMTP_PORT: ${LOGIN_GATEWAY_SMTP_PORT:-587}
+      LOGIN_GATEWAY_SMTP_USER: ${LOGIN_GATEWAY_SMTP_USER:-}
+      LOGIN_GATEWAY_SMTP_PASSWORD: ${LOGIN_GATEWAY_SMTP_PASSWORD:-}
+      LOGIN_GATEWAY_SMTP_STARTTLS: ${LOGIN_GATEWAY_SMTP_STARTTLS:-1}
+      LOGIN_GATEWAY_MAIL_FROM: ${LOGIN_GATEWAY_MAIL_FROM:-}
       # INFO, not WARNING. Every audit line this service writes — failed login,
       # rate-limit lockout, rejected CSRF, refused SSO — is emitted at INFO.
       # Raising this to WARNING deletes the authentication audit trail. Until

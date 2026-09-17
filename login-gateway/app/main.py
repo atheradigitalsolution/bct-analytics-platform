@@ -33,6 +33,7 @@ from .config import settings_from_env
 from .keys import load_key_ring
 from . import sso as sso_mod
 from . import webui
+from . import mailer
 from .odoo import AuthenticationFailed, OdooClient, OdooError, read_session_claims
 from .ratelimit import RateLimiter
 from .registry import Registry
@@ -50,6 +51,14 @@ JWKS_KEYS = Gauge(
     "bct_gateway_jwks_keys",
     "Number of keys published in JWKS. Two is the floor: a single-key JWKS cannot be rotated "
     "without a flag-day outage (security finding T-4).",
+)
+RESET_TOTAL = Counter(
+    "bct_gateway_password_reset_total",
+    "Password-reset steps by outcome. Labelled rather than split into several counters because "
+    "the interesting question is always a ratio: `sent` against `no_account` says whether people "
+    "are mistyping their tenant code, and `mail_failed` against everything else is the only "
+    "external sign that the relay stopped working — the page looks identical either way.",
+    ["result"],
 )
 ENTITLEMENT_ENFORCEMENT = Gauge(
     "bct_gateway_entitlement_enforcement_enabled",
@@ -364,6 +373,237 @@ def create_app(settings=None) -> FastAPI:
         _issue(response, db, uid, claims, password)
         response.delete_cookie(CSRF_COOKIE, path="/auth")
         return response
+
+    # -----------------------------------------------------------------------------------
+    # Reset password.
+    #
+    # THE GATEWAY NEVER SETS A PASSWORD. It resolves nothing, stores nothing and writes nothing
+    # to any tenant database. It asks the tenant's own Odoo for a reset token, mails the link,
+    # and later hands the token back with the new password. Odoo validates the token and performs
+    # the write, through `res.users.signup()` — the same code path its own reset form uses.
+    #
+    # WHY THE CLIENT CODE IS ASKED FOR. The login form already asks for it (`_handle_login_form`
+    # takes `db` straight from the form), so the gateway has never needed to know which tenants
+    # an email belongs to. Keeping it that way here costs one field the person already fills in,
+    # and avoids both a new capability and an enumeration oracle.
+    #
+    # EVERY OUTCOME RENDERS THE SAME PAGE. Unknown tenant, unknown account, account with no email
+    # address, Odoo refusing the shared secret, relay rejecting the message: all of them answer
+    # `reset_sent_page()`. The only refusal a visitor can distinguish is "the feature is turned
+    # off", which is a fact about our deployment and not about them.
+    # -----------------------------------------------------------------------------------
+
+    def _reset_headers() -> dict:
+        return {"X-Athera-Reset-Secret": settings.reset_shared_secret}
+
+    @router.get("/auth/reset")
+    def reset_request_form(db: str = ""):
+        csrf = secrets.token_urlsafe(24)
+        response = HTMLResponse(webui.reset_request_page(csrf, db[:64]))
+        _set_csrf_cookie(response, csrf)
+        return response
+
+    @router.post("/auth/reset/form")
+    async def reset_request_submit(request: Request):
+        length = int(request.headers.get("content-length") or 0)
+        if length > MAX_FORM_BYTES:
+            return JSONResponse({"error": "payload_too_large"}, status_code=413)
+        raw = await request.body()
+        if len(raw) > MAX_FORM_BYTES:
+            return JSONResponse({"error": "payload_too_large"}, status_code=413)
+        fields = urllib.parse.parse_qs(raw.decode("utf-8", "replace"), keep_blank_values=True)
+        client_ip = request.client.host if request.client else "unknown"
+        cookie_csrf = request.cookies.get(CSRF_COOKIE) or ""
+
+        def one(name, limit=320):
+            return ((fields.get(name) or [""])[0])[:limit]
+
+        # Blocking: this makes an HTTP call to Odoo and then an SMTP conversation. Both would
+        # stall every other request on the event loop if they ran inline.
+        return await run_in_threadpool(
+            _handle_reset_request,
+            one("db", 64), one("login", 320), one("csrf", 256), cookie_csrf, client_ip,
+        )
+
+    def _handle_reset_request(db, login_name, form_csrf, cookie_csrf, client_ip):
+        def _page(error=""):
+            csrf = secrets.token_urlsafe(24)
+            response = HTMLResponse(webui.reset_request_page(csrf, db, error), status_code=400)
+            _set_csrf_cookie(response, csrf)
+            return response
+
+        if not settings.reset_enabled:
+            # Honest, and not an enumeration leak: this says something about our configuration,
+            # not about whether the visitor has an account.
+            RESET_TOTAL.labels(result="disabled").inc()
+            return _page(webui.RESET_DISABLED)
+
+        if not cookie_csrf or not secrets.compare_digest(form_csrf, cookie_csrf):
+            RESET_TOTAL.labels(result="csrf_rejected").inc()
+            _audit("reset.csrf_rejected", db=db, source=client_ip)
+            return _page(webui.RESET_EXPIRED_FORM)
+
+        if not db or not login_name:
+            return _page(webui.RESET_INVALID)
+
+        # Two buckets, exactly as the login path does it: one per (tenant, account) so a single
+        # account cannot be flooded, one per source so a single host cannot walk the address
+        # space. A reset form without the second is a free mail cannon pointed at our relay.
+        account_key = "reset:%s:%s" % (db, login_name)
+        source_key = "reset-source:%s" % client_ip
+        for key in (account_key, source_key):
+            if limiter.is_locked(key):
+                RESET_TOTAL.labels(result="ratelimited").inc()
+                _audit("reset.ratelimited", db=db, source=client_ip)
+                return _page(webui.RESET_RATE_LIMITED)
+        limiter.record_failure(account_key)
+        limiter.record_failure(source_key)
+
+        sent = webui.reset_sent_page()
+
+        if db not in settings.allowed_databases:
+            # Uniform. Whether a tenant exists is not something an unauthenticated visitor gets
+            # to enumerate — the same rule `_authenticate` follows for the same reason.
+            RESET_TOTAL.labels(result="unknown_tenant").inc()
+            _audit("reset.requested", db=db, source=client_ip, outcome="unknown_tenant")
+            return HTMLResponse(sent)
+
+        try:
+            result = odoo.call_route(
+                db, "/athera/sso/reset/token", {"login": login_name}, _reset_headers()
+            ) or {}
+        except OdooError as exc:
+            RESET_TOTAL.labels(result="upstream_error").inc()
+            _logger.error("reset token request failed: %s", exc)
+            return HTMLResponse(sent)
+
+        if result.get("error"):
+            # Almost always `unauthorised`: the tenant's `athera.sso.reset_secret` is unset or
+            # does not match ours. Loud in the log, invisible on the page.
+            RESET_TOTAL.labels(result="refused_by_odoo").inc()
+            _logger.error("reset token refused by %s: %s", db, result.get("error"))
+            return HTMLResponse(sent)
+
+        token = result.get("token")
+        if not token:
+            RESET_TOTAL.labels(result="no_account").inc()
+            _audit("reset.requested", db=db, source=client_ip, outcome="no_account")
+            return HTMLResponse(sent)
+
+        reset_url = "%s/auth/reset/new?db=%s&token=%s" % (
+            settings.public_base,
+            urllib.parse.quote(db, safe=""),
+            urllib.parse.quote(token, safe=""),
+        )
+        try:
+            mailer.send_reset_mail(
+                settings, result.get("email") or "", reset_url, result.get("name") or ""
+            )
+        except mailer.MailNotSent as exc:
+            RESET_TOTAL.labels(result="mail_failed").inc()
+            _logger.error("reset mail not sent for %s: %s", db, exc)
+            return HTMLResponse(sent)
+
+        RESET_TOTAL.labels(result="sent").inc()
+        _audit("reset.requested", db=db, source=client_ip, outcome="sent")
+        return HTMLResponse(sent)
+
+    @router.get("/auth/reset/new")
+    def reset_new_form(db: str = "", token: str = ""):
+        """The emailed link lands here. Nothing is verified yet — the token is spent on submit.
+
+        Checking it here as well would burn a single-use token on a mail scanner's link preview,
+        which is a real thing that happens to every transactional email, and the person would
+        then meet "already used" on their first click.
+        """
+        csrf = secrets.token_urlsafe(24)
+        response = HTMLResponse(webui.reset_new_page(db[:64], token[:2048], csrf))
+        _set_csrf_cookie(response, csrf)
+        return response
+
+    @router.post("/auth/reset/new")
+    async def reset_new_submit(request: Request):
+        length = int(request.headers.get("content-length") or 0)
+        if length > MAX_FORM_BYTES:
+            return JSONResponse({"error": "payload_too_large"}, status_code=413)
+        raw = await request.body()
+        if len(raw) > MAX_FORM_BYTES:
+            return JSONResponse({"error": "payload_too_large"}, status_code=413)
+        fields = urllib.parse.parse_qs(raw.decode("utf-8", "replace"), keep_blank_values=True)
+        client_ip = request.client.host if request.client else "unknown"
+        cookie_csrf = request.cookies.get(CSRF_COOKIE) or ""
+
+        def one(name, limit=2048):
+            return ((fields.get(name) or [""])[0])[:limit]
+
+        return await run_in_threadpool(
+            _handle_reset_new,
+            one("db", 64), one("token", 2048), one("password", 1024), one("confirm", 1024),
+            one("csrf", 256), cookie_csrf, client_ip,
+        )
+
+    def _handle_reset_new(db, token, password, confirm, form_csrf, cookie_csrf, client_ip):
+        def _page(error):
+            csrf = secrets.token_urlsafe(24)
+            response = HTMLResponse(webui.reset_new_page(db, token, csrf, error), status_code=400)
+            _set_csrf_cookie(response, csrf)
+            return response
+
+        if not settings.reset_enabled:
+            RESET_TOTAL.labels(result="disabled").inc()
+            return _page(webui.RESET_DISABLED)
+        if not cookie_csrf or not secrets.compare_digest(form_csrf, cookie_csrf):
+            RESET_TOTAL.labels(result="csrf_rejected").inc()
+            _audit("reset.csrf_rejected", db=db, source=client_ip)
+            return _page(webui.RESET_EXPIRED_FORM)
+        if not db or not token:
+            return _page(webui.RESET_LINK_BAD)
+        if password != confirm:
+            return _page(webui.RESET_MISMATCH)
+        if len(password) < 8:
+            # Checked here as well as in Odoo. The browser's `minlength` is a convenience, the
+            # Odoo check is the one that cannot be bypassed, and this one keeps a pointless round
+            # trip off the wire.
+            return _page(webui.RESET_TOO_SHORT)
+
+        source_key = "reset-new-source:%s" % client_ip
+        if limiter.is_locked(source_key):
+            RESET_TOTAL.labels(result="ratelimited").inc()
+            return _page(webui.RESET_RATE_LIMITED)
+        limiter.record_failure(source_key)
+
+        if db not in settings.allowed_databases:
+            RESET_TOTAL.labels(result="unknown_tenant").inc()
+            return _page(webui.RESET_LINK_BAD)
+
+        try:
+            result = odoo.call_route(
+                db, "/athera/sso/reset/complete",
+                {"token": token, "password": password}, _reset_headers(),
+            ) or {}
+        except OdooError as exc:
+            RESET_TOTAL.labels(result="upstream_error").inc()
+            _logger.error("reset completion failed: %s", exc)
+            return _page(webui.RESET_LINK_BAD)
+
+        if not result.get("ok"):
+            RESET_TOTAL.labels(result="token_refused").inc()
+            _audit("reset.completed", db=db, source=client_ip, outcome="refused")
+            return _page(
+                webui.RESET_TOO_SHORT
+                if result.get("error") == "password_too_short"
+                else webui.RESET_LINK_BAD
+            )
+
+        limiter.record_success(source_key)
+        RESET_TOTAL.labels(result="completed").inc()
+        _audit("reset.completed", db=db, source=client_ip, outcome="ok")
+        # Straight to the login form with the tenant prefilled. No session is created here: a
+        # password reset that logs you in turns possession of an inbox into a session, and the
+        # point of the flow is to prove possession of the PASSWORD you just chose.
+        return RedirectResponse(
+            "/auth/login?db=" + urllib.parse.quote(db, safe=""), status_code=303
+        )
 
     @router.post("/auth/login")
     def login(payload: LoginRequest, request: Request, response: Response):

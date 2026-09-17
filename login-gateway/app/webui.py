@@ -71,6 +71,7 @@ button{width:100%%;margin-top:1.25rem;padding:.65rem;font:inherit;font-weight:60
 <input id="password" name="password" type="password" required autocomplete="current-password">
 <button type="submit">Masuk</button>
 </form>
+<p class="hint" style="margin-top:1rem"><a href="/auth/reset">Lupa kata sandi?</a></p>
 </main></body></html>
 """
 
@@ -92,3 +93,106 @@ def login_page(next_path: str, db: str = "", csrf: str = "", error: str = "") ->
         "csrf": html.escape(csrf, quote=True),
         "error": ('<p class="err">%s</p>' % html.escape(error)) if error else "",
     }
+
+
+# ---------------------------------------------------------------------------
+# Reset password
+#
+# THREE PAGES, ONE SHELL. They share `_PAGE`'s stylesheet by being built from the same string
+# with a different body, rather than by importing a template engine into a service whose whole
+# UI is four forms. `default-src 'self'` stays satisfiable because nothing here loads anything.
+#
+# THE MIDDLE PAGE IS THE SECURITY CONTROL. `reset_sent_page` is returned for an address that
+# exists, an address that does not, a tenant code that does not, and a mail relay that just
+# refused the message. If any of those rendered differently, the form would answer the question
+# "does this person have an account with you" for anybody who asks.
+# ---------------------------------------------------------------------------
+
+_SHELL = _PAGE.split("<h1>")[0] + "%(body)s</main></body></html>\n"
+
+
+def _shell(title: str, body: str) -> str:
+    return _SHELL.replace("<title>Masuk — ATHERA</title>", "<title>%s — ATHERA</title>" % title) % {
+        "body": body,
+    }
+
+
+RESET_INVALID = "Kode klien atau email tidak lengkap."
+RESET_EXPIRED_FORM = "Formulir sudah kedaluwarsa. Mulai lagi dari awal."
+RESET_RATE_LIMITED = "Terlalu banyak permintaan. Coba lagi beberapa menit lagi."
+RESET_DISABLED = "Atur ulang kata sandi belum tersedia. Hubungi admin ATHERA Anda."
+RESET_LINK_BAD = "Tautan ini sudah dipakai atau kedaluwarsa. Mintalah tautan baru."
+RESET_TOO_SHORT = "Kata sandi baru minimal 8 karakter."
+RESET_MISMATCH = "Kedua kata sandi tidak sama."
+
+
+def reset_request_page(csrf: str = "", db: str = "", error: str = "") -> str:
+    """Where a person asks for a link. Same two identifiers the login form already asks for.
+
+    It asks for the client code as well as the email because the gateway has never resolved one
+    to the other: `_handle_login_form` takes `db` straight from the form. Adding a lookup here
+    would mean the gateway learning which tenants an address belongs to — a new capability, and
+    an enumeration oracle — to save a field the person already fills in to log in.
+    """
+    body = (
+        '<h1>Atur ulang kata sandi</h1>'
+        '<p class="sub">Kami kirim tautan ke email Anda.</p>'
+        + (('<p class="err">%s</p>' % html.escape(error)) if error else "")
+        + '<form method="post" action="/auth/reset/form">'
+        '<input type="hidden" name="csrf" value="%s">'
+        '<label for="db">Kode klien</label>'
+        '<input id="db" name="db" value="%s" required autocapitalize="none"'
+        ' autocomplete="organization" spellcheck="false">'
+        '<label for="login">Email</label>'
+        '<input id="login" name="login" type="email" required autocomplete="username" autofocus>'
+        '<button type="submit">Kirim tautan</button>'
+        '</form>'
+        '<p class="hint" style="margin-top:1rem"><a href="/auth/login">Kembali ke halaman masuk</a></p>'
+        % (html.escape(csrf, quote=True), html.escape(db, quote=True))
+    )
+    return _shell("Atur ulang kata sandi", body)
+
+
+def reset_sent_page() -> str:
+    """The one answer. See the note at the top of this section for why it is the only one."""
+    body = (
+        '<h1>Periksa email Anda</h1>'
+        '<p class="sub">Kalau kode klien dan email itu cocok dengan sebuah akun, tautan untuk '
+        'mengatur ulang kata sandi sudah dikirim ke sana.</p>'
+        '<p class="hint">Tautannya berlaku singkat dan hanya bisa dipakai sekali. Tidak menerima '
+        'apa pun setelah beberapa menit? Periksa folder spam, lalu coba lagi.</p>'
+        '<p class="hint" style="margin-top:1rem"><a href="/auth/login">Kembali ke halaman masuk</a></p>'
+    )
+    return _shell("Periksa email Anda", body)
+
+
+def reset_new_page(db: str, token: str, csrf: str = "", error: str = "") -> str:
+    """Where the new password is chosen. The token rides in a hidden field, not the query string.
+
+    It arrives in the URL — an emailed link has nowhere else to put it — but this form POSTs it in
+    the body so that the browser's next request, and anything it sends a `Referer` to, does not
+    carry a live reset token.
+    """
+    body = (
+        '<h1>Kata sandi baru</h1>'
+        '<p class="sub">Pilih kata sandi baru untuk akun Anda.</p>'
+        + (('<p class="err">%s</p>' % html.escape(error)) if error else "")
+        + '<form method="post" action="/auth/reset/new">'
+        '<input type="hidden" name="csrf" value="%s">'
+        '<input type="hidden" name="db" value="%s">'
+        '<input type="hidden" name="token" value="%s">'
+        '<label for="password">Kata sandi baru</label>'
+        '<input id="password" name="password" type="password" required minlength="8"'
+        ' autocomplete="new-password" autofocus>'
+        '<label for="confirm">Ulangi kata sandi</label>'
+        '<input id="confirm" name="confirm" type="password" required minlength="8"'
+        ' autocomplete="new-password">'
+        '<button type="submit">Simpan kata sandi</button>'
+        '</form>'
+        % (
+            html.escape(csrf, quote=True),
+            html.escape(db, quote=True),
+            html.escape(token, quote=True),
+        )
+    )
+    return _shell("Kata sandi baru", body)
