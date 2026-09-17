@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_estimation_cost,spk.estimation.cost,model_custom_spk_estimation,custom_spk.group_spk_cost_viewer,1,1,1,0
+access_estimation_price,spk.estimation.price,model_custom_spk_estimation,custom_spk.group_spk_price_viewer,1,1,1,1
+access_estimation_line_cost,spk.estimation.line.cost,model_custom_spk_estimation_line,custom_spk.group_spk_cost_viewer,1,1,1,1
+access_estimation_line_price,spk.estimation.line.price,model_custom_spk_estimation_line,custom_spk.group_spk_price_viewer,1,1,1,1
+access_estimation_tmpl_cost,spk.estimation.template.cost,model_custom_spk_estimation_template,custom_spk.group_spk_cost_viewer,1,1,1,0
+access_estimation_tmpl_price,spk.estimation.template.price,model_custom_spk_estimation_template,custom_spk.group_spk_price_viewer,1,1,1,1
+access_estimation_tmpl_line_cost,spk.estimation.template.line.cost,model_custom_spk_estimation_template_line,custom_spk.group_spk_cost_viewer,1,1,1,1
+access_estimation_tmpl_line_price,spk.estimation.template.line.price,model_custom_spk_estimation_template_line,custom_spk.group_spk_price_viewer,1,1,1,1

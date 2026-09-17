@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_spk_estimation_form" model="ir.ui.view">
+        <field name="name">custom.spk.estimation.form</field>
+        <field name="model">custom.spk.estimation</field>
+        <field name="arch" type="xml">
+            <form string="Estimasi">
+                <header>
+                    <button name="action_approve" type="object" string="Approve"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_revise" type="object" string="Revisi"
+                            invisible="state != 'approved'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/>
+                            <span class="text-muted"> rev <field name="revision" readonly="1"/></span>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="spk_id"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Rate">
+                            <field name="overhead_rate"/>
+                            <field name="risk_rate"/>
+                            <field name="target_margin" groups="custom_spk.group_spk_price_viewer"/>
+                        </group>
+                    </group>
+                    <field name="line_ids">
+                        <list editable="bottom">
+                            <field name="work_item"/>
+                            <field name="category"/>
+                            <field name="name"/>
+                            <field name="product_id"/>
+                            <field name="quantity"/>
+                            <field name="uom_id"/>
+                            <field name="unit_cost"/>
+                            <field name="waste_pct"/>
+                            <field name="waste_amount" readonly="1" optional="hide"/>
+                            <field name="subtotal" readonly="1" sum="Total"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                    <group class="oe_subtotal_footer oe_right">
+                        <field name="material_cost" readonly="1"/>
+                        <field name="labor_cost" readonly="1"/>
+                        <field name="subcon_cost" readonly="1"/>
+                        <field name="delivery_cost" readonly="1"/>
+                        <field name="venue_cost" readonly="1"/>
+                        <field name="direct_cost" readonly="1" class="oe_subtotal_footer_separator"/>
+                        <field name="overhead_amount" readonly="1"/>
+                        <field name="total_cost" readonly="1"/>
+                        <field name="contingency_amount" readonly="1"/>
+                        <field name="base_price" readonly="1"/>
+                        <field name="waste_allowance" readonly="1"/>
+                        <field name="quoted_price" readonly="1"
+                               class="oe_subtotal_footer_separator"
+                               groups="custom_spk.group_spk_price_viewer"/>
+                        <field name="margin_amount" readonly="1"
+                               groups="custom_spk.group_spk_price_viewer"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_spk_estimation_list" model="ir.ui.view">
+        <field name="name">custom.spk.estimation.list</field>
+        <field name="model">custom.spk.estimation</field>
+        <field name="arch" type="xml">
+            <list string="Estimasi">
+                <field name="name"/>
+                <field name="spk_id"/>
+                <field name="partner_id"/>
+                <field name="revision"/>
+                <field name="total_cost" sum="Total HPP"/>
+                <field name="quoted_price" sum="Total Penawaran"
+                       groups="custom_spk.group_spk_price_viewer"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_spk_estimation" model="ir.actions.act_window">
+        <field name="name">Estimasi / BoQ</field>
+        <field name="res_model">custom.spk.estimation</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

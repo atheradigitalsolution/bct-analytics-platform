@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_estimation" name="Estimasi / BoQ"
+              parent="custom_spk.menu_spk_operations"
+              action="action_spk_estimation" sequence="20"
+              groups="custom_spk.group_spk_cost_viewer"/>
+    <menuitem id="menu_spk_estimation_template" name="Template Estimasi"
+              parent="custom_spk.menu_spk_config"
+              action="action_spk_estimation_template" sequence="20"
+              groups="custom_spk.group_spk_cost_viewer"/>
+</odoo>
