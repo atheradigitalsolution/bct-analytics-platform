@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_project_task_form_athera_service" model="ir.ui.view">
+        <field name="name">project.task.form.athera.service</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_form2"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="athera_contract_id"/>
+                <field name="athera_tenant_id" readonly="1"
+                       invisible="not athera_contract_id"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_project_task_list_athera_service" model="ir.ui.view">
+        <field name="name">project.task.list.athera.service</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_tree2"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="athera_contract_id" optional="hide"/>
+                <field name="athera_tenant_id" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

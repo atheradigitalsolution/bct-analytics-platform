@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_helpdesk_ticket_form_athera_service" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.form.athera.service</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="custom_helpdesk.view_helpdesk_ticket_form"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="athera_contract_id"/>
+                <field name="athera_tenant_id" readonly="1"
+                       invisible="not athera_contract_id"/>
+                <field name="athera_hours_spent"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

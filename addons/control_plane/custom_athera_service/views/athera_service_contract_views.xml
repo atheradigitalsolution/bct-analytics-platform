@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_athera_service_contract_list" model="ir.ui.view">
+        <field name="name">athera.service.contract.list</field>
+        <field name="model">athera.service.contract</field>
+        <field name="arch" type="xml">
+            <list string="Kontrak Layanan"
+                  decoration-danger="hours_remaining &lt; 0"
+                  decoration-warning="state == 'exhausted'"
+                  decoration-muted="state == 'closed'">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="service_type"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="hours_purchased" sum="Jam dibeli"/>
+                <field name="hours_consumed" sum="Jam terpakai"/>
+                <field name="hours_remaining" sum="Sisa jam"/>
+                <field name="amount_total" sum="Nilai" widget="monetary"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'running'"
+                       decoration-warning="state == 'exhausted'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_athera_service_contract_form" model="ir.ui.view">
+        <field name="name">athera.service.contract.form</field>
+        <field name="model">athera.service.contract</field>
+        <field name="arch" type="xml">
+            <form string="Kontrak Layanan">
+                <header>
+                    <button name="action_start" type="object" string="Mulai"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_close" type="object" string="Tutup"
+                            invisible="state in ('draft', 'closed')"/>
+                    <button name="action_reset_to_draft" type="object" string="Kembali ke draf"
+                            invisible="state != 'closed'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,running,exhausted,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_tasks" type="object" class="oe_stat_button"
+                                icon="fa-tasks">
+                            <field name="task_count" widget="statinfo" string="Task"/>
+                        </button>
+                        <button name="action_view_tickets" type="object" class="oe_stat_button"
+                                icon="fa-life-ring">
+                            <field name="ticket_count" widget="statinfo" string="Tiket"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="mis. SVC/2026/0001"/></h1>
+                    </div>
+                    <group>
+                        <group string="Klien">
+                            <field name="tenant_id"/>
+                            <field name="tenant_slug" readonly="1"/>
+                            <field name="subscription_id"/>
+                            <field name="service_type"/>
+                            <field name="sla_id"/>
+                        </group>
+                        <group string="Periode">
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Jam">
+                            <field name="hours_purchased"/>
+                            <field name="hours_consumed" readonly="1"/>
+                            <field name="hours_remaining" readonly="1"
+                                   decoration-danger="hours_remaining &lt; 0"/>
+                        </group>
+                        <group string="Nilai">
+                            <field name="currency_id" groups="base.group_multi_currency"/>
+                            <field name="rate_hour"/>
+                            <field name="amount_total" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Task" name="tasks">
+                            <field name="task_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="stage_id"/>
+                                    <field name="effective_hours"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Tiket" name="tickets">
+                            <field name="ticket_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="subject"/>
+                                    <field name="state"/>
+                                    <field name="athera_hours_spent"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Catatan" name="note">
+                            <field name="note" placeholder="Ruang lingkup, batasan, kesepakatan."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_athera_service_contract_search" model="ir.ui.view">
+        <field name="name">athera.service.contract.search</field>
+        <field name="model">athera.service.contract</field>
+        <field name="arch" type="xml">
+            <search string="Kontrak Layanan">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="tenant_slug"/>
+                <filter name="running" string="Berjalan" domain="[('state', '=', 'running')]"/>
+                <filter name="exhausted" string="Jam habis" domain="[('state', '=', 'exhausted')]"/>
+                <filter name="overdrawn" string="Saldo minus" domain="[('hours_remaining', '&lt;', 0)]"/>
+                <filter name="development" string="Pengembangan" domain="[('service_type', '=', 'development')]"/>
+                <filter name="maintenance" string="Pemeliharaan" domain="[('service_type', '=', 'maintenance')]"/>
+                <filter name="training" string="Training" domain="[('service_type', '=', 'training')]"/>
+                <group>
+                    <filter name="groupby_tenant_id" string="Klien" domain="" context="{'group_by': 'tenant_id'}"/>
+                    <filter name="groupby_service_type" string="Jenis Layanan" domain="" context="{'group_by': 'service_type'}"/>
+                    <filter name="groupby_state" string="Status" domain="" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_athera_service_contract" model="ir.actions.act_window">
+        <field name="name">Kontrak Layanan</field>
+        <field name="res_model">athera.service.contract</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_athera_service_contract_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Belum ada kontrak layanan.</p>
+            <p>
+                Jam pengembangan kustom, pemeliharaan, dan training dicatat di sini.
+                Pekerjaannya sendiri tetap di Task dan Tiket — yang ini saldonya.
+            </p>
+        </field>
+    </record>
+
+</odoo>

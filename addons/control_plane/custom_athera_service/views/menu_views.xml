@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Menu ditempel di bawah konsol super admin yang sudah ada, bukan aplikasi baru.
+         Kontrak layanan adalah permukaan operator, dan operator sudah punya satu tempat. -->
+    <menuitem id="menu_athera_service_contract"
+              name="Kontrak Layanan"
+              parent="custom_super_admin.menu_super_admin_root"
+              action="action_athera_service_contract"
+              groups="custom_super_admin.group_csm"
+              sequence="45"/>
+
+</odoo>

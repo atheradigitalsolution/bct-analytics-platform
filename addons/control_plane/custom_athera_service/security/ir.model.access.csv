@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_athera_service_contract_csm,athera.service.contract csm,model_athera_service_contract,custom_super_admin.group_csm,1,1,1,0
+access_athera_service_contract_super,athera.service.contract super admin,model_athera_service_contract,custom_super_admin.group_super_admin,1,1,1,1
