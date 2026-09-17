@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_shopfloor_round_form" model="ir.ui.view">
+        <field name="name">custom.spk.shopfloor.round.form</field>
+        <field name="model">custom.spk.shopfloor.round</field>
+        <field name="arch" type="xml">
+            <form string="Ronde Shopfloor">
+                <header>
+                    <button name="action_submit_round" type="object" string="Submit Ronde"
+                            class="btn-primary" invisible="state != 'open'"/>
+                    <button name="action_approve_round" type="object" string="Approve Ronde"
+                            class="btn-primary" invisible="state == 'approved'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="alert alert-warning" role="alert" invisible="unmapped_count == 0">
+                        <field name="unmapped_count" class="oe_inline"/> shift harian di
+                        ronde ini belum mendarat di mana pun. Upahnya sudah jalan.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="shift_id"/>
+                            <field name="supervisor_id"/>
+                        </group>
+                        <group>
+                            <field name="attendance_count" readonly="1"/>
+                            <field name="unmapped_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <!--
+                        Editable list, one row per person, work log inline. This is the
+                        sixty-second screen: a round of the workshops ticked off in one
+                        pass, with the job split entered where the shift was split.
+                    -->
+                    <field name="attendance_ids" context="{'default_shopfloor_round_id': id}">
+                        <list editable="bottom"
+                              decoration-warning="is_daily and attendance_status == 'hadir' and portion_total &lt; 1">
+                            <field name="employee_id"/>
+                            <field name="attendance_status"/>
+                            <field name="is_daily" string="Harian" readonly="1"/>
+                            <field name="overtime_hours" string="Lembur"/>
+                            <field name="portion_total" string="Porsi" readonly="1"/>
+                            <field name="work_log_ids" widget="one2many_tags" optional="hide"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopfloor_round_list" model="ir.ui.view">
+        <field name="name">custom.spk.shopfloor.round.list</field>
+        <field name="model">custom.spk.shopfloor.round</field>
+        <field name="arch" type="xml">
+            <list string="Ronde Shopfloor" decoration-warning="unmapped_count > 0">
+                <field name="date"/>
+                <field name="shift_id"/>
+                <field name="supervisor_id"/>
+                <field name="attendance_count" string="Pekerja"/>
+                <field name="unmapped_count" string="Belum Mapping"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_shopfloor_round" model="ir.actions.act_window">
+        <field name="name">Ronde Shopfloor</field>
+        <field name="res_model">custom.spk.shopfloor.round</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_today': 1}</field>
+    </record>
+</odoo>

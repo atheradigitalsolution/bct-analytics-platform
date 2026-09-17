@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_round_supervisor,spk.round.supervisor,model_custom_spk_shopfloor_round,custom_spk.group_spk_supervisor,1,1,1,0
+access_round_pm,spk.round.pm,model_custom_spk_shopfloor_round,custom_spk.group_spk_pm,1,1,1,1

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_shopfloor" name="Ronde Shopfloor"
+              parent="custom_spk_workforce.menu_spk_workforce"
+              action="action_shopfloor_round" sequence="5"/>
+</odoo>
