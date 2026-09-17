@@ -37,7 +37,11 @@ inventing. So this is a MERGE, not a rewrite:
 
   carried forward from the existing row, keyed by module name
       domain, maturity, coupling, disposition, cdc_impact_cols, packs, tags,
-      models_without_search, core_field_dupes, commits, last_commit
+      core_field_dupes, commits, last_commit
+
+  carried forward, then pruned against the code
+      models_without_search -- the judgement is kept, but names the module no
+      longer declares are dropped (see prune_stale_models)
 
 A module that appears or disappears is reported, never silently dropped: a new
 module gets empty judgement columns for a human to fill, and a module gone from
@@ -57,6 +61,7 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -152,6 +157,40 @@ def measure(entry: dict) -> dict:
     return {"loc": loc, "files": files, "tests": tests}
 
 
+MODEL_NAME_RE = re.compile(r"""_name\s*=\s*["']([\w.]+)["']""")
+
+
+def owned_models(mod_dir: Path) -> set[str]:
+    """Model technical names this module declares via ``_name = "..."``."""
+    names: set[str] = set()
+    for path in mod_dir.rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        try:
+            names.update(MODEL_NAME_RE.findall(path.read_text(encoding="utf-8", errors="replace")))
+        except OSError:
+            continue
+    return names
+
+
+def prune_stale_models(listed: str, mod_dir: Path) -> str:
+    """Drop names from a carried-forward model list that the code no longer declares.
+
+    ``models_without_search`` is a judgement (which models lack a search view) over
+    a set that is NOT a judgement at all — the model names themselves come from the
+    code. Carrying the whole string forward preserved names that had been renamed,
+    and in this tree those stale names were the client names that a scrubbing pass
+    had already removed from the code: ``levis.categ.reclass``,
+    ``custom.ppob.eraspace.*``. The catalogue kept publishing them after the source
+    stopped. So the judgement survives, but only for models that still exist.
+    """
+    if not listed:
+        return listed
+    live = owned_models(mod_dir)
+    kept = [m for m in (x.strip() for x in listed.split(";")) if m and m in live]
+    return ";".join(kept)
+
+
 def layer_of(name: str, found: dict, seen: frozenset = frozenset()) -> int:
     """Longest dependency chain to a module outside this repo. Cycles clamp to 0."""
     if name in seen or name not in found:
@@ -202,6 +241,9 @@ def main(argv=None) -> int:
         row = dict(previous.get(name) or {k: "" for k in fieldnames})
         old_tier = row.get("tier", "")
         row.update(measure(entry))
+        row["models_without_search"] = prune_stale_models(
+            row.get("models_without_search", ""), entry["dir"]
+        )
         row.update({
             "module": name,
             "tier": entry["tier"],
