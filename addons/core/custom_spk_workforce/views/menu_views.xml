@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_workforce" name="Tenaga Kerja"
+              parent="custom_spk.menu_spk_root" sequence="20"
+              groups="custom_spk.group_spk_supervisor,custom_spk.group_spk_pm"/>
+    <menuitem id="menu_spk_attendance" name="Absensi Shift" parent="menu_spk_workforce"
+              action="action_spk_attendance" sequence="10"/>
+    <menuitem id="menu_spk_work_log" name="Work Log per SPK" parent="menu_spk_workforce"
+              action="action_spk_work_log" sequence="20"
+              groups="custom_spk.group_spk_cost_viewer"/>
+    <menuitem id="menu_spk_labor_allocation" name="Alokasi Gaji Tetap" parent="menu_spk_workforce"
+              action="action_spk_labor_allocation" sequence="30"
+              groups="custom_spk.group_spk_cost_viewer"/>
+</odoo>

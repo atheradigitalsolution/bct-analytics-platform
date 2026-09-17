@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        No new groups. The roles already exist in custom_spk, and inventing a parallel
+        set here would mean two places to get the price fence wrong.
+
+        The allocation run is the exception worth noting: it reads payroll totals, so it
+        sits behind cost visibility rather than the supervisor group. A supervisor ticks
+        attendance boxes; they have no business seeing the month's wage bill.
+    -->
+    <record id="rule_spk_attendance_company" model="ir.rule">
+        <field name="name">Absensi: per perusahaan</field>
+        <field name="model_id" ref="model_custom_spk_attendance"/>
+        <field name="domain_force">[('employee_id.company_id', 'in', company_ids + [False])]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_spk_allocation_company" model="ir.rule">
+        <field name="name">Alokasi gaji: per perusahaan</field>
+        <field name="model_id" ref="model_custom_spk_labor_allocation"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+</odoo>

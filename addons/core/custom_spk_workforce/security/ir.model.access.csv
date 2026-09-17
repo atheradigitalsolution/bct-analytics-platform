@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_attendance_supervisor,spk.attendance.supervisor,model_custom_spk_attendance,custom_spk.group_spk_supervisor,1,1,1,0
+access_attendance_pm,spk.attendance.pm,model_custom_spk_attendance,custom_spk.group_spk_pm,1,1,1,1
+access_attendance_cost,spk.attendance.cost,model_custom_spk_attendance,custom_spk.group_spk_cost_viewer,1,0,0,0
+access_worklog_supervisor,spk.worklog.supervisor,model_custom_spk_work_log,custom_spk.group_spk_supervisor,1,1,1,1
+access_worklog_pm,spk.worklog.pm,model_custom_spk_work_log,custom_spk.group_spk_pm,1,1,1,1
+access_worklog_cost,spk.worklog.cost,model_custom_spk_work_log,custom_spk.group_spk_cost_viewer,1,0,0,0
+access_allocation_pm,spk.allocation.pm,model_custom_spk_labor_allocation,custom_spk.group_spk_cost_viewer,1,1,1,0
+access_allocation_price,spk.allocation.price,model_custom_spk_labor_allocation,custom_spk.group_spk_price_viewer,1,1,1,1
+access_allocation_line_pm,spk.allocation.line.pm,model_custom_spk_labor_allocation_line,custom_spk.group_spk_cost_viewer,1,1,1,0
+access_allocation_line_price,spk.allocation.line.price,model_custom_spk_labor_allocation_line,custom_spk.group_spk_price_viewer,1,1,1,1

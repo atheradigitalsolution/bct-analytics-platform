@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_spk_labor_allocation_form" model="ir.ui.view">
+        <field name="name">custom.spk.labor.allocation.form</field>
+        <field name="model">custom.spk.labor.allocation</field>
+        <field name="arch" type="xml">
+            <form string="Alokasi Gaji Pekerja Tetap">
+                <header>
+                    <button name="action_compute" type="object" string="Hitung"
+                            class="btn-primary" invisible="state == 'posted'"/>
+                    <button name="action_post" type="object" string="Posting"
+                            class="btn-primary" invisible="state != 'computed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="period_year"/>
+                            <field name="period_month"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="total_shifts" readonly="1"/>
+                            <field name="payroll_total" readonly="1"/>
+                            <field name="rate_per_shift" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <field name="line_ids" readonly="1">
+                        <list string="Per SPK">
+                            <field name="spk_id"/>
+                            <field name="shifts"/>
+                            <field name="amount" sum="Total"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_spk_labor_allocation" model="ir.actions.act_window">
+        <field name="name">Alokasi Gaji Pekerja Tetap</field>
+        <field name="res_model">custom.spk.labor.allocation</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

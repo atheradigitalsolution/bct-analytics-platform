@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_employee_form_spk" model="ir.ui.view">
+        <field name="name">hr.employee.form.spk</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="SPK / Tenaga Kerja" name="spk_workforce">
+                    <group>
+                        <group string="Klasifikasi">
+                            <!--
+                                The employment type is shown but owned by payroll. It is here
+                                so the supervisor can see why a worker's shifts do or do not
+                                carry money, without a second field to keep in step.
+                            -->
+                            <field name="x_custom_employment_type"/>
+                            <field name="x_spk_is_daily" readonly="1"/>
+                            <field name="x_spk_labor_category"/>
+                        </group>
+                        <group string="Upah" groups="custom_spk.group_spk_cost_viewer">
+                            <field name="x_spk_shift_rate"
+                                   invisible="x_custom_employment_type != 'pegawai_tidak_tetap'"
+                                   required="x_custom_employment_type == 'pegawai_tidak_tetap'"/>
+                            <field name="x_spk_currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+</odoo>

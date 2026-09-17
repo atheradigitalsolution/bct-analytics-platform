@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_res_config_settings_spk_workforce" model="ir.ui.view">
+        <field name="name">res.config.settings.spk.workforce</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="SPK Workforce" name="custom_spk_workforce"
+                     groups="custom_spk.group_spk_cost_viewer">
+                    <block title="Alokasi Biaya Tenaga Kerja">
+                        <setting string="Metode alokasi gaji pekerja tetap"
+                                 help="Per jumlah shift membebankan tiap SPK sesuai shift yang benar-benar dikerjakan staf tetap di sana. Rata terhadap direct cost lebih murah dihitung dan keliru ke arah yang sama setiap kali.">
+                            <field name="x_spk_labor_allocation_method"/>
+                        </setting>
+                        <setting string="Analytic untuk shift tanpa job"
+                                 help="Shift harian yang hadir tanpa pekerjaan tetap dibayar. Tanpa akun ini, biayanya terpaksa didorong ke SPK yang tidak menyebabkannya.">
+                            <field name="x_spk_idle_analytic_id"/>
+                            <field name="x_spk_internal_analytic_id"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
