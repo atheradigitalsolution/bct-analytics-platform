@@ -382,6 +382,13 @@ import-policy: ## Load a non-Odoo client's column classification: make import-po
 	@test -n "$(FILE)" || { echo "FILE is required, e.g. FILE=policies/acme.csv (relative to analytics/warehouse/)"; exit 1; }
 	@$(WCTL) import-policy --file /warehouse/$(FILE)
 
+.PHONY: load-csv
+load-csv: ## Land a client's CSV into raw.*: make load-csv FILE=x.csv TENANT=slug TABLE=res_partner
+	@test -n "$(FILE)"   || { echo "FILE is required (relative to analytics/warehouse/)"; exit 1; }
+	@test -n "$(TENANT)" || { echo "TENANT is required, e.g. TENANT=acme"; exit 1; }
+	@test -n "$(TABLE)"  || { echo "TABLE is required, e.g. TABLE=res_partner"; exit 1; }
+	@$(WCTL) load-csv --file /warehouse/$(FILE) --tenant $(TENANT) --table $(TABLE) $(if $(DRY_RUN),--dry-run,)
+
 .PHONY: warehouse-raw-ddl
 warehouse-raw-ddl: ## Regenerate raw.* landing DDL from warehouse.column_policy
 	@# The CDC loader's drift error message has always pointed here
