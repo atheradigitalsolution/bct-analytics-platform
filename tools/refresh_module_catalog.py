@@ -11,10 +11,10 @@ classification seed, a path to an unpacked Odoo core). It produced the original
 23-column row set; it cannot be run from here.
 
 So the catalogue had no way back to the truth once modules were renamed or moved,
-and it drifted: the committed CSV still named ``custom_arka_show_date``,
-``custom_arka_aim_numbering`` and ``custom_levis_*`` long after they became
-``custom_sale_show_date``, ``custom_doc_numbering`` and ``custom_retail_*``, and
-it listed 154 modules against 162 on disk.
+and it drifted: thirteen modules had been renamed in place when client names were
+scrubbed from the source, and the committed CSV still carried the old names long
+afterwards. It also listed 154 modules against 162 on disk. The pairs are in
+``RENAMES`` below, imported rather than repeated -- see the note there.
 
 This is deliberately NOT named ``module_inventory.py``. It does strictly less than
 the upstream tool, and shadowing that name would make a narrower script look like
@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import csv
 import re
 import sys
@@ -83,31 +84,27 @@ TIER_ORDER = [
     "_tenants",
 ]
 
-# Modules renamed in place when client names were scrubbed from the tree. Without
-# this the merge would see a delete plus an unrelated insert, and every judgement
-# column earned on the old row would be thrown away. Each pair below was confirmed
-# by diffing the catalogue summary against the manifest summary on disk: identical
-# text, client name removed.
+# The old-to-new module map is NOT redeclared here. It lives in
+# scripts/import-platform-addons.py, and scripts/migrate-client-renames.py already
+# reads it from there for the same reason: one source of truth, so a rename added
+# once is honoured everywhere on the next run.
 #
-# The old keys necessarily carry the client names — that is what makes the lookup
-# work — so this map is load-bearing and is NOT a scrubbing oversight. The same
-# information already exists in scripts/migrate-client-renames.py. Do not "clean"
-# it: a renamed module would silently lose its judgement columns on the next run.
-RENAMES = {
-    "custom_arka_show_date": "custom_sale_show_date",
-    "custom_arka_aim_numbering": "custom_doc_numbering",
-    "custom_arka_fx_header": "custom_account_fx_header",
-    "custom_arka_aim_asset_register": "custom_asset_register_seed",
-    "custom_arka_aim_opening_balance": "custom_opening_balance_seed",
-    "custom_arka_aim_seed": "custom_tenant_coa_seed",
-    "custom_levis_asset_accounts": "custom_retail_asset_accounts",
-    "custom_levis_categ_approval": "custom_retail_categ_approval",
-    "custom_levis_localization": "custom_retail_localization",
-    "custom_levis_sales_dashboard": "custom_retail_sales_dashboard",
-    "custom_ops_reports": "custom_asset_ops_reports",
-    "custom_ppob_eraspace_bridge": "custom_ppob_pos_bridge",
-    "l10n_erajaya": "l10n_id_coa_10d",
-}
+# It is load-bearing for this script. Without it the merge sees a delete plus an
+# unrelated insert, and every judgement column earned on the old row is thrown
+# away. It is also, unavoidably, where the scrubbed client names still live -- and
+# duplicating it here made this file, whose whole job is to stop the catalogue
+# republishing those names, one more place carrying them. Hence the import.
+#
+# custom_pdp_core is excluded for the reason migrate-client-renames.py gives: that
+# entry resolves a name COLLISION at import time, not a de-branding. Both modules
+# exist in this tree today, and honouring it would merge two unrelated catalogue
+# rows into one.
+_spec = importlib.util.spec_from_file_location(
+    "import_platform_addons", REPO / "scripts" / "import-platform-addons.py")
+_imp = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_imp)
+IMPORT_ONLY_RENAMES = {"custom_pdp_core"}
+RENAMES = {k: v for k, v in _imp.RENAMES.items() if k not in IMPORT_ONLY_RENAMES}
 
 MEASURED = {
     "module", "tier", "version", "application", "license", "summary",
