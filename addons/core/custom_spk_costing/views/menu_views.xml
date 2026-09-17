@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_spk_costing" name="Biaya &amp; Margin" parent="custom_spk.menu_spk_root"
+              sequence="40" groups="custom_spk.group_spk_cost_viewer"/>
+    <menuitem id="menu_spk_cost_summary" name="Estimasi vs Realisasi"
+              parent="menu_spk_costing" action="action_cost_summary" sequence="10"/>
+</odoo>

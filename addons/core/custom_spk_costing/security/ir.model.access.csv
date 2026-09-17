@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cost_summary_cost,spk.cost.summary.cost,model_custom_spk_cost_summary,custom_spk.group_spk_cost_viewer,1,1,1,0
+access_cost_summary_price,spk.cost.summary.price,model_custom_spk_cost_summary,custom_spk.group_spk_price_viewer,1,1,1,1

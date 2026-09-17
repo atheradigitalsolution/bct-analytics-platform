@@ -162,7 +162,7 @@ class CustomSpkLaborAllocation(models.Model):
                         _("%(spk)s has no analytic account, so its allocation has "
                           "nowhere to go.", spk=line.spk_id.name)
                     )
-                AnalyticLine.create({
+                vals = {
                     "name": _("Alokasi gaji pekerja tetap %(period)s (%(shifts).2f shift)",
                               period="%s-%s" % (rec.period_year, rec.period_month),
                               shifts=line.shifts),
@@ -170,7 +170,12 @@ class CustomSpkLaborAllocation(models.Model):
                     "account_id": line.spk_id.analytic_account_id.id,
                     "amount": -abs(line.amount),
                     "company_id": rec.company_id.id,
-                })
+                }
+                # Say what this is, rather than leaving the cost report to work it out.
+                # The field belongs to custom_spk_costing, which may not be installed.
+                if "x_spk_cost_category" in AnalyticLine._fields:
+                    vals["x_spk_cost_category"] = "labor"
+                AnalyticLine.create(vals)
             rec.state = "posted"
         return True
 

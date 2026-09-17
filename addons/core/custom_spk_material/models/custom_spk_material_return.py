@@ -71,14 +71,19 @@ class CustomSpkMaterialReturn(models.Model):
                 raise UserError(
                     _("%(spk)s has no analytic account to credit.", spk=rec.spk_id.name))
             for line in rec.line_ids.filtered(lambda l: l.credit_amount > 0):
-                AnalyticLine.create({
+                vals = {
                     "name": _("Sisa material kembali: %(product)s",
                               product=line.product_id.display_name),
                     "date": rec.date,
                     "account_id": rec.spk_id.analytic_account_id.id,
                     # Positive: this reduces the job's cost, which is held negative.
                     "amount": abs(line.credit_amount),
-                })
+                }
+                # A credit belongs in the same bucket as the cost it reverses, or the
+                # material variance would show the issue without the return.
+                if "x_spk_cost_category" in AnalyticLine._fields:
+                    vals["x_spk_cost_category"] = "material"
+                AnalyticLine.create(vals)
             rec.state = "done"
         return True
 

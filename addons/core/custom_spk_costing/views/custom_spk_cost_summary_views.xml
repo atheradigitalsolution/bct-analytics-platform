@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cost_summary_list" model="ir.ui.view">
+        <field name="name">custom.spk.cost.summary.list</field>
+        <field name="model">custom.spk.cost.summary</field>
+        <field name="arch" type="xml">
+            <!-- The margin board: one row per job, red where the margin slipped. -->
+            <list string="Estimasi vs Realisasi"
+                  decoration-danger="margin_slipped"
+                  decoration-success="var_total > 0">
+                <field name="spk_id"/>
+                <field name="partner_id"/>
+                <field name="event_name"/>
+                <field name="est_total" sum="Estimasi"/>
+                <field name="act_total" sum="Realisasi"/>
+                <field name="var_total" sum="Variance"/>
+                <field name="var_total_pct" string="Var %" widget="percentage" optional="show"/>
+                <field name="margin_actual" sum="Margin"
+                       groups="custom_spk.group_spk_price_viewer"/>
+                <field name="margin_actual_pct" string="Margin %"
+                       groups="custom_spk.group_spk_price_viewer"/>
+                <field name="margin_slipped" column_invisible="True"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cost_summary_form" model="ir.ui.view">
+        <field name="name">custom.spk.cost.summary.form</field>
+        <field name="model">custom.spk.cost.summary</field>
+        <field name="arch" type="xml">
+            <form string="Estimasi vs Realisasi">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"
+                            class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="spk_id" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not margin_slipped"
+                         groups="custom_spk.group_spk_price_viewer">
+                        Margin realisasi di bawah margin yang ditawarkan. Ini baris
+                        pertama yang dibaca saat post-mortem SPK.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="estimation_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="event_name" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="refreshed_on" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Per Kategori">
+                        <group string="Estimasi">
+                            <field name="est_material" readonly="1"/>
+                            <field name="est_labor" readonly="1"/>
+                            <field name="est_subcon" readonly="1"/>
+                            <field name="est_delivery" readonly="1"/>
+                            <field name="est_overhead" readonly="1"/>
+                            <field name="est_total" readonly="1"/>
+                            <field name="est_waste" readonly="1"/>
+                        </group>
+                        <group string="Realisasi">
+                            <field name="act_material" readonly="1"/>
+                            <field name="act_labor" readonly="1"/>
+                            <field name="act_subcon" readonly="1"/>
+                            <field name="act_delivery" readonly="1"/>
+                            <field name="act_other" readonly="1"/>
+                            <field name="act_total" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Variance">
+                        <group>
+                            <field name="var_material" readonly="1"/>
+                            <field name="var_labor" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="var_total" readonly="1"/>
+                            <field name="var_total_pct" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Margin" groups="custom_spk.group_spk_price_viewer">
+                        <group>
+                            <field name="quoted_price" readonly="1"/>
+                            <field name="margin_actual" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="margin_estimated_pct" readonly="1"/>
+                            <field name="margin_actual_pct" readonly="1"/>
+                            <field name="margin_slipped" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cost_summary" model="ir.actions.act_window">
+        <field name="name">Estimasi vs Realisasi</field>
+        <field name="res_model">custom.spk.cost.summary</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_cost_summary_refresh_all" model="ir.actions.server">
+        <field name="name">Refresh semua ringkasan biaya</field>
+        <field name="model_id" ref="model_custom_spk_cost_summary"/>
+        <field name="state">code</field>
+        <field name="code">model.refresh_all()</field>
+    </record>
+</odoo>
