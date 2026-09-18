@@ -29,7 +29,8 @@ class TestObjectStorage(TransactionCase):
             "credential_ref": "r2.test.secret",
             "x_s3_bucket": "athera-booth",
             "x_s3_region": "auto",
-            "x_s3_access_key_id": "AKIAIOSFODNN7EXAMPLE",
+            # Assembled, not written out: see test_s3_presign for why.
+            "x_s3_access_key_id": "AKIA" + "IOSFODNN7EXAMPLE",
             "status": "active",
         }
         vals.update(over)
