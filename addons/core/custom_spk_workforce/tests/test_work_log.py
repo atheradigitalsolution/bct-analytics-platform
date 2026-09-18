@@ -21,12 +21,25 @@ class TestWorkLog(WorkforceCommon):
         self.daily.x_custom_employment_type = "pegawai_tetap"
         self.assertFalse(self.daily.x_spk_is_daily, "the derived flag follows payroll")
 
-    def test_a_daily_worker_without_a_rate_is_refused(self):
-        with self.assertRaises(ValidationError):
-            self.env["hr.employee"].create({
-                "name": "Helper", "x_custom_employment_type": "pegawai_tidak_tetap",
-                "x_spk_labor_category": "direct", "x_spk_shift_rate": 0.0,
-            })
+    def test_a_daily_worker_without_a_rate_can_exist_but_not_be_approved(self):
+        """The check belongs where the money is, not where the person is hired.
+
+        As an employee constraint this fired in every module that creates an employee,
+        including custom_hr_payroll_id's own fixtures, and broke tests that know nothing
+        about SPK.
+        """
+        helper = self.env["hr.employee"].create({
+            "name": "Helper", "x_custom_employment_type": "pegawai_tidak_tetap",
+            "x_spk_labor_category": "direct", "x_spk_shift_rate": 0.0,
+        })
+        self.assertTrue(helper.spk_missing_shift_rate())
+
+        spk = self._spk()
+        att = self._attendance(helper)
+        self.WorkLog.create({
+            "attendance_id": att.id, "spk_id": spk.id, "shift_portion": 1.0})
+        with self.assertRaises(UserError):
+            att.action_approve()
 
     # ---------- cost belongs to the daily worker only ----------
 

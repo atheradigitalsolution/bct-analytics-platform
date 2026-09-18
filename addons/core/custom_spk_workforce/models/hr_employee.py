@@ -15,7 +15,6 @@ may be permanent and direct, and still has to reach COGS.
 from __future__ import annotations
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
 
 
 class HrEmployee(models.Model):
@@ -57,17 +56,20 @@ class HrEmployee(models.Model):
         for rec in self:
             rec.x_spk_is_daily = rec.x_custom_employment_type == "pegawai_tidak_tetap"
 
-    @api.constrains("x_custom_employment_type", "x_spk_shift_rate")
-    def _check_daily_has_a_rate(self):
+    def spk_missing_shift_rate(self) -> bool:
         """A daily worker with no rate produces attendance that costs nothing.
 
-        Caught here rather than at payroll time, because by then the shifts have
-        already been worked and the week is being paid.
+        This was an @api.constrains on hr.employee, and that was the wrong place. It
+        fired on every employee write in every module -- including fixtures in
+        custom_hr_payroll_id, which knows nothing about SPK and whose own tests it
+        broke. A validation that reaches that far is a validation in the wrong layer.
+
+        The rate matters when a shift is costed, not when a person is hired, so the
+        check now lives at attendance approval: that is where the money is, and where
+        the person reading the error can actually fix it.
         """
-        for rec in self:
-            if rec.x_custom_employment_type == "pegawai_tidak_tetap" and rec.x_spk_shift_rate <= 0:
-                raise ValidationError(
-                    _("%(name)s is a daily worker, so a shift rate is required — "
-                      "without it every shift they work costs nothing and the job "
-                      "looks cheaper than it was.", name=rec.name or "?")
-                )
+        self.ensure_one()
+        return bool(
+            self.x_custom_employment_type == "pegawai_tidak_tetap"
+            and self.x_spk_shift_rate <= 0
+        )

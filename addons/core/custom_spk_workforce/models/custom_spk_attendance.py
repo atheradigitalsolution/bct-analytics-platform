@@ -124,6 +124,13 @@ class CustomSpkAttendance(models.Model):
             if rec.attendance_status != WORKED:
                 rec.state = "approved"
                 continue
+            if rec.is_daily and rec.employee_id.spk_missing_shift_rate():
+                raise UserError(
+                    _("%(who)s is paid per shift but has no shift rate set, so this "
+                      "shift would cost the job nothing. Set the rate on the employee "
+                      "before approving — the wage is real either way.",
+                      who=rec.employee_id.name or "?")
+                )
             if rec.is_daily and float_is_zero_total(rec.portion_total):
                 raise UserError(
                     _("%(who)s worked shift %(shift)s on %(date)s and is paid per shift, "
