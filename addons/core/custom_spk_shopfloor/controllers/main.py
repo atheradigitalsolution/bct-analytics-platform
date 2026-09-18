@@ -166,6 +166,40 @@ class SpkShopfloorController(http.Controller):
             spk.message_post(body=_("Foto progres: %(url)s", url=photo_url))
         return _ok({"progress": spk.progress, "risk_level": spk.risk_level})
 
+    @http.route("/api/spk/shopfloor/presign", type="http", auth="none",
+                methods=["POST"], csrf=False, save_session=False)
+    @secure_endpoint("hht")
+    def presign_upload(self, **_kw):
+        """Hand back a URL to upload one photograph to.
+
+        **Call this at flush time, not when the photo enters the queue.** A pre-signed
+        URL lives for minutes; one requested while offline has expired by the time signal
+        returns, and the upload then fails without saying why. The response carries
+        `expires_at` so the device can check before spending an upload on a dead URL.
+
+        The bytes go straight to the bucket. They never pass through Odoo, which is why a
+        survey with forty photographs costs this server nothing.
+        """
+        data = request.get_json_data()
+        model = data.get("model")
+        res_id = data.get("res_id")
+        filename = data.get("filename") or "photo.jpg"
+        if not model or not res_id:
+            return _fail("MISSING_FIELDS", "model and res_id are required")
+        if model not in request.env:
+            return _fail("UNKNOWN_MODEL", "no model %s" % model)
+        record = request.env[model].sudo().browse(int(res_id))
+        if not record.exists():
+            return _fail("UNKNOWN_RECORD", "%s %s does not exist" % (model, res_id))
+        if not hasattr(record, "action_request_upload"):
+            return _fail("NOT_STORABLE", "%s holds no object reference" % model)
+        try:
+            out = record.action_request_upload(filename)
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning("shopfloor presign rejected: %s", exc)
+            return _fail("REJECTED", str(exc))
+        return _ok(out)
+
     @http.route("/api/spk/shopfloor/material", type="http", auth="none",
                 methods=["POST"], csrf=False, save_session=False)
     @secure_endpoint("hht")

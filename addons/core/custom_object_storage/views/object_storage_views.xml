@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_adapter_config_form_s3" model="ir.ui.view">
+        <field name="name">custom.adapter.config.form.s3</field>
+        <field name="model">custom.adapter.config</field>
+        <field name="inherit_id" ref="custom_adapter_framework.view_adapter_config_form"/>
+        <field name="arch" type="xml">
+            <sheet position="inside">
+                <group string="Object Storage (S3 / Cloudflare R2)"
+                       invisible="adapter_type != 's3_compatible'">
+                    <group>
+                        <field name="x_s3_bucket"/>
+                        <field name="x_s3_region"/>
+                        <field name="x_s3_access_key_id"/>
+                    </group>
+                    <group>
+                        <field name="x_s3_default_expiry_s"/>
+                        <field name="x_s3_public_base_url"/>
+                    </group>
+                    <div class="text-muted" colspan="2">
+                        The secret half of the key pair is never stored here. Put it in
+                        <code>ir.config_parameter</code> and name the key in
+                        <em>Credential ir.config_parameter Key</em> above.
+                    </div>
+                </group>
+            </sheet>
+        </field>
+    </record>
+</odoo>

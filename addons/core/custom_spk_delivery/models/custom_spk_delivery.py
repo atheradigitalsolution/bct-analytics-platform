@@ -29,7 +29,8 @@ class CustomBastDocument(models.Model):
 class CustomSpkDelivery(models.Model):
     _name = "custom.spk.delivery"
     _description = "Jadwal Delivery & Instalasi"
-    _inherit = ["pdp.audited.mixin", "mail.thread", "mail.activity.mixin"]
+    _inherit = ["pdp.audited.mixin", "mail.thread", "mail.activity.mixin",
+                "custom.object.storage.mixin"]
     _order = "loading_in asc, id asc"
 
     name = fields.Char(required=True, default=lambda s: _("New"), copy=False, readonly=True)
@@ -97,12 +98,14 @@ class CustomSpkDelivery(models.Model):
         compute="_compute_bast_signed", store=True,
         help="True only once the client side has signed. This is what billing waits on.",
     )
-    photo_url = fields.Char(
-        string="Link Foto Instalasi",
-        help="A link, because photographs are held outside the filestore here. The "
-        "signature is NOT a link: it is captured as an attachment, because it is the "
-        "part that has to survive a dispute months later.",
-    )
+    # Installation photographs go to object storage via custom.object.storage.mixin.
+    # The BAST signature deliberately does NOT: it stays an attachment on the handover
+    # document, because it is the part that has to survive a dispute months later, and a
+    # reference that can rot takes the evidence with it.
+
+    def _storage_key_parts(self):
+        self.ensure_one()
+        return ["spk", self.spk_id.name or "unassigned", "delivery", self.name or ""]
 
     state = fields.Selection(
         [

@@ -18,7 +18,8 @@
                             <field name="venue_name"/>
                             <field name="survey_date"/>
                             <field name="surveyed_by"/>
-                            <field name="photo_url" widget="url"/>
+                            <field name="storage_url" widget="url" readonly="1"/>
+                            <field name="storage_key" readonly="1" groups="base.group_no_one"/>
                         </group>
                     </group>
                     <notebook>

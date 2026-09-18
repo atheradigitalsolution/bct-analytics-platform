@@ -171,6 +171,7 @@ class CustomSpkDesignRevision(models.Model):
 
     _name = "custom.spk.design.revision"
     _description = "Revisi Design"
+    _inherit = ["custom.object.storage.mixin"]
     _order = "spk_id, revision_no"
 
     spk_id = fields.Many2one("custom.spk", required=True, index=True, ondelete="cascade")
@@ -185,11 +186,13 @@ class CustomSpkDesignRevision(models.Model):
         default="client_scope",
     )
     note = fields.Text()
-    design_url = fields.Char(
-        string="Link Design",
-        help="A link, matching the decision to hold files outside the filestore. The "
-        "client's approval is captured on the change order, not here.",
-    )
+    # The drawing goes to object storage; the client's approval is captured on the
+    # change order, not here, because agreement is a decision and a file is not.
+
+    def _storage_key_parts(self):
+        self.ensure_one()
+        return ["spk", self.spk_id.name or "unassigned", "design",
+                "D%s" % (self.revision_no or 0)]
     date = fields.Date(default=fields.Date.context_today, required=True)
     is_chargeable = fields.Boolean(
         compute="_compute_is_chargeable", store=True,

@@ -48,6 +48,7 @@ is queued and the URL is requested **at flush time**, never at enqueue time.
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": [
+        "custom_object_storage",
         "custom_spk",
         "custom_spk_workforce",
         "custom_spk_material",

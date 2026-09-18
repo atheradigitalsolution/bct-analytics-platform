@@ -55,7 +55,8 @@
                         <group string="Serah Terima">
                             <field name="bast_id" readonly="1"/>
                             <field name="bast_signed" readonly="1"/>
-                            <field name="photo_url" widget="url"/>
+                            <field name="storage_url" widget="url" readonly="1"/>
+                            <field name="storage_key" readonly="1" groups="base.group_no_one"/>
                         </group>
                     </group>
                 </sheet>

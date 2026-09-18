@@ -46,7 +46,7 @@ lands on the job like any other.
     "category": "Custom Platform/Operations",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_spk", "custom_bast", "stock", "analytic"],
+    "depends": ["custom_object_storage", "custom_spk", "custom_bast", "stock", "analytic"],
     "capability_tags": ["delivery", "installation", "bast", "handover", "job-costing"],
     "data": [
         "security/ir.model.access.csv",
