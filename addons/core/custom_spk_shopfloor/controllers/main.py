@@ -12,6 +12,7 @@ a device rather than by someone typing a password with gloves on.
 
 from __future__ import annotations
 
+import base64
 import logging
 
 from odoo import _, http
@@ -20,6 +21,42 @@ from odoo.http import request
 from odoo.addons.custom_core.controllers.secure_endpoint import secure_endpoint
 
 _logger = logging.getLogger(__name__)
+
+
+# A phone camera produces 4 MB images. As evidence of a booth's condition, 1600px at
+# moderate quality is indistinguishable and roughly a tenth of the size. Since the client
+# accepted the disk cost rather than sign up for object storage, the cheapest thing that
+# can be done for them is not to spend ten times what the evidence needs.
+#
+# At 500 photographs a month, 4 MB each fills most of the free disk inside a year; the
+# same volume downscaled does not come close. The original is not kept: keeping both
+# would defeat the point, and nobody has ever needed the 4 MB version of a photograph of
+# a partition wall.
+PHOTO_MAX_EDGE = 1600
+PHOTO_QUALITY = 80
+
+
+def _downscale(data_b64: str, mimetype: str | None) -> str:
+    """Shrink an uploaded photograph. Returns the original on any failure.
+
+    Deliberately forgiving: a photograph that arrives in a format Pillow dislikes should
+    still be stored, because the evidence matters more than the saving.
+    """
+    if mimetype and not mimetype.startswith("image/"):
+        return data_b64
+    try:
+        from odoo.tools.image import image_process
+
+        return base64.b64encode(
+            image_process(
+                base64.b64decode(data_b64),
+                size=(PHOTO_MAX_EDGE, PHOTO_MAX_EDGE),
+                quality=PHOTO_QUALITY,
+            )
+        ).decode("ascii")
+    except Exception as exc:  # noqa: BLE001
+        _logger.info("photo kept at original size (%s)", exc)
+        return data_b64
 
 
 def _ok(payload=None):
@@ -201,6 +238,7 @@ class SpkShopfloorController(http.Controller):
         if not field:
             return _fail("NOT_ATTACHABLE", "%s holds no photographs" % model)
         try:
+            payload = _downscale(payload, data.get("mimetype"))
             attachment = request.env["ir.attachment"].sudo().create({
                 "name": filename,
                 "datas": payload,
