@@ -52,8 +52,9 @@ call belongs to the owner, who may well have a reason.
     "data": [
         "security/ir.model.access.csv",
         "data/ir_sequence_data.xml",
-        "data/custom_spk_followup_data.xml",
+        # The template must load before the levels that reference it.
         "data/mail_template_data.xml",
+        "data/custom_spk_followup_data.xml",
         "views/custom_spk_billing_views.xml",
         "views/custom_spk_followup_views.xml",
         "views/menu_views.xml",

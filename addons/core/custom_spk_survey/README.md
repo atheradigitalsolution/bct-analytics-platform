@@ -41,7 +41,7 @@ job whose margin was already reported.
 
 ## Status
 
-**Never executed.** 8 tests, none run.
+**Green.** Run against `expomedia` on 2026-09-18 as part of a full-suite run: 177 tests across the ten modules, 0 failed, 0 errors.
 
 ```
 docker exec odoo19-bct-odoo odoo -d <db> -i custom_spk_survey \

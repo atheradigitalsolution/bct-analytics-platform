@@ -65,23 +65,37 @@ class CustomSpkBillingPlan(models.Model):
         for rec in self:
             rec.milestone_total_pct = sum(rec.milestone_ids.mapped("percentage"))
 
-    @api.constrains("mode", "milestone_ids", "milestone_total_pct")
+    @api.constrains("mode", "milestone_ids", "milestone_total_pct", "state")
     def _check_milestones(self):
+        """Only an ACTIVE plan has to add up.
+
+        Enforcing this at creation made a milestone plan impossible to build: the plan
+        has to exist before its milestones can point at it, so the first save was always
+        rejected for having none. A draft is allowed to be half-written; activation is
+        the gate.
+        """
         for rec in self:
-            if rec.mode != "milestone":
+            if rec.mode != "milestone" or rec.state == "draft":
                 continue
-            if not rec.milestone_ids:
-                raise ValidationError(
-                    _("%(name)s bills by milestone but has none defined.", name=rec.name))
-            if abs(rec.milestone_total_pct - 100.0) > 0.01:
-                raise ValidationError(
-                    _("Milestones total %(total).2f%%, not 100%%. A plan that does not add "
-                      "up either leaves money uninvoiced or bills it twice.",
-                      total=rec.milestone_total_pct)
-                )
+            rec._assert_milestones_add_up()
+
+    def _assert_milestones_add_up(self):
+        self.ensure_one()
+        if not self.milestone_ids:
+            raise ValidationError(
+                _("%(name)s bills by milestone but has none defined.", name=self.name))
+        if abs(self.milestone_total_pct - 100.0) > 0.01:
+            raise ValidationError(
+                _("Milestones total %(total).2f%%, not 100%%. A plan that does not add "
+                  "up either leaves money uninvoiced or bills it twice.",
+                  total=self.milestone_total_pct)
+            )
 
     def action_activate(self):
+        """The gate: a plan that does not add up must not become the one in force."""
         for rec in self:
+            if rec.mode == "milestone":
+                rec._assert_milestones_add_up()
             rec.state = "active"
         return True
 

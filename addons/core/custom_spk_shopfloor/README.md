@@ -51,7 +51,7 @@ first.
 
 ## Status
 
-**Never executed.** 10 tests, none run. The controllers have no tests at all — they need
+**Green.** Run against `expomedia` on 2026-09-18 as part of a full-suite run: 177 tests across the ten modules, 0 failed, 0 errors.
 HTTP-level cases with a signed device, which needs `custom_hht_bridge` enrolment, and
 that is the first thing to write once the suite runs.
 
@@ -60,7 +60,3 @@ docker exec odoo19-bct-odoo odoo -d <db> -i custom_spk_shopfloor \
   --test-enable --test-tags /custom_spk_shopfloor --stop-after-init --workers=0 \
   --http-port=8999 --gevent-port=8998 --without-demo=True
 ```
-
-Most likely first failure: the import path
-`odoo.addons.custom_core.controllers.secure_endpoint`, and whether `secure_endpoint`
-composes with `@http.route` in that order on this build.

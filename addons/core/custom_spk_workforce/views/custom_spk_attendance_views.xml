@@ -103,10 +103,10 @@
                         domain="[('is_daily', '=', True), ('attendance_status', '=', 'hadir'), ('work_log_ids', '=', False)]"/>
                 <filter name="to_approve" string="Belum Approve"
                         domain="[('state', '!=', 'approved')]"/>
-                <group expand="0" string="Group By">
-                    <filter name="by_date" string="Tanggal" context="{'group_by': 'date'}"/>
-                    <filter name="by_shift" string="Shift" context="{'group_by': 'shift_id'}"/>
-                    <filter name="by_employee" string="Pekerja" context="{'group_by': 'employee_id'}"/>
+                <group>
+                    <filter name="by_date" string="Tanggal" domain="" context="{'group_by': 'date'}"/>
+                    <filter name="by_shift" string="Shift" domain="" context="{'group_by': 'shift_id'}"/>
+                    <filter name="by_employee" string="Pekerja" domain="" context="{'group_by': 'employee_id'}"/>
                 </group>
             </search>
         </field>

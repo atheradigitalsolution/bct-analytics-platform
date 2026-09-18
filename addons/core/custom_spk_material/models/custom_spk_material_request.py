@@ -135,11 +135,18 @@ class CustomSpkMaterialRequest(models.Model):
         return True
 
     def action_issue(self):
-        """Move the goods and let stock valuation carry the cost to the job.
+        """Move the goods, then book the cost against the job.
 
-        The analytic distribution rides on the move rather than being posted here, so
-        that one mechanism books material cost and there is no second number to
-        reconcile.
+        The first version put an ``analytic_distribution`` on the stock move and let
+        valuation carry the cost. That field does not exist on ``stock.move`` in this
+        build, so the cost silently never arrived -- the move succeeded and the job
+        showed nothing. The analytic line is therefore written here, explicitly, with
+        the category stamped.
+
+        The trade-off is real and worth stating: material cost is now booked from this
+        document rather than from stock valuation, so a move made outside a material
+        request does not reach the job. That is acceptable because issuing to a job
+        without a request is the thing this module exists to stop.
         """
         Picking = self.env["stock.picking"]
         for rec in self:
@@ -156,13 +163,14 @@ class CustomSpkMaterialRequest(models.Model):
             moves = []
             for line in rec.line_ids.filtered(lambda l: l.qty_approved > 0):
                 moves.append((0, 0, {
-                    "name": line.product_id.display_name,
+                    # stock.move has no `name` in Odoo 19; the picking description is
+                    # `description_picking`.
+                    "description_picking": line.product_id.display_name,
                     "product_id": line.product_id.id,
                     "product_uom_qty": line.qty_approved,
                     "product_uom": line.uom_id.id or line.product_id.uom_id.id,
                     "location_id": picking_type.default_location_src_id.id,
                     "location_dest_id": picking_type.default_location_dest_id.id,
-                    "analytic_distribution": {str(rec.spk_id.analytic_account_id.id): 100.0},
                 }))
             rec.picking_id = Picking.create({
                 "picking_type_id": picking_type.id,
@@ -173,8 +181,27 @@ class CustomSpkMaterialRequest(models.Model):
             })
             for line in rec.line_ids:
                 line.qty_issued = line.qty_approved
+            rec._post_material_cost()
             rec.state = "issued"
         return True
+
+    def _post_material_cost(self):
+        """One analytic line per issued product, carrying the job and the category."""
+        self.ensure_one()
+        AnalyticLine = self.env["account.analytic.line"].sudo()
+        for line in self.line_ids.filtered(lambda l: l.qty_issued > 0):
+            vals = {
+                "name": _("%(mr)s — %(product)s",
+                          mr=self.name, product=line.product_id.display_name),
+                "date": fields.Date.context_today(self),
+                "account_id": self.spk_id.analytic_account_id.id,
+                "amount": -abs(line.subtotal),
+                "product_id": line.product_id.id,
+                "unit_amount": line.qty_issued,
+            }
+            if "x_spk_cost_category" in AnalyticLine._fields:
+                vals["x_spk_cost_category"] = "material"
+            AnalyticLine.create(vals)
 
 
 class CustomSpkMaterialRequestLine(models.Model):

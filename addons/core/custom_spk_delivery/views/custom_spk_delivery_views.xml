@@ -94,9 +94,9 @@
                         domain="[('bast_signed', '=', False), ('state', 'in', ('installed',))]"/>
                 <filter name="no_dismantle" string="Bongkar Belum Dijadwalkan"
                         domain="[('dismantle_at', '=', False), ('state', 'in', ('installed', 'bast_signed'))]"/>
-                <group expand="0" string="Group By">
-                    <filter name="by_spk" string="SPK" context="{'group_by': 'spk_id'}"/>
-                    <filter name="by_venue" string="Venue" context="{'group_by': 'venue_name'}"/>
+                <group>
+                    <filter name="by_spk" string="SPK" domain="" context="{'group_by': 'spk_id'}"/>
+                    <filter name="by_venue" string="Venue" domain="" context="{'group_by': 'venue_name'}"/>
                 </group>
             </search>
         </field>

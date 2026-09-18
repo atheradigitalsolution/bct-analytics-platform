@@ -36,14 +36,14 @@ class TestBillingPlan(BillingCommon):
         plan = self._plan(mode="milestone")
         self.Milestone.create({"plan_id": plan.id, "name": "DP", "percentage": 50.0})
         with self.assertRaises(ValidationError):
-            plan._check_milestones()
+            plan.action_activate()
 
     def test_milestones_totalling_more_than_one_hundred_are_refused(self):
         plan = self._plan(mode="milestone")
         self.Milestone.create({"plan_id": plan.id, "name": "DP", "percentage": 60.0})
         self.Milestone.create({"plan_id": plan.id, "name": "Sisa", "percentage": 60.0})
         with self.assertRaises(ValidationError):
-            plan._check_milestones()
+            plan.action_activate()
 
     def test_standard_terms_add_up_and_price_out(self):
         plan = self._standard_terms(self._plan(mode="milestone", amount=44_000_000.0))
@@ -60,10 +60,17 @@ class TestBillingPlan(BillingCommon):
                 self.Milestone.create({
                     "plan_id": plan.id, "name": "x", "percentage": bad})
 
+    def test_a_draft_milestone_plan_may_be_incomplete(self):
+        """The plan has to exist before milestones can point at it."""
+        plan = self._plan(mode="milestone")
+        self.assertEqual(plan.state, "draft")
+        self.Milestone.create({"plan_id": plan.id, "name": "DP", "percentage": 50.0})
+        self.assertAlmostEqual(plan.milestone_total_pct, 50.0, places=2)
+
     def test_a_milestone_plan_with_no_milestones_is_refused(self):
         plan = self._plan(mode="milestone")
         with self.assertRaises(ValidationError):
-            plan._check_milestones()
+            plan.action_activate()
 
     # ---------- the down payment gate ----------
 

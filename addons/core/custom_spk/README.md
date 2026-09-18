@@ -62,7 +62,7 @@ AE-facing model later, which a view-level review would pass.
 
 ## Status
 
-**Never executed.** Written without the ability to run Odoo in the authoring
+**Green.** Run against `expomedia` on 2026-09-18 as part of a full-suite run: 177 tests across the ten modules, 0 failed, 0 errors.
 session. 22 tests, all unrun. To verify:
 
 ```

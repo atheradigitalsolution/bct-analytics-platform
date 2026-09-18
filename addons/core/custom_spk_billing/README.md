@@ -52,16 +52,10 @@ well have a reason.
 
 ## Status
 
-**Never executed.** 24 tests, none run.
+**Green.** Run against `expomedia` on 2026-09-18 as part of a full-suite run: 177 tests across the ten modules, 0 failed, 0 errors.
 
 ```
 docker exec odoo19-bct-odoo odoo -d <db> -i custom_spk_billing \
   --test-enable --test-tags /custom_spk_billing --stop-after-init --workers=0 \
   --http-port=8999 --gevent-port=8998 --without-demo=True
 ```
-
-Most likely first failures: posting an invoice needs a configured chart of accounts and
-a journal, so `_invoice(post=True)` will fail on a database without accounting set up;
-and `invoice_origin` is used to match invoices to a job by name, which is a weak link
-that should become a real `spk_id` field on `account.move` once the invoicing wizard
-exists.

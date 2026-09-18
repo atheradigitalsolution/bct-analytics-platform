@@ -81,8 +81,13 @@ class TestMaterialRequest(MaterialCommon):
         with self.assertRaises(UserError):
             req.action_issue()
 
-    def test_issue_moves_goods_and_carries_the_analytic_account(self):
-        """One mechanism books material cost, so there is no second number to reconcile."""
+    def test_issue_moves_goods_and_books_the_cost_to_the_job(self):
+        """stock.move carries no analytic_distribution in this build.
+
+        The first design relied on one and the cost silently never arrived: the move
+        succeeded and the job showed nothing. The analytic line is now written by the
+        request itself, which is the only reason this test asserts both halves.
+        """
         spk = self._spk()
         req = self._request(spk, self.sheet, 4.0)
         req.action_submit()
@@ -94,7 +99,12 @@ class TestMaterialRequest(MaterialCommon):
         move = req.picking_id.move_ids
         self.assertEqual(len(move), 1)
         self.assertAlmostEqual(move.product_uom_qty, 4.0, places=3)
-        self.assertIn(str(spk.analytic_account_id.id), move.analytic_distribution or {})
+
+        lines = self.env["account.analytic.line"].search(
+            [("account_id", "=", spk.analytic_account_id.id)])
+        self.assertTrue(lines, "issued material never reached the job")
+        self.assertAlmostEqual(sum(lines.mapped("amount")), -4.0 * 185_000.0, places=2)
+        self.assertEqual(lines[0].x_spk_cost_category, "material")
 
     def test_request_cost_uses_product_cost(self):
         spk = self._spk()

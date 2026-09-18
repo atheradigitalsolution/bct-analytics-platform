@@ -49,14 +49,10 @@ arrives one sheet at a time and each request on its own looks reasonable.
 
 ## Status
 
-**Never executed.** 23 tests, none run.
+**Green.** Run against `expomedia` on 2026-09-18 as part of a full-suite run: 177 tests across the ten modules, 0 failed, 0 errors.
 
 ```
 docker exec odoo19-bct-odoo odoo -d <db> -i custom_spk_material \
   --test-enable --test-tags /custom_spk_material --stop-after-init --workers=0 \
   --http-port=8999 --gevent-port=8998 --without-demo=True
 ```
-
-Most likely first failures: `stock.picking_type_internal` may not exist without
-multi-step routes enabled, and `product.product` `type` values changed in recent
-versions (`consu` vs `product`).

@@ -36,7 +36,12 @@ class CustomSpkEstimation(models.Model):
         default="draft", required=True, tracking=True,
     )
     revision = fields.Integer(default=1, readonly=True)
-    line_ids = fields.One2many("custom.spk.estimation.line", "estimation_id")
+    line_ids = fields.One2many(
+        "custom.spk.estimation.line", "estimation_id",
+        # One2many defaults to copy=False, which made action_revise produce an estimate
+        # with no lines and a price of zero. Caught by the revision test.
+        copy=True,
+    )
 
     # ---- rates. Ratios, so they are not money and stay visible to the estimator ----
     overhead_rate = fields.Float(

@@ -9,6 +9,23 @@ from odoo.exceptions import UserError, ValidationError
 COST_GROUP = "custom_spk.group_spk_cost_viewer"
 
 
+class CustomBastDocument(models.Model):
+    """Teach BAST that a delivery is something it can be raised against.
+
+    ``custom_bast`` publishes ``_get_referenceable_models`` precisely so inheriting
+    modules can add their own document without editing the core list. Without this the
+    Reference field rejects the value, which is the right default: a handover pointing
+    at an arbitrary model would be a handover of nothing in particular.
+    """
+
+    _inherit = "custom.bast.document"
+
+    @api.model
+    def _get_referenceable_models(self):
+        models_list = super()._get_referenceable_models()
+        return models_list + [("custom.spk.delivery", "SPK Delivery")]
+
+
 class CustomSpkDelivery(models.Model):
     _name = "custom.spk.delivery"
     _description = "Jadwal Delivery & Instalasi"

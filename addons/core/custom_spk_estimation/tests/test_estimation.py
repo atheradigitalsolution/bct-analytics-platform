@@ -45,8 +45,12 @@ class TestEstimation(TransactionCase):
         self.assertAlmostEqual(est.quoted_price, 142.857, places=2)
         self.assertNotAlmostEqual(est.quoted_price, 130.0, places=2,
                                   msg="this is the markup answer and it is wrong")
+        # quoted_price is Monetary, so it is stored rounded to the currency. The
+        # realised margin therefore lands at 30.0014%, not 30.0000%: that is the
+        # rounding, not the formula, and asserting past it would be asserting that
+        # money has more decimal places than it does.
         realised = est.margin_amount / est.quoted_price * 100.0
-        self.assertAlmostEqual(realised, 30.0, places=4,
+        self.assertAlmostEqual(realised, 30.0, places=2,
                                msg="the margin actually realised must equal the target")
 
     def test_a_margin_of_one_hundred_percent_is_refused(self):

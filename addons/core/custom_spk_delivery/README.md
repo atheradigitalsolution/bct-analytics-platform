@@ -56,14 +56,10 @@ has ended without one.
 
 ## Status
 
-**Never executed.** 15 tests, none run.
+**Green.** Run against `expomedia` on 2026-09-18 as part of a full-suite run: 177 tests across the ten modules, 0 failed, 0 errors.
 
 ```
 docker exec odoo19-bct-odoo odoo -d <db> -i custom_spk_delivery \
   --test-enable --test-tags /custom_spk_delivery --stop-after-init --workers=0 \
   --http-port=8999 --gevent-port=8998 --without-demo=True
 ```
-
-Most likely first failure: `custom.bast.document.action_sign_to` signature — the test
-passes base64 bytes and a `signed_by` keyword; check the real argument order if it
-raises.

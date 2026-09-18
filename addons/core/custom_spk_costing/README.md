@@ -60,14 +60,10 @@ everyone who gets blamed for it.
 
 ## Status
 
-**Never executed.** 15 tests, none run.
+**Green.** Run against `expomedia` on 2026-09-18 as part of a full-suite run: 177 tests across the ten modules, 0 failed, 0 errors.
 
 ```
 docker exec odoo19-bct-odoo odoo -d <db> -i custom_spk_costing \
   --test-enable --test-tags /custom_spk_costing --stop-after-init --workers=0 \
   --http-port=8999 --gevent-port=8998 --without-demo=True
 ```
-
-Most likely first failure: `account.analytic.line` requires a company and, in some
-configurations, a plan-derived account field; the fixtures create lines with only
-`account_id` and `amount`.

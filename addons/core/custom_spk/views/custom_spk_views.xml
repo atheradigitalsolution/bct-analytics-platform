@@ -92,10 +92,10 @@
                         domain="[('state', 'not in', ('paid', 'closed', 'lost'))]"/>
                 <separator/>
                 <filter name="my_spk" string="SPK Saya" domain="[('user_id', '=', uid)]"/>
-                <group expand="0" string="Group By">
-                    <filter name="by_state" string="Status" context="{'group_by': 'state'}"/>
-                    <filter name="by_ae" string="Account Executive" context="{'group_by': 'user_id'}"/>
-                    <filter name="by_partner" string="Klien" context="{'group_by': 'partner_id'}"/>
+                <group>
+                    <filter name="by_state" string="Status" domain="" context="{'group_by': 'state'}"/>
+                    <filter name="by_ae" string="Account Executive" domain="" context="{'group_by': 'user_id'}"/>
+                    <filter name="by_partner" string="Klien" domain="" context="{'group_by': 'partner_id'}"/>
                 </group>
             </search>
         </field>

@@ -38,14 +38,10 @@ negotiation that overwrites its own history cannot answer what was quoted last w
 
 ## Status
 
-**Never executed.** 12 tests, none run.
+**Green.** Run against `expomedia` on 2026-09-18 as part of a full-suite run: 177 tests across the ten modules, 0 failed, 0 errors.
 
 ```
 docker exec odoo19-bct-odoo odoo -d <db> -i custom_spk_estimation \
   --test-enable --test-tags /custom_spk_estimation --stop-after-init --workers=0 \
   --http-port=8999 --gevent-port=8998 --without-demo=True
 ```
-
-Most likely first failure: `uom.uom` model name and the `uom` module dependency
-changed between recent Odoo versions; if the install fails on dependencies, that is
-where to look.

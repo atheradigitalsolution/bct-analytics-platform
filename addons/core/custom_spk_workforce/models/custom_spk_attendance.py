@@ -21,7 +21,7 @@ WORKED = "hadir"
 class CustomSpkAttendance(models.Model):
     _name = "custom.spk.attendance"
     _description = "Absensi Shift"
-    _inherit = ["pdp.audited.mixin", "mail.thread"]
+    _inherit = ["pdp.audited.mixin", "mail.thread", "mail.activity.mixin"]
     _order = "date desc, employee_id"
 
     employee_id = fields.Many2one("hr.employee", required=True, index=True, tracking=True)
