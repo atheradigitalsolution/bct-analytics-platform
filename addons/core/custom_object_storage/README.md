@@ -74,7 +74,20 @@ agreement.
    does not delete the object — a record being tidied is not a reason to destroy
    evidence — so deletion should be a deliberate policy rather than a side effect.
 
-## Status
+## Status: built, verified, and currently dormant
 
-**Green.** 15 tests, part of a 250-test run against `expomedia` on 2026-09-18, 0 failed,
-0 errors.
+**Green.** 12 tests covering the signer, against `expomedia` on 2026-09-18.
+
+**Nothing uses it right now.** Cloudflare R2 requires a card on file, and the client chose
+to keep photographs in the Odoo filestore instead and carry the disk cost. So the SPK
+documents hold `ir.attachment` records, and this module sits installed and idle.
+
+It is kept rather than deleted because it works and is proved: the day a bucket exists --
+R2, Garage, SeaweedFS, anything S3-compatible -- a document adopts
+`custom.object.storage.mixin`, one `custom.adapter.config` row is filled in, and nothing
+else has to be written.
+
+One honest gap while dormant: the mixin's own behaviour has no tests, because no model
+inherits it and a test-only model would be clutter in a production tree. The signer is
+what needed proving and it has it. Whoever adopts the mixin should bring those tests with
+them.

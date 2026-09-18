@@ -84,7 +84,7 @@
                 <field name="date"/>
                 <field name="reason"/>
                 <field name="is_chargeable" string="Berbayar" readonly="1"/>
-                <field name="storage_url" widget="url" readonly="1" optional="show"/>
+                <field name="design_ids" widget="many2many_binary" optional="show"/>
                 <field name="change_order_id" readonly="1" optional="hide"/>
                 <field name="note" optional="hide"/>
             </list>

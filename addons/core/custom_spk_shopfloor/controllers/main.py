@@ -141,10 +141,9 @@ class SpkShopfloorController(http.Controller):
     def post_progress(self, **_kw):
         """Progress on a job, with an optional photo link.
 
-        The link is accepted, never the bytes. Photographs live outside the filestore
-        here, and the upload URL is pre-signed at flush time by the device -- requesting
-        it at enqueue time would hand the queue a URL that expires before the signal
-        returns.
+        Photographs go to /api/spk/shopfloor/photo, not here: progress is a number the
+        supervisor reports, and coupling it to an upload would mean a failed upload loses
+        the number too.
         """
         data = request.get_json_data()
         spk_id = data.get("spk_id")
@@ -161,44 +160,59 @@ class SpkShopfloorController(http.Controller):
         if not 0.0 <= progress <= 100.0:
             return _fail("BAD_PROGRESS", "progress must be between 0 and 100")
         spk.progress = progress
-        photo_url = data.get("photo_url")
-        if photo_url:
-            spk.message_post(body=_("Foto progres: %(url)s", url=photo_url))
+        note = data.get("note")
+        if note:
+            spk.message_post(body=_("Catatan progres: %(note)s", note=note))
         return _ok({"progress": spk.progress, "risk_level": spk.risk_level})
 
-    @http.route("/api/spk/shopfloor/presign", type="http", auth="none",
+    @http.route("/api/spk/shopfloor/photo", type="http", auth="none",
                 methods=["POST"], csrf=False, save_session=False)
     @secure_endpoint("hht")
-    def presign_upload(self, **_kw):
-        """Hand back a URL to upload one photograph to.
+    def post_photo(self, **_kw):
+        """Accept a photograph and attach it to the record.
 
-        **Call this at flush time, not when the photo enters the queue.** A pre-signed
-        URL lives for minutes; one requested while offline has expired by the time signal
-        returns, and the upload then fails without saying why. The response carries
-        `expires_at` so the device can check before spending an upload on a dead URL.
+        This replaced a pre-signed-URL endpoint. Object storage would have let the device
+        upload straight to a bucket and kept the bytes off this server entirely, but it
+        needs a card on file, so the filestore is the destination and the bytes come
+        through here. The cost is real and accepted: a round with twenty photographs is
+        twenty uploads across the application server.
 
-        The bytes go straight to the bucket. They never pass through Odoo, which is why a
-        survey with forty photographs costs this server nothing.
+        One thing improves by it. A file in the filestore is inside the record's access
+        rules and inside athera-backup, which a bucket would not have been without extra
+        work.
+
+        The offline queue still matters, just differently: there is no URL to expire now,
+        so a queued photograph can be flushed whenever signal returns. Send one per call
+        and keep them small -- the size limit is enforced by secure_endpoint, not here.
         """
         data = request.get_json_data()
         model = data.get("model")
         res_id = data.get("res_id")
+        payload = data.get("data_b64")
         filename = data.get("filename") or "photo.jpg"
-        if not model or not res_id:
-            return _fail("MISSING_FIELDS", "model and res_id are required")
+        if not (model and res_id and payload):
+            return _fail("MISSING_FIELDS", "model, res_id and data_b64 are required")
         if model not in request.env:
             return _fail("UNKNOWN_MODEL", "no model %s" % model)
         record = request.env[model].sudo().browse(int(res_id))
         if not record.exists():
             return _fail("UNKNOWN_RECORD", "%s %s does not exist" % (model, res_id))
-        if not hasattr(record, "action_request_upload"):
-            return _fail("NOT_STORABLE", "%s holds no object reference" % model)
+        field = "photo_ids" if "photo_ids" in record._fields else None
+        if not field:
+            return _fail("NOT_ATTACHABLE", "%s holds no photographs" % model)
         try:
-            out = record.action_request_upload(filename)
+            attachment = request.env["ir.attachment"].sudo().create({
+                "name": filename,
+                "datas": payload,
+                "res_model": model,
+                "res_id": record.id,
+                "mimetype": data.get("mimetype") or "image/jpeg",
+            })
+            record.write({field: [(4, attachment.id)]})
         except Exception as exc:  # noqa: BLE001
-            _logger.warning("shopfloor presign rejected: %s", exc)
+            _logger.warning("shopfloor photo rejected: %s", exc)
             return _fail("REJECTED", str(exc))
-        return _ok(out)
+        return _ok({"attachment_id": attachment.id, "count": len(record[field])})
 
     @http.route("/api/spk/shopfloor/material", type="http", auth="none",
                 methods=["POST"], csrf=False, save_session=False)

@@ -18,8 +18,7 @@
                             <field name="venue_name"/>
                             <field name="survey_date"/>
                             <field name="surveyed_by"/>
-                            <field name="storage_url" widget="url" readonly="1"/>
-                            <field name="storage_key" readonly="1" groups="base.group_no_one"/>
+                            <field name="photo_ids" widget="many2many_binary" string="Foto Survey"/>
                         </group>
                     </group>
                     <notebook>

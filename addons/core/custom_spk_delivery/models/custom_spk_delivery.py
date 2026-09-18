@@ -29,8 +29,7 @@ class CustomBastDocument(models.Model):
 class CustomSpkDelivery(models.Model):
     _name = "custom.spk.delivery"
     _description = "Jadwal Delivery & Instalasi"
-    _inherit = ["pdp.audited.mixin", "mail.thread", "mail.activity.mixin",
-                "custom.object.storage.mixin"]
+    _inherit = ["pdp.audited.mixin", "mail.thread", "mail.activity.mixin"]
     _order = "loading_in asc, id asc"
 
     name = fields.Char(required=True, default=lambda s: _("New"), copy=False, readonly=True)
@@ -98,14 +97,27 @@ class CustomSpkDelivery(models.Model):
         compute="_compute_bast_signed", store=True,
         help="True only once the client side has signed. This is what billing waits on.",
     )
-    # Installation photographs go to object storage via custom.object.storage.mixin.
-    # The BAST signature deliberately does NOT: it stays an attachment on the handover
-    # document, because it is the part that has to survive a dispute months later, and a
-    # reference that can rot takes the evidence with it.
+    # Photographs live in the Odoo filestore, not object storage. R2 needs a card on
+    # file, so the client accepted the disk cost instead. One consequence is in their
+    # favour: files here ARE covered by athera-backup, which closes the evidence gap that
+    # an external bucket would have opened.
+    photo_ids = fields.Many2many(
+        "ir.attachment",
+        string="Foto Instalasi",
+        domain="[('mimetype', 'like', 'image/')]",
+        help="Held in the filestore. Backed up with the database, and inside the same "
+        "access rules as the record -- which a pasted external link never was.",
+    )
+    photo_count = fields.Integer(compute="_compute_photo_count")
 
-    def _storage_key_parts(self):
-        self.ensure_one()
-        return ["spk", self.spk_id.name or "unassigned", "delivery", self.name or ""]
+    @api.depends("photo_ids")
+    def _compute_photo_count(self):
+        for rec in self:
+            rec.photo_count = len(rec.photo_ids)
+
+    # The BAST signature is still NOT one of these. It stays an attachment on the handover
+    # document itself, because it is the part that has to survive a dispute months later,
+    # and mixing it in with progress photographs invites somebody to tidy it away.
 
     state = fields.Selection(
         [

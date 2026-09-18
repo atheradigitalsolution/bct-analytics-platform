@@ -12,7 +12,7 @@ COST_GROUP = "custom_spk.group_spk_cost_viewer"
 class CustomSpkSurvey(models.Model):
     _name = "custom.spk.survey"
     _description = "Survey Lokasi"
-    _inherit = ["pdp.audited.mixin", "mail.thread", "custom.object.storage.mixin"]
+    _inherit = ["pdp.audited.mixin", "mail.thread"]
     _order = "survey_date desc, id desc"
 
     name = fields.Char(compute="_compute_name", store=True)
@@ -22,14 +22,23 @@ class CustomSpkSurvey(models.Model):
     survey_date = fields.Date(default=fields.Date.context_today, required=True)
     surveyed_by = fields.Many2one(
         "res.users", default=lambda self: self.env.user, required=True)
-    # storage_key / storage_url come from custom.object.storage.mixin. There is no
-    # pasted-link field: a pasted link is the thing that rots, and it rots at the moment
-    # a dispute needs it.
+    # Photographs live in the Odoo filestore, not object storage. R2 needs a card on
+    # file, so the client accepted the disk cost instead. One consequence is in their
+    # favour: files here ARE covered by athera-backup, which closes the evidence gap that
+    # an external bucket would have opened.
+    photo_ids = fields.Many2many(
+        "ir.attachment",
+        string="Foto",
+        domain="[('mimetype', 'like', 'image/')]",
+        help="Held in the filestore. Backed up with the database, and inside the same "
+        "access rules as the record -- which a pasted external link never was.",
+    )
+    photo_count = fields.Integer(compute="_compute_photo_count")
 
-    def _storage_key_parts(self):
-        """Readable in the bucket without the database to explain it."""
-        self.ensure_one()
-        return ["spk", self.spk_id.name or "unassigned", "survey", self.venue_name or ""]
+    @api.depends("photo_ids")
+    def _compute_photo_count(self):
+        for rec in self:
+            rec.photo_count = len(rec.photo_ids)
 
     # ---- what the space actually is ----
     ceiling_height_m = fields.Float(

@@ -75,3 +75,28 @@ class TestSurvey(TransactionCase):
     def test_negative_dimensions_are_refused(self):
         with self.assertRaises(ValidationError):
             self._survey(ceiling_height_m=-1.0)
+
+    # ---------- photographs live in the filestore ----------
+
+    def test_photographs_attach_to_the_record(self):
+        """R2 needs a card on file, so the filestore carries the cost and the evidence.
+
+        One consequence favours the client: a file here is inside the record's own access
+        rules and inside athera-backup, neither of which an external bucket would have
+        been without extra work.
+        """
+        s = self._survey()
+        att = self.env["ir.attachment"].create({
+            "name": "front.jpg", "datas": b"aGVsbG8=", "mimetype": "image/jpeg",
+            "res_model": s._name, "res_id": s.id,
+        })
+        s.photo_ids = [(4, att.id)]
+        self.assertEqual(s.photo_count, 1)
+        self.assertIn(att, s.photo_ids)
+
+    def test_a_survey_with_no_photographs_still_closes(self):
+        """The two mandatory numbers are dimensions, not pictures."""
+        s = self._survey()
+        self.assertEqual(s.photo_count, 0)
+        s.action_done()
+        self.assertEqual(s.state, "done")
