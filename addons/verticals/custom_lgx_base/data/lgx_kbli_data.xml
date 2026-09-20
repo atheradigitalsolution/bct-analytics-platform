@@ -85,13 +85,28 @@
             <field name="source_note">⚠ Belum dikonfirmasi ke OSS</field>
         </record>
 
-        <!-- Pelayaran dalam negeri — ⚠ konversi belum terkonfirmasi (butir A9) -->
+        <!-- Pelayaran dalam negeri — ⚠ konversi belum terkonfirmasi (butir A9).
+
+             CATATAN REGULASI TIDAK DITARUH DI SINI. Record ini lahir di blok
+             noupdate="1", jadi field yang ditambahkan kemudian TIDAK akan
+             pernah sampai ke database yang sudah terpasang — diukur, bukan
+             diduga: percobaan pertama menaruh permit_form dan requirement_note
+             sebagai field di record ini, dan keduanya tetap NULL di athera_lgx
+             setelah upgrade.
+
+             noupdate tetap benar untuk record-nya: `is_verified` diisi manusia
+             setelah mengonfirmasi ke OSS, dan upgrade tidak boleh menghapus
+             kerja itu. Yang salah adalah menaruh sesuatu yang HARUS menyebar
+             di tempat yang dirancang untuk tidak menyebar.
+
+             Catatan regulasi karena itu disemai lewat <function> di bawah,
+             pola yang sudah dipakai berkas ini untuk pemetaan versi dengan
+             alasan yang persis sama. -->
         <record id="kbli_2020_50131" model="lgx.kbli">
             <field name="version">2020</field><field name="code">50131</field>
             <field name="name">Angkutan Laut Dalam Negeri untuk Barang Umum</field>
             <field name="section">H</field>
             <field name="is_verified">0</field>
-            <field name="source_note">⚠ Konversi ke KBLI 2025 belum dikonfirmasi — Lampiran A butir A9</field>
         </record>
 
         <!--
@@ -103,5 +118,6 @@
     </data>
     <data>
         <function model="lgx.kbli" name="_lgx_seed_version_mapping"/>
+        <function model="lgx.kbli" name="_lgx_seed_requirements"/>
     </data>
 </odoo>

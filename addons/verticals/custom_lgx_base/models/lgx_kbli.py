@@ -157,6 +157,57 @@ class LgxKbli(models.Model):
         ("52101", "52109", False),
     ]
 
+    # Catatan perizinan yang HARUS menyebar ke database yang sudah terpasang.
+    # Ditaruh di sini dan bukan sebagai field record, karena record KBLI lahir
+    # di blok noupdate="1" — field yang ditambahkan kemudian tidak akan pernah
+    # sampai. Diukur: percobaan pertama menaruhnya sebagai field, dan kolomnya
+    # tetap NULL di athera_lgx setelah upgrade.
+    _SEED_REQUIREMENTS = {
+        "50131": {
+            "permit_form": "SIUPAL (lewat OSS, berbasis risiko)",
+            "requirement_note": (
+                "Butir A11, diperiksa 2026-09-20.\n\n"
+                "Dasar: PP 31/2021 (Penyelenggaraan Bidang Pelayaran) dan "
+                "PP 5/2021 (Perizinan Berusaha Berbasis Risiko); pelaksanaannya "
+                "PM 93/2013.\n\n"
+                "Ambang yang disebut sumber sekunder — BELUM diverifikasi ke "
+                "fulltext:\n"
+                "- modal dasar minimal Rp50.000.000.000\n"
+                "- modal disetor minimal Rp12.500.000.000\n"
+                "- sekurang-kurangnya satu kapal berbendera Indonesia, minimal "
+                "GT 175, laik laut\n\n"
+                "Ambang ini bukan formalitas: ia pagar yang memisahkan "
+                "perusahaan PELAYARAN dari perusahaan yang MENYEWA ruang kapal. "
+                "Yang kedua tidak memerlukan SIUPAL dan tidak akan memenuhi "
+                "syarat kapalnya. Bedakan lebih dulu sebelum menyarankan klien "
+                "mengurusnya.\n\n"
+                "Sumbernya halaman konsultan perizinan, bukan fulltext "
+                "PP 31/2021. Angkanya konsisten di beberapa sumber, tetapi "
+                "konsistensi antar sumber sekunder BUKAN konfirmasi — butir A4 "
+                "ditutup justru karena beberapa sumber sekunder sepakat pada "
+                "hal yang keliru. Jangan dipakai sebagai dasar menolak klien "
+                "tanpa membaca peraturannya."
+            ),
+        },
+    }
+
+    @api.model
+    def _lgx_seed_requirements(self):
+        """Semai catatan perizinan, idempoten, menimpa yang lama.
+
+        Menimpa dengan sengaja: ini catatan yang berasal dari peraturan, bukan
+        isian pengguna. Ketika peraturannya diperjelas, versi baru HARUS
+        mengalahkan versi lama — kebalikan dari `is_verified`, yang diisi
+        manusia dan karena itu tidak disentuh di sini.
+        """
+        disemai = 0
+        for kode, nilai in self._SEED_REQUIREMENTS.items():
+            catatan = self.search([("code", "=", kode)])
+            if catatan:
+                catatan.write(nilai)
+                disemai += len(catatan)
+        return {"disemai": disemai}
+
     @api.model
     def _lgx_seed_version_mapping(self):
         verified_pairs = [(a, b) for a, b, ok in self._SEED_MAPPING if ok]

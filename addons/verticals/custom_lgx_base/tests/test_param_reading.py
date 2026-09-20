@@ -71,3 +71,81 @@ class TestParamReading(TransactionCase):
     def tearDown(self):
         self.P.search([("key", "=", KUNCI)]).unlink()
         super().tearDown()
+
+
+@tagged("post_install", "-at_install")
+class TestKbliRequirementsSeeded(TransactionCase):
+    """Catatan regulasi harus SAMPAI ke database, bukan hanya ada di berkas.
+
+    Record KBLI lahir di blok noupdate="1", jadi field yang ditambahkan
+    kemudian tidak pernah menyebar ke database yang sudah terpasang. Percobaan
+    pertama butir A11 menaruh permit_form dan requirement_note sebagai field di
+    record, dan keduanya tetap NULL setelah upgrade — berkasnya benar, kolomnya
+    kosong, dan tidak ada galat apa pun.
+
+    Uji ini menanyakan ke DATABASE, bukan ke berkas. Itu bedanya dengan
+    membaca XML dan merasa yakin.
+    """
+
+    def test_shipping_licence_note_reaches_the_database(self):
+        """BATASNYA disebut: uji ini menangkap pemasangan BARU yang gagal disemai.
+
+        Ia TIDAK menangkap pencabutan <function> pada database yang sudah
+        terisi — nilainya sudah ada di sana dan tidak hilang. Diukur, bukan
+        diduga: pemanggilan penyemai dicabut dari berkas data, suite tetap
+        hijau.
+
+        Menyebut batas ini alih-alih mendiamkannya, karena uji yang dikira
+        menjaga sesuatu padahal tidak adalah bentuk yang kami kejar seharian.
+        Yang menjaga penyemainya sendiri adalah uji di bawah.
+        """
+        kbli = self.env["lgx.kbli"].search([("code", "=", "50131")], limit=1)
+        self.assertTrue(kbli, "Prasyarat: KBLI 50131 harus ada.")
+        self.assertTrue(
+            kbli.permit_form,
+            "permit_form kosong — catatan regulasi tidak sampai ke database. "
+            "Kemungkinan besar ia ditaruh sebagai field di record noupdate, "
+            "bukan disemai lewat <function>.",
+        )
+        self.assertIn("SIUPAL", kbli.permit_form)
+        self.assertIn("PP 31/2021", kbli.requirement_note or "")
+
+    def test_seeder_restores_notes_that_were_wiped(self):
+        """Inilah yang benar-benar menguji penyemainya.
+
+        Kosongkan kolomnya — meniru database yang belum pernah disemai — lalu
+        panggil penyemai dan pastikan ia mengisinya kembali. Berbeda dari uji
+        di atas, yang ini merah kalau penyemainya rusak, bukan hanya kalau
+        databasenya kebetulan kosong.
+        """
+        Kbli = self.env["lgx.kbli"]
+        kbli = Kbli.search([("code", "=", "50131")], limit=1)
+        kbli.write({"permit_form": False, "requirement_note": False})
+        kbli.invalidate_recordset()
+        self.assertFalse(kbli.permit_form, "Prasyarat: kolomnya harus kosong dulu.")
+
+        Kbli._lgx_seed_requirements()
+        kbli.invalidate_recordset()
+        self.assertIn("SIUPAL", kbli.permit_form or "")
+        self.assertIn("PP 31/2021", kbli.requirement_note or "")
+
+    def test_seeding_is_idempotent(self):
+        """Dijalankan tiap update, jadi ia harus aman dijalankan berkali-kali."""
+        Kbli = self.env["lgx.kbli"]
+        pertama = Kbli._lgx_seed_requirements()
+        kedua = Kbli._lgx_seed_requirements()
+        self.assertEqual(pertama, kedua)
+        self.assertGreater(pertama["disemai"], 0)
+
+    def test_seeding_does_not_touch_is_verified(self):
+        """`is_verified` diisi manusia setelah konfirmasi ke OSS.
+
+        Penyemai yang menimpanya akan menghapus kerja itu tiap upgrade, diam-
+        diam, dan gejalanya baru muncul sebagai daftar yang tidak pernah
+        selesai diverifikasi.
+        """
+        kbli = self.env["lgx.kbli"].search([("code", "=", "50131")], limit=1)
+        kbli.is_verified = True
+        self.env["lgx.kbli"]._lgx_seed_requirements()
+        kbli.invalidate_recordset()
+        self.assertTrue(kbli.is_verified, "Penyemai tidak boleh menyentuh is_verified.")
