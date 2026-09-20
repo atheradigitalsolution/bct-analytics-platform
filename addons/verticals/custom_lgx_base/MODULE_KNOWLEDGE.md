@@ -199,6 +199,11 @@ membaca kedekatan keduanya di berkas yang sama sebagai jaminan.
 > Dua draf pertama dari sebuah tabel tentang apa yang dijaga, keduanya ditulis
 > sebelum diukur, oleh dua orang yang sedang menulis tentang mengukur sebelum
 > menulis. Bedanya cuma keberuntungan tentang tes mana yang kebetulan sudah ada.
+>
+> Dan sekali lagi beberapa jam kemudian, dalam bentuk paling telanjang: commit
+> `428ed09` menyebut "164 post-tests" sementara suite mengukur **163**. Angkanya
+> saya hitung dari aritmetika — 160 ditambah jumlah uji yang saya kira saya
+> tulis — bukan dibaca dari log yang sedang terbuka di layar yang sama.
 > Insiden itu ditaruh di sini alih-alih dihapus, karena tabel kejujuran yang
 > draf pertamanya tidak jujur adalah satu-satunya contoh yang benar-benar
 > meyakinkan untuk apa yang sedang ia katakan.
