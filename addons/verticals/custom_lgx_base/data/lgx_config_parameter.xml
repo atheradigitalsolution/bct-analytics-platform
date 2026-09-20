@@ -23,6 +23,8 @@
               lgx.stamp_duty_amount            belum ada yang memakainya
               lgx.stamp_duty_receipt_threshold belum ada yang memakainya
               lgx.coretax_xml_batch_size       belum ada yang memakainya
+              lgx.coretax_xml_max_bytes        belum ada yang memakainya (A10)
+              lgx.coretax_sign_batch_size      belum ada yang memakainya (A10)
 
             Dan enam ini LEBIH BERBAHAYA daripada sekadar tidak terpakai,
             karena ia DUPLIKAT dari state yang hidup:
@@ -229,9 +231,43 @@
             <field name="key">lgx.stamp_duty_receipt_threshold</field>
             <field name="value">5000000</field>
         </record>
+        <!-- A10 DITUTUP (diperiksa 2026-09-20). Angkanya benar, tetapi ia
+             BUKAN SATU-SATUNYA BATAS, dan parameter tunggal ini tidak dapat
+             menyatakan sisanya.
+
+             Coretax menerima 1.000 faktur pajak per berkas XML — naik dari 100
+             sebelumnya. Jadi 1000 di bawah tepat untuk batas unggah.
+
+             Dua batas lain yang tidak terwakili di sini:
+
+             * UKURAN BERKAS maksimum 100 MB. Seribu faktur dengan banyak baris
+               masing-masing dapat melewatinya jauh sebelum mencapai hitungan
+               seribu. Pemecah batch yang hanya menghitung dokumen akan
+               menghasilkan berkas yang ditolak tanpa satu pun angka di sistem
+               kita terlihat salah.
+             * DJP MENYARANKAN penandatanganan bertahap 500 lembar per unggah,
+               meski 1.000 dapat diunggah. Unggah dan tanda tangan adalah dua
+               operasi dengan batas praktis yang berbeda.
+
+             Untuk SPT Tahunan PPh Badan batasnya lain lagi: mulai dari 50.000
+             baris lalu dinaikkan bertahap. Itu jenis dokumen berbeda dan tidak
+             boleh memakai parameter yang sama.
+
+             CATATAN: parameter ini belum dibaca kode mana pun (lihat audit di
+             kepala berkas). Saat pemecah batch benar-benar dibangun, ia harus
+             memeriksa UKURAN juga, bukan hanya jumlah — dan 500 versus 1.000
+             harus menjadi dua nilai, bukan satu. -->
         <record id="param_coretax_xml_batch_size" model="ir.config_parameter">
             <field name="key">lgx.coretax_xml_batch_size</field>
             <field name="value">1000</field>
+        </record>
+        <record id="param_coretax_xml_max_bytes" model="ir.config_parameter">
+            <field name="key">lgx.coretax_xml_max_bytes</field>
+            <field name="value">104857600</field>
+        </record>
+        <record id="param_coretax_sign_batch_size" model="ir.config_parameter">
+            <field name="key">lgx.coretax_sign_batch_size</field>
+            <field name="value">500</field>
         </record>
 
         <!-- Operasional -->
