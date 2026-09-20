@@ -34,6 +34,10 @@ class LgxRoute(models.Model):
         "unique(origin_location_id, destination_location_id, company_id)",
         "Rute dengan asal dan tujuan ini sudah ada.",
     )
+    _duration_non_negative = models.Constraint(
+        "check(standard_duration_hours >= 0)",
+        "Durasi standar rute tidak boleh negatif.",
+    )
     _distance_non_negative = models.Constraint(
         "check(distance_km >= 0)", "Jarak tidak boleh negatif.",
     )

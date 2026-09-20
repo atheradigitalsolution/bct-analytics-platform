@@ -48,6 +48,16 @@ class LgxWmsSlaMeasurement(models.Model):
     breach_summary = fields.Char("Ringkasan Pelanggaran", compute="_compute_breach", store=True)
     note = fields.Text("Catatan")
 
+    # Keempatnya rasio dari hitungan: berapa yang tepat waktu dibagi berapa
+    # seluruhnya. Angka di luar 0-100 bukan kinerja yang luar biasa, melainkan
+    # salah ketik — dan pengukuran SLA yang salah menggeser tagihan penalti.
+    _pct_in_range = models.Constraint(
+        "check(receiving_ontime_pct between 0 and 100 "
+        "and dispatch_ontime_pct between 0 and 100 "
+        "and inventory_accuracy_pct between 0 and 100 "
+        "and order_accuracy_pct between 0 and 100)",
+        "Persentase pengukuran SLA harus antara 0 dan 100.",
+    )
     _client_period_uniq = models.Constraint(
         "unique(client_id, date)", "Pengukuran SLA untuk klien dan periode ini sudah ada.",
     )

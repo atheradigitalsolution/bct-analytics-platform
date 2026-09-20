@@ -43,9 +43,21 @@ class LgxHsCode(models.Model):
     active = fields.Boolean(default=True)
 
     _code_uniq = models.Constraint("unique(code)", "HS code harus unik.")
+    # Kelima tarif, bukan tiga. Versi sebelumnya menjaga bm_rate, ppn_rate, dan
+    # pph22_rate lalu melewatkan ppnbm_rate serta pph22_rate_no_api — penjaga
+    # yang dipasang di satu tempat dan terlupa di tempat lain pada model yang
+    # sama. Keduanya mengalikan dasar pungutan sama seperti tiga yang lain.
+    #
+    # TIDAK ada batas atas, dan itu disengaja: tarif PPnBM dapat mencapai
+    # ratusan persen untuk barang mewah, dan batas maksimum menurut undang-
+    # undang belum kami verifikasi ke sumber primer. Menebak angka batas lalu
+    # menolak data yang sah lebih buruk daripada tidak membatasi — yang salah
+    # ketik akan tertangkap perbandingan terhadap BTKI, bukan oleh constraint
+    # yang dikarang.
     _rates_sane = models.Constraint(
-        "check(bm_rate >= 0 and ppn_rate >= 0 and pph22_rate >= 0)",
-        "Tarif tidak boleh negatif.",
+        "check(bm_rate >= 0 and ppn_rate >= 0 and ppnbm_rate >= 0 "
+        "and pph22_rate >= 0 and pph22_rate_no_api >= 0)",
+        "Tarif pungutan impor tidak boleh negatif.",
     )
 
     @api.constrains("code")

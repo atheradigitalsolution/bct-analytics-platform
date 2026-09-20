@@ -39,6 +39,10 @@ class LgxWmsCountProgram(models.Model):
     task_ids = fields.One2many("lgx.wms.count.task", "program_id", "Tugas Hitung")
     active = fields.Boolean(default=True)
 
+    _threshold_in_range = models.Constraint(
+        "check(discrepancy_threshold_pct between 0 and 100)",
+        "Ambang selisih harus antara 0 dan 100 persen.",
+    )
     _frequency_positive = models.Constraint(
         "check(frequency_days > 0)", "Frekuensi hitung harus lebih dari nol hari.",
     )
