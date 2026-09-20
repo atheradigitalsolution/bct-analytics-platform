@@ -11,6 +11,24 @@ Pemeriksaan masa berlaku sertifikat ada di sini dan bukan menunggu mesin
 peringatan generik di `custom_lgx_doc`: LGX-C01 menuntut deklarasi DITOLAK bila
 sertifikat ahlinya kedaluwarsa, dan aturan yang menahan uang tidak boleh
 menunggu fase berikutnya.
+
+BUTIR A8 MASIH TERBUKA, dan sengaja tidak ditutup dengan jawaban yang salah
+(diperiksa 2026-09-20). Pencarian tentang "masa berlaku sertifikat ahli
+kepabeanan" mengembalikan angka **2 tahun** yang tampak meyakinkan. Angka itu
+adalah KETENTUAN PERALIHAN PMK 219/2019 — jendela dua tahun sejak PMK berlaku
+bagi pemegang sertifikat lama untuk mengajukan izin spesialis kepabeanan, dan
+jendela itu sudah lewat. Ia bukan masa berlaku sertifikatnya.
+
+Mencatatnya sebagai masa berlaku akan mengulang persis kekeliruan yang menutup
+butir A4, hanya ke arah sebaliknya. Yang masih perlu dibaca: ketentuan BPPK
+Kemenkeu tentang sertifikasi Ahli Kepabeanan, bukan PMK registrasinya.
+
+Untungnya ini tidak memblokir apa pun. `certificate_expiry` disalin dari
+sertifikatnya, tidak pernah dihitung dari masa berlaku — sama seperti KIR dan
+Kartu Pengawasan di `custom_lgx_fleet`. Selama tanggalnya datang dari dokumen,
+tidak tahu berapa lama masa berlakunya tidak membuat sistem salah; ia hanya
+membuat kita tidak bisa memperingatkan lebih awal untuk sertifikat yang
+tanggalnya belum diisi.
 """
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError

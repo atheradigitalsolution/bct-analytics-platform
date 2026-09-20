@@ -29,6 +29,14 @@ pemeriksaan A5 (2026-09-20) menunjukkan mengapa. PM 19/2021 tidak memberi satu
 angka: uji berkala pendaftaran berlaku 1 tahun, perpanjangan berikutnya 6 bulan.
 Karena itu ``lgx_kir_expiry_date`` disalin dari kartu lulus uji dan tidak pernah
 dihitung dari masa berlaku — kartunya membawa tanggalnya sendiri.
+
+Pemeriksaan A6 (2026-09-20): Kartu Pengawasan berlaku **1 tahun**. Yang penting
+dibedakan, dan sering tertukar: izin penyelenggaraan angkutannya berlaku
+**5 tahun**, kartu pengawasannya hanya satu. Modul ini menyimpan yang satu
+tahun (``lgx_kp_expiry_date``, per kendaraan); izin lima tahun itu dokumen
+perusahaan dan tidak dimodelkan di sini. Sumbernya halaman layanan Dishub dan
+BPTJ, bukan fulltext peraturan — cukup untuk peringatan, belum cukup untuk
+dijadikan dasar memblokir.
 """,
     "author": "Athera Digital Solution",
     "website": "https://athera-digital.com",
