@@ -69,6 +69,61 @@ Seluruh modul `custom_lgx_*` lain berdiri di atas modul ini. `lgx.charge.code.pr
 
 **Kode simpul boleh memuat tanda hubung.** UN/LOCODE murni lima huruf, tetapi depo dan CFS diberi kode turunan seperti `IDJKT-D1`. Melarang tanda hubung memaksa kode internal menjadi rangkaian huruf yang tidak terbaca.
 
+## Cara memeriksa yang tidak berbohong
+
+Ditaruh **sebelum** jebakan Odoo di bawah, karena bagian ini yang portabel.
+Jebakan Odoo kedaluwarsa bersama versinya; tujuh butir ini tidak.
+
+Semuanya lahir dari satu hari, 2026-09-20, ketika dua sesi menemukan sepuluh
+cacat pemeriksaan di pekerjaan satu sama lain. Akibatnya selalu sama — **laporan
+yang lebih meyakinkan daripada yang dibenarkan pemeriksaannya** — dan tiap
+perbaikan hanya menutup satu bentuk.
+
+**1. Beri kontrol positif pada alat pemeriksanya sendiri.** Pemindai yang
+melaporkan nol tanpa pernah terlihat melaporkan sesuatu belum diuji. Suntikkan
+pelanggaran sintetis, pastikan ia tertangkap, baru percayai nolnya.
+
+**2. Bandingkan NAMA, bukan JUMLAH.** Dua `count()` yang sama bukan bukti bahwa
+himpunannya sama: satu hilang ditambah satu yatim menghasilkan selisih nol yang
+sepenuhnya salah.
+
+**3. Periksa DUA ARAH.** Yang diharapkan tapi tidak ada, DAN yang ada tapi tidak
+diharapkan. Arah kedua jarang berbahaya, tetapi ia satu-satunya petunjuk bahwa
+sesuatu dulu dijaga dan sekarang tidak, tanpa ada yang memutuskan begitu.
+
+**4. Pastikan yang Anda tanyai memang ada.** Nama database, path endpoint, nama
+field, nama model, nama container — ambil dari sumber otoritatif, bukan dari
+ingatan. Probe `/web/login` dengan hostname karangan menjawab 303 dengan jujur;
+`int(vals["description"])` pada field yang tidak ada meledak; `hms.payer` yang
+tidak punya field itu melempar galat yang **terlihat seperti jawaban**.
+
+  Butir ini berbeda dari yang lain dan itu sebabnya ia paling sering terulang:
+  **membaca ulang perintah tidak dapat menangkapnya.** Butir 1, 2, 3, dan 5 bisa
+  diperbaiki dengan menatap perintah sendiri lebih lama. Butir 4 tidak — tidak
+  ada cara membaca `curl -H "Host: athera_simrs..."` lalu melihat bahwa namanya
+  karangan. Ia menuntut langkah tambahan yang benar-benar dijalankan, bukan
+  kewaspadaan yang lebih tinggi.
+
+**5. Jangan salurkan keluaran gerbang ke `head`/`tail`.** `make scan-secret`
+menjawab FAIL dengan exit code bukan nol; `| tail -3` memotong barisnya, dan
+`git push` sebagai perintah berikutnya tidak digerbangi apa pun. Gandeng dengan
+`&&`, atau periksa `${PIPESTATUS[0]}`. Dan keluaran KOSONG dilaporkan sebagai
+pemeriksaan gagal, bukan sebagai aman.
+
+**6. Jangan tegakkan yang bergantung mesin, dan jangan karang batas.** Tes yang
+merah di satu tempat dan hijau di tempat lain mengajari orang bahwa merah itu
+normal. Batas maksimum yang ditebak menolak data yang sah, dan penggunanya tidak
+punya petunjuk apa pun — lebih sulit didiagnosis daripada ketiadaan batas.
+
+**7. Pra-terbang data sebelum menambah constraint.** Hitung baris yang melanggar
+lebih dulu. Kalau ada, upgrade gagal di tengah dan Anda menemukannya sebagai
+kerusakan, bukan sebagai temuan.
+
+**Dan aturan tentang aturannya: "sudah ada pemeriksaannya" bukan jawaban.**
+Pemeriksaan menangkap BENTUK, bukan AKIBAT. Tiga bentuk "tes yang tidak berjalan"
+di bawah berakibat identik, dan tidak satu pun dari tiga pemeriksaannya menangkap
+dua lainnya.
+
 ## Jebakan Odoo 19 yang sudah kami bayar
 
 Dikumpulkan di sini, bukan di memori sesi, karena tiap satu di antaranya sudah
