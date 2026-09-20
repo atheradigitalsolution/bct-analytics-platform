@@ -177,3 +177,34 @@ class TestWriteThenReject(TransactionCase):
         self.assertEqual(result["error"]["code"], "bad_action")
         trip.invalidate_recordset()
         self.assertNotEqual(trip.odometer_start, 1234)
+
+    # --- kontrak: nilai yang tidak terbaca -------------------------------
+    def test_unreadable_value_is_a_refusal_not_a_crash(self):
+        """Payload cacat adalah kesalahan KLIEN, dan harus dijawab begitu.
+
+        `int("dua")` melempar ValueError, yang tidak ada di tuple yang kita
+        tangkap. Akibatnya perangkat menerima 500 "kesalahan sistem, hubungi
+        administrator" untuk kesalahannya sendiri — dan setiap payload cacat
+        menulis traceback ERROR penuh yang mengubur galat sungguhan di log.
+        """
+        result = self.service.submit_pod(stop_id="dua", received_by="Pak Joko")
+        self.assertIn("error", result, "Harus ditolak, bukan meledak.")
+        self.assertEqual(result["error"]["code"], "bad_value")
+
+    def test_unreadable_quantity_is_refused_too(self):
+        """Bukan hanya id. Kuantitas pun datang dari perangkat, dan bisa cacat."""
+        trip = self._trip()
+        stop = self._stop(trip)
+        result = self.service.submit_pod(
+            stop_id=stop.id, received_by="Pak Joko", qty_delivered="banyak")
+        self.assertIn("error", result)
+        self.assertEqual(result["error"]["code"], "bad_value")
+
+    def test_a_readable_value_is_still_processed(self):
+        """Penjaga tidak boleh menolak angka yang sah, termasuk yang berbentuk teks."""
+        stop = self._stop(self._trip())
+        result = self.service.submit_pod(
+            stop_id=str(stop.id), received_by="Pak Joko", qty_delivered="12.5")
+        self.assertNotIn("error", result)
+        stop.invalidate_recordset()
+        self.assertAlmostEqual(stop.qty_delivered, 12.5, places=2)

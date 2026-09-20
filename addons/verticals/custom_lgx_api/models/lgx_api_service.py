@@ -20,6 +20,7 @@ mengembalikan ``{"error": {"code", "message", "fields"}}``. Konvensi kedua di
 repo yang sama berarti setiap frontend harus tahu sedang bicara dengan yang mana.
 """
 import base64
+import functools
 import logging
 
 from odoo import _, api, fields, models
@@ -28,6 +29,38 @@ from odoo.exceptions import AccessError, UserError, ValidationError
 _logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = "1"
+
+
+def lgx_public_api(func):
+    """Payload yang tidak dapat dibaca adalah kesalahan KLIEN, dan dijawab begitu.
+
+    `int("dua")` dan `float("banyak")` melempar ValueError, yang tidak ada di
+    tuple exception yang ditangkap tiap method. Tanpa penjaga ini, perangkat di
+    lapangan menerima 500 "kesalahan sistem, hubungi administrator" untuk
+    kesalahannya sendiri — dan setiap payload cacat menulis traceback ERROR
+    penuh yang mengubur galat sungguhan di log.
+
+    Dipasang di BATAS, satu tempat, bukan ditambal di empat belas titik
+    konversi. Menambal per titik berarti titik kelima belas yang ditulis besok
+    akan luput.
+
+    Harga yang dibayar, dan disebut supaya tidak lupa: ValueError yang lahir
+    dari cacat KITA SENDIRI ikut terlihat seperti kesalahan klien. Karena itu
+    ia dicatat sebagai WARNING dengan traceback — cukup untuk ditemukan saat
+    dicari, tidak cukup untuk mengubur log seperti ERROR.
+    """
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except (ValueError, TypeError) as error:
+            _logger.warning("Payload ditolak pada %s: %s", func.__name__, error,
+                            exc_info=True)
+            return self._error(
+                "bad_value",
+                _("Ada nilai pada permintaan yang tidak dapat dibaca: %s", error),
+            )
+    return wrapper
 
 
 class LgxApiService(models.AbstractModel):
@@ -53,6 +86,7 @@ class LgxApiService(models.AbstractModel):
 
     # --- pelacakan pelanggan (LGX-G01) -------------------------------------
     @api.model
+    @lgx_public_api
     def track_shipment(self, reference=None, **kwargs):
         """Lacak dengan nomor job, B/L, kontainer, atau referensi pelanggan.
 
@@ -109,6 +143,7 @@ class LgxApiService(models.AbstractModel):
         })
 
     @api.model
+    @lgx_public_api
     def list_jobs(self, filters=None, limit=80, offset=0, **kwargs):
         """Daftar job yang boleh dilihat pemanggil.
 
@@ -149,6 +184,7 @@ class LgxApiService(models.AbstractModel):
 
     # --- aplikasi pengemudi (LGX-D04) --------------------------------------
     @api.model
+    @lgx_public_api
     def driver_trip_list(self, driver_id=None, **kwargs):
         """Trip milik pengemudi yang sedang login.
 
@@ -188,6 +224,7 @@ class LgxApiService(models.AbstractModel):
         })
 
     @api.model
+    @lgx_public_api
     def submit_pod(self, stop_id=None, signature=None, photos=None, received_by=None,
                    qty_delivered=None, qty_rejected=None, rejection_reason=None, **kwargs):
         """Kirim bukti terima untuk satu stop. Satu operasi, aman diulang.
@@ -260,6 +297,7 @@ class LgxApiService(models.AbstractModel):
         })
 
     @api.model
+    @lgx_public_api
     def driver_update_trip(self, trip_id=None, action=None, odometer=None, **kwargs):
         """Ubah status trip dari perangkat. Aksi dibatasi daftar putih."""
         allowed = {
@@ -287,6 +325,7 @@ class LgxApiService(models.AbstractModel):
 
     # --- pemindai gudang (LGX-E01, LGX-E03) --------------------------------
     @api.model
+    @lgx_public_api
     def scan_receive(self, picking_id=None, barcode=None, quantity=1.0, lot_name=None,
                      owner_id=None, **kwargs):
         """Terima barang hasil pemindaian. Pemilik WAJIB.
@@ -358,6 +397,7 @@ class LgxApiService(models.AbstractModel):
         })
 
     @api.model
+    @lgx_public_api
     def scan_pick(self, picking_id=None, barcode=None, location=None, quantity=1.0, **kwargs):
         """Ambil barang hasil pemindaian, dengan validasi lokasi.
 
@@ -405,6 +445,7 @@ class LgxApiService(models.AbstractModel):
         })
 
     @api.model
+    @lgx_public_api
     def wms_task_list(self, kind="incoming", limit=40, **kwargs):
         """Daftar picking terbuka untuk operator gudang.
 
@@ -478,6 +519,7 @@ class LgxApiService(models.AbstractModel):
 
     # --- gudang: isolasi antar klien ---------------------------------------
     @api.model
+    @lgx_public_api
     def wms_stock_by_client(self, client_id=None, **kwargs):
         """Stok per pemilik barang, tunduk record rule.
 
