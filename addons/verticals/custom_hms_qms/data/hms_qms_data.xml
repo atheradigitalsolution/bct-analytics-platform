@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="cron_hms_qms_expire_bookings" model="ir.cron">
+            <field name="name">SIMRS: kedaluwarsakan booking yang tidak check-in</field>
+            <field name="model_id" ref="model_hms_qms_ticket"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_expire_bookings()</field>
+            <field name="interval_number">15</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+        <record id="cron_hms_qms_print_job_gc" model="ir.cron">
+            <field name="name">SIMRS: bersihkan antrian cetak lama</field>
+            <field name="model_id" ref="model_hms_qms_print_job"/>
+            <field name="state">code</field>
+            <field name="code">model._gc()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="report_hms_bill_detail" model="ir.actions.report">
+        <field name="name">Rincian Tagihan</field>
+        <field name="model">hms.bill</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_billing.report_bill_detail_document</field>
+        <field name="report_file">custom_hms_billing.report_bill_detail_document</field>
+        <field name="binding_model_id" ref="model_hms_bill"/>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="report_hms_receipt" model="ir.actions.report">
+        <field name="name">Kwitansi</field>
+        <field name="model">hms.payment</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_billing.report_receipt_document</field>
+        <field name="report_file">custom_hms_billing.report_receipt_document</field>
+        <field name="binding_model_id" ref="model_hms_payment"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_bill_detail_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="bill">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 9.5pt;">
+                        <h4 style="text-align: center;">RINCIAN TAGIHAN</h4>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td style="width: 18%;"><strong>No. Tagihan</strong></td>
+                                <td style="width: 32%;"><span t-field="bill.name"/></td>
+                                <td style="width: 18%;"><strong>No. RM</strong></td>
+                                <td style="width: 32%;"><span t-field="bill.patient_id.mrn"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Pasien</strong></td>
+                                <td><span t-field="bill.patient_id.name"/></td>
+                                <td><strong>No. Kunjungan</strong></td>
+                                <td><span t-field="bill.encounter_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Penjamin</strong></td>
+                                <td><span t-field="bill.payer_id.name"/></td>
+                                <td><strong>Unit</strong></td>
+                                <td><span t-field="bill.unit_id.name"/></td>
+                            </tr>
+                        </table>
+                        <t t-set="sections" t-value="{}"/>
+                        <t t-foreach="bill.line_ids.filtered(lambda l: l.state != 'cancelled')" t-as="line">
+                            <t t-set="key" t-value="line.report_section or 'other'"/>
+                            <t t-set="sections" t-value="dict(sections, **{key: sections.get(key, bill.env['hms.bill.line']) | line})"/>
+                        </t>
+                        <t t-foreach="sections.items()" t-as="section">
+                            <h6 style="margin-top: 3mm; background: #eee; padding: 1mm;">
+                                <span t-esc="dict(bill.env['hms.tariff.category']._fields['report_section'].selection).get(section[0], section[0])"/>
+                            </h6>
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 12%;">Tanggal</th>
+                                        <th style="width: 38%;">Uraian</th>
+                                        <th style="width: 8%;" class="text-end">Qty</th>
+                                        <th style="width: 14%;" class="text-end">Harga</th>
+                                        <th style="width: 14%;" class="text-end">Penjamin</th>
+                                        <th style="width: 14%;" class="text-end">Pasien</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="section[1]" t-as="line">
+                                        <td><span t-field="line.service_date"/></td>
+                                        <td><span t-field="line.name"/></td>
+                                        <td class="text-end"><span t-field="line.qty"/></td>
+                                        <td class="text-end"><span t-field="line.unit_price"/></td>
+                                        <td class="text-end"><span t-field="line.amount_payer"/></td>
+                                        <td class="text-end"><span t-field="line.amount_patient"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+                        <table class="table table-sm" style="width: 60%; margin-left: 40%;">
+                            <tr><td>Total Bruto</td>
+                                <td class="text-end"><span t-field="bill.amount_gross"/></td></tr>
+                            <tr t-if="bill.amount_discount"><td>Diskon</td>
+                                <td class="text-end">- <span t-field="bill.amount_discount"/></td></tr>
+                            <tr><td><strong>Total Tagihan</strong></td>
+                                <td class="text-end"><strong><span t-field="bill.amount_total"/></strong></td></tr>
+                            <tr><td>Ditanggung Penjamin</td>
+                                <td class="text-end">- <span t-field="bill.amount_payer"/></td></tr>
+                            <tr><td>Deposit</td>
+                                <td class="text-end">- <span t-field="bill.amount_deposit"/></td></tr>
+                            <tr><td>Sudah Dibayar</td>
+                                <td class="text-end">- <span t-field="bill.amount_paid"/></td></tr>
+                            <tr style="border-top: 0.4mm solid #000;">
+                                <td><strong>SISA BAYAR</strong></td>
+                                <td class="text-end"><strong><span t-field="bill.amount_due"/></strong></td></tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_receipt_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="pay">
+                <t t-set="settings" t-value="pay.env['hms.settings'].get_settings()"/>
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 10pt;">
+                        <h4 style="text-align: center; letter-spacing: 1mm;">KWITANSI</h4>
+                        <p style="text-align: center; margin-top: -2mm;">
+                            No. <strong><span t-field="pay.name"/></strong>
+                            <t t-if="pay.printed_count &gt; 0">
+                                <span style="color:#b00;"> — COPY</span>
+                            </t>
+                        </p>
+                        <table class="table table-sm table-borderless" style="margin-top: 5mm;">
+                            <tr>
+                                <td style="width: 28%;">Telah diterima dari</td>
+                                <td>: <strong><span t-field="pay.patient_id.name"/></strong>
+                                    (<span t-field="pay.patient_id.mrn"/>)</td>
+                            </tr>
+                            <tr>
+                                <td>Jumlah</td>
+                                <td>: <strong><span t-field="pay.amount"/></strong></td>
+                            </tr>
+                            <tr>
+                                <td>Untuk pembayaran</td>
+                                <td>: Pelayanan kesehatan, tagihan
+                                    <span t-field="pay.bill_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td>Metode</td>
+                                <td>: <span t-esc="dict(pay._fields['method'].selection).get(pay.method)"/>
+                                    <t t-if="pay.reference"> — <span t-field="pay.reference"/></t></td>
+                            </tr>
+                            <tr t-if="pay.change">
+                                <td>Kembalian</td>
+                                <td>: <span t-field="pay.change"/></td>
+                            </tr>
+                        </table>
+                        <table style="width: 100%; margin-top: 15mm;">
+                            <tr>
+                                <td style="width: 55%;">
+                                    <small>Kwitansi ini sah tanpa tanda tangan basah bila
+                                    dicetak dari sistem.</small>
+                                </td>
+                                <td style="width: 45%; text-align: center;">
+                                    <span t-esc="settings.hospital_name"/>,
+                                    <span t-field="pay.paid_at" t-options='{"format": "dd MMMM yyyy"}'/>
+                                    <br/><br/><br/>
+                                    (<span t-field="pay.cashier_id.name"/>)<br/>
+                                    <small>Kasir</small>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Menu induk dibuka untuk PMIK dan manajemen saja.
+
+        Berbeda dari menu keselamatan pasien (yang dibuka seluruh staf supaya
+        melapor semurah mungkin), tidak ada alasan seorang apoteker membuka
+        daftar pelepasan informasi atau daftar retensi. Yang memang perlu
+        dilihat klinisi — temuan KLPCM miliknya — sampai lewat inbox dan layar
+        kunjungan, bukan lewat menu ini.
+    -->
+    <menuitem id="menu_hms_medrec_root" name="Rekam Medis"
+              parent="custom_hms_base.menu_hms_root" sequence="75"
+              groups="custom_hms_medrec.group_hms_medrec,custom_hms_base.group_hms_manager"/>
+
+    <menuitem id="menu_hms_klpcm" name="Kelengkapan Berkas (KLPCM)"
+              parent="menu_hms_medrec_root" action="action_hms_klpcm" sequence="10"/>
+
+    <menuitem id="menu_hms_roi_request" name="Pelepasan Informasi"
+              parent="menu_hms_medrec_root" action="action_hms_roi_request" sequence="20"/>
+
+    <menuitem id="menu_hms_correction_request" name="Koreksi Rekam Medis"
+              parent="menu_hms_medrec_root" action="action_hms_correction_request" sequence="30"/>
+
+    <menuitem id="menu_hms_medical_letter" name="Surat Keterangan Medis"
+              parent="menu_hms_medrec_root" action="action_hms_medical_letter" sequence="40"/>
+
+    <menuitem id="menu_hms_death_certificate" name="Sertifikat Kematian"
+              parent="menu_hms_medrec_root" action="action_hms_death_certificate" sequence="50"/>
+
+    <menuitem id="menu_hms_retention" name="Retensi" parent="menu_hms_medrec_root"
+              sequence="60" groups="custom_hms_medrec.group_hms_medrec_manager"/>
+
+    <menuitem id="menu_hms_retention_review" name="Tinjauan Retensi"
+              parent="menu_hms_retention" action="action_hms_retention_review" sequence="10"/>
+
+    <menuitem id="menu_hms_retention_rule" name="Aturan Retensi"
+              parent="menu_hms_retention" action="action_hms_retention_rule" sequence="20"/>
+</odoo>

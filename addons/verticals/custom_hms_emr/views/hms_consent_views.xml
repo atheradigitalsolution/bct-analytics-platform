@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_consent_list" model="ir.ui.view">
+        <field name="name">hms.consent.list</field>
+        <field name="model">hms.consent</field>
+        <field name="arch" type="xml">
+            <list string="Persetujuan" decoration-warning="state == 'draft'"
+                  decoration-danger="state == 'refused'">
+                <field name="patient_id"/>
+                <field name="encounter_id"/>
+                <field name="template_id"/>
+                <field name="type"/>
+                <field name="signer_name"/>
+                <field name="state" widget="badge"/>
+                <field name="signed_at"/>
+                <button name="action_sign" type="object" string="Tandatangani" icon="fa-check"
+                        invisible="state != 'draft'"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_consent_form" model="ir.ui.view">
+        <field name="name">hms.consent.form</field>
+        <field name="model">hms.consent</field>
+        <field name="arch" type="xml">
+            <form string="Persetujuan">
+                <header>
+                    <button name="action_sign" type="object" string="Tandatangani"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_refuse" type="object" string="Pasien Menolak"
+                            invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="patient_id"/>
+                            <field name="encounter_id"/>
+                            <field name="template_id"/>
+                            <field name="tariff_id"/>
+                            <field name="explained_by_id"/>
+                        </group>
+                        <group>
+                            <field name="signer_type"/>
+                            <field name="signer_name"/>
+                            <field name="signer_relation" invisible="signer_type == 'patient'"/>
+                            <field name="signer_identity_no"/>
+                            <field name="witness_name"/>
+                            <field name="signed_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="refusal_reason" invisible="state != 'refused'"/>
+                    <separator string="Isi Persetujuan"/>
+                    <field name="body_snapshot" readonly="1" invisible="state == 'draft'"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_consent" model="ir.actions.act_window">
+        <field name="name">Persetujuan Pasien</field>
+        <field name="res_model">hms.consent</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_consent" name="Persetujuan"
+              parent="custom_hms_base.menu_hms_clinical" action="action_hms_consent" sequence="40"/>
+
+    <record id="action_hms_consent_template" model="ir.actions.act_window">
+        <field name="name">Template Persetujuan</field>
+        <field name="res_model">hms.consent.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_consent_template" name="Template Persetujuan"
+              parent="custom_hms_base.menu_hms_config_master"
+              action="action_hms_consent_template" sequence="60"/>
+</odoo>

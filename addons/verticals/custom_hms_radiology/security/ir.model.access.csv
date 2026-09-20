@@ -1,0 +1,10 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hms_rad_report_admin,hms.rad.report/group_hms_admin,model_hms_rad_report,custom_hms_base.group_hms_admin,1,1,1,1
+access_hms_rad_report_diagnostic_user,hms.rad.report/group_hms_diagnostic_user,model_hms_rad_report,custom_hms_base.group_hms_diagnostic_user,1,1,1,0
+access_hms_rad_report_diagnostic_verifier,hms.rad.report/group_hms_diagnostic_verifier,model_hms_rad_report,custom_hms_base.group_hms_diagnostic_verifier,1,1,1,1
+access_hms_rad_report_emr_clinician,hms.rad.report/group_hms_emr_clinician,model_hms_rad_report,custom_hms_base.group_hms_emr_clinician,1,1,0,0
+access_hms_rad_report_staff,hms.rad.report/group_hms_staff,model_hms_rad_report,custom_hms_base.group_hms_staff,1,0,0,0
+access_hms_rad_exam_admin,hms.rad.exam/group_hms_admin,model_hms_rad_exam,custom_hms_base.group_hms_admin,1,1,1,1
+access_hms_rad_exam_diagnostic_verifier,hms.rad.exam/group_hms_diagnostic_verifier,model_hms_rad_exam,custom_hms_base.group_hms_diagnostic_verifier,1,1,1,0
+access_hms_rad_exam_diagnostic_user,hms.rad.exam/group_hms_diagnostic_user,model_hms_rad_exam,custom_hms_base.group_hms_diagnostic_user,1,0,0,0
+access_hms_rad_exam_staff,hms.rad.exam/group_hms_staff,model_hms_rad_exam,custom_hms_base.group_hms_staff,1,0,0,0

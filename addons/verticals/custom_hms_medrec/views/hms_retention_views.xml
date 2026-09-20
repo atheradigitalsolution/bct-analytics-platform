@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_retention_rule_list" model="ir.ui.view">
+        <field name="name">hms.retention.rule.list</field>
+        <field name="model">hms.retention.rule</field>
+        <field name="arch" type="xml">
+            <list string="Aturan Retensi" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="scope"/>
+                <field name="retention_years"/>
+                <field name="note"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_hms_retention_rule" model="ir.actions.act_window">
+        <field name="name">Aturan Retensi</field>
+        <field name="res_model">hms.retention.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada aturan retensi.</p>
+            <p>PMK 24/2022 Ps. 39 ayat (1): rekam medis disimpan paling singkat
+               25 tahun sejak kunjungan terakhir. Nilai di bawah itu ditolak.</p>
+        </field>
+    </record>
+
+    <record id="view_hms_retention_review_list" model="ir.ui.view">
+        <field name="name">hms.retention.review.list</field>
+        <field name="model">hms.retention.review</field>
+        <field name="arch" type="xml">
+            <list string="Tinjauan Retensi"
+                  decoration-warning="is_excepted"
+                  decoration-muted="state == 'reviewed'">
+                <field name="patient_id"/>
+                <field name="rule_id"/>
+                <field name="last_visit_date"/>
+                <field name="due_date"/>
+                <field name="has_active_claim"/>
+                <field name="legal_hold"/>
+                <field name="is_excepted" string="Dikecualikan"/>
+                <field name="exception_reason" optional="show"/>
+                <field name="disposition"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_retention_review_form" model="ir.ui.view">
+        <field name="name">hms.retention.review.form</field>
+        <field name="model">hms.retention.review</field>
+        <field name="arch" type="xml">
+            <form string="Tinjauan Retensi">
+                <header>
+                    <button name="action_review" type="object" string="Putuskan Tinjauan"
+                            class="btn-primary" invisible="state == 'reviewed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Dikecualikan" bg_color="text-bg-warning"
+                            invisible="not is_excepted"/>
+                    <group>
+                        <group string="Rekam">
+                            <field name="patient_id" readonly="1"/>
+                            <field name="rule_id" readonly="1"/>
+                            <field name="last_visit_date" readonly="1"/>
+                            <field name="due_date" readonly="1"/>
+                        </group>
+                        <group string="Pengecualian (Ps. 39 ayat (2))">
+                            <field name="has_active_claim" readonly="1"/>
+                            <field name="legal_hold"/>
+                            <field name="legal_hold_reference" invisible="not legal_hold"/>
+                            <field name="is_excepted" readonly="1"/>
+                            <field name="exception_reason" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Keputusan">
+                        <field name="disposition"/>
+                        <field name="note"/>
+                        <field name="reviewed_by_id" readonly="1"/>
+                        <field name="reviewed_at" readonly="1"/>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Sistem ini tidak pernah memusnahkan rekam medis. Keputusan
+                        "diusulkan dimusnahkan" berhenti sebagai usulan sampai tata
+                        cara pemusnahan RME (PMK 24/2022 Ps. 39 ayat (3)) terbit.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_retention_review_search" model="ir.ui.view">
+        <field name="name">hms.retention.review.search</field>
+        <field name="model">hms.retention.review</field>
+        <field name="arch" type="xml">
+            <search string="Cari Tinjauan Retensi">
+                <field name="patient_id"/>
+                <filter name="filter_pending" string="Belum Ditinjau"
+                        domain="[('state', '=', 'pending')]"/>
+                <filter name="filter_excepted" string="Dikecualikan"
+                        domain="[('is_excepted', '=', True)]"/>
+                <separator/>
+                <filter name="group_rule" string="Aturan" context="{'group_by': 'rule_id'}"/>
+                <filter name="group_disposition" string="Keputusan"
+                        context="{'group_by': 'disposition'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_retention_review" model="ir.actions.act_window">
+        <field name="name">Tinjauan Retensi</field>
+        <field name="res_model">hms.retention.review</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_pending': 1}</field>
+        <field name="search_view_id" ref="view_hms_retention_review_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada rekam yang mendekati batas retensi.</p>
+        </field>
+    </record>
+</odoo>

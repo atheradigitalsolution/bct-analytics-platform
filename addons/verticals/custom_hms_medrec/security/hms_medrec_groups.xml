@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Sumbu peran tersendiri, bukan menumpang privilege pendaftaran.
+
+            custom_hms_base sudah punya `privilege_hms_registration` yang
+            memuat "Kepala Pendaftaran / Rekam Medis". Peran itu tentang
+            LOKET: mendaftarkan pasien, memperbaiki identitas. PMIK adalah
+            pekerjaan yang justru dimulai setelah pasien pulang — analisis
+            kelengkapan, pelepasan informasi, retensi.
+
+            Digabung ke satu privilege, keduanya dirender sebagai dropdown
+            pilih-satu pada form pengguna (Odoo 19), sehingga menyimpan form
+            seorang petugas yang memang mengerjakan keduanya akan membuang
+            salah satunya tanpa peringatan.
+        -->
+        <record id="privilege_hms_medrec" model="res.groups.privilege">
+            <field name="name">SIMRS / Rekam Medis &amp; Pelepasan Informasi</field>
+            <field name="category_id" ref="custom_hms_base.module_category_hms"/>
+            <field name="sequence">490</field>
+        </record>
+
+        <!--
+            PMIK — Perekam Medis dan Informasi Kesehatan.
+
+            Menyiratkan `group_hms_emr_reader`: pekerjaan analisis kelengkapan
+            mustahil dilakukan tanpa membaca berkasnya. Yang TIDAK disiratkan
+            adalah `group_hms_emr_clinician` — PMIK menilai kelengkapan
+            catatan, tidak menulis catatan klinis.
+        -->
+        <record id="group_hms_medrec" model="res.groups">
+            <field name="name">Petugas Rekam Medis (PMIK)</field>
+            <field name="privilege_id" ref="privilege_hms_medrec"/>
+            <field name="implied_ids" eval="[(4, ref('custom_hms_base.group_hms_emr_reader'))]"/>
+        </record>
+
+        <!--
+            Kepala Rekam Medis.
+
+            Satu-satunya tambahan wewenangnya di modul ini adalah menyetujui
+            koreksi RME di luar masa tenggang (PMK 24/2022 Ps. 30 ayat (7)).
+            Persetujuan PELEPASAN informasi sengaja TIDAK diberikan ke sini:
+            Ps. 34 ayat (2) menyebut pimpinan fasilitas pelayanan kesehatan,
+            dan kepala unit yang menyiapkan berkasnya bukan pimpinan itu.
+        -->
+        <record id="group_hms_medrec_manager" model="res.groups">
+            <field name="name">Kepala Rekam Medis</field>
+            <field name="privilege_id" ref="privilege_hms_medrec"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_medrec'))]"/>
+        </record>
+
+    </data>
+</odoo>

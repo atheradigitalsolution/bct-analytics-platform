@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Root and section menus only. Actions and their leaf menu items live
+         beside the views they open, so a module that is uninstalled takes its
+         own menu entries with it. -->
+    <menuitem id="menu_hms_root" name="Rumah Sakit" sequence="15"
+              web_icon="custom_hms_base,static/description/icon.png"
+              groups="group_hms_staff"/>
+
+    <menuitem id="menu_hms_frontdesk" name="Pendaftaran" parent="menu_hms_root" sequence="10"
+              groups="group_hms_registration_user"/>
+    <menuitem id="menu_hms_clinical" name="Pelayanan Klinis" parent="menu_hms_root" sequence="20"
+              groups="group_hms_emr_reader"/>
+    <menuitem id="menu_hms_inpatient_root" name="Rawat Inap" parent="menu_hms_root" sequence="30"
+              groups="group_hms_staff"/>
+    <menuitem id="menu_hms_pharmacy_root" name="Farmasi" parent="menu_hms_root" sequence="40"
+              groups="group_hms_pharmacy_tech"/>
+    <menuitem id="menu_hms_diagnostic_root" name="Penunjang" parent="menu_hms_root" sequence="50"
+              groups="group_hms_diagnostic_user"/>
+    <menuitem id="menu_hms_billing_root" name="Kasir &amp; Billing" parent="menu_hms_root" sequence="60"
+              groups="group_hms_cashier"/>
+    <menuitem id="menu_hms_reporting_root" name="Laporan" parent="menu_hms_root" sequence="80"
+              groups="group_hms_manager"/>
+    <menuitem id="menu_hms_config" name="Konfigurasi" parent="menu_hms_root" sequence="90"
+              groups="group_hms_admin"/>
+    <menuitem id="menu_hms_config_master" name="Master Data" parent="menu_hms_config" sequence="10"/>
+    <menuitem id="menu_hms_config_reference" name="Referensi Klinis" parent="menu_hms_config" sequence="20"/>
+    <menuitem id="menu_hms_config_tariff" name="Tarif &amp; Penjamin" parent="menu_hms_config" sequence="30"/>
+</odoo>

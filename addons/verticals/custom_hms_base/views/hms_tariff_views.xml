@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_tariff_list" model="ir.ui.view">
+        <field name="name">hms.tariff.list</field>
+        <field name="model">hms.tariff</field>
+        <field name="arch" type="xml">
+            <list string="Item Tarif">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="unit_id"/>
+                <field name="requires_consent"/>
+                <field name="is_package"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_tariff_form" model="ir.ui.view">
+        <field name="name">hms.tariff.form</field>
+        <field name="model">hms.tariff</field>
+        <field name="arch" type="xml">
+            <form string="Item Tarif">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="code"/>
+                        <h1><field name="code"/></h1>
+                        <h2><field name="name"/></h2>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="category_id"/>
+                            <field name="unit_id"/>
+                            <field name="uom_name"/>
+                            <field name="product_id"/>
+                            <field name="duration_minutes"/>
+                        </group>
+                        <group>
+                            <field name="icd9_id"/>
+                            <field name="loinc_code"/>
+                            <field name="bpjs_procedure_code"/>
+                            <field name="requires_consent"/>
+                            <field name="requires_authorization"/>
+                            <field name="is_package"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Harga per Kelas &amp; Penjamin">
+                            <div class="alert alert-info" role="alert">
+                                Baris tanpa kelas berlaku untuk semua kelas; baris tanpa penjamin
+                                berlaku untuk semua penjamin. Baris paling spesifik yang menang.
+                                Jumlah komponen wajib sama dengan total bila komponen diisi.
+                            </div>
+                            <field name="price_ids">
+                                <list editable="bottom">
+                                    <field name="class_id"/>
+                                    <field name="payer_id"/>
+                                    <field name="price_total"/>
+                                    <field name="amount_facility"/>
+                                    <field name="amount_medical"/>
+                                    <field name="amount_consumable"/>
+                                    <field name="amount_other"/>
+                                    <field name="cito_multiplier"/>
+                                    <field name="valid_from"/>
+                                    <field name="valid_to"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Isi Paket" invisible="not is_package">
+                            <field name="package_line_ids">
+                                <list editable="bottom">
+                                    <field name="tariff_id"/>
+                                    <field name="qty"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Keterangan">
+                            <group>
+                                <field name="valid_from"/>
+                                <field name="valid_to"/>
+                            </group>
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_tariff_search" model="ir.ui.view">
+        <field name="name">hms.tariff.search</field>
+        <field name="model">hms.tariff</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="unit_id"/>
+                <separator/>
+                    <filter name="g_cat" string="Kategori" context="{'group_by': 'category_id'}"/>
+                    <filter name="g_unit" string="Unit" context="{'group_by': 'unit_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_tariff" model="ir.actions.act_window">
+        <field name="name">Item Tarif</field>
+        <field name="res_model">hms.tariff</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_tariff_search"/>
+    </record>
+    <menuitem id="menu_hms_tariff" name="Item Tarif" parent="menu_hms_config_tariff"
+              action="action_hms_tariff" sequence="20"/>
+
+    <record id="view_hms_tariff_category_list" model="ir.ui.view">
+        <field name="name">hms.tariff.category.list</field>
+        <field name="model">hms.tariff.category</field>
+        <field name="arch" type="xml">
+            <list string="Kategori Tarif" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="report_section"/>
+                <field name="charge_on"/>
+                <field name="eklaim_component"/>
+                <field name="product_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_tariff_category_form" model="ir.ui.view">
+        <field name="name">hms.tariff.category.form</field>
+        <field name="model">hms.tariff.category</field>
+        <field name="arch" type="xml">
+            <form string="Kategori Tarif">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group string="Identitas">
+                            <field name="code"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Pembebanan &amp; Pelaporan">
+                            <field name="report_section"/>
+                            <field name="charge_on"/>
+                            <field name="product_id"/>
+                        </group>
+                        <group string="Pemetaan Klaim">
+                            <field name="eklaim_component"
+                                   placeholder="mis. prosedur_non_bedah"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_tariff_category" model="ir.actions.act_window">
+        <field name="name">Kategori Tarif</field>
+        <field name="res_model">hms.tariff.category</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_tariff_category" name="Kategori Tarif" parent="menu_hms_config_tariff"
+              action="action_hms_tariff_category" sequence="30"/>
+</odoo>

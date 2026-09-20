@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_hms_bill" model="ir.sequence">
+            <field name="name">Nomor Tagihan</field>
+            <field name="code">hms.bill</field>
+            <field name="prefix">BILL-%(year)s%(month)s-</field>
+            <field name="padding">5</field>
+            <field name="implementation">standard</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+        <!-- Receipts are numbered no_gap: the sequence is the audit trail a
+             tax inspector reads, and a hole in it has to be explainable. -->
+        <record id="seq_hms_payment" model="ir.sequence">
+            <field name="name">Nomor Kwitansi</field>
+            <field name="code">hms.payment</field>
+            <field name="prefix">KW-%(year)s%(month)s-</field>
+            <field name="padding">5</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+        <record id="seq_hms_deposit" model="ir.sequence">
+            <field name="name">Nomor Bukti Deposit</field>
+            <field name="code">hms.deposit</field>
+            <field name="prefix">DEP-%(year)s%(month)s-</field>
+            <field name="padding">5</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+    </data>
+</odoo>

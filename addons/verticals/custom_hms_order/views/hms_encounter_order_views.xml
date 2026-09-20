@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_encounter_form_order" model="ir.ui.view">
+        <field name="name">hms.encounter.form.order</field>
+        <field name="model">hms.encounter</field>
+        <field name="inherit_id" ref="custom_hms_emr.view_hms_encounter_form_emr"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='procedures']" position="before">
+                <page string="Order" name="orders">
+                    <field name="order_ids" context="{'default_encounter_id': id}">
+                        <list decoration-danger="priority == 'cito'">
+                            <field name="name"/>
+                            <field name="ordered_at"/>
+                            <field name="order_type"/>
+                            <field name="target_unit_id"/>
+                            <field name="priority"/>
+                            <field name="line_count"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+            <xpath expr="//field[@name='unsigned_note_count']" position="after">
+                <field name="open_order_count" readonly="1" invisible="open_order_count == 0"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

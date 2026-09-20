@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_event_list" model="ir.ui.view">
+        <field name="name">hms.event.list</field>
+        <field name="model">hms.event</field>
+        <field name="arch" type="xml">
+            <list string="Outbox Event" create="false" decoration-danger="not published and attempts &gt; 0">
+                <field name="id"/>
+                <field name="create_date" string="Dibuat"/>
+                <field name="topic"/>
+                <field name="published" widget="boolean_toggle" readonly="1"/>
+                <field name="published_at"/>
+                <field name="attempts"/>
+                <field name="last_error"/>
+                <button name="action_retry" type="object" string="Kirim ulang" icon="fa-refresh"
+                        invisible="published"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_event_search" model="ir.ui.view">
+        <field name="name">hms.event.search</field>
+        <field name="model">hms.event</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="topic"/>
+                <filter name="f_pending" string="Belum terkirim" domain="[('published', '=', False)]"/>
+                <separator/>
+                <filter name="g_topic" string="Topik" context="{'group_by': 'topic'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_event" model="ir.actions.act_window">
+        <field name="name">Outbox Event</field>
+        <field name="res_model">hms.event</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_hms_event_search"/>
+    </record>
+
+    <record id="action_hms_redis_test" model="ir.actions.server">
+        <field name="name">Uji Koneksi Redis</field>
+        <field name="model_id" ref="model_hms_event"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_test_connection()</field>
+    </record>
+
+    <menuitem id="menu_hms_integration" name="Integrasi" parent="custom_hms_base.menu_hms_config"
+              sequence="70"/>
+    <menuitem id="menu_hms_event" name="Outbox Event" parent="menu_hms_integration"
+              action="action_hms_event" sequence="10"/>
+    <menuitem id="menu_hms_redis_test" name="Uji Koneksi Redis" parent="menu_hms_integration"
+              action="action_hms_redis_test" sequence="30"/>
+</odoo>

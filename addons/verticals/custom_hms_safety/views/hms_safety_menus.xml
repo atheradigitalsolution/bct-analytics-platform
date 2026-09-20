@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Menu induk dibuka untuk seluruh staf, bukan untuk tim KP saja.
+
+        Melapor harus semurah mungkin: menu yang hanya muncul bagi tim KP
+        berarti perawat yang menyaksikan insiden tidak punya jalan masuk sama
+        sekali. Yang membatasi bukan menu, melainkan record rule — daftar yang
+        terbuka bagi pelapor hanya berisi laporannya sendiri.
+    -->
+    <menuitem id="menu_hms_safety_root" name="Keselamatan Pasien &amp; Mutu"
+              parent="custom_hms_base.menu_hms_root" sequence="70"
+              groups="custom_hms_base.group_hms_staff"/>
+
+    <menuitem id="menu_hms_incident_report" name="Insiden Keselamatan Pasien"
+              parent="menu_hms_safety_root" action="action_hms_incident_report"
+              sequence="10"/>
+
+    <menuitem id="menu_hms_complaint" name="Komplain Pasien"
+              parent="menu_hms_safety_root" action="action_hms_complaint"
+              sequence="20"/>
+</odoo>

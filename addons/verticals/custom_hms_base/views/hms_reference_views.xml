@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_icd10_list" model="ir.ui.view">
+        <field name="name">hms.icd10.list</field>
+        <field name="model">hms.icd10</field>
+        <field name="arch" type="xml">
+            <list string="ICD-10" editable="bottom">
+                <field name="code"/>
+                <field name="name_id"/>
+                <field name="name_en"/>
+                <field name="chapter" optional="hide"/>
+                <field name="group_code" optional="hide"/>
+                <field name="is_billable"/>
+                <field name="is_notifiable"/>
+                <field name="is_icd10_im"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_icd10_form" model="ir.ui.view">
+        <field name="name">hms.icd10.form</field>
+        <field name="model">hms.icd10</field>
+        <field name="arch" type="xml">
+            <form string="ICD-10">
+                <sheet>
+                    <div class="oe_title"><h1><field name="code"/></h1></div>
+                    <group>
+                        <group string="Nama Diagnosis">
+                            <field name="name_id"/>
+                            <field name="name_en"/>
+                        </group>
+                        <group string="Pengelompokan">
+                            <field name="chapter"/>
+                            <field name="group_code"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Penandaan Klaim &amp; Pelaporan">
+                            <field name="is_billable"/>
+                            <field name="is_notifiable"/>
+                            <field name="is_icd10_im"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_icd10" model="ir.actions.act_window">
+        <field name="name">ICD-10 (Diagnosis)</field>
+        <field name="res_model">hms.icd10</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_icd10" name="ICD-10" parent="menu_hms_config_reference"
+              action="action_hms_icd10" sequence="10"/>
+
+    <record id="view_hms_icd9_list" model="ir.ui.view">
+        <field name="name">hms.icd9.list</field>
+        <field name="model">hms.icd9</field>
+        <field name="arch" type="xml">
+            <list string="ICD-9-CM" editable="bottom">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="is_surgical"/>
+                <field name="is_special_cmg"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_icd9_form" model="ir.ui.view">
+        <field name="name">hms.icd9.form</field>
+        <field name="model">hms.icd9</field>
+        <field name="arch" type="xml">
+            <form string="ICD-9-CM">
+                <sheet>
+                    <div class="oe_title"><h1><field name="code"/></h1></div>
+                    <group>
+                        <group string="Prosedur">
+                            <field name="name"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Penandaan Klaim">
+                            <field name="is_surgical"/>
+                            <field name="is_special_cmg"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_icd9" model="ir.actions.act_window">
+        <field name="name">ICD-9-CM (Prosedur)</field>
+        <field name="res_model">hms.icd9</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_icd9" name="ICD-9-CM" parent="menu_hms_config_reference"
+              action="action_hms_icd9" sequence="20"/>
+
+    <record id="action_hms_specialty" model="ir.actions.act_window">
+        <field name="name">Spesialisasi</field>
+        <field name="res_model">hms.specialty</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_specialty" name="Spesialisasi" parent="menu_hms_config_reference"
+              action="action_hms_specialty" sequence="30"/>
+
+    <record id="action_hms_region" model="ir.actions.act_window">
+        <field name="name">Wilayah</field>
+        <field name="res_model">hms.region</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_region" name="Wilayah" parent="menu_hms_config_reference"
+              action="action_hms_region" sequence="40"/>
+
+    <record id="action_hms_ingredient" model="ir.actions.act_window">
+        <field name="name">Zat Aktif</field>
+        <field name="res_model">hms.ingredient</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_ingredient" name="Zat Aktif" parent="menu_hms_config_reference"
+              action="action_hms_ingredient" sequence="50"/>
+
+    <record id="action_hms_frequency" model="ir.actions.act_window">
+        <field name="name">Frekuensi Pemberian</field>
+        <field name="res_model">hms.frequency</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_frequency" name="Frekuensi Pemberian" parent="menu_hms_config_reference"
+              action="action_hms_frequency" sequence="60"/>
+
+    <record id="action_hms_route" model="ir.actions.act_window">
+        <field name="name">Rute Pemberian</field>
+        <field name="res_model">hms.route</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_route" name="Rute Pemberian" parent="menu_hms_config_reference"
+              action="action_hms_route" sequence="70"/>
+
+    <record id="action_hms_dosage_form" model="ir.actions.act_window">
+        <field name="name">Bentuk Sediaan</field>
+        <field name="res_model">hms.dosage.form</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_dosage_form" name="Bentuk Sediaan" parent="menu_hms_config_reference"
+              action="action_hms_dosage_form" sequence="80"/>
+
+    <record id="action_hms_infection_flag" model="ir.actions.act_window">
+        <field name="name">Kewaspadaan Infeksi</field>
+        <field name="res_model">hms.infection.flag</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_infection_flag" name="Kewaspadaan Infeksi" parent="menu_hms_config_reference"
+              action="action_hms_infection_flag" sequence="90"/>
+</odoo>

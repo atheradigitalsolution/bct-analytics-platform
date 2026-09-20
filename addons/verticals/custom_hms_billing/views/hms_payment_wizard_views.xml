@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_payment_wizard_form" model="ir.ui.view">
+        <field name="name">hms.payment.wizard.form</field>
+        <field name="model">hms.payment.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Terima Pembayaran">
+                <group>
+                    <group>
+                        <field name="bill_id" readonly="1"/>
+                        <field name="patient_id" readonly="1"/>
+                        <field name="amount_due" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="deposit_available" readonly="1"/>
+                        <field name="use_deposit"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                </group>
+                <separator string="Metode Pembayaran"/>
+                <field name="line_ids">
+                    <list editable="bottom">
+                        <field name="method"/>
+                        <field name="amount"/>
+                        <field name="tendered"/>
+                        <field name="reference"/>
+                        <field name="bank" optional="hide"/>
+                        <field name="approval_code" optional="hide"/>
+                        <field name="journal_id"/>
+                        <field name="currency_id" column_invisible="1"/>
+                    </list>
+                </field>
+                <group class="oe_subtotal_footer">
+                    <field name="amount_entered"/>
+                    <field name="amount_remaining" class="oe_subtotal_footer_separator"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" string="Proses Pembayaran"
+                            class="btn-primary"/>
+                    <button string="Batal" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_payment_wizard" model="ir.actions.act_window">
+        <field name="name">Terima Pembayaran</field>
+        <field name="res_model">hms.payment.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

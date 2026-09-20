@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_medication_reconciliation_list" model="ir.ui.view">
+        <field name="name">hms.medication.reconciliation.list</field>
+        <field name="model">hms.medication.reconciliation</field>
+        <field name="arch" type="xml">
+            <list string="Rekonsiliasi Obat"
+                  decoration-warning="state in ('draft', 'in_progress')"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="performed_at"/>
+                <field name="patient_id"/>
+                <field name="encounter_id" optional="hide"/>
+                <field name="moment"/>
+                <field name="performed_by_id"/>
+                <field name="line_count" string="Obat"/>
+                <field name="discrepancy_count" string="Perubahan"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_medication_reconciliation_form" model="ir.ui.view">
+        <field name="name">hms.medication.reconciliation.form</field>
+        <field name="model">hms.medication.reconciliation</field>
+        <field name="arch" type="xml">
+            <form string="Rekonsiliasi Obat">
+                <header>
+                    <button name="action_start" type="object" string="Mulai"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_complete" type="object" string="Selesaikan"
+                            class="btn-primary" invisible="state not in ('draft', 'in_progress')"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('completed', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="encounter_id"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="moment"/>
+                            <field name="from_unit_id" invisible="moment != 'transfer'"/>
+                            <field name="to_unit_id" invisible="moment != 'transfer'"/>
+                        </group>
+                        <group>
+                            <field name="performed_by_id"/>
+                            <field name="performed_at"/>
+                            <field name="information_source"/>
+                            <field name="no_home_medication"/>
+                            <field name="discrepancy_count" readonly="1"/>
+                            <field name="completed_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <separator string="Obat Rumah dan Keputusannya"/>
+                    <field name="line_ids" invisible="no_home_medication">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="home_medicine_name"/>
+                            <field name="medicine_id" optional="show"/>
+                            <field name="dose"/>
+                            <field name="frequency"/>
+                            <field name="route_id" optional="hide"/>
+                            <field name="last_taken" optional="hide"/>
+                            <field name="decision"/>
+                            <field name="substitute_medicine_id"
+                                   readonly="decision != 'substitute'"/>
+                            <field name="reason"/>
+                            <field name="decided_by_id" optional="hide"/>
+                            <field name="is_discrepancy" optional="hide"/>
+                        </list>
+                    </field>
+                    <separator string="Catatan"/>
+                    <field name="note"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_medication_reconciliation_search" model="ir.ui.view">
+        <field name="name">hms.medication.reconciliation.search</field>
+        <field name="model">hms.medication.reconciliation</field>
+        <field name="arch" type="xml">
+            <search string="Cari Rekonsiliasi Obat">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="performed_by_id"/>
+                <filter name="filter_open" string="Belum Selesai"
+                        domain="[('state', 'in', ['draft', 'in_progress'])]"/>
+                <filter name="filter_discrepancy" string="Ada Perubahan Terapi"
+                        domain="[('discrepancy_count', '&gt;', 0)]"/>
+                <separator/>
+                <filter name="group_moment" string="Momen" context="{'group_by': 'moment'}"/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_medication_reconciliation" model="ir.actions.act_window">
+        <field name="name">Rekonsiliasi Obat</field>
+        <field name="res_model">hms.medication.reconciliation</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_medication_reconciliation_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada rekonsiliasi obat.</p>
+            <p>PKPO 4 mewajibkan rekonsiliasi saat pasien masuk, pindah unit, dan
+               sebelum pulang — dengan keputusan lanjut/stop/ganti/tunda beralasan
+               untuk setiap obat rumah.</p>
+        </field>
+    </record>
+    <menuitem id="menu_hms_medication_reconciliation" name="Rekonsiliasi Obat"
+              parent="custom_hms_base.menu_hms_pharmacy_root"
+              action="action_hms_medication_reconciliation" sequence="35"/>
+</odoo>

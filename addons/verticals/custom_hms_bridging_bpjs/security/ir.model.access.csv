@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hms_bpjs_config_admin,hms.bpjs.config/group_hms_admin,model_hms_bpjs_config,custom_hms_base.group_hms_admin,1,1,1,1
+access_hms_bpjs_config_staff,hms.bpjs.config/group_hms_staff,model_hms_bpjs_config,custom_hms_base.group_hms_staff,1,0,0,0
+access_hms_sep_admin,hms.sep/group_hms_admin,model_hms_sep,custom_hms_base.group_hms_admin,1,1,1,1
+access_hms_sep_registration_user,hms.sep/group_hms_registration_user,model_hms_sep,custom_hms_base.group_hms_registration_user,1,1,1,0
+access_hms_sep_staff,hms.sep/group_hms_staff,model_hms_sep,custom_hms_base.group_hms_staff,1,0,0,0

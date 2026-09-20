@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_qms_kiosk_form" model="ir.ui.view">
+        <field name="name">hms.qms.kiosk.form</field>
+        <field name="model">hms.qms.kiosk</field>
+        <field name="arch" type="xml">
+            <form string="Kiosk">
+                <header>
+                    <button name="action_regenerate_token" type="object"
+                            string="Ganti Token" confirm="Perangkat lama akan berhenti bekerja. Lanjutkan?"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="token" readonly="1"/>
+                            <field name="printer_id"/>
+                            <field name="allowed_ips"/>
+                        </group>
+                        <group>
+                            <field name="priority_enabled"/>
+                            <field name="booking_checkin_enabled"/>
+                        </group>
+                    </group>
+                    <field name="service_ids" widget="many2many_tags"/>
+                    <group>
+                        <field name="header_lines"/>
+                        <field name="footer_lines"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_qms_kiosk" model="ir.actions.act_window">
+        <field name="name">Kiosk</field>
+        <field name="res_model">hms.qms.kiosk</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_qms_kiosk" name="Kiosk" parent="menu_hms_qms_config"
+              action="action_hms_qms_kiosk" sequence="30"/>
+
+    <record id="view_hms_qms_display_form" model="ir.ui.view">
+        <field name="name">hms.qms.display.form</field>
+        <field name="model">hms.qms.display</field>
+        <field name="arch" type="xml">
+            <form string="Layar Antrian">
+                <header>
+                    <button name="action_regenerate_token" type="object" string="Ganti Token"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="token" readonly="1"/>
+                            <field name="layout"/>
+                            <field name="allowed_ips"/>
+                        </group>
+                        <group>
+                            <field name="audio_enabled"/>
+                            <field name="audio_from" widget="float_time"/>
+                            <field name="audio_to" widget="float_time"/>
+                            <field name="running_text"/>
+                        </group>
+                    </group>
+                    <field name="theme"/>
+                    <separator string="Zona Tampilan"/>
+                    <field name="zone_ids">
+                        <list editable="bottom">
+                            <field name="position"/>
+                            <field name="kind"/>
+                            <field name="title"/>
+                            <field name="service_ids" widget="many2many_tags"/>
+                            <field name="counter_ids" widget="many2many_tags"/>
+                            <field name="max_items"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_qms_display" model="ir.actions.act_window">
+        <field name="name">Layar Antrian</field>
+        <field name="res_model">hms.qms.display</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_qms_display" name="Layar TV" parent="menu_hms_qms_config"
+              action="action_hms_qms_display" sequence="40"/>
+
+    <record id="view_hms_qms_printer_form" model="ir.ui.view">
+        <field name="name">hms.qms.printer.form</field>
+        <field name="model">hms.qms.printer</field>
+        <field name="arch" type="xml">
+            <form string="Printer">
+                <header>
+                    <button name="action_test_print" type="object" string="Cetak Tes"
+                            class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="type"/>
+                            <field name="host" invisible="type != 'escpos_network'"
+                                   required="type == 'escpos_network'"/>
+                            <field name="port" invisible="type != 'escpos_network'"/>
+                            <field name="agent_id" invisible="type != 'escpos_usb_agent'"
+                                   required="type == 'escpos_usb_agent'"/>
+                        </group>
+                        <group>
+                            <field name="paper_width_mm"/>
+                            <field name="codepage"/>
+                            <field name="cut"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_qms_printer" model="ir.actions.act_window">
+        <field name="name">Printer Antrian</field>
+        <field name="res_model">hms.qms.printer</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_qms_printer" name="Printer" parent="menu_hms_qms_config"
+              action="action_hms_qms_printer" sequence="50"/>
+
+    <record id="view_hms_qms_print_agent_list" model="ir.ui.view">
+        <field name="name">hms.qms.print.agent.list</field>
+        <field name="model">hms.qms.print.agent</field>
+        <field name="arch" type="xml">
+            <list string="Agen Cetak" decoration-danger="not is_online">
+                <field name="name"/>
+                <field name="token"/>
+                <field name="last_seen"/>
+                <field name="version"/>
+                <field name="is_online" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_hms_qms_print_agent" model="ir.actions.act_window">
+        <field name="name">Agen Cetak</field>
+        <field name="res_model">hms.qms.print.agent</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_qms_print_agent" name="Agen Cetak" parent="menu_hms_qms_config"
+              action="action_hms_qms_print_agent" sequence="60"/>
+</odoo>

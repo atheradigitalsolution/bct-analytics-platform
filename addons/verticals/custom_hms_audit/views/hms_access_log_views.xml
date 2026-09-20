@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_access_log_list" model="ir.ui.view">
+        <field name="name">hms.access.log.list</field>
+        <field name="model">hms.access.log</field>
+        <field name="arch" type="xml">
+            <list string="Log Akses Rekam Medis" create="false" edit="false" delete="false"
+                  decoration-warning="not was_in_care_team">
+                <field name="access_date"/>
+                <field name="user_id"/>
+                <field name="patient_id"/>
+                <field name="model_name"/>
+                <field name="action"/>
+                <field name="hit_count" sum="Total"/>
+                <field name="first_at"/>
+                <field name="last_at"/>
+                <field name="was_in_care_team"/>
+                <field name="ip_address" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_access_log_search" model="ir.ui.view">
+        <field name="name">hms.access.log.search</field>
+        <field name="model">hms.access.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="user_id"/>
+                <field name="patient_id"/>
+                <field name="model_name"/>
+                <filter name="f_outside" string="Di luar tim perawatan"
+                        domain="[('was_in_care_team', '=', False)]"/>
+                <filter name="f_today" string="Hari ini"
+                        domain="[('access_date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <separator/>
+                <filter name="g_user" string="Pengguna" context="{'group_by': 'user_id'}"/>
+                <filter name="g_patient" string="Pasien" context="{'group_by': 'patient_id'}"/>
+                <filter name="g_date" string="Tanggal" context="{'group_by': 'access_date'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_access_log" model="ir.actions.act_window">
+        <field name="name">Log Akses Rekam Medis</field>
+        <field name="res_model">hms.access.log</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_hms_access_log_search"/>
+    </record>
+    <menuitem id="menu_hms_access_log" name="Log Akses Rekam Medis"
+              parent="custom_hms_base.menu_hms_config" action="action_hms_access_log" sequence="80"/>
+</odoo>

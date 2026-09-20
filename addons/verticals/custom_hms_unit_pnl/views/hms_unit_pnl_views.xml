@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_medical_fee_list" model="ir.ui.view">
+        <field name="name">hms.medical.fee.list</field>
+        <field name="model">hms.medical.fee</field>
+        <field name="arch" type="xml">
+            <list string="Jasa Medis" create="false">
+                <field name="date"/>
+                <field name="practitioner_id"/>
+                <field name="unit_id"/>
+                <field name="patient_id" optional="show"/>
+                <field name="bill_id" optional="hide"/>
+                <field name="gross_amount" sum="Komponen"/>
+                <field name="amount" sum="Hak Praktisi"/>
+                <field name="fee_rule_id" optional="hide"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_medical_fee_search" model="ir.ui.view">
+        <field name="name">hms.medical.fee.search</field>
+        <field name="model">hms.medical.fee</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="practitioner_id"/>
+                <field name="unit_id"/>
+                <filter name="f_accrued" string="Belum Dibayar" domain="[('state', '=', 'accrued')]"/>
+                <separator/>
+                <filter name="g_practitioner" string="Praktisi"
+                        context="{'group_by': 'practitioner_id'}"/>
+                <filter name="g_unit" string="Unit" context="{'group_by': 'unit_id'}"/>
+                <filter name="g_month" string="Bulan" context="{'group_by': 'date:month'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_medical_fee" model="ir.actions.act_window">
+        <field name="name">Jasa Medis</field>
+        <field name="res_model">hms.medical.fee</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_hms_medical_fee_search"/>
+        <field name="context">{'search_default_g_practitioner': 1}</field>
+    </record>
+    <menuitem id="menu_hms_medical_fee" name="Jasa Medis"
+              parent="custom_hms_base.menu_hms_reporting_root" action="action_hms_medical_fee"
+              sequence="30"/>
+
+    <record id="action_hms_medical_fee_rule" model="ir.actions.act_window">
+        <field name="name">Aturan Jasa Medis</field>
+        <field name="res_model">hms.medical.fee.rule</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_medical_fee_rule" name="Aturan Jasa Medis"
+              parent="custom_hms_base.menu_hms_config_tariff"
+              action="action_hms_medical_fee_rule" sequence="60"/>
+
+    <record id="view_hms_cost_allocation_form" model="ir.ui.view">
+        <field name="name">hms.cost.allocation.run.form</field>
+        <field name="model">hms.cost.allocation.run</field>
+        <field name="arch" type="xml">
+            <form string="Alokasi Overhead">
+                <header>
+                    <button name="action_run" type="object" string="Jalankan Alokasi"
+                            class="btn-primary"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="period" placeholder="2026-09"/>
+                            <field name="run_at" readonly="1"/>
+                            <field name="run_by_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="pool_ids" widget="many2many_tags"/>
+                    <field name="amount_by_pool" placeholder='{"Listrik": 50000000, "IT": 20000000}'/>
+                    <div class="alert alert-info" role="alert">
+                        Menjalankan ulang alokasi menghapus baris sebelumnya dan menghitung
+                        ulang — hasilnya pengganti, bukan tambahan. Baris yang dibuat hanya
+                        analytic line; buku besar tidak tersentuh.
+                    </div>
+                    <field name="analytic_line_ids" readonly="1">
+                        <list>
+                            <field name="date"/>
+                            <field name="account_id"/>
+                            <field name="hms_cost_pool_id"/>
+                            <field name="name"/>
+                            <field name="amount" sum="Total"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_cost_allocation" model="ir.actions.act_window">
+        <field name="name">Alokasi Overhead</field>
+        <field name="res_model">hms.cost.allocation.run</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_cost_allocation" name="Alokasi Overhead"
+              parent="custom_hms_base.menu_hms_reporting_root"
+              action="action_hms_cost_allocation" sequence="40"/>
+
+    <record id="action_hms_cost_pool" model="ir.actions.act_window">
+        <field name="name">Pool Biaya Overhead</field>
+        <field name="res_model">hms.cost.pool</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_cost_pool" name="Pool Biaya"
+              parent="custom_hms_base.menu_hms_config_tariff" action="action_hms_cost_pool"
+              sequence="70"/>
+
+    <record id="view_hms_unit_form_analytic" model="ir.ui.view">
+        <field name="name">hms.unit.form.analytic</field>
+        <field name="model">hms.unit</field>
+        <field name="inherit_id" ref="custom_hms_base.view_hms_unit_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='is_revenue_unit']" position="before">
+                <field name="analytic_account_id"/>
+                <field name="cost_center_code"/>
+                <field name="overhead_pool"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

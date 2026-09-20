@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_wristband_document">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="enc">
+                <div class="page" style="font-family: Arial, sans-serif;">
+                    <!-- Printed on the flat middle of the band; the ends wrap and
+                         must stay empty or the text disappears around the wrist. -->
+                    <table style="width: 100%; font-size: 7pt; margin-left: 60mm;">
+                        <tr>
+                            <td style="width: 45%;">
+                                <div style="font-size: 9pt; font-weight: bold;">
+                                    <span t-field="enc.patient_id.name"/>
+                                </div>
+                                <div>
+                                    <span t-field="enc.patient_id.mrn"/> ·
+                                    <span t-field="enc.patient_id.birth_date"
+                                          t-options='{"format": "dd/MM/yyyy"}'/> ·
+                                    <span t-esc="dict(enc.patient_id._fields['gender'].selection).get(enc.patient_id.gender, '')"/>
+                                </div>
+                                <div t-if="enc.patient_id.has_allergy"
+                                     style="font-weight: bold; color: #b00;">
+                                    ALERGI:
+                                    <span t-esc="', '.join(enc.patient_id.allergy_ids.mapped('substance')[:3])"/>
+                                </div>
+                            </td>
+                            <td style="width: 30%; text-align: center;">
+                                <img t-att-src="'/report/barcode/Code128/%s?width=340&amp;height=60' % enc.patient_id.mrn"
+                                     style="width: 34mm; height: 6mm;"/>
+                            </td>
+                            <td style="width: 25%; font-size: 6pt;">
+                                <div><span t-field="enc.name"/></div>
+                                <div><span t-field="enc.unit_id.name"/></div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_registration_sheet_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="enc">
+                <t t-set="settings" t-value="enc.env['hms.settings'].get_settings()"/>
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h3 style="text-align: center; margin-bottom: 0;">LEMBAR REGISTRASI PASIEN</h3>
+                        <p style="text-align: center; margin-top: 0;">
+                            <span t-esc="settings.hospital_name"/>
+                        </p>
+                        <table class="table table-sm" style="font-size: 10pt;">
+                            <tr>
+                                <td style="width: 25%;"><strong>No. Kunjungan</strong></td>
+                                <td style="width: 25%;"><span t-field="enc.name"/></td>
+                                <td style="width: 25%;"><strong>Tanggal/Jam</strong></td>
+                                <td style="width: 25%;"><span t-field="enc.arrival_at"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>No. Rekam Medis</strong></td>
+                                <td><span t-field="enc.patient_id.mrn"/></td>
+                                <td><strong>Jenis Kunjungan</strong></td>
+                                <td><span t-esc="dict(enc._fields['type'].selection).get(enc.type)"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Nama Pasien</strong></td>
+                                <td><span t-field="enc.patient_id.name"/></td>
+                                <td><strong>Tanggal Lahir</strong></td>
+                                <td><span t-field="enc.patient_id.birth_date"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Unit/Poli</strong></td>
+                                <td><span t-field="enc.unit_id.name"/></td>
+                                <td><strong>Dokter</strong></td>
+                                <td><span t-field="enc.practitioner_id"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Penjamin</strong></td>
+                                <td><span t-field="enc.payer_id.name"/></td>
+                                <td><strong>No. SEP</strong></td>
+                                <td><span t-field="enc.sep_no"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Keluhan Utama</strong></td>
+                                <td colspan="3"><span t-field="enc.chief_complaint"/></td>
+                            </tr>
+                        </table>
+                        <div t-if="enc.patient_id.has_allergy" class="alert alert-danger"
+                             style="font-size: 10pt;">
+                            <strong>ALERGI:</strong>
+                            <span t-esc="', '.join(enc.patient_id.allergy_ids.mapped('substance'))"/>
+                        </div>
+                        <table style="width: 100%; margin-top: 15mm; font-size: 10pt;">
+                            <tr>
+                                <td style="width: 50%; text-align: center;">
+                                    Pasien/Keluarga<br/><br/><br/>(________________)
+                                </td>
+                                <td style="width: 50%; text-align: center;">
+                                    Petugas Pendaftaran<br/><br/><br/>
+                                    (<span t-esc="enc.create_uid.name"/>)
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

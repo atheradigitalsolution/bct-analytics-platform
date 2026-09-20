@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- The Indonesian ward class ladder. `rank` drives upgrade/downgrade
+             arithmetic, so the numbers must stay ordered even if a hospital
+             renames the classes. -->
+        <record id="care_class_vvip" model="hms.care.class">
+            <field name="code">VVIP</field><field name="name">VVIP</field>
+            <field name="sequence">10</field><field name="rank">60</field>
+        </record>
+        <record id="care_class_vip" model="hms.care.class">
+            <field name="code">VIP</field><field name="name">VIP</field>
+            <field name="sequence">20</field><field name="rank">50</field>
+        </record>
+        <record id="care_class_1" model="hms.care.class">
+            <field name="code">I</field><field name="name">Kelas I</field>
+            <field name="sequence">30</field><field name="rank">40</field>
+        </record>
+        <record id="care_class_2" model="hms.care.class">
+            <field name="code">II</field><field name="name">Kelas II</field>
+            <field name="sequence">40</field><field name="rank">30</field>
+        </record>
+        <record id="care_class_3" model="hms.care.class">
+            <field name="code">III</field><field name="name">Kelas III</field>
+            <field name="sequence">50</field><field name="rank">20</field>
+        </record>
+        <record id="care_class_icu" model="hms.care.class">
+            <field name="code">ICU</field><field name="name">Intensif (ICU/HCU)</field>
+            <field name="sequence">60</field><field name="rank">70</field>
+            <field name="is_intensive" eval="True"/>
+        </record>
+        <record id="care_class_outpatient" model="hms.care.class">
+            <field name="code">RJ</field><field name="name">Rawat Jalan</field>
+            <field name="sequence">90</field><field name="rank">0</field>
+        </record>
+
+        <!-- Tariff categories. `report_section` is what groups a bill and the
+             unit P&L; `charge_on` decides when the charge lands. -->
+        <record id="tariff_cat_admin" model="hms.tariff.category">
+            <field name="code">ADM</field><field name="name">Administrasi</field>
+            <field name="report_section">administration</field>
+            <field name="charge_on">ordered</field><field name="sequence">10</field>
+        </record>
+        <record id="tariff_cat_consult" model="hms.tariff.category">
+            <field name="code">CONSULT</field><field name="name">Konsultasi &amp; Visite</field>
+            <field name="report_section">consultation</field><field name="sequence">20</field>
+        </record>
+        <record id="tariff_cat_procedure" model="hms.tariff.category">
+            <field name="code">TIND</field><field name="name">Tindakan Medis</field>
+            <field name="report_section">procedure</field><field name="sequence">30</field>
+        </record>
+        <record id="tariff_cat_nursing" model="hms.tariff.category">
+            <field name="code">ASKEP</field><field name="name">Asuhan Keperawatan</field>
+            <field name="report_section">nursing</field><field name="sequence">40</field>
+        </record>
+        <record id="tariff_cat_room" model="hms.tariff.category">
+            <field name="code">KAMAR</field><field name="name">Akomodasi Kamar</field>
+            <field name="report_section">room</field><field name="sequence">50</field>
+        </record>
+        <record id="tariff_cat_medicine" model="hms.tariff.category">
+            <field name="code">OBAT</field><field name="name">Obat &amp; BHP</field>
+            <field name="report_section">medicine</field><field name="sequence">60</field>
+        </record>
+        <record id="tariff_cat_lab" model="hms.tariff.category">
+            <field name="code">LAB</field><field name="name">Laboratorium</field>
+            <field name="report_section">lab</field><field name="sequence">70</field>
+        </record>
+        <record id="tariff_cat_rad" model="hms.tariff.category">
+            <field name="code">RAD</field><field name="name">Radiologi</field>
+            <field name="report_section">radiology</field><field name="sequence">80</field>
+        </record>
+
+        <!-- The self-pay guarantor always exists; registration falls back to it. -->
+        <record id="payer_self" model="hms.payer">
+            <field name="code">UMUM</field><field name="name">Umum (Bayar Sendiri)</field>
+            <field name="type">self</field><field name="sequence">1</field>
+        </record>
+    </data>
+</odoo>

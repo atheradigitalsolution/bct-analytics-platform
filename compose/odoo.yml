@@ -208,6 +208,41 @@ services:
       ODOO_PROXY_MODE: ${ODOO_PROXY_MODE:-True}
       ODOO_HTTP_PORT: ${ODOO_HTTP_PORT:-8069}
       ODOO_LONGPOLLING_PORT: ${ODOO_LONGPOLLING_PORT:-8072}
+
+      # --- SIMRS (custom_hms_queue) ------------------------------------
+      # The outbox publishes queue/bed/result events to Redis so the SIMRS
+      # frontline screens update without polling. Its own DB index keeps the
+      # channels clear of anything else on this Redis instance, and the client
+      # is a socket implementation inside the module — the shared Odoo image
+      # deliberately carries no `redis` package.
+      HMS_REDIS_HOST: ${REDIS_HOST:-redis}
+      HMS_REDIS_PORT: ${REDIS_PORT:-6379}
+      HMS_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      HMS_REDIS_DB: ${HMS_REDIS_DB:-3}
+
+      # SIMRS REST API (custom_hms_api) and the bridging clients. Secrets stay
+      # in the environment; the settings screens only report whether each one
+      # is present.
+      HMS_JWT_SECRET: ${HMS_JWT_SECRET:-}
+      HMS_JWT_ACCESS_TTL: ${HMS_JWT_ACCESS_TTL:-900}
+      HMS_JWT_REFRESH_TTL: ${HMS_JWT_REFRESH_TTL:-28800}
+      # Sandi akun peran demo. Diambil saat penyemaian; nilai bawaan di kode
+      # sumber sengaja tidak dipakai karena halaman login demo menghadap publik.
+      SIMRS_DEMO_PASSWORD: ${SIMRS_DEMO_PASSWORD:-}
+      BPJS_MODE: ${BPJS_MODE:-mock}
+      BPJS_BASE_URL: ${BPJS_BASE_URL:-http://simrs-mock:4010/bpjs}
+      BPJS_ANTROL_BASE_URL: ${BPJS_ANTROL_BASE_URL:-http://simrs-mock:4010/bpjs/antrean}
+      BPJS_CONS_ID: ${BPJS_CONS_ID:-}
+      BPJS_SECRET_KEY: ${BPJS_SECRET_KEY:-}
+      BPJS_USER_KEY_VCLAIM: ${BPJS_USER_KEY_VCLAIM:-}
+      BPJS_USER_KEY_ANTROL: ${BPJS_USER_KEY_ANTROL:-}
+      BPJS_PPK_CODE: ${BPJS_PPK_CODE:-0000000000}
+      SATUSEHAT_MODE: ${SATUSEHAT_MODE:-mock}
+      SATUSEHAT_BASE_URL: ${SATUSEHAT_BASE_URL:-http://simrs-mock:4010/satusehat}
+      SATUSEHAT_AUTH_URL: ${SATUSEHAT_AUTH_URL:-http://simrs-mock:4010/satusehat/oauth2/v1/accesstoken}
+      SATUSEHAT_CLIENT_ID: ${SATUSEHAT_CLIENT_ID:-}
+      SATUSEHAT_CLIENT_SECRET: ${SATUSEHAT_CLIENT_SECRET:-}
+      SATUSEHAT_ORG_ID: ${SATUSEHAT_ORG_ID:-demo-org}
       ODOO_WORKERS: ${ODOO_WORKERS:-2}
       ODOO_MAX_CRON_THREADS: ${ODOO_MAX_CRON_THREADS:-1}
       ODOO_LIMIT_MEMORY_SOFT: ${ODOO_LIMIT_MEMORY_SOFT:-1073741824}
@@ -317,6 +352,13 @@ services:
           # expomedia — tenant demo/proposal (PT Expomedia Indo Karya, jasa event),
           # ditambahkan 2026-09-11. Literal dengan alasan yang sama seperti ndi.
           - expomedia.${ATHERA_DOMAIN:-athera.localhost}
+          - simrs_demo.${ATHERA_DOMAIN:-athera.localhost}
+          # athera_lgx — vertical logistik (custom_lgx_*), ditambahkan 2026-09-19.
+          # Literal dengan alasan yang sama seperti ndi dan expomedia. Tanpa alias
+          # ini login-gateway memanggil http://athera_lgx.athera-digital.com:8069,
+          # DNS embedded Docker tidak menemukannya, dan password yang BENAR dijawab
+          # upstream_unavailable — persis yang terukur sebelum baris ini ada.
+          - athera_lgx.${ATHERA_DOMAIN:-athera.localhost}
 
 # --- Networks --------------------------------------------------------------
 # One explicit network. Named `bct` inside the file; the actual docker network

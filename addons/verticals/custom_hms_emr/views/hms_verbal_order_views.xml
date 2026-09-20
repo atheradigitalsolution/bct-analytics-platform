@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_verbal_order_list" model="ir.ui.view">
+        <field name="name">hms.verbal.order.list</field>
+        <field name="model">hms.verbal.order</field>
+        <field name="arch" type="xml">
+            <list string="Perintah Lisan (TBaK)"
+                  decoration-danger="state == 'expired'"
+                  decoration-warning="state == 'spoken'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="spoken_at"/>
+                <field name="patient_id"/>
+                <field name="prescriber_id"/>
+                <field name="receiver_id"/>
+                <field name="medium"/>
+                <field name="read_back_at" optional="show"/>
+                <field name="confirm_due_at" optional="show"/>
+                <field name="confirmed_at" optional="hide"/>
+                <field name="state" widget="badge"/>
+                <button name="action_read_back" type="object" string="Baca Ulang"
+                        icon="fa-volume-control-phone" invisible="state != 'spoken'"/>
+                <button name="action_confirm" type="object" string="Konfirmasi"
+                        icon="fa-check" invisible="state not in ('read_back', 'expired')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_verbal_order_form" model="ir.ui.view">
+        <field name="name">hms.verbal.order.form</field>
+        <field name="model">hms.verbal.order</field>
+        <field name="arch" type="xml">
+            <form string="Perintah Lisan / Telepon">
+                <header>
+                    <button name="action_read_back" type="object" string="Catat Baca Ulang"
+                            class="btn-primary" invisible="state != 'spoken'"/>
+                    <button name="action_confirm" type="object"
+                            string="Konfirmasi Pemberi Perintah" class="btn-primary"
+                            invisible="state not in ('read_back', 'expired')"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('confirmed', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="spoken,read_back,confirmed"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Lewat batas tanda tangan"
+                            bg_color="text-bg-danger" invisible="not is_overdue"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Pihak">
+                            <field name="encounter_id"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="prescriber_id"/>
+                            <field name="receiver_id"/>
+                            <field name="medium"/>
+                        </group>
+                        <group string="Jejak TBaK">
+                            <field name="spoken_at"/>
+                            <field name="read_back_at"/>
+                            <field name="read_back_by_id"/>
+                            <field name="confirm_hours_applied"/>
+                            <field name="confirm_due_at"/>
+                            <field name="confirmed_at"/>
+                            <field name="confirmed_by_id"/>
+                            <field name="is_overdue"/>
+                        </group>
+                    </group>
+                    <separator string="Isi Instruksi (ditulis penerima)"/>
+                    <field name="content"
+                           placeholder="Tulis instruksi persis seperti yang diucapkan."/>
+                    <group>
+                        <field name="lasa_spelled"/>
+                        <field name="cancel_reason" invisible="state != 'cancelled'"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_verbal_order_search" model="ir.ui.view">
+        <field name="name">hms.verbal.order.search</field>
+        <field name="model">hms.verbal.order</field>
+        <field name="arch" type="xml">
+            <search string="Cari Perintah Lisan">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="prescriber_id"/>
+                <filter name="filter_unsigned" string="Belum Ditandatangani"
+                        domain="[('state', 'in', ['spoken', 'read_back', 'expired'])]"/>
+                <filter name="filter_expired" string="Lewat Batas"
+                        domain="[('state', '=', 'expired')]"/>
+                <separator/>
+                <filter name="group_prescriber" string="Pemberi Perintah"
+                        context="{'group_by': 'prescriber_id'}"/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_verbal_order" model="ir.actions.act_window">
+        <field name="name">Perintah Lisan (TBaK)</field>
+        <field name="res_model">hms.verbal.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_verbal_order_search"/>
+    </record>
+    <menuitem id="menu_hms_verbal_order" name="Perintah Lisan (TBaK)"
+              parent="custom_hms_base.menu_hms_clinical"
+              action="action_hms_verbal_order" sequence="50"/>
+</odoo>

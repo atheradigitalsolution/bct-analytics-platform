@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_discount_wizard_form" model="ir.ui.view">
+        <field name="name">hms.discount.wizard.form</field>
+        <field name="model">hms.discount.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Diskon Tagihan">
+                <group>
+                    <field name="bill_id" readonly="1"/>
+                    <field name="amount_total" readonly="1"/>
+                    <field name="percent"/>
+                    <field name="threshold" readonly="1"/>
+                    <field name="needs_authorization" invisible="1"/>
+                    <field name="has_approval" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                </group>
+                <field name="reason" placeholder="Alasan pemberian diskon"/>
+                <div class="alert alert-warning" role="alert"
+                     invisible="not needs_authorization or has_approval">
+                    Diskon melewati batas kewenangan kasir. Ajukan otorisasi; supervisor
+                    kasir yang menyetujui harus orang yang berbeda.
+                </div>
+                <footer>
+                    <button name="action_apply" type="object" string="Terapkan Diskon"
+                            class="btn-primary"
+                            invisible="needs_authorization and not has_approval"/>
+                    <button name="action_request" type="object" string="Minta Otorisasi"
+                            class="btn-primary"
+                            invisible="not needs_authorization or has_approval"/>
+                    <button string="Batal" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_discount_wizard" model="ir.actions.act_window">
+        <field name="name">Diskon Tagihan</field>
+        <field name="res_model">hms.discount.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

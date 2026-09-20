@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_hms_cashier_session" model="ir.sequence">
+            <field name="name">Nomor Shift Kasir</field>
+            <field name="code">hms.cashier.session</field>
+            <field name="prefix">SHF-%(year)s%(month)s%(day)s-</field>
+            <field name="padding">3</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+    </data>
+
+    <record id="report_hms_cashier_closing" model="ir.actions.report">
+        <field name="name">Laporan Closing Shift</field>
+        <field name="model">hms.cashier.session</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_cashier.report_closing_document</field>
+        <field name="report_file">custom_hms_cashier.report_closing_document</field>
+        <field name="binding_model_id" ref="model_hms_cashier_session"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_closing_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="session">
+                <t t-set="summary" t-value="session.closing_summary()"/>
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 10pt;">
+                        <h4 style="text-align: center;">LAPORAN CLOSING SHIFT KASIR</h4>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td style="width: 20%;"><strong>No. Shift</strong></td>
+                                <td style="width: 30%;"><span t-field="session.name"/></td>
+                                <td style="width: 20%;"><strong>Kasir</strong></td>
+                                <td style="width: 30%;"><span t-field="session.user_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Loket</strong></td>
+                                <td><span t-field="session.counter_id.name"/></td>
+                                <td><strong>Periode</strong></td>
+                                <td>
+                                    <span t-field="session.opened_at"/> —
+                                    <span t-field="session.closed_at"/>
+                                </td>
+                            </tr>
+                        </table>
+                        <h6>Rekap per Metode Pembayaran</h6>
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Metode</th>
+                                    <th class="text-end">Seharusnya</th>
+                                    <th class="text-end">Hitungan Fisik</th>
+                                    <th class="text-end">Selisih</th>
+                                    <th>Keterangan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="summary['by_method']" t-as="row">
+                                    <td><span t-esc="row['method']"/></td>
+                                    <td class="text-end"><span t-esc="row['expected']"
+                                        t-options='{"widget": "monetary", "display_currency": session.currency_id}'/></td>
+                                    <td class="text-end"><span t-esc="row['counted']"
+                                        t-options='{"widget": "monetary", "display_currency": session.currency_id}'/></td>
+                                    <td class="text-end"
+                                        t-attf-style="#{'color:#b00;font-weight:bold;' if row['difference'] else ''}">
+                                        <span t-esc="row['difference']"
+                                            t-options='{"widget": "monetary", "display_currency": session.currency_id}'/>
+                                    </td>
+                                    <td><span t-esc="row['note']"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <h6>Rekap per Penjamin</h6>
+                        <table class="table table-sm table-bordered">
+                            <tbody>
+                                <tr t-foreach="summary['by_payer'].items()" t-as="row">
+                                    <td><span t-esc="row[0]"/></td>
+                                    <td class="text-end"><span t-esc="row[1]"
+                                        t-options='{"widget": "monetary", "display_currency": session.currency_id}'/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p>
+                            <strong>Jumlah transaksi:</strong> <span t-esc="summary['transaction_count']"/>
+                            &#160;·&#160;
+                            <strong>Void:</strong> <span t-esc="summary['void_count']"/>
+                        </p>
+                        <table style="width: 100%; margin-top: 15mm;">
+                            <tr>
+                                <td style="width: 50%; text-align: center;">
+                                    Kasir<br/><br/><br/>
+                                    (<span t-field="session.user_id.name"/>)
+                                </td>
+                                <td style="width: 50%; text-align: center;">
+                                    Supervisor Kasir<br/><br/><br/>(________________)
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

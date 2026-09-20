@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_hms_qms_root" name="Antrian" parent="custom_hms_base.menu_hms_root"
+              sequence="15" groups="custom_hms_base.group_hms_staff"/>
+    <menuitem id="menu_hms_qms_config" name="Konfigurasi Antrian"
+              parent="custom_hms_base.menu_hms_config" sequence="40"/>
+
+    <record id="view_hms_qms_service_list" model="ir.ui.view">
+        <field name="name">hms.qms.service.list</field>
+        <field name="model">hms.qms.service</field>
+        <field name="arch" type="xml">
+            <list string="Layanan Antrian">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="prefix"/>
+                <field name="unit_id"/>
+                <field name="waiting_count"/>
+                <field name="serving_ticket_id"/>
+                <field name="avg_service_seconds"/>
+                <field name="sla_minutes"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_qms_service_form" model="ir.ui.view">
+        <field name="name">hms.qms.service.form</field>
+        <field name="model">hms.qms.service</field>
+        <field name="arch" type="xml">
+            <form string="Layanan Antrian">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group string="Identitas">
+                            <field name="code"/>
+                            <field name="kind"/>
+                            <field name="unit_id"/>
+                            <field name="per_practitioner"/>
+                            <field name="practitioner_id" invisible="not per_practitioner"/>
+                            <field name="display_label"/>
+                            <field name="color" widget="color_picker"/>
+                        </group>
+                        <group string="Penomoran &amp; Prioritas">
+                            <field name="prefix"/>
+                            <field name="priority_prefix"/>
+                            <field name="priority_interleave"/>
+                            <field name="daily_reset"/>
+                            <field name="sla_minutes"/>
+                            <field name="avg_service_seconds" readonly="1"/>
+                        </group>
+                        <group string="Alur">
+                            <field name="next_service_id"/>
+                            <field name="antrol_task_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_qms_service" model="ir.actions.act_window">
+        <field name="name">Layanan Antrian</field>
+        <field name="res_model">hms.qms.service</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_qms_service" name="Layanan Antrian" parent="menu_hms_qms_config"
+              action="action_hms_qms_service" sequence="10"/>
+
+    <record id="view_hms_qms_counter_list" model="ir.ui.view">
+        <field name="name">hms.qms.counter.list</field>
+        <field name="model">hms.qms.counter</field>
+        <field name="arch" type="xml">
+            <list string="Loket" decoration-success="state == 'open'"
+                  decoration-warning="state == 'paused'" decoration-muted="state == 'closed'">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="location"/>
+                <field name="service_ids" widget="many2many_tags"/>
+                <field name="state" widget="badge"/>
+                <field name="current_user_id"/>
+                <field name="current_ticket_id"/>
+                <field name="served_today"/>
+                <button name="action_open" type="object" string="Buka" icon="fa-play"
+                        invisible="state == 'open'"/>
+                <button name="action_call_next" type="object" string="Panggil Berikutnya"
+                        icon="fa-bullhorn" class="btn-primary" invisible="state != 'open'"/>
+                <button name="action_recall" type="object" string="Panggil Ulang" icon="fa-repeat"
+                        invisible="not current_ticket_id"/>
+                <button name="action_finish" type="object" string="Selesai" icon="fa-check"
+                        invisible="not current_ticket_id"/>
+                <button name="action_close" type="object" string="Tutup" icon="fa-stop"
+                        invisible="state == 'closed'"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_hms_qms_counter" model="ir.actions.act_window">
+        <field name="name">Loket Antrian</field>
+        <field name="res_model">hms.qms.counter</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_qms_counter" name="Loket Pemanggil" parent="menu_hms_qms_root"
+              action="action_hms_qms_counter" sequence="10"/>
+    <menuitem id="menu_hms_qms_counter_cfg" name="Loket" parent="menu_hms_qms_config"
+              action="action_hms_qms_counter" sequence="20"/>
+</odoo>

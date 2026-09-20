@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            F-EMR-07: a clinician sees the records of patients they are involved
+            with, not the whole hospital. "Involved" is read as: the encounter
+            is in a unit where this practitioner works, or they are the DPJP,
+            or they wrote the note themselves.
+
+            Deliberately unit-based rather than strictly care-team-based. A
+            ward doctor covering for a colleague must be able to open the chart
+            of the patient in front of them; a rule that says otherwise gets
+            worked around by sharing logins, which is far worse. Every access
+            outside the care team is still written to hms.access.log and
+            flagged there for review.
+        -->
+        <record id="rule_hms_clinical_note_involved" model="ir.rule">
+            <field name="name">CPPT: hanya pasien yang dirawat pengguna</field>
+            <field name="model_id" ref="model_hms_clinical_note"/>
+            <field name="domain_force">['|', '|',
+                ('author_id.user_id', '=', user.id),
+                ('encounter_id.practitioner_id.user_id', '=', user.id),
+                ('encounter_id.unit_id.practitioner_ids.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_emr_clinician'))]"/>
+        </record>
+        <record id="rule_hms_clinical_note_full" model="ir.rule">
+            <field name="name">CPPT: akses rekam medis penuh</field>
+            <field name="model_id" ref="model_hms_clinical_note"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_emr_full'))]"/>
+        </record>
+
+        <record id="rule_hms_observation_involved" model="ir.rule">
+            <field name="name">Observasi: hanya pasien yang dirawat pengguna</field>
+            <field name="model_id" ref="model_hms_observation"/>
+            <field name="domain_force">['|',
+                ('encounter_id.practitioner_id.user_id', '=', user.id),
+                ('encounter_id.unit_id.practitioner_ids.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_emr_clinician'))]"/>
+        </record>
+        <record id="rule_hms_observation_full" model="ir.rule">
+            <field name="name">Observasi: akses penuh</field>
+            <field name="model_id" ref="model_hms_observation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_emr_full')),
+                                        (4, ref('custom_hms_base.group_hms_nurse'))]"/>
+        </record>
+    </data>
+</odoo>

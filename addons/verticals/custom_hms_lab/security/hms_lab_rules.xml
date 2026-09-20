@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Mengikuti pola F-EMR-07 di custom_hms_emr/security/hms_emr_rules.xml:
+            "terlibat" dibaca sebagai DPJP kunjungan, atau praktisi yang bekerja
+            di unit tempat kunjungan itu berlangsung. Sengaja berbasis unit,
+            bukan care-team ketat: dokter jaga yang menggantikan sejawat harus
+            bisa menutup lingkaran nilai kritis pasien di depannya, dan aturan
+            yang melarangnya diakali dengan berbagi login — jauh lebih buruk.
+
+            BERCAKUPAN perm_write SAJA. Klinisi sudah boleh MEMBACA seluruh
+            hasil lab sejak awal (layar hasil penunjang, resume medis), dan
+            mempersempit pembacaan di sini akan mematikan fitur yang sedang
+            jalan sambil memperbaiki yang lain. Yang baru dibuka — dan karena
+            itu yang perlu dipersempit — hanyalah hak tulis.
+        -->
+        <record id="rule_hms_lab_result_ack_involved" model="ir.rule">
+            <field name="name">Hasil lab: klinisi hanya menulis pada pasien yang dirawatnya</field>
+            <field name="model_id" ref="model_hms_lab_result"/>
+            <field name="domain_force">['|',
+                ('encounter_id.practitioner_id.user_id', '=', user.id),
+                ('encounter_id.unit_id.practitioner_ids.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_emr_clinician'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <!--
+            Administrator SIMRS menyiratkan group_hms_emr_clinician lewat
+            group_hms_emr_full, jadi tanpa baris ini aturan di atas akan ikut
+            mengunci admin. Aturan per-grup di-OR-kan: yang ini mengembalikan
+            akses penuh bagi peran yang memang menjalankan alur hasil lab.
+        -->
+        <record id="rule_hms_lab_result_diagnostic_all" model="ir.rule">
+            <field name="name">Hasil lab: petugas penunjang &amp; admin menulis semua</field>
+            <field name="model_id" ref="model_hms_lab_result"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_diagnostic_user')),
+                                        (4, ref('custom_hms_base.group_hms_admin'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+    </data>
+</odoo>

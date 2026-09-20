@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_practitioner_list" model="ir.ui.view">
+        <field name="name">hms.practitioner.list</field>
+        <field name="model">hms.practitioner</field>
+        <field name="arch" type="xml">
+            <list string="Praktisi" decoration-danger="license_state == 'expired'"
+                  decoration-warning="license_state == 'expiring'">
+                <field name="name"/>
+                <field name="type"/>
+                <field name="specialty_id"/>
+                <field name="primary_unit_id"/>
+                <field name="employment_type"/>
+                <field name="str_valid_to"/>
+                <field name="license_state" widget="badge"
+                       decoration-danger="license_state == 'expired'"
+                       decoration-warning="license_state == 'expiring'"
+                       decoration-success="license_state == 'ok'"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_practitioner_form" model="ir.ui.view">
+        <field name="name">hms.practitioner.form</field>
+        <field name="model">hms.practitioner</field>
+        <field name="arch" type="xml">
+            <form string="Praktisi">
+                <sheet>
+                    <field name="photo" widget="image" class="oe_avatar"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="title_prefix" placeholder="dr." class="oe_inline"/>
+                            <field name="name" placeholder="Nama" class="oe_inline"/>
+                            <field name="title_suffix" placeholder="Sp.PD" class="oe_inline"/>
+                        </h1>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="license_state != 'expired'">
+                        Izin praktik kedaluwarsa. Jadwal praktik tidak boleh dibuka sampai izin diperbarui.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="license_state != 'expiring'">
+                        Izin praktik akan berakhir dalam <field name="license_days_left" readonly="1" class="oe_inline"/> hari.
+                    </div>
+                    <group>
+                        <group string="Profesi">
+                            <field name="type"/>
+                            <field name="specialty_id" invisible="type not in ('doctor', 'dentist')"/>
+                            <field name="subspecialty_id" invisible="type not in ('doctor', 'dentist')"/>
+                            <field name="employment_type"/>
+                            <field name="unit_ids" widget="many2many_tags"/>
+                            <field name="primary_unit_id"/>
+                            <field name="state"/>
+                        </group>
+                        <group string="Identitas &amp; Sistem">
+                            <field name="nik"/>
+                            <field name="gender"/>
+                            <field name="birth_date"/>
+                            <field name="phone"/>
+                            <field name="email"/>
+                            <field name="employee_id"/>
+                            <field name="user_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Izin Praktik" name="license">
+                            <group>
+                                <field name="str_no"/>
+                                <field name="str_valid_to"/>
+                                <field name="license_state" readonly="1"/>
+                            </group>
+                            <field name="sip_ids">
+                                <list editable="bottom">
+                                    <field name="type"/>
+                                    <field name="number"/>
+                                    <field name="issuer"/>
+                                    <field name="facility"/>
+                                    <field name="valid_from"/>
+                                    <field name="valid_to"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Pajak &amp; Jasa Medis" name="tax">
+                            <group>
+                                <group string="Perpajakan">
+                                    <field name="tax_status"/>
+                                    <field name="npwp"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Kewenangan Klinis" name="privilege">
+                            <group>
+                                <group>
+                                    <field name="can_prescribe"/>
+                                    <field name="can_order_lab"/>
+                                    <field name="can_order_rad"/>
+                                    <field name="can_be_dpjp"/>
+                                </group>
+                                <group>
+                                    <field name="can_operate"/>
+                                    <field name="can_anesthetize"/>
+                                    <field name="accepts_bpjs"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Keperawatan" name="nursing"
+                              invisible="type not in ('nurse', 'midwife')">
+                            <group>
+                                <group>
+                                    <field name="nurse_level"/>
+                                    <field name="nurse_role"/>
+                                </group>
+                                <group>
+                                    <field name="can_double_check_high_alert"/>
+                                    <field name="can_administer_iv"/>
+                                    <field name="can_take_blood_sample"/>
+                                </group>
+                            </group>
+                            <field name="competency_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="cert_no"/>
+                                    <field name="issuer"/>
+                                    <field name="valid_to"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Praktik &amp; Tarif" name="practice">
+                            <group>
+                                <group>
+                                    <field name="default_consult_tariff_id"/>
+                                    <field name="max_patients_per_session"/>
+                                    <field name="slot_minutes_default"/>
+                                </group>
+                                <group>
+                                    <field name="bpjs_doctor_code"/>
+                                    <field name="ihs_practitioner_id"/>
+                                    <field name="notification_channels"/>
+                                    <field name="color" widget="color_picker"/>
+                                </group>
+                            </group>
+                            <separator string="Tanda Tangan"/>
+                            <field name="signature_image" widget="image" options="{'size': [300, 120]}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_practitioner_search" model="ir.ui.view">
+        <field name="name">hms.practitioner.search</field>
+        <field name="model">hms.practitioner</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="nik"/>
+                <field name="specialty_id"/>
+                <field name="unit_ids"/>
+                <filter name="f_doctor" string="Dokter" domain="[('type', 'in', ('doctor', 'dentist'))]"/>
+                <filter name="f_nurse" string="Perawat" domain="[('type', 'in', ('nurse', 'midwife'))]"/>
+                <separator/>
+                <filter name="f_license_issue" string="Izin bermasalah"
+                        domain="[('license_state', 'in', ('expired', 'expiring', 'missing'))]"/>
+                <filter name="f_active" string="Aktif" domain="[('state', '=', 'active')]"/>
+                <separator/>
+                    <filter name="g_type" string="Profesi" context="{'group_by': 'type'}"/>
+                    <filter name="g_specialty" string="Spesialisasi" context="{'group_by': 'specialty_id'}"/>
+                    <filter name="g_unit" string="Unit Utama" context="{'group_by': 'primary_unit_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_practitioner" model="ir.actions.act_window">
+        <field name="name">Praktisi</field>
+        <field name="res_model">hms.practitioner</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_practitioner_search"/>
+        <field name="context">{'search_default_f_active': 1}</field>
+    </record>
+
+    <menuitem id="menu_hms_practitioner" name="Praktisi" parent="menu_hms_config_master"
+              action="action_hms_practitioner" sequence="10"/>
+</odoo>

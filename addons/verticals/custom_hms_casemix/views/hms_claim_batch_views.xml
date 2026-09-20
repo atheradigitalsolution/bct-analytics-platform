@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_claim_batch_list" model="ir.ui.view">
+        <field name="name">hms.claim.batch.list</field>
+        <field name="model">hms.claim.batch</field>
+        <field name="arch" type="xml">
+            <list string="Batch Klaim">
+                <field name="name"/>
+                <field name="service_period"/>
+                <field name="care_type"/>
+                <field name="batch_type"/>
+                <field name="payer_id"/>
+                <field name="claim_count"/>
+                <field name="amount_hospital" sum="Tarif RS"/>
+                <field name="amount_grouped" sum="Tarif Grouper"/>
+                <field name="fpk_no" optional="show"/>
+                <field name="ba_no" optional="hide"/>
+                <field name="reconciliation_state" widget="badge"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_claim_batch_form" model="ir.ui.view">
+        <field name="name">hms.claim.batch.form</field>
+        <field name="model">hms.claim.batch</field>
+        <field name="arch" type="xml">
+            <form string="Batch Pengajuan Klaim">
+                <header>
+                    <button name="action_collect_claims" type="object"
+                            string="Susun dari Klaim Final"
+                            invisible="reconciliation_state != 'draft'"/>
+                    <button name="action_submit" type="object" string="Ajukan Batch"
+                            class="btn-primary" invisible="reconciliation_state != 'draft'"/>
+                    <button name="action_mark_verified" type="object"
+                            string="Hasil Verifikasi Diterima"
+                            invisible="reconciliation_state != 'submitted'"/>
+                    <button name="action_reconcile" type="object" string="Rekonsiliasi"
+                            class="btn-primary"
+                            invisible="reconciliation_state != 'verified'"/>
+                    <button name="action_close" type="object" string="Tutup Batch"
+                            invisible="reconciliation_state != 'reconciled'"/>
+                    <field name="reconciliation_state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Kunci Batch">
+                            <field name="service_period"
+                                   readonly="reconciliation_state != 'draft'"/>
+                            <field name="care_type"
+                                   readonly="reconciliation_state != 'draft'"/>
+                            <field name="batch_type"
+                                   readonly="reconciliation_state != 'draft'"/>
+                            <field name="payer_id"
+                                   readonly="reconciliation_state != 'draft'"/>
+                        </group>
+                        <group string="Berkas Pengajuan">
+                            <field name="fpk_no"/>
+                            <field name="submitted_at" readonly="1"/>
+                            <field name="submitted_by_id" readonly="1"/>
+                            <field name="ba_no"/>
+                            <field name="ba_date"/>
+                        </group>
+                        <group string="Nilai">
+                            <field name="currency_id" invisible="1"/>
+                            <field name="claim_count" readonly="1"/>
+                            <field name="amount_hospital" readonly="1"/>
+                            <field name="amount_grouped" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Klaim dalam Batch">
+                            <field name="claim_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="patient_id"/>
+                                    <field name="sep_id"/>
+                                    <field name="hospital_bill_amount"/>
+                                    <field name="grouped_tariff"/>
+                                    <field name="deadline_at"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Catatan">
+                            <field name="note"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hms_claim_batch" model="ir.actions.act_window">
+        <field name="name">Batch Klaim</field>
+        <field name="res_model">hms.claim.batch</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada batch pengajuan.</p>
+            <p>Satu batch = satu periode layanan x jenis rawat x reguler/susulan x
+               penjamin. Kombinasi yang sama tidak boleh dibuat dua kali.</p>
+        </field>
+    </record>
+</odoo>

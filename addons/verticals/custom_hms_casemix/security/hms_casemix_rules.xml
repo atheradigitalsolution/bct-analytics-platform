@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        SENGAJA TANPA noupdate: domain record rule adalah hal yang paling
+        sering perlu dibetulkan setelah dipakai, dan noupdate="1" membuat
+        domain yang salah menetap selamanya di basis data yang sudah
+        terpasang.
+    -->
+    <data>
+
+        <!--
+            hms.coding.query
+
+            DPJP boleh menjawab pertanyaan yang ditujukan kepadanya, dan hanya
+            itu. Tanpa aturan ini, `group_hms_emr_clinician` yang diberi hak
+            tulis (supaya bisa menjawab) juga bisa menulis jawaban atas nama
+            dokter lain — dan jawaban koding adalah keterangan profesional,
+            bukan pesan.
+        -->
+        <record id="rule_hms_coding_query_addressee" model="ir.rule">
+            <field name="name">Query koding: DPJP menjawab yang ditujukan kepadanya</field>
+            <field name="model_id" ref="model_hms_coding_query"/>
+            <field name="domain_force">[('addressed_to_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_emr_clinician'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_hms_coding_query_casemix" model="ir.rule">
+            <field name="name">Query koding: casemix melihat seluruhnya</field>
+            <field name="model_id" ref="model_hms_coding_query"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_hms_coder')),
+                                        (4, ref('custom_hms_medrec.group_hms_medrec'))]"/>
+        </record>
+
+        <!--
+            hms.claim.code
+
+            Klinisi boleh MEMBACA kode yang dipakai untuk kunjungan yang ia
+            tangani — itu yang membuat dialog koder-DPJP mungkin — tetapi
+            tidak boleh menulisnya. Hak tulisnya memang sudah nol di
+            ir.model.access; aturan ini yang membatasi apa yang terlihat,
+            supaya daftar kode seluruh rumah sakit tidak terbuka bagi setiap
+            klinisi.
+        -->
+        <record id="rule_hms_claim_code_clinician_read" model="ir.rule">
+            <field name="name">Kode klaim: klinisi membaca kunjungan yang ditanganinya</field>
+            <field name="model_id" ref="model_hms_claim_code"/>
+            <field name="domain_force">['|',
+                ('encounter_id.practitioner_id.user_id', '=', user.id),
+                ('encounter_id.unit_id.practitioner_ids.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_emr_clinician'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_hms_claim_code_casemix" model="ir.rule">
+            <field name="name">Kode klaim: casemix dan audit melihat seluruhnya</field>
+            <field name="model_id" ref="model_hms_claim_code"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_hms_coder')),
+                                        (4, ref('custom_hms_medrec.group_hms_medrec')),
+                                        (4, ref('custom_hms_base.group_hms_manager'))]"/>
+        </record>
+
+    </data>
+</odoo>

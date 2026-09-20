@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_hms_encounter" model="ir.sequence">
+            <field name="name">Nomor Kunjungan</field>
+            <field name="code">hms.encounter</field>
+            <field name="prefix">KJ-%(year)s%(month)s%(day)s-</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+    </data>
+</odoo>

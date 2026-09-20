@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_hms_nursing_root" name="Keperawatan" parent="custom_hms_base.menu_hms_root"
+              sequence="35" groups="custom_hms_base.group_hms_nurse"/>
+
+    <record id="view_hms_nursing_station_list" model="ir.ui.view">
+        <field name="name">hms.nursing.station.list</field>
+        <field name="model">hms.nursing.station</field>
+        <field name="arch" type="xml">
+            <list string="Nurse Station" decoration-danger="overdue_task_count &gt; 0">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="type"/>
+                <field name="ward_id"/>
+                <field name="patient_count"/>
+                <field name="overdue_task_count"/>
+                <field name="high_ews_count"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_nursing_station_form" model="ir.ui.view">
+        <field name="name">hms.nursing.station.form</field>
+        <field name="model">hms.nursing.station</field>
+        <field name="arch" type="xml">
+            <form string="Nurse Station">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="type"/>
+                            <field name="ward_id"/>
+                            <field name="unit_id"/>
+                            <field name="location_id"/>
+                        </group>
+                        <group>
+                            <field name="patient_count" readonly="1"/>
+                            <field name="overdue_task_count" readonly="1"/>
+                            <field name="high_ews_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="nurse_ids" widget="many2many_tags"/>
+                    <separator string="Pasien di Station"/>
+                    <field name="admission_ids" readonly="1">
+                        <list>
+                            <field name="bed_id"/>
+                            <field name="patient_id"/>
+                            <field name="dpjp_id"/>
+                            <field name="length_of_stay"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_nursing_station" model="ir.actions.act_window">
+        <field name="name">Nurse Station</field>
+        <field name="res_model">hms.nursing.station</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_nursing_station" name="Nurse Station" parent="menu_hms_nursing_root"
+              action="action_hms_nursing_station" sequence="10"/>
+
+    <record id="view_hms_nursing_task_list" model="ir.ui.view">
+        <field name="name">hms.nursing.task.list</field>
+        <field name="model">hms.nursing.task</field>
+        <field name="arch" type="xml">
+            <list string="Tugas Keperawatan" decoration-danger="state == 'overdue'"
+                  decoration-warning="priority == '2'" decoration-muted="state == 'skipped'">
+                <field name="due_at"/>
+                <field name="station_id"/>
+                <field name="patient_id"/>
+                <field name="type"/>
+                <field name="title"/>
+                <field name="priority"/>
+                <field name="state" widget="badge"/>
+                <field name="done_by_id" optional="show"/>
+                <field name="minutes_late" optional="hide"/>
+                <button name="action_done" type="object" string="Selesai" icon="fa-check"
+                        invisible="state not in ('due', 'overdue')"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_nursing_task_search" model="ir.ui.view">
+        <field name="name">hms.nursing.task.search</field>
+        <field name="model">hms.nursing.task</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="patient_id"/>
+                <field name="station_id"/>
+                <field name="title"/>
+                <filter name="f_open" string="Belum Selesai"
+                        domain="[('state', 'in', ('due', 'overdue'))]"/>
+                <filter name="f_overdue" string="Terlambat" domain="[('state', '=', 'overdue')]"/>
+                <separator/>
+                <filter name="g_station" string="Station" context="{'group_by': 'station_id'}"/>
+                <filter name="g_patient" string="Pasien" context="{'group_by': 'patient_id'}"/>
+                <filter name="g_type" string="Jenis" context="{'group_by': 'type'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_nursing_task" model="ir.actions.act_window">
+        <field name="name">Tugas Keperawatan</field>
+        <field name="res_model">hms.nursing.task</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_hms_nursing_task_search"/>
+        <field name="context">{'search_default_f_open': 1, 'search_default_g_station': 1}</field>
+    </record>
+    <menuitem id="menu_hms_nursing_task" name="Tugas" parent="menu_hms_nursing_root"
+              action="action_hms_nursing_task" sequence="20"/>
+
+    <record id="view_hms_emar_schedule_list" model="ir.ui.view">
+        <field name="name">hms.emar.schedule.list</field>
+        <field name="model">hms.emar.schedule</field>
+        <field name="arch" type="xml">
+            <list string="eMAR" decoration-danger="is_high_alert" create="false">
+                <field name="scheduled_at"/>
+                <field name="patient_id"/>
+                <field name="medicine_id"/>
+                <field name="dose"/>
+                <field name="dose_unit"/>
+                <field name="route_id"/>
+                <field name="is_high_alert"/>
+                <field name="is_prn" optional="show"/>
+                <field name="state" widget="badge"/>
+                <button name="action_open_administration" type="object" string="Catat Pemberian"
+                        icon="fa-medkit" invisible="state != 'due'"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_hms_emar" model="ir.actions.act_window">
+        <field name="name">eMAR</field>
+        <field name="res_model">hms.emar.schedule</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_g_patient': 1}</field>
+    </record>
+    <menuitem id="menu_hms_emar" name="eMAR" parent="menu_hms_nursing_root"
+              action="action_hms_emar" sequence="30"/>
+
+    <record id="view_hms_emar_administration_form" model="ir.ui.view">
+        <field name="name">hms.emar.administration.form</field>
+        <field name="model">hms.emar.administration</field>
+        <field name="arch" type="xml">
+            <form string="Pemberian Obat">
+                <group>
+                    <group>
+                        <field name="schedule_id" readonly="1"/>
+                        <field name="medicine_id" readonly="1"/>
+                        <field name="is_high_alert" readonly="1"/>
+                        <field name="outcome"/>
+                        <field name="dose_given"/>
+                        <field name="site"/>
+                    </group>
+                    <group>
+                        <field name="given_at"/>
+                        <field name="given_by_id"/>
+                        <field name="witness_id" required="is_high_alert and outcome == 'given'"/>
+                        <field name="patient_scanned"/>
+                        <field name="medication_scanned"/>
+                    </group>
+                </group>
+                <div class="alert alert-danger" role="alert" invisible="not is_high_alert">
+                    Obat high-alert: wajib diverifikasi perawat kedua yang berwenang.
+                </div>
+                <field name="reason" invisible="outcome == 'given'"
+                       required="outcome != 'given'"/>
+                <field name="note"/>
+                <footer>
+                    <button string="Simpan" special="save" class="btn-primary"/>
+                    <button string="Batal" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_handover_form" model="ir.ui.view">
+        <field name="name">hms.handover.form</field>
+        <field name="model">hms.handover</field>
+        <field name="arch" type="xml">
+            <form string="Serah Terima (SBAR)">
+                <header>
+                    <button name="action_sign" type="object" string="Tandatangani Serah Terima"
+                            class="btn-primary" invisible="signed_at"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="station_id"/>
+                            <field name="admission_id"/>
+                            <field name="patient_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="given_by_id"/>
+                            <field name="received_by_id"/>
+                            <field name="signed_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="SBAR">
+                        <field name="situation"/>
+                        <field name="background"/>
+                        <field name="assessment"/>
+                        <field name="recommendation" placeholder="Apa yang harus dilakukan shift berikutnya"/>
+                    </group>
+                    <separator string="Tugas Terbuka"/>
+                    <field name="open_task_summary" readonly="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_handover" model="ir.actions.act_window">
+        <field name="name">Serah Terima Shift</field>
+        <field name="res_model">hms.handover</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_handover" name="Serah Terima" parent="menu_hms_nursing_root"
+              action="action_hms_handover" sequence="40"/>
+
+    <record id="action_hms_unit_request" model="ir.actions.act_window">
+        <field name="name">Permintaan ke Unit Lain</field>
+        <field name="res_model">hms.unit.request</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_unit_request" name="Permintaan Unit" parent="menu_hms_nursing_root"
+              action="action_hms_unit_request" sequence="50"/>
+
+    <record id="action_hms_nursing_assessment" model="ir.actions.act_window">
+        <field name="name">Asuhan Keperawatan</field>
+        <field name="res_model">hms.nursing.assessment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_nursing_assessment" name="Asuhan Keperawatan"
+              parent="menu_hms_nursing_root" action="action_hms_nursing_assessment" sequence="25"/>
+
+    <record id="action_hms_ews" model="ir.actions.act_window">
+        <field name="name">Skor EWS</field>
+        <field name="res_model">hms.ews.score</field>
+        <field name="view_mode">list</field>
+    </record>
+    <menuitem id="menu_hms_ews" name="Skor EWS" parent="menu_hms_nursing_root"
+              action="action_hms_ews" sequence="35"/>
+
+    <record id="action_hms_sdki" model="ir.actions.act_window">
+        <field name="name">SDKI</field>
+        <field name="res_model">hms.sdki</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_sdki" name="SDKI / SLKI / SIKI"
+              parent="custom_hms_base.menu_hms_config_reference" action="action_hms_sdki"
+              sequence="96"/>
+</odoo>

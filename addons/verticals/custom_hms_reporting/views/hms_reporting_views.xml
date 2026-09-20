@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_report_visit_pivot" model="ir.ui.view">
+        <field name="name">hms.report.visit.pivot</field>
+        <field name="model">hms.report.visit</field>
+        <field name="arch" type="xml">
+            <pivot string="Kunjungan" sample="1">
+                <field name="unit_id" type="row"/>
+                <field name="arrival_date" interval="month" type="col"/>
+                <field name="visit_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+    <record id="view_hms_report_visit_graph" model="ir.ui.view">
+        <field name="name">hms.report.visit.graph</field>
+        <field name="model">hms.report.visit</field>
+        <field name="arch" type="xml">
+            <graph string="Kunjungan" type="bar" sample="1">
+                <field name="arrival_date" interval="day"/>
+                <field name="visit_count" type="measure"/>
+            </graph>
+        </field>
+    </record>
+    <record id="view_hms_report_visit_search" model="ir.ui.view">
+        <field name="name">hms.report.visit.search</field>
+        <field name="model">hms.report.visit</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="unit_id"/>
+                <field name="practitioner_id"/>
+                <field name="payer_id"/>
+                <filter name="f_month" string="Bulan Ini"
+                        domain="[('arrival_date', '&gt;=', (context_today().replace(day=1)).strftime('%Y-%m-%d'))]"/>
+                <filter name="f_outpatient" string="Rawat Jalan"
+                        domain="[('encounter_type', '=', 'outpatient')]"/>
+                <filter name="f_emergency" string="IGD"
+                        domain="[('encounter_type', '=', 'emergency')]"/>
+                <separator/>
+                <filter name="g_unit" string="Unit" context="{'group_by': 'unit_id'}"/>
+                <filter name="g_doctor" string="Dokter" context="{'group_by': 'practitioner_id'}"/>
+                <filter name="g_payer" string="Penjamin" context="{'group_by': 'payer_id'}"/>
+                <filter name="g_age" string="Kelompok Umur" context="{'group_by': 'age_group'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_report_visit" model="ir.actions.act_window">
+        <field name="name">Laporan Kunjungan</field>
+        <field name="res_model">hms.report.visit</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="search_view_id" ref="view_hms_report_visit_search"/>
+        <field name="context">{'search_default_f_month': 1, 'search_default_g_unit': 1}</field>
+    </record>
+    <menuitem id="menu_hms_report_visit" name="Kunjungan"
+              parent="custom_hms_base.menu_hms_reporting_root"
+              action="action_hms_report_visit" sequence="10"/>
+
+    <record id="view_hms_report_revenue_pivot" model="ir.ui.view">
+        <field name="name">hms.report.revenue.pivot</field>
+        <field name="model">hms.report.revenue</field>
+        <field name="arch" type="xml">
+            <pivot string="Pendapatan" sample="1">
+                <field name="unit_id" type="row"/>
+                <field name="report_section" type="col"/>
+                <field name="amount_gross" type="measure"/>
+                <field name="amount_medical" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+    <record id="action_hms_report_revenue" model="ir.actions.act_window">
+        <field name="name">Laporan Pendapatan</field>
+        <field name="res_model">hms.report.revenue</field>
+        <field name="view_mode">pivot,graph,list</field>
+    </record>
+    <menuitem id="menu_hms_report_revenue" name="Pendapatan"
+              parent="custom_hms_base.menu_hms_reporting_root"
+              action="action_hms_report_revenue" sequence="20"/>
+
+    <record id="view_hms_report_census_pivot" model="ir.ui.view">
+        <field name="name">hms.report.census.pivot</field>
+        <field name="model">hms.report.census</field>
+        <field name="arch" type="xml">
+            <pivot string="Sensus Rawat Inap" sample="1">
+                <field name="ward_id" type="row"/>
+                <field name="census_date" interval="day" type="col"/>
+                <field name="patient_days" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+    <record id="action_hms_report_census" model="ir.actions.act_window">
+        <field name="name">Sensus Rawat Inap</field>
+        <field name="res_model">hms.report.census</field>
+        <field name="view_mode">pivot,graph,list</field>
+    </record>
+    <menuitem id="menu_hms_report_census" name="Sensus Rawat Inap"
+              parent="custom_hms_base.menu_hms_reporting_root"
+              action="action_hms_report_census" sequence="50"/>
+
+    <record id="view_hms_report_rl4_pivot" model="ir.ui.view">
+        <field name="name">hms.report.rl4.pivot</field>
+        <field name="model">hms.report.rl4</field>
+        <field name="arch" type="xml">
+            <pivot string="RL 4a Morbiditas" sample="1">
+                <field name="icd10_id" type="row"/>
+                <field name="age_group" type="col"/>
+                <field name="case_count" type="measure"/>
+                <field name="is_death" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+    <record id="action_hms_report_rl4" model="ir.actions.act_window">
+        <field name="name">RL 4a — Morbiditas Rawat Inap</field>
+        <field name="res_model">hms.report.rl4</field>
+        <field name="view_mode">pivot,list</field>
+    </record>
+    <menuitem id="menu_hms_report_rl4" name="RL 4a Morbiditas"
+              parent="custom_hms_base.menu_hms_reporting_root"
+              action="action_hms_report_rl4" sequence="60"/>
+</odoo>

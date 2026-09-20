@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_hms_schedule_root" name="Jadwal" parent="custom_hms_base.menu_hms_root"
+              sequence="25" groups="custom_hms_base.group_hms_staff"/>
+
+    <record id="view_hms_schedule_template_list" model="ir.ui.view">
+        <field name="name">hms.schedule.template.list</field>
+        <field name="model">hms.schedule.template</field>
+        <field name="arch" type="xml">
+            <list string="Template Jadwal" editable="bottom">
+                <field name="practitioner_id"/>
+                <field name="unit_id"/>
+                <field name="weekday"/>
+                <field name="session"/>
+                <field name="time_from" widget="float_time"/>
+                <field name="time_to" widget="float_time"/>
+                <field name="slot_minutes"/>
+                <field name="quota_walkin"/>
+                <field name="quota_booking"/>
+                <field name="quota_bpjs"/>
+                <field name="room_id"/>
+                <field name="valid_to"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_hms_schedule_template" model="ir.actions.act_window">
+        <field name="name">Template Jadwal Praktik</field>
+        <field name="res_model">hms.schedule.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_schedule_template" name="Template Jadwal"
+              parent="menu_hms_schedule_root" action="action_hms_schedule_template" sequence="10"/>
+
+    <record id="view_hms_schedule_slot_list" model="ir.ui.view">
+        <field name="name">hms.schedule.slot.list</field>
+        <field name="model">hms.schedule.slot</field>
+        <field name="arch" type="xml">
+            <list string="Slot Jadwal" decoration-muted="state == 'blocked'"
+                  decoration-info="state in ('booked', 'walkin')">
+                <field name="date"/>
+                <field name="time_from" widget="float_time"/>
+                <field name="time_to" widget="float_time"/>
+                <field name="practitioner_id"/>
+                <field name="unit_id"/>
+                <field name="state" widget="badge"/>
+                <field name="encounter_id" optional="show"/>
+                <field name="block_reason" optional="show"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_schedule_slot_search" model="ir.ui.view">
+        <field name="name">hms.schedule.slot.search</field>
+        <field name="model">hms.schedule.slot</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="practitioner_id"/>
+                <field name="unit_id"/>
+                <field name="date"/>
+                <filter name="f_open" string="Tersedia" domain="[('state', '=', 'open')]"/>
+                <filter name="f_today" string="Hari Ini"
+                        domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <separator/>
+                <filter name="g_doctor" string="Dokter" context="{'group_by': 'practitioner_id'}"/>
+                <filter name="g_date" string="Tanggal" context="{'group_by': 'date'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_schedule_slot" model="ir.actions.act_window">
+        <field name="name">Slot Jadwal</field>
+        <field name="res_model">hms.schedule.slot</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_hms_schedule_slot_search"/>
+        <field name="context">{'search_default_f_today': 1}</field>
+    </record>
+    <menuitem id="menu_hms_schedule_slot" name="Slot Harian" parent="menu_hms_schedule_root"
+              action="action_hms_schedule_slot" sequence="20"/>
+
+    <record id="view_hms_schedule_exception_form" model="ir.ui.view">
+        <field name="name">hms.schedule.exception.form</field>
+        <field name="model">hms.schedule.exception</field>
+        <field name="arch" type="xml">
+            <form string="Pengecualian Jadwal">
+                <header>
+                    <button name="action_approve" type="object" string="Setujui &amp; Blokir Slot"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_reassign" type="object" string="Alihkan ke Dokter Pengganti"
+                            invisible="affected_booked_count == 0"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="practitioner_id"/>
+                            <field name="type"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group>
+                            <field name="replacement_practitioner_id"/>
+                            <field name="leave_id" readonly="1"/>
+                            <field name="affected_booked_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="affected_booked_count == 0">
+                        <field name="affected_booked_count" readonly="1" class="oe_inline"/>
+                        pasien sudah terjadwal pada periode ini. Alihkan ke dokter pengganti
+                        atau hubungi pasien sebelum menyetujui.
+                    </div>
+                    <field name="note"/>
+                    <field name="affected_slot_ids" readonly="1">
+                        <list>
+                            <field name="date"/>
+                            <field name="time_from" widget="float_time"/>
+                            <field name="state"/>
+                            <field name="encounter_id"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_schedule_exception" model="ir.actions.act_window">
+        <field name="name">Cuti &amp; Pengecualian Jadwal</field>
+        <field name="res_model">hms.schedule.exception</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_schedule_exception" name="Cuti &amp; Pengecualian"
+              parent="menu_hms_schedule_root" action="action_hms_schedule_exception" sequence="30"/>
+</odoo>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Penyemaian dijalankan dari berkas data, BUKAN hanya dari
+        ``post_init_hook``.
+
+        ``post_init_hook`` hanya berjalan saat modul dipasang. Begitu
+        ``custom_hms_demo`` terpasang, satu-satunya cara menambahkan isi demo
+        baru adalah menghapus modulnya dan memasang ulang — yang berarti
+        membuang seluruh data demo yang sudah dipakai berlatih. Sebuah
+        ``<function>`` di berkas data dijalankan pada instalasi BARU maupun
+        pada ``-u``, sehingga database demo yang sudah hidup ikut terisi.
+
+        Aman dipanggil berulang: ``seed_all`` idempoten, dan ia memanggil
+        ``_assert_demo_database()`` lebih dulu sehingga jalur ini tidak
+        menjadi pintu belakang menuju database produksi.
+    -->
+    <function model="hms.demo.builder" name="seed_all"/>
+</odoo>

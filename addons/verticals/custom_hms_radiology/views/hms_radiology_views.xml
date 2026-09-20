@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_rad_report_list" model="ir.ui.view">
+        <field name="name">hms.rad.report.list</field>
+        <field name="model">hms.rad.report</field>
+        <field name="arch" type="xml">
+            <list string="Worklist Radiologi" decoration-danger="is_critical"
+                  decoration-success="state == 'verified'">
+                <field name="patient_id"/>
+                <field name="exam_name"/>
+                <field name="modality"/>
+                <field name="body_part"/>
+                <field name="performed_at"/>
+                <field name="radiographer_id" optional="show"/>
+                <field name="radiologist_id" optional="show"/>
+                <field name="is_critical"/>
+                <field name="ack_state" widget="badge" optional="show"
+                       decoration-danger="ack_state == 'overdue'"
+                       decoration-warning="ack_state == 'pending'"
+                       decoration-success="ack_state == 'acknowledged'"
+                       invisible="not is_critical"/>
+                <field name="state" widget="badge"/>
+                <button name="action_perform" type="object" string="Kerjakan" icon="fa-play"
+                        invisible="state != 'scheduled'"/>
+                <button name="action_report" type="object" string="Kirim Ekspertise"
+                        icon="fa-file-text-o" invisible="state != 'performed'"/>
+                <button name="action_verify" type="object" string="Verifikasi" icon="fa-check-circle"
+                        invisible="state != 'reported'"
+                        groups="custom_hms_base.group_hms_diagnostic_verifier"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_rad_report_form" model="ir.ui.view">
+        <field name="name">hms.rad.report.form</field>
+        <field name="model">hms.rad.report</field>
+        <field name="arch" type="xml">
+            <form string="Ekspertise Radiologi">
+                <header>
+                    <button name="action_perform" type="object" string="Tandai Dikerjakan"
+                            class="btn-primary" invisible="state != 'scheduled'"/>
+                    <button name="action_report" type="object" string="Kirim Ekspertise"
+                            class="btn-primary" invisible="state != 'performed'"/>
+                    <button name="action_verify" type="object" string="Verifikasi Radiolog"
+                            class="btn-primary" invisible="state != 'reported'"
+                            groups="custom_hms_base.group_hms_diagnostic_verifier"/>
+                    <button name="action_notify" type="object" string="Catat Pelaporan"
+                            class="btn-secondary"
+                            invisible="not is_critical or state != 'verified' or notified_at"/>
+                    <button name="action_acknowledge" type="object" string="Akui Temuan Kritis"
+                            class="btn-primary"
+                            invisible="not is_critical or state != 'verified' or acknowledged_at"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('verified', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="scheduled,performed,reported,verified"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert" invisible="not is_critical">
+                        TEMUAN KRITIS — wajib dilaporkan langsung ke dokter pengirim, tidak
+                        cukup menunggu dibaca di sistem.
+                    </div>
+                    <div class="oe_title"><h1><field name="exam_name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="encounter_id" readonly="1"/>
+                            <field name="order_line_id" readonly="1"/>
+                            <field name="exam_id"/>
+                            <field name="modality"/>
+                            <field name="body_part"/>
+                            <field name="preparation_note" invisible="not preparation_note"/>
+                        </group>
+                        <group>
+                            <field name="contrast_used"/>
+                            <field name="contrast_agent" invisible="not contrast_used"/>
+                            <field name="performed_at"/>
+                            <field name="radiographer_id"/>
+                            <field name="radiologist_id"/>
+                            <field name="is_critical"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Ekspertise">
+                            <group>
+                                <field name="clinical_info" placeholder="Keterangan klinis dari dokter pengirim"/>
+                                <field name="technique" placeholder="Teknik/posisi pemeriksaan"/>
+                                <field name="findings" placeholder="Deskripsi temuan"
+                                       readonly="state == 'verified'"/>
+                                <field name="impression" placeholder="Kesan"
+                                       readonly="state == 'verified'"/>
+                                <field name="suggestion" placeholder="Saran pemeriksaan lanjutan"/>
+                            </group>
+                        </page>
+                        <page string="Citra">
+                            <field name="image_ids" widget="many2many_binary"/>
+                        </page>
+                        <page string="Pelaporan Nilai Kritis" invisible="not is_critical">
+                            <group>
+                                <group string="Pelaporan">
+                                    <field name="notified_at"/>
+                                    <field name="notified_by_id"/>
+                                    <field name="notified_to_id"/>
+                                    <field name="notify_channel"/>
+                                </group>
+                                <group string="Pengakuan Klinisi">
+                                    <field name="ack_state" widget="badge"
+                                           decoration-danger="ack_state == 'overdue'"
+                                           decoration-warning="ack_state == 'pending'"
+                                           decoration-success="ack_state == 'acknowledged'"/>
+                                    <field name="acknowledged_at"/>
+                                    <field name="acknowledged_by_id"/>
+                                    <field name="ack_minutes"/>
+                                </group>
+                            </group>
+                            <field name="ack_readback"
+                                   placeholder="Tulis kembali isi laporan seperti yang dibacakan ulang penerima"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_rad_report_search" model="ir.ui.view">
+        <field name="name">hms.rad.report.search</field>
+        <field name="model">hms.rad.report</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="patient_id"/>
+                <field name="exam_name"/>
+                <field name="modality"/>
+                <filter name="f_open" string="Belum Diverifikasi"
+                        domain="[('state', 'in', ('scheduled', 'performed', 'reported'))]"/>
+                <filter name="f_critical" string="Temuan Kritis" domain="[('is_critical', '=', True)]"/>
+                <filter name="f_ack_pending" string="Kritis Belum Diakui"
+                        domain="[('ack_state', '=', 'pending')]"/>
+                <filter name="f_ack_overdue" string="Kritis Terlambat Diakui"
+                        domain="[('ack_state', '=', 'overdue')]"/>
+                <separator/>
+                <filter name="g_modality" string="Modalitas" context="{'group_by': 'modality'}"/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="g_ack_state" string="Status Pengakuan"
+                        context="{'group_by': 'ack_state'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_rad_report" model="ir.actions.act_window">
+        <field name="name">Worklist Radiologi</field>
+        <field name="res_model">hms.rad.report</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_rad_report_search"/>
+        <field name="context">{'search_default_f_open': 1}</field>
+    </record>
+    <menuitem id="menu_hms_rad_report" name="Worklist Radiologi"
+              parent="custom_hms_base.menu_hms_diagnostic_root" action="action_hms_rad_report"
+              sequence="20"/>
+
+    <!-- ================= Katalog Pemeriksaan (hms.rad.exam) ================= -->
+    <record id="view_hms_rad_exam_list" model="ir.ui.view">
+        <field name="name">hms.rad.exam.list</field>
+        <field name="model">hms.rad.exam</field>
+        <field name="arch" type="xml">
+            <list string="Katalog Pemeriksaan Radiologi">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="modality"/>
+                <field name="body_part"/>
+                <field name="tariff_id"/>
+                <field name="requires_contrast"/>
+                <field name="estimated_minutes" optional="hide"/>
+                <field name="dose_reference" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_rad_exam_form" model="ir.ui.view">
+        <field name="name">hms.rad.exam.form</field>
+        <field name="model">hms.rad.exam</field>
+        <field name="arch" type="xml">
+            <form string="Katalog Pemeriksaan Radiologi">
+                <sheet>
+                    <widget name="web_ribbon" title="Diarsipkan" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="tariff_id"/>
+                            <field name="modality"/>
+                            <field name="body_part"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="requires_contrast"/>
+                            <field name="estimated_minutes"/>
+                            <field name="dose_reference"/>
+                        </group>
+                    </group>
+                    <separator string="Persiapan Pasien"/>
+                    <field name="preparation_note"
+                           placeholder="Mis. puasa 6 jam, kandung kemih penuh."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_rad_exam_search" model="ir.ui.view">
+        <field name="name">hms.rad.exam.search</field>
+        <field name="model">hms.rad.exam</field>
+        <field name="arch" type="xml">
+            <search string="Katalog Pemeriksaan Radiologi">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="tariff_id"/>
+                <filter name="f_contrast" string="Dengan Kontras"
+                        domain="[('requires_contrast', '=', True)]"/>
+                <filter name="f_archived" string="Diarsipkan" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="g_modality" string="Modalitas" context="{'group_by': 'modality'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_rad_exam" model="ir.actions.act_window">
+        <field name="name">Katalog Pemeriksaan Radiologi</field>
+        <field name="res_model">hms.rad.exam</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_rad_exam_search"/>
+    </record>
+    <menuitem id="menu_hms_rad_exam" name="Katalog Pemeriksaan Radiologi"
+              parent="custom_hms_base.menu_hms_config_master" action="action_hms_rad_exam"
+              sequence="61"/>
+</odoo>

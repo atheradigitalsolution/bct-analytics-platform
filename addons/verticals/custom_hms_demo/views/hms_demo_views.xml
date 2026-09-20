@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_hms_demo_rebuild" model="ir.actions.server">
+        <field name="name">Bangun Ulang Data Demo</field>
+        <field name="model_id" ref="model_hms_demo_builder"/>
+        <field name="state">code</field>
+        <field name="code">model.build_all()</field>
+    </record>
+    <menuitem id="menu_hms_demo_rebuild" name="Bangun Ulang Data Demo"
+              parent="custom_hms_base.menu_hms_config" action="action_hms_demo_rebuild"
+              sequence="95" groups="custom_hms_base.group_hms_admin"/>
+</odoo>

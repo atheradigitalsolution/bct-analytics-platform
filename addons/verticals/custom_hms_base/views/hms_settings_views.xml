@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_settings_form" model="ir.ui.view">
+        <field name="name">hms.settings.form</field>
+        <field name="model">hms.settings</field>
+        <field name="arch" type="xml">
+            <form string="Pengaturan SIMRS">
+                <sheet>
+                    <field name="hospital_logo" widget="image" class="oe_avatar"/>
+                    <div class="oe_title"><h1><field name="hospital_name"/></h1></div>
+                    <group>
+                        <group string="Identitas Rumah Sakit">
+                            <field name="hospital_code"/>
+                            <field name="hospital_class"/>
+                            <field name="director_name"/>
+                            <field name="hospital_phone"/>
+                            <field name="hospital_address"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Antrian">
+                            <field name="max_call_count"/>
+                            <field name="no_show_recover_minutes"/>
+                            <field name="booking_checkin_before_minutes"/>
+                            <field name="priority_interleave"/>
+                            <field name="name_masking"/>
+                        </group>
+                        <group string="Klinis">
+                            <field name="ews_escalate_score"/>
+                            <field name="ews_alarm_score"/>
+                            <field name="vitals_interval_hours"/>
+                        </group>
+                        <group string="Kasir">
+                            <field name="discount_auth_percent"/>
+                            <field name="deposit_warning_percent"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Klinis &amp; Mutu" name="policy_clinical">
+                            <group>
+                                <group string="Nilai Kritis &amp; Insiden">
+                                    <field name="critical_result_ack_minutes"/>
+                                    <field name="incident_report_due_hours"/>
+                                </group>
+                                <group string="Rekam Medis">
+                                    <field name="klpcm_due_hours"/>
+                                    <field name="discharge_summary_due_hours"/>
+                                    <field name="emr_correction_grace_hours"/>
+                                    <field name="emr_retention_years"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Rawat Inap &amp; Kelas" name="policy_inpatient">
+                            <group>
+                                <group string="Kelas Perawatan">
+                                    <field name="titip_kelas_max_days"/>
+                                    <field name="prorate_partial_days"/>
+                                    <field name="sep_igd_to_inpatient_policy"/>
+                                </group>
+                                <group string="Hari Rawat">
+                                    <field name="checkout_time" widget="float_time"/>
+                                    <field name="half_day_grace_hours"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Klaim / Casemix" name="policy_claim">
+                            <group>
+                                <group string="Grouper">
+                                    <field name="grouper_mode"/>
+                                    <field name="jkn_revenue_basis"/>
+                                    <field name="claim_expiry_months"/>
+                                </group>
+                                <group string="Audit Klaim">
+                                    <field name="claim_variance_threshold"/>
+                                    <field name="readmission_window_days"/>
+                                    <field name="fragmentation_window_days"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Kasir &amp; Keuangan" name="policy_finance">
+                            <group>
+                                <group string="Kas">
+                                    <field name="cash_variance_tolerance"/>
+                                    <field name="stamp_duty_threshold"/>
+                                </group>
+                                <group string="Penutupan Buku">
+                                    <field name="billing_lock_date"/>
+                                    <field name="hpp_mode"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_settings" model="ir.actions.act_window">
+        <field name="name">Pengaturan SIMRS</field>
+        <field name="res_model">hms.settings</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_settings" name="Pengaturan SIMRS" parent="menu_hms_config"
+              action="action_hms_settings" sequence="99"/>
+</odoo>

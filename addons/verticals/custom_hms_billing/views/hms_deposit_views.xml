@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_deposit_list" model="ir.ui.view">
+        <field name="name">hms.deposit.list</field>
+        <field name="model">hms.deposit</field>
+        <field name="arch" type="xml">
+            <list string="Deposit" editable="bottom">
+                <field name="name" readonly="1"/>
+                <field name="patient_id"/>
+                <field name="admission_id"/>
+                <field name="received_at"/>
+                <field name="method"/>
+                <field name="amount"/>
+                <field name="used_amount" readonly="1"/>
+                <field name="refunded_amount" readonly="1"/>
+                <field name="balance" readonly="1" sum="Saldo"/>
+                <field name="state" widget="badge" readonly="1"/>
+                <field name="currency_id" column_invisible="1"/>
+                <button name="action_refund" type="object" string="Kembalikan Sisa"
+                        icon="fa-undo" invisible="state != 'open'"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_hms_deposit" model="ir.actions.act_window">
+        <field name="name">Deposit Pasien</field>
+        <field name="res_model">hms.deposit</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_deposit" name="Deposit"
+              parent="custom_hms_base.menu_hms_billing_root" action="action_hms_deposit"
+              sequence="30"/>
+
+    <record id="view_hms_payment_list" model="ir.ui.view">
+        <field name="name">hms.payment.list</field>
+        <field name="model">hms.payment</field>
+        <field name="arch" type="xml">
+            <list string="Pembayaran" create="false" decoration-muted="state == 'void'">
+                <field name="name"/>
+                <field name="paid_at"/>
+                <field name="patient_id"/>
+                <field name="bill_id"/>
+                <field name="method"/>
+                <field name="amount" sum="Total"/>
+                <field name="reference"/>
+                <field name="journal_id" optional="hide"/>
+                <field name="account_payment_id" optional="hide"/>
+                <field name="cashier_id"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_hms_payment" model="ir.actions.act_window">
+        <field name="name">Pembayaran</field>
+        <field name="res_model">hms.payment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_payment" name="Pembayaran"
+              parent="custom_hms_base.menu_hms_billing_root" action="action_hms_payment"
+              sequence="40"/>
+</odoo>

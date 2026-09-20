@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_lab_parameter_list" model="ir.ui.view">
+        <field name="name">hms.lab.parameter.list</field>
+        <field name="model">hms.lab.parameter</field>
+        <field name="arch" type="xml">
+            <list string="Parameter Laboratorium">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="uom_name"/>
+                <field name="value_type"/>
+                <field name="specimen_type"/>
+                <field name="loinc_code" optional="hide"/>
+                <field name="tat_minutes" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_lab_parameter_form" model="ir.ui.view">
+        <field name="name">hms.lab.parameter.form</field>
+        <field name="model">hms.lab.parameter</field>
+        <field name="arch" type="xml">
+            <form string="Parameter Laboratorium">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="uom_name"/>
+                            <field name="value_type"/>
+                            <field name="selection_values" invisible="value_type != 'selection'"/>
+                            <field name="decimal_places" invisible="value_type != 'numeric'"/>
+                        </group>
+                        <group>
+                            <field name="loinc_code"/>
+                            <field name="method"/>
+                            <field name="specimen_type"/>
+                            <field name="tat_minutes"/>
+                        </group>
+                    </group>
+                    <separator string="Nilai Rujukan"/>
+                    <div class="alert alert-info" role="alert">
+                        Baris paling spesifik yang dipakai: rentang yang menyebut jenis kelamin
+                        menang atas rentang untuk semua. Isi 0 pada "Usia Sampai" bila tanpa batas atas.
+                    </div>
+                    <field name="range_ids">
+                        <list editable="bottom">
+                            <field name="gender"/>
+                            <field name="age_from"/>
+                            <field name="age_to"/>
+                            <field name="ref_low"/>
+                            <field name="ref_high"/>
+                            <field name="critical_low"/>
+                            <field name="critical_high"/>
+                            <field name="note"/>
+                        </list>
+                    </field>
+                    <field name="tariff_ids" widget="many2many_tags"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_lab_parameter" model="ir.actions.act_window">
+        <field name="name">Parameter Laboratorium</field>
+        <field name="res_model">hms.lab.parameter</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_lab_parameter" name="Parameter Laboratorium"
+              parent="custom_hms_base.menu_hms_config_reference"
+              action="action_hms_lab_parameter" sequence="95"/>
+
+    <record id="view_hms_lab_result_list" model="ir.ui.view">
+        <field name="name">hms.lab.result.list</field>
+        <field name="model">hms.lab.result</field>
+        <field name="arch" type="xml">
+            <list string="Hasil Laboratorium" editable="bottom"
+                  decoration-danger="is_critical" decoration-warning="flag in ('low', 'high')">
+                <field name="patient_id" readonly="1" optional="show"/>
+                <field name="parameter_id" readonly="1"/>
+                <field name="value_numeric"/>
+                <field name="value_text"/>
+                <field name="uom_name" readonly="1"/>
+                <field name="ref_display" readonly="1"/>
+                <field name="flag" readonly="1" widget="badge"
+                       decoration-danger="is_critical"
+                       decoration-warning="flag in ('low', 'high')"
+                       decoration-success="flag == 'normal'"/>
+                <field name="state" readonly="1" widget="badge"/>
+                <field name="ack_state" readonly="1" widget="badge" optional="show"
+                       decoration-danger="ack_state == 'overdue'"
+                       decoration-warning="ack_state == 'pending'"
+                       decoration-success="ack_state == 'acknowledged'"
+                       invisible="not is_critical"/>
+                <field name="note"/>
+                <field name="is_critical" column_invisible="1"/>
+                <button name="action_enter" type="object" string="Simpan Hasil" icon="fa-save"
+                        invisible="state not in ('pending', 'entered', 'rejected')"/>
+                <button name="action_validate" type="object" string="Validasi" icon="fa-check"
+                        invisible="state != 'entered'"/>
+                <button name="action_verify" type="object" string="Verifikasi" icon="fa-check-circle"
+                        invisible="state != 'validated'"
+                        groups="custom_hms_base.group_hms_diagnostic_verifier"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_lab_result_form" model="ir.ui.view">
+        <field name="name">hms.lab.result.form</field>
+        <field name="model">hms.lab.result</field>
+        <field name="arch" type="xml">
+            <form string="Hasil Laboratorium">
+                <header>
+                    <button name="action_notify" type="object" string="Catat Pelaporan"
+                            class="btn-secondary"
+                            invisible="not is_critical or state != 'verified' or notified_at"/>
+                    <button name="action_acknowledge" type="object" string="Akui Nilai Kritis"
+                            class="btn-primary"
+                            invisible="not is_critical or state != 'verified' or acknowledged_at"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,entered,validated,verified"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert" invisible="not is_critical">
+                        NILAI KRITIS — wajib dilaporkan langsung ke dokter penanggung jawab
+                        dan diakui dengan read-back (TBaK), tidak cukup menunggu dibaca di sistem.
+                    </div>
+                    <div class="oe_title"><h1><field name="parameter_id" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="encounter_id" readonly="1"/>
+                            <field name="order_id" readonly="1"/>
+                            <field name="order_line_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="value_numeric"/>
+                            <field name="value_text"/>
+                            <field name="uom_name"/>
+                            <field name="ref_display"/>
+                            <field name="flag" widget="badge"/>
+                            <field name="is_critical"/>
+                            <field name="note"/>
+                        </group>
+                    </group>
+                    <group string="Pelaporan Nilai Kritis" invisible="not is_critical">
+                        <group string="Pelaporan">
+                            <field name="notified_at"/>
+                            <field name="notified_by_id"/>
+                            <field name="notified_to_id"/>
+                            <field name="notify_channel"/>
+                        </group>
+                        <group string="Pengakuan Klinisi">
+                            <field name="ack_state" widget="badge"
+                                   decoration-danger="ack_state == 'overdue'"
+                                   decoration-warning="ack_state == 'pending'"
+                                   decoration-success="ack_state == 'acknowledged'"/>
+                            <field name="acknowledged_at"/>
+                            <field name="acknowledged_by_id"/>
+                            <field name="ack_minutes"/>
+                        </group>
+                        <field name="ack_readback" colspan="2"
+                               placeholder="Tulis kembali isi laporan seperti yang dibacakan ulang penerima"/>
+                    </group>
+                    <group string="Jejak Verifikasi">
+                        <group>
+                            <field name="entered_by_id"/>
+                            <field name="entered_at"/>
+                        </group>
+                        <group>
+                            <field name="validated_by_id"/>
+                            <field name="verified_by_id"/>
+                            <field name="verified_at"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_lab_result_search" model="ir.ui.view">
+        <field name="name">hms.lab.result.search</field>
+        <field name="model">hms.lab.result</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="patient_id"/>
+                <field name="parameter_id"/>
+                <field name="order_id"/>
+                <filter name="f_open" string="Belum Diverifikasi"
+                        domain="[('state', 'in', ('pending', 'entered', 'validated'))]"/>
+                <filter name="f_critical" string="Nilai Kritis" domain="[('is_critical', '=', True)]"/>
+                <filter name="f_ack_pending" string="Kritis Belum Diakui"
+                        domain="[('ack_state', '=', 'pending')]"/>
+                <filter name="f_ack_overdue" string="Kritis Terlambat Diakui"
+                        domain="[('ack_state', '=', 'overdue')]"/>
+                <separator/>
+                <filter name="g_patient" string="Pasien" context="{'group_by': 'patient_id'}"/>
+                <filter name="g_order" string="Order" context="{'group_by': 'order_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="g_ack_state" string="Status Pengakuan"
+                        context="{'group_by': 'ack_state'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_lab_result" model="ir.actions.act_window">
+        <field name="name">Hasil Laboratorium</field>
+        <field name="res_model">hms.lab.result</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_lab_result_search"/>
+        <field name="context">{'search_default_f_open': 1, 'search_default_g_order': 1}</field>
+    </record>
+    <menuitem id="menu_hms_lab_result" name="Worklist Laboratorium"
+              parent="custom_hms_base.menu_hms_diagnostic_root" action="action_hms_lab_result"
+              sequence="10"/>
+
+    <record id="action_hms_lab_worklist" model="ir.actions.act_window">
+        <field name="name">Order Laboratorium</field>
+        <field name="res_model">hms.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('order_type', '=', 'lab')]</field>
+        <field name="context">{'search_default_f_open': 1, 'default_order_type': 'lab'}</field>
+    </record>
+    <menuitem id="menu_hms_lab_worklist" name="Order Laboratorium"
+              parent="custom_hms_base.menu_hms_diagnostic_root" action="action_hms_lab_worklist"
+              sequence="5"/>
+
+    <!-- ================= Katalog Pemeriksaan (hms.lab.test) ================= -->
+    <record id="view_hms_lab_test_list" model="ir.ui.view">
+        <field name="name">hms.lab.test.list</field>
+        <field name="model">hms.lab.test</field>
+        <field name="arch" type="xml">
+            <list string="Katalog Pemeriksaan Laboratorium">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="tariff_id"/>
+                <field name="specimen_type"/>
+                <field name="container"/>
+                <field name="parameter_count"/>
+                <field name="is_panel"/>
+                <field name="tat_minutes" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_lab_test_form" model="ir.ui.view">
+        <field name="name">hms.lab.test.form</field>
+        <field name="model">hms.lab.test</field>
+        <field name="arch" type="xml">
+            <form string="Katalog Pemeriksaan Laboratorium">
+                <sheet>
+                    <widget name="web_ribbon" title="Diarsipkan" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="tariff_id"/>
+                            <field name="is_panel"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="specimen_type"/>
+                            <field name="container"/>
+                            <field name="tat_minutes"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Parameter di sini mendahului daftar "Termasuk dalam Pemeriksaan"
+                        pada master parameter. Bila katalog ini dikosongkan, sistem kembali
+                        memakai hubungan lama tarif-parameter.
+                    </div>
+                    <field name="parameter_ids" widget="many2many_tags"/>
+                    <separator string="Catatan Persiapan"/>
+                    <field name="note" placeholder="Mis. puasa 10-12 jam."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_lab_test_search" model="ir.ui.view">
+        <field name="name">hms.lab.test.search</field>
+        <field name="model">hms.lab.test</field>
+        <field name="arch" type="xml">
+            <search string="Katalog Pemeriksaan Laboratorium">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="tariff_id"/>
+                <field name="parameter_ids"/>
+                <filter name="f_panel" string="Panel" domain="[('is_panel', '=', True)]"/>
+                <filter name="f_archived" string="Diarsipkan" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="g_specimen" string="Jenis Spesimen"
+                        context="{'group_by': 'specimen_type'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_lab_test" model="ir.actions.act_window">
+        <field name="name">Katalog Pemeriksaan Lab</field>
+        <field name="res_model">hms.lab.test</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_lab_test_search"/>
+    </record>
+    <menuitem id="menu_hms_lab_test" name="Katalog Pemeriksaan Lab"
+              parent="custom_hms_base.menu_hms_config_master" action="action_hms_lab_test"
+              sequence="60"/>
+
+    <!-- ================= Penerimaan spesimen ================= -->
+    <record id="view_hms_order_line_specimen_list" model="ir.ui.view">
+        <field name="name">hms.order.line.specimen.list</field>
+        <field name="model">hms.order.line</field>
+        <field name="arch" type="xml">
+            <list string="Penerimaan Spesimen" create="false">
+                <field name="order_id"/>
+                <field name="patient_id"/>
+                <field name="name"/>
+                <field name="scheduled_at" optional="hide"/>
+                <field name="specimen_state"/>
+                <field name="specimen_reject_reason" optional="hide"/>
+                <field name="state"/>
+                <button name="action_receive_specimen" type="object" icon="fa-check"
+                        string="Terima Spesimen"
+                        invisible="specimen_state != 'pending' or state != 'ordered'"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_order_line_specimen_search" model="ir.ui.view">
+        <field name="name">hms.order.line.specimen.search</field>
+        <field name="model">hms.order.line</field>
+        <field name="arch" type="xml">
+            <search string="Penerimaan Spesimen">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <filter name="f_pending" string="Belum Diterima"
+                        domain="[('specimen_state', '=', 'pending')]"/>
+                <filter name="f_rejected" string="Ditolak"
+                        domain="[('specimen_state', '=', 'rejected')]"/>
+                <separator/>
+                <filter name="g_specimen_state" string="Status Spesimen"
+                        context="{'group_by': 'specimen_state'}"/>
+                <filter name="g_reason" string="Alasan Penolakan"
+                        context="{'group_by': 'specimen_reject_reason'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_lab_specimen" model="ir.actions.act_window">
+        <field name="name">Penerimaan Spesimen</field>
+        <field name="res_model">hms.order.line</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('order_type', '=', 'lab')]</field>
+        <field name="search_view_id" ref="view_hms_order_line_specimen_search"/>
+        <field name="context">{'search_default_f_pending': 1}</field>
+    </record>
+    <record id="action_hms_lab_specimen_view" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_hms_order_line_specimen_list"/>
+        <field name="act_window_id" ref="action_hms_lab_specimen"/>
+    </record>
+    <menuitem id="menu_hms_lab_specimen" name="Penerimaan Spesimen"
+              parent="custom_hms_base.menu_hms_diagnostic_root" action="action_hms_lab_specimen"
+              sequence="7"/>
+</odoo>

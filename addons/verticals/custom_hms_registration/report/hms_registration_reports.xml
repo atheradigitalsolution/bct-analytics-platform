@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Card stock and wristband stock are physical sizes, not A4. Getting the
+         paper format wrong is the single most common reason a hospital demo
+         prints a wristband across half a page. -->
+    <record id="paperformat_hms_patient_card" model="report.paperformat">
+        <field name="name">SIMRS Kartu Pasien (86 x 54 mm)</field>
+        <field name="format">custom</field>
+        <field name="page_width">86</field>
+        <field name="page_height">54</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">2</field>
+        <field name="margin_bottom">2</field>
+        <field name="margin_left">2</field>
+        <field name="margin_right">2</field>
+        <field name="dpi">300</field>
+    </record>
+
+    <record id="paperformat_hms_wristband" model="report.paperformat">
+        <field name="name">SIMRS Gelang Pasien (250 x 25 mm)</field>
+        <field name="format">custom</field>
+        <field name="page_width">250</field>
+        <field name="page_height">25</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">1</field>
+        <field name="margin_bottom">1</field>
+        <field name="margin_left">2</field>
+        <field name="margin_right">2</field>
+        <field name="dpi">300</field>
+    </record>
+
+    <record id="report_hms_patient_card" model="ir.actions.report">
+        <field name="name">Kartu Pasien</field>
+        <field name="model">hms.patient</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_registration.report_patient_card_document</field>
+        <field name="report_file">custom_hms_registration.report_patient_card_document</field>
+        <field name="paperformat_id" ref="paperformat_hms_patient_card"/>
+        <field name="binding_model_id" ref="custom_hms_base.model_hms_patient"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <record id="report_hms_wristband" model="ir.actions.report">
+        <field name="name">Gelang Pasien</field>
+        <field name="model">hms.encounter</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_registration.report_wristband_document</field>
+        <field name="report_file">custom_hms_registration.report_wristband_document</field>
+        <field name="paperformat_id" ref="paperformat_hms_wristband"/>
+        <field name="binding_model_id" ref="model_hms_encounter"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <record id="report_hms_registration_sheet" model="ir.actions.report">
+        <field name="name">Lembar Registrasi</field>
+        <field name="model">hms.encounter</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_registration.report_registration_sheet_document</field>
+        <field name="report_file">custom_hms_registration.report_registration_sheet_document</field>
+        <field name="binding_model_id" ref="model_hms_encounter"/>
+        <field name="binding_type">report</field>
+    </record>
+</odoo>

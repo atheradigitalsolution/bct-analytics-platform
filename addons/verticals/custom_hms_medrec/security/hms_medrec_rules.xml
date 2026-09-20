@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        SENGAJA TANPA noupdate — alasan yang sama dengan custom_hms_safety:
+        domain record rule adalah hal yang paling sering perlu dibetulkan
+        setelah dipakai, dan noupdate="1" membuat domain yang salah menetap
+        selamanya di basis data yang sudah terpasang.
+    -->
+    <data>
+
+        <!--
+            hms.correction.request
+
+            Seorang perawat boleh mengajukan koreksi atas catatannya sendiri,
+            tetapi tidak boleh membaca permintaan koreksi orang lain: isi
+            permintaan memuat kutipan catatan klinis pasien lain secara utuh
+            (old_value/new_value), jadi daftar yang terbuka untuk semua staf
+            adalah rekam medis yang terbuka untuk semua staf lewat pintu
+            belakang.
+        -->
+        <record id="rule_hms_correction_own" model="ir.rule">
+            <field name="name">Koreksi RME: pemohon melihat permintaannya sendiri</field>
+            <field name="model_id" ref="model_hms_correction_request"/>
+            <field name="domain_force">[('requested_by_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_staff'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_hms_correction_medrec" model="ir.rule">
+            <field name="name">Koreksi RME: PMIK menelaah seluruh permintaan</field>
+            <field name="model_id" ref="model_hms_correction_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_hms_medrec')),
+                                        (4, ref('custom_hms_base.group_hms_manager'))]"/>
+        </record>
+
+        <!--
+            hms.roi.request
+
+            Tidak ada aturan "pemohon melihat miliknya sendiri": pemohon
+            pelepasan informasi adalah orang luar (pasien, asuransi, penyidik),
+            bukan pengguna Odoo. Yang membaca daftar ini hanya unit rekam
+            medis dan pimpinan yang harus memutuskannya.
+        -->
+        <record id="rule_hms_roi_request_all" model="ir.rule">
+            <field name="name">ROI: unit rekam medis dan pimpinan</field>
+            <field name="model_id" ref="model_hms_roi_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_hms_medrec')),
+                                        (4, ref('custom_hms_base.group_hms_manager'))]"/>
+        </record>
+
+        <!--
+            hms.klpcm
+
+            Dibaca luas dengan sengaja. Baris KLPCM tidak memuat isi klinis —
+            hanya nama komponen yang kurang — sementara ia menjadi gerbang
+            koding klaim. Gerbang yang lolos karena pembacanya tidak berhak
+            membaca adalah gerbang yang gagal tanpa suara, dan itu jenis
+            kegagalan yang paling mahal di sini.
+
+            Yang dibatasi adalah PENULISANNYA: klinisi hanya boleh menyentuh
+            baris yang menjadi tanggung jawabnya, sehingga tidak ada peran
+            klinis yang bisa menutup temuan milik orang lain.
+        -->
+        <record id="rule_hms_klpcm_clinician_write" model="ir.rule">
+            <field name="name">KLPCM: klinisi hanya menyentuh temuan miliknya</field>
+            <field name="model_id" ref="model_hms_klpcm"/>
+            <field name="domain_force">[('responsible_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_emr_clinician'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="report_hms_rad_report" model="ir.actions.report">
+        <field name="name">Hasil Ekspertise Radiologi</field>
+        <field name="model">hms.rad.report</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_radiology.report_rad_report_document</field>
+        <field name="report_file">custom_hms_radiology.report_rad_report_document</field>
+        <field name="binding_model_id" ref="model_hms_rad_report"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_rad_report_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 10pt;">
+                        <h4 style="text-align: center;">HASIL PEMERIKSAAN RADIOLOGI</h4>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td style="width: 18%;"><strong>Nama</strong></td>
+                                <td style="width: 32%;"><span t-field="doc.patient_id.name"/></td>
+                                <td style="width: 18%;"><strong>No. RM</strong></td>
+                                <td style="width: 32%;"><span t-field="doc.patient_id.mrn"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Usia / JK</strong></td>
+                                <td>
+                                    <span t-field="doc.patient_id.age_display"/> /
+                                    <span t-esc="dict(doc.patient_id._fields['gender'].selection).get(doc.patient_id.gender, '')"/>
+                                </td>
+                                <td><strong>Tanggal</strong></td>
+                                <td><span t-field="doc.performed_at"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Pemeriksaan</strong></td>
+                                <td><span t-field="doc.exam_name"/></td>
+                                <td><strong>Modalitas</strong></td>
+                                <td><span t-esc="dict(doc._fields['modality'].selection).get(doc.modality)"/></td>
+                            </tr>
+                        </table>
+                        <p t-if="doc.clinical_info"><strong>Keterangan Klinis</strong><br/>
+                            <span t-field="doc.clinical_info"/></p>
+                        <p t-if="doc.technique"><strong>Teknik</strong><br/>
+                            <span t-field="doc.technique"/></p>
+                        <p><strong>Hasil</strong><br/><span t-field="doc.findings"/></p>
+                        <p style="margin-top: 4mm;">
+                            <strong>KESAN</strong><br/>
+                            <span t-field="doc.impression"
+                                  t-attf-style="#{'color:#b00;font-weight:bold;' if doc.is_critical else ''}"/>
+                        </p>
+                        <p t-if="doc.suggestion"><strong>Saran</strong><br/>
+                            <span t-field="doc.suggestion"/></p>
+                        <table style="width: 100%; margin-top: 15mm;">
+                            <tr>
+                                <td style="width: 60%;"/>
+                                <td style="width: 40%; text-align: center;">
+                                    Dokter Spesialis Radiologi<br/>
+                                    <img t-if="doc.radiologist_id.signature_image"
+                                         t-att-src="image_data_uri(doc.radiologist_id.signature_image)"
+                                         style="height: 18mm;"/>
+                                    <div t-else="" style="height: 18mm;"/>
+                                    (<span t-field="doc.radiologist_id.display_name"/>)
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

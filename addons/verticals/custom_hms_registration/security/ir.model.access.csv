@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hms_encounter_staff,hms.encounter/staff,model_hms_encounter,custom_hms_base.group_hms_staff,1,0,0,0
+access_hms_encounter_registration,hms.encounter/registration,model_hms_encounter,custom_hms_base.group_hms_registration_user,1,1,1,0
+access_hms_encounter_clinician,hms.encounter/clinician,model_hms_encounter,custom_hms_base.group_hms_emr_clinician,1,1,0,0
+access_hms_encounter_admin,hms.encounter/admin,model_hms_encounter,custom_hms_base.group_hms_admin,1,1,1,1
+access_hms_referral_staff,hms.referral/staff,model_hms_referral,custom_hms_base.group_hms_staff,1,0,0,0
+access_hms_referral_registration,hms.referral/registration,model_hms_referral,custom_hms_base.group_hms_registration_user,1,1,1,1
+access_hms_registration_wizard_reg,hms.registration.wizard/registration,model_hms_registration_wizard,custom_hms_base.group_hms_registration_user,1,1,1,1

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_hms_roi_request" model="ir.sequence">
+            <field name="name">Nomor Permintaan Pelepasan Informasi</field>
+            <field name="code">hms.roi.request</field>
+            <field name="prefix">ROI-%(year)s%(month)s-</field>
+            <field name="padding">4</field>
+            <field name="implementation">standard</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+        <record id="seq_hms_correction_request" model="ir.sequence">
+            <field name="name">Nomor Permintaan Koreksi RME</field>
+            <field name="code">hms.correction.request</field>
+            <field name="prefix">KOR-%(year)s%(month)s-</field>
+            <field name="padding">4</field>
+            <field name="implementation">standard</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+        <record id="seq_hms_medical_letter" model="ir.sequence">
+            <field name="name">Nomor Surat Keterangan Medis</field>
+            <field name="code">hms.medical.letter</field>
+            <field name="prefix">SKM-%(year)s%(month)s-</field>
+            <field name="padding">4</field>
+            <field name="implementation">standard</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+        <record id="seq_hms_death_certificate" model="ir.sequence">
+            <field name="name">Nomor Sertifikat Kematian</field>
+            <field name="code">hms.death.certificate</field>
+            <field name="prefix">SKK-%(year)s%(month)s-</field>
+            <field name="padding">4</field>
+            <field name="implementation">standard</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_summary_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 10pt;">
+                        <h4 style="text-align: center;">
+                            <t t-if="doc.type == 'discharge'">RINGKASAN PULANG (DISCHARGE SUMMARY)</t>
+                            <t t-else="">RESUME MEDIS RAWAT JALAN</t>
+                        </h4>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td style="width: 20%;"><strong>Nama</strong></td>
+                                <td style="width: 30%;"><span t-field="doc.patient_id.name"/></td>
+                                <td style="width: 20%;"><strong>No. RM</strong></td>
+                                <td style="width: 30%;"><span t-field="doc.patient_id.mrn"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tgl Lahir</strong></td>
+                                <td><span t-field="doc.patient_id.birth_date"/></td>
+                                <td><strong>No. Kunjungan</strong></td>
+                                <td><span t-field="doc.encounter_id.name"/></td>
+                            </tr>
+                            <tr t-if="doc.type == 'discharge'">
+                                <td><strong>Masuk</strong></td>
+                                <td><span t-field="doc.admitted_at"/></td>
+                                <td><strong>Keluar</strong></td>
+                                <td>
+                                    <span t-field="doc.discharged_at"/>
+                                    (<span t-field="doc.length_of_stay"/> hari)
+                                </td>
+                            </tr>
+                        </table>
+                        <hr/>
+                        <p><strong>Keluhan Utama</strong><br/><span t-field="doc.chief_complaint"/></p>
+                        <p><strong>Riwayat Penyakit</strong><br/><span t-field="doc.history"/></p>
+                        <p><strong>Pemeriksaan Fisik</strong><br/><span t-field="doc.physical_exam"/></p>
+                        <p t-if="doc.lab_summary"><strong>Hasil Penunjang</strong><br/>
+                            <span t-field="doc.lab_summary"/></p>
+                        <p>
+                            <strong>Diagnosis Utama</strong><br/>
+                            <span t-field="doc.diagnosis_primary_id"/>
+                        </p>
+                        <p t-if="doc.diagnosis_secondary_ids">
+                            <strong>Diagnosis Sekunder</strong><br/>
+                            <t t-foreach="doc.diagnosis_secondary_ids" t-as="dx">
+                                <span t-field="dx.display_name"/><br/>
+                            </t>
+                        </p>
+                        <p t-if="doc.procedure_summary"><strong>Tindakan</strong><br/>
+                            <span t-field="doc.procedure_summary"/></p>
+                        <p t-if="doc.treatment"><strong>Terapi</strong><br/>
+                            <span t-field="doc.treatment"/></p>
+                        <p t-if="doc.discharge_medication"><strong>Obat Pulang</strong><br/>
+                            <span t-field="doc.discharge_medication"/></p>
+                        <p>
+                            <strong>Keadaan Keluar:</strong>
+                            <span t-esc="dict(doc._fields['condition_at_discharge'].selection).get(doc.condition_at_discharge, '-')"/>
+                            &#160;·&#160;
+                            <strong>Cara Keluar:</strong>
+                            <span t-esc="dict(doc._fields['disposition'].selection).get(doc.disposition, '-')"/>
+                        </p>
+                        <p t-if="doc.followup_instruction"><strong>Anjuran</strong><br/>
+                            <span t-field="doc.followup_instruction"/></p>
+                        <p t-if="doc.followup_date">
+                            <strong>Kontrol:</strong> <span t-field="doc.followup_date"/>
+                            di <span t-field="doc.followup_unit_id.name"/>
+                        </p>
+                        <table style="width: 100%; margin-top: 15mm;">
+                            <tr>
+                                <td style="width: 60%;"/>
+                                <td style="width: 40%; text-align: center;">
+                                    Dokter Penanggung Jawab Pelayanan<br/>
+                                    <img t-if="doc.practitioner_id.signature_image"
+                                         t-att-src="image_data_uri(doc.practitioner_id.signature_image)"
+                                         style="height: 18mm;"/>
+                                    <div t-else="" style="height: 18mm;"/>
+                                    <span t-field="doc.practitioner_id.display_name"/>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_consent_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 10pt;">
+                        <h4 style="text-align: center;"><span t-field="doc.template_id.name"/></h4>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td style="width: 20%;"><strong>Pasien</strong></td>
+                                <td><span t-field="doc.patient_id.name"/>
+                                    (<span t-field="doc.patient_id.mrn"/>)</td>
+                            </tr>
+                            <tr t-if="doc.tariff_id">
+                                <td><strong>Tindakan</strong></td>
+                                <td><span t-field="doc.tariff_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dijelaskan oleh</strong></td>
+                                <td><span t-field="doc.explained_by_id.display_name"/></td>
+                            </tr>
+                        </table>
+                        <div t-field="doc.body_snapshot" t-if="doc.body_snapshot"/>
+                        <div t-else="" t-field="doc.template_id.body"/>
+                        <table style="width: 100%; margin-top: 12mm;">
+                            <tr>
+                                <td style="width: 50%; text-align: center;">
+                                    Yang Menyatakan<br/><br/><br/>
+                                    (<span t-field="doc.signer_name"/>)<br/>
+                                    <small><span t-field="doc.signer_relation"/></small>
+                                </td>
+                                <td style="width: 50%; text-align: center;">
+                                    Saksi<br/><br/><br/>
+                                    (<span t-field="doc.witness_name"/>)
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_patient_list" model="ir.ui.view">
+        <field name="name">hms.patient.list</field>
+        <field name="model">hms.patient</field>
+        <field name="arch" type="xml">
+            <list string="Pasien">
+                <field name="mrn"/>
+                <field name="name"/>
+                <!-- NIK is masked in the list on purpose: a shoulder-surfable
+                     screen at a busy counter is the most common leak path. -->
+                <field name="nik" groups="custom_hms_base.group_hms_registration_manager"/>
+                <field name="gender"/>
+                <field name="birth_date"/>
+                <field name="age_display"/>
+                <field name="phone"/>
+                <field name="default_payer_id"/>
+                <field name="has_allergy" widget="boolean_toggle" readonly="1"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_patient_form" model="ir.ui.view">
+        <field name="name">hms.patient.form</field>
+        <field name="model">hms.patient</field>
+        <field name="arch" type="xml">
+            <form string="Pasien">
+                <sheet>
+                    <widget name="web_ribbon" title="Digabung" bg_color="text-bg-danger"
+                            invisible="state != 'merged'"/>
+                    <field name="photo" widget="image" class="oe_avatar"/>
+                    <div class="oe_title">
+                        <h1><field name="mrn" readonly="1"/></h1>
+                        <h2><field name="name" placeholder="Nama sesuai KTP"/></h2>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="not has_allergy">
+                        Pasien memiliki alergi terdaftar — periksa tab Klinis sebelum meresepkan.
+                    </div>
+                    <group>
+                        <group string="Identitas">
+                            <field name="identity_type"/>
+                            <field name="nik" invisible="identity_type != 'ktp'"/>
+                            <field name="identity_no" invisible="identity_type in ('ktp', 'none')"/>
+                            <field name="birth_place"/>
+                            <field name="birth_date"/>
+                            <field name="age_display"/>
+                            <field name="gender"/>
+                            <field name="blood_type"/>
+                            <field name="rhesus"/>
+                            <field name="mother_name"/>
+                            <field name="is_newborn"/>
+                            <field name="mother_patient_id" invisible="not is_newborn"/>
+                            <field name="is_anonymous"/>
+                        </group>
+                        <group string="Kontak">
+                            <field name="phone"/>
+                            <field name="phone2"/>
+                            <field name="email"/>
+                            <field name="address_street"/>
+                            <label for="rt" string="RT / RW"/>
+                            <div class="o_row">
+                                <field name="rt"/> /
+                                <field name="rw"/>
+                            </div>
+                            <field name="village_id"/>
+                            <field name="district_id"/>
+                            <field name="city_id"/>
+                            <field name="state_region_id"/>
+                            <field name="postal_code"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Klinis" name="clinical">
+                            <group>
+                                <group>
+                                    <field name="height_cm_last"/>
+                                    <field name="weight_kg_last"/>
+                                    <field name="disability"/>
+                                    <field name="is_dnr"/>
+                                </group>
+                                <group>
+                                    <field name="infection_flag_ids" widget="many2many_tags"
+                                           groups="custom_hms_base.group_hms_emr_clinician"/>
+                                    <field name="special_needs"/>
+                                </group>
+                            </group>
+                            <separator string="Alergi"/>
+                            <field name="allergy_ids">
+                                <list editable="bottom">
+                                    <field name="substance_type"/>
+                                    <field name="substance"/>
+                                    <field name="ingredient_id"/>
+                                    <field name="reaction"/>
+                                    <field name="severity"/>
+                                    <field name="source"/>
+                                    <field name="verified_by_id"/>
+                                </list>
+                            </field>
+                            <separator string="Kondisi Kronis"/>
+                            <field name="chronic_condition_ids">
+                                <list editable="bottom">
+                                    <field name="icd10_id"/>
+                                    <field name="since"/>
+                                    <field name="note"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Penjamin" name="payer">
+                            <group>
+                                <field name="default_payer_id"/>
+                                <field name="bpjs_no"/>
+                                <field name="bpjs_class"/>
+                                <field name="bpjs_status" readonly="1"/>
+                                <field name="bpjs_checked_at" readonly="1"/>
+                            </group>
+                            <field name="insurance_ids">
+                                <list editable="bottom">
+                                    <field name="payer_id"/>
+                                    <field name="plan_id"/>
+                                    <field name="member_no"/>
+                                    <field name="valid_to"/>
+                                    <field name="is_primary"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Darurat &amp; Sosial" name="social">
+                            <group>
+                                <group string="Kontak Darurat">
+                                    <field name="emergency_contact_name"/>
+                                    <field name="emergency_contact_relation"/>
+                                    <field name="emergency_contact_phone"/>
+                                    <field name="guardian_partner_id"/>
+                                </group>
+                                <group string="Data Sosial">
+                                    <field name="marital_status"/>
+                                    <field name="religion"/>
+                                    <field name="education"/>
+                                    <field name="occupation"/>
+                                    <field name="nationality_id"/>
+                                    <field name="language"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Administrasi" name="admin">
+                            <group>
+                                <group>
+                                    <field name="partner_id" readonly="1"/>
+                                    <field name="first_visit_date" readonly="1"/>
+                                    <field name="last_visit_date" readonly="1"/>
+                                    <field name="visit_count" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="is_vip"/>
+                                    <field name="is_employee"/>
+                                    <field name="is_staff_family"/>
+                                    <field name="consent_marketing"/>
+                                    <field name="consent_data_sharing"/>
+                                    <field name="ihs_patient_id" readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="Status">
+                                <field name="state"/>
+                                <field name="merged_into_id" readonly="1" invisible="state != 'merged'"/>
+                                <field name="deceased_at" invisible="state != 'deceased'"/>
+                                <field name="death_cause_icd10_id" invisible="state != 'deceased'"/>
+                            </group>
+                            <field name="note_internal" placeholder="Catatan non-klinis"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_patient_search" model="ir.ui.view">
+        <field name="name">hms.patient.search</field>
+        <field name="model">hms.patient</field>
+        <field name="arch" type="xml">
+            <search string="Cari Pasien">
+                <field name="mrn"/>
+                <field name="name" filter_domain="[('name', 'ilike', self)]"/>
+                <field name="nik"/>
+                <field name="bpjs_no"/>
+                <field name="phone"/>
+                <field name="birth_date"/>
+                <filter name="f_allergy" string="Ada Alergi" domain="[('has_allergy', '=', True)]"/>
+                <filter name="f_vip" string="VIP" domain="[('is_vip', '=', True)]"/>
+                <separator/>
+                <filter name="f_active" string="Aktif" domain="[('state', '=', 'active')]"/>
+                <separator/>
+                    <filter name="g_payer" string="Penjamin" context="{'group_by': 'default_payer_id'}"/>
+                    <filter name="g_gender" string="Jenis Kelamin" context="{'group_by': 'gender'}"/>
+                    <filter name="g_city" string="Kabupaten/Kota" context="{'group_by': 'city_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_patient" model="ir.actions.act_window">
+        <field name="name">Pasien</field>
+        <field name="res_model">hms.patient</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_patient_search"/>
+        <field name="context">{'search_default_f_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Belum ada pasien terdaftar</p>
+            <p>Nomor rekam medis dibuat otomatis saat pasien disimpan.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_hms_patient" name="Pasien" parent="menu_hms_frontdesk"
+              action="action_hms_patient" sequence="10"/>
+</odoo>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_bpjs_config_form" model="ir.ui.view">
+        <field name="name">hms.bpjs.config.form</field>
+        <field name="model">hms.bpjs.config</field>
+        <field name="arch" type="xml">
+            <form string="Konfigurasi BPJS">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Kredensial BPJS dibaca dari environment dan tidak pernah disimpan di
+                        basis data. Layar ini hanya menunjukkan apakah nilainya sudah terisi.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="mode" readonly="1"/>
+                            <field name="ppk_code" readonly="1"/>
+                            <field name="vclaim_base_url" readonly="1"/>
+                            <field name="antrol_base_url" readonly="1"/>
+                        </group>
+                        <group string="Status Kredensial">
+                            <field name="cons_id_set" readonly="1" widget="boolean_toggle"/>
+                            <field name="secret_set" readonly="1" widget="boolean_toggle"/>
+                            <field name="user_key_vclaim_set" readonly="1" widget="boolean_toggle"/>
+                            <field name="user_key_antrol_set" readonly="1" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_bpjs_config" model="ir.actions.server">
+        <field name="name">Konfigurasi BPJS</field>
+        <field name="model_id" ref="model_hms_bpjs_config"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_settings()</field>
+    </record>
+    <menuitem id="menu_hms_bpjs_config" name="Konfigurasi BPJS"
+              parent="custom_hms_queue.menu_hms_integration"
+              action="action_hms_bpjs_config" sequence="50"/>
+
+    <record id="view_hms_sep_list" model="ir.ui.view">
+        <field name="name">hms.sep.list</field>
+        <field name="model">hms.sep</field>
+        <field name="arch" type="xml">
+            <list string="SEP" create="false">
+                <field name="name"/>
+                <field name="issued_at"/>
+                <field name="patient_id"/>
+                <field name="encounter_id"/>
+                <field name="card_no"/>
+                <field name="service_type"/>
+                <field name="poli"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_hms_sep" model="ir.actions.act_window">
+        <field name="name">SEP Terbit</field>
+        <field name="res_model">hms.sep</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_sep" name="SEP Terbit"
+              parent="custom_hms_base.menu_hms_frontdesk" action="action_hms_sep" sequence="40"/>
+
+    <record id="view_hms_encounter_form_bpjs" model="ir.ui.view">
+        <field name="name">hms.encounter.form.bpjs</field>
+        <field name="model">hms.encounter</field>
+        <field name="inherit_id" ref="custom_hms_registration.view_hms_encounter_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='sep_error']" position="after">
+                <button name="action_retry_sep" type="object" string="Ulangi Permintaan SEP"
+                        class="btn-secondary" invisible="sep_state not in ('failed', 'pending')"/>
+                <button name="action_check_peserta" type="object" string="Cek Peserta"
+                        class="btn-secondary" invisible="sep_state == 'none'"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

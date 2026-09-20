@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        SENGAJA TANPA noupdate.
+
+        Grup-grup SIMRS lahir di hms_groups.xml di dalam <data noupdate="1">.
+        Flag itu tersimpan di baris ir.model.data milik grup tersebut, bukan
+        pada modul penulisnya, sehingga <record model="res.groups"> yang
+        mencoba menambah implied_ids ke grup itu akan dilewati diam-diam pada
+        setiap install dan update — termasuk dari modul ini sendiri.
+
+        <function> di blok tanpa noupdate justru dijalankan ulang setiap kali
+        modul di-update, jadi hibahnya mendarat pada basis data yang sudah
+        terpasang (yang tidak akan pernah menjalankan post_init_hook lagi) dan
+        tetap mendarat pada install bersih.
+    -->
+    <data>
+        <function model="res.groups" name="_hms_apply_group_implications"/>
+    </data>
+</odoo>

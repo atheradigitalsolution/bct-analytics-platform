@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hms_event_staff,hms.event/staff,model_hms_event,custom_hms_base.group_hms_staff,1,0,0,0
+access_hms_event_admin,hms.event/admin,model_hms_event,custom_hms_base.group_hms_admin,1,1,1,1
+access_hms_job_staff,hms.job/staff,model_hms_job,custom_hms_base.group_hms_staff,1,0,0,0
+access_hms_job_regmanager,hms.job/registration_manager,model_hms_job,custom_hms_base.group_hms_registration_manager,1,1,0,0
+access_hms_job_admin,hms.job/admin,model_hms_job,custom_hms_base.group_hms_admin,1,1,1,1
+access_hms_bridging_log_staff,hms.bridging.log/staff,model_hms_bridging_log,custom_hms_base.group_hms_staff,1,0,0,0
+access_hms_bridging_log_admin,hms.bridging.log/admin,model_hms_bridging_log,custom_hms_base.group_hms_admin,1,0,1,0

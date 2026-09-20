@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="report_hms_summary" model="ir.actions.report">
+        <field name="name">Resume Medis</field>
+        <field name="model">hms.summary</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_emr.report_summary_document</field>
+        <field name="report_file">custom_hms_emr.report_summary_document</field>
+        <field name="binding_model_id" ref="model_hms_summary"/>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="report_hms_consent" model="ir.actions.report">
+        <field name="name">Formulir Persetujuan</field>
+        <field name="model">hms.consent</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_emr.report_consent_document</field>
+        <field name="report_file">custom_hms_emr.report_consent_document</field>
+        <field name="binding_model_id" ref="model_hms_consent"/>
+        <field name="binding_type">report</field>
+    </record>
+</odoo>

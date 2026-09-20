@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="report_hms_lab_result" model="ir.actions.report">
+        <field name="name">Hasil Laboratorium</field>
+        <field name="model">hms.order</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_lab.report_lab_result_document</field>
+        <field name="report_file">custom_hms_lab.report_lab_result_document</field>
+        <field name="binding_model_id" ref="custom_hms_order.model_hms_order"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_lab_result_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="order">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 10pt;">
+                        <h4 style="text-align: center;">HASIL PEMERIKSAAN LABORATORIUM</h4>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td style="width: 18%;"><strong>Nama</strong></td>
+                                <td style="width: 32%;"><span t-field="order.patient_id.name"/></td>
+                                <td style="width: 18%;"><strong>No. RM</strong></td>
+                                <td style="width: 32%;"><span t-field="order.patient_id.mrn"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Usia / JK</strong></td>
+                                <td>
+                                    <span t-field="order.patient_id.age_display"/> /
+                                    <span t-esc="dict(order.patient_id._fields['gender'].selection).get(order.patient_id.gender, '')"/>
+                                </td>
+                                <td><strong>No. Order</strong></td>
+                                <td><span t-field="order.name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dokter Pengirim</strong></td>
+                                <td><span t-field="order.practitioner_id.display_name"/></td>
+                                <td><strong>Tanggal</strong></td>
+                                <td><span t-field="order.ordered_at"/></td>
+                            </tr>
+                        </table>
+                        <t t-foreach="order.line_ids" t-as="line">
+                            <h6 style="margin-top: 4mm;"><span t-field="line.name"/></h6>
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 35%;">Pemeriksaan</th>
+                                        <th style="width: 18%;" class="text-end">Hasil</th>
+                                        <th style="width: 10%;">Satuan</th>
+                                        <th style="width: 25%;">Nilai Rujukan</th>
+                                        <th style="width: 12%;">Penanda</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="line.lab_result_ids.filtered(lambda r: r.state == 'verified')" t-as="res">
+                                        <td><span t-field="res.parameter_id.name"/></td>
+                                        <td class="text-end">
+                                            <strong t-if="res.is_critical" style="color:#b00;">
+                                                <span t-field="res.value_numeric"/>
+                                            </strong>
+                                            <t t-else="">
+                                                <span t-if="res.parameter_id.value_type == 'numeric'"
+                                                      t-field="res.value_numeric"/>
+                                                <span t-else="" t-field="res.value_text"/>
+                                            </t>
+                                        </td>
+                                        <td><span t-field="res.uom_name"/></td>
+                                        <td><span t-field="res.ref_display"/></td>
+                                        <td>
+                                            <span t-esc="dict(res._fields['flag'].selection).get(res.flag, '')"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+                        <p style="font-size: 8pt; font-style: italic;">
+                            Hasil hanya berlaku untuk spesimen yang diperiksa. Nilai kritis dicetak
+                            tebal berwarna dan telah dilaporkan kepada dokter penanggung jawab.
+                        </p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

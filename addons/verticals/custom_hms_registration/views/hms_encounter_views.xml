@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_encounter_list" model="ir.ui.view">
+        <field name="name">hms.encounter.list</field>
+        <field name="model">hms.encounter</field>
+        <field name="arch" type="xml">
+            <list string="Kunjungan"
+                  decoration-danger="triage_level == 'red'"
+                  decoration-warning="triage_level == 'yellow'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="arrival_at"/>
+                <field name="mrn"/>
+                <field name="patient_id"/>
+                <field name="type"/>
+                <field name="unit_id"/>
+                <field name="practitioner_id"/>
+                <field name="payer_id"/>
+                <field name="triage_level" optional="show"/>
+                <field name="sep_no" optional="hide"/>
+                <field name="sep_state" optional="show" widget="badge"/>
+                <field name="state" widget="badge"
+                       decoration-success="state in ('finished', 'discharged')"
+                       decoration-info="state == 'in_progress'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_encounter_form" model="ir.ui.view">
+        <field name="name">hms.encounter.form</field>
+        <field name="model">hms.encounter</field>
+        <field name="arch" type="xml">
+            <form string="Kunjungan">
+                <header>
+                    <button name="action_start_service" type="object" string="Mulai Dilayani"
+                            class="btn-primary" invisible="state != 'registered'"/>
+                    <button name="action_close" type="object" string="Tutup Kunjungan"
+                            class="btn-primary" invisible="state not in ('registered', 'in_progress')"/>
+                    <button name="action_reopen" type="object" string="Buka Kembali"
+                            invisible="state != 'finished'"
+                            groups="custom_hms_base.group_hms_registration_manager"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('cancelled', 'discharged', 'admitted')"
+                            confirm="Batalkan kunjungan ini?"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="registered,in_progress,finished"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Terkunci" bg_color="text-bg-warning"
+                            invisible="not is_locked"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="triage_level != 'red'">
+                        TRIASE MERAH — resusitasi. Pasien didahulukan di atas seluruh antrian.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="not identity_pending">
+                        Identitas pasien belum lengkap. Lengkapi sebelum kunjungan ditutup.
+                    </div>
+                    <group>
+                        <group string="Pasien">
+                            <field name="patient_id" options="{'no_create': True}"/>
+                            <field name="mrn" readonly="1"/>
+                            <field name="type"/>
+                            <field name="visit_type"/>
+                            <field name="arrival_at"/>
+                            <field name="arrival_mode"/>
+                            <field name="chief_complaint"/>
+                        </group>
+                        <group string="Pelayanan">
+                            <field name="unit_id"/>
+                            <field name="practitioner_id"/>
+                            <field name="payer_id"/>
+                            <field name="payer_plan_id"/>
+                            <field name="class_id"/>
+                            <field name="referral_id"/>
+                        </group>
+                    </group>
+                    <group string="Triase" invisible="type != 'emergency'">
+                        <group>
+                            <field name="triage_level"/>
+                            <field name="triage_at"/>
+                            <field name="triage_by_id"/>
+                        </group>
+                    </group>
+                    <group string="Penjaminan BPJS" invisible="sep_state == 'none'">
+                        <group>
+                            <field name="sep_state" readonly="1"/>
+                            <field name="sep_no" readonly="1"/>
+                            <field name="sep_error" readonly="1" invisible="not sep_error"/>
+                        </group>
+                    </group>
+                    <group string="Program Nasional">
+                        <group>
+                            <field name="sitb_register_no"/>
+                        </group>
+                    </group>
+                    <group string="Penutupan" invisible="state not in ('finished', 'discharged')">
+                        <group>
+                            <field name="closed_at" readonly="1"/>
+                            <field name="closed_by_id" readonly="1"/>
+                            <field name="discharge_disposition"/>
+                            <field name="reopen_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Catatan pendaftaran"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_encounter_search" model="ir.ui.view">
+        <field name="name">hms.encounter.search</field>
+        <field name="model">hms.encounter</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="mrn"/>
+                <field name="unit_id"/>
+                <field name="practitioner_id"/>
+                <field name="payer_id"/>
+                <filter name="f_today" string="Hari Ini"
+                        domain="[('arrival_at', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0,0,0)))]"/>
+                <filter name="f_open" string="Masih Terbuka"
+                        domain="[('state', 'in', ('registered', 'in_progress'))]"/>
+                <filter name="f_emergency" string="IGD" domain="[('type', '=', 'emergency')]"/>
+                <filter name="f_sep_problem" string="SEP Bermasalah"
+                        domain="[('sep_state', 'in', ('pending', 'failed'))]"/>
+                <filter name="f_identity" string="Identitas Belum Lengkap"
+                        domain="[('identity_pending', '=', True)]"/>
+                <separator/>
+                <filter name="g_unit" string="Unit" context="{'group_by': 'unit_id'}"/>
+                <filter name="g_doctor" string="Dokter" context="{'group_by': 'practitioner_id'}"/>
+                <filter name="g_payer" string="Penjamin" context="{'group_by': 'payer_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="g_date" string="Tanggal" context="{'group_by': 'arrival_at:day'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_encounter" model="ir.actions.act_window">
+        <field name="name">Kunjungan</field>
+        <field name="res_model">hms.encounter</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_encounter_search"/>
+        <field name="context">{'search_default_f_today': 1, 'search_default_f_open': 1}</field>
+    </record>
+    <menuitem id="menu_hms_encounter" name="Kunjungan Hari Ini"
+              parent="custom_hms_base.menu_hms_frontdesk" action="action_hms_encounter" sequence="20"/>
+
+    <record id="action_hms_encounter_emergency" model="ir.actions.act_window">
+        <field name="name">Papan IGD</field>
+        <field name="res_model">hms.encounter</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_encounter_search"/>
+        <field name="domain">[('type', '=', 'emergency')]</field>
+        <field name="context">{'search_default_f_today': 1, 'search_default_f_open': 1}</field>
+    </record>
+    <menuitem id="menu_hms_emergency_board" name="Papan IGD"
+              parent="custom_hms_base.menu_hms_clinical" action="action_hms_encounter_emergency"
+              sequence="10"/>
+
+    <record id="action_hms_referral" model="ir.actions.act_window">
+        <field name="name">Rujukan Masuk</field>
+        <field name="res_model">hms.referral</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_referral" name="Rujukan Masuk"
+              parent="custom_hms_base.menu_hms_frontdesk" action="action_hms_referral" sequence="30"/>
+</odoo>

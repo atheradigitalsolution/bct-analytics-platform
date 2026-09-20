@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_observation_list" model="ir.ui.view">
+        <field name="name">hms.observation.list</field>
+        <field name="model">hms.observation</field>
+        <field name="arch" type="xml">
+            <list string="Observasi" editable="bottom">
+                <field name="taken_at"/>
+                <field name="context"/>
+                <field name="systolic"/>
+                <field name="diastolic"/>
+                <field name="pulse"/>
+                <field name="respiratory_rate"/>
+                <field name="temperature"/>
+                <field name="spo2"/>
+                <field name="pain_score" optional="show"/>
+                <field name="weight_kg" optional="hide"/>
+                <field name="height_cm" optional="hide"/>
+                <field name="bmi" optional="hide" readonly="1"/>
+                <field name="fall_risk_score" optional="hide"/>
+                <field name="fall_risk_level" optional="hide" readonly="1" widget="badge"
+                       decoration-danger="fall_risk_level == 'high'"
+                       decoration-warning="fall_risk_level == 'medium'"/>
+                <field name="taken_by_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_observation_form" model="ir.ui.view">
+        <field name="name">hms.observation.form</field>
+        <field name="model">hms.observation</field>
+        <field name="arch" type="xml">
+            <form string="Observasi">
+                <sheet>
+                    <group>
+                        <group string="Konteks">
+                            <field name="encounter_id"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="taken_at"/>
+                            <field name="taken_by_id"/>
+                            <field name="context"/>
+                        </group>
+                        <group string="Tanda Vital">
+                            <label for="systolic" string="Tekanan Darah"/>
+                            <div class="o_row">
+                                <field name="systolic"/> /
+                                <field name="diastolic"/> mmHg
+                            </div>
+                            <field name="pulse"/>
+                            <field name="respiratory_rate"/>
+                            <field name="temperature"/>
+                            <field name="spo2"/>
+                            <field name="oxygen_support"/>
+                        </group>
+                        <group string="Kesadaran">
+                            <field name="consciousness"/>
+                            <label for="gcs_eye" string="GCS (E/V/M)"/>
+                            <div class="o_row">
+                                <field name="gcs_eye"/> /
+                                <field name="gcs_verbal"/> /
+                                <field name="gcs_motor"/> =
+                                <field name="gcs_total" readonly="1"/>
+                            </div>
+                        </group>
+                        <group string="Antropometri &amp; Skrining">
+                            <field name="weight_kg"/>
+                            <field name="height_cm"/>
+                            <field name="bmi" readonly="1"/>
+                            <field name="pain_score"/>
+                            <field name="fall_risk_score"/>
+                            <field name="fall_risk_level" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Catatan pengukuran"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_observation" model="ir.actions.act_window">
+        <field name="name">Observasi / TTV</field>
+        <field name="res_model">hms.observation</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

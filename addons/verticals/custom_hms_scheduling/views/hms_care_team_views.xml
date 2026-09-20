@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_consult_list" model="ir.ui.view">
+        <field name="name">hms.consult.request.list</field>
+        <field name="model">hms.consult.request</field>
+        <field name="arch" type="xml">
+            <list string="Konsul" decoration-danger="urgency == 'cito'"
+                  decoration-warning="urgency == 'urgent'">
+                <field name="requested_at"/>
+                <field name="patient_id"/>
+                <field name="from_practitioner_id"/>
+                <field name="to_practitioner_id"/>
+                <field name="to_specialty_id"/>
+                <field name="urgency"/>
+                <field name="state" widget="badge"/>
+                <button name="action_accept" type="object" string="Terima" icon="fa-check"
+                        invisible="state != 'requested'"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_consult_form" model="ir.ui.view">
+        <field name="name">hms.consult.request.form</field>
+        <field name="model">hms.consult.request</field>
+        <field name="arch" type="xml">
+            <form string="Konsul">
+                <header>
+                    <button name="action_accept" type="object" string="Terima Konsul"
+                            class="btn-primary" invisible="state != 'requested'"/>
+                    <button name="action_decline" type="object" string="Tolak"
+                            invisible="state not in ('requested', 'accepted')"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="encounter_id"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="from_practitioner_id"/>
+                        </group>
+                        <group>
+                            <field name="to_practitioner_id"/>
+                            <field name="to_specialty_id"/>
+                            <field name="urgency"/>
+                            <field name="tariff_id"/>
+                            <field name="answer_note_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="question" placeholder="Pertanyaan klinis untuk dokter tujuan"/>
+                    <field name="decline_reason" invisible="state != 'declined'"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_consult" model="ir.actions.act_window">
+        <field name="name">Konsul Antar Dokter</field>
+        <field name="res_model">hms.consult.request</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_consult" name="Konsul" parent="custom_hms_base.menu_hms_clinical"
+              action="action_hms_consult" sequence="35"/>
+
+    <record id="view_hms_encounter_form_careteam" model="ir.ui.view">
+        <field name="name">hms.encounter.form.careteam</field>
+        <field name="model">hms.encounter</field>
+        <field name="inherit_id" ref="custom_hms_emr.view_hms_encounter_form_emr"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='summaries']" position="after">
+                <page string="Tim Perawatan" name="care_team">
+                    <field name="care_team_ids">
+                        <list editable="bottom">
+                            <field name="practitioner_id"/>
+                            <field name="role"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="is_active"/>
+                            <field name="reason"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

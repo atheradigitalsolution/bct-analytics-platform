@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_cashier_session_list" model="ir.ui.view">
+        <field name="name">hms.cashier.session.list</field>
+        <field name="model">hms.cashier.session</field>
+        <field name="arch" type="xml">
+            <list string="Shift Kasir" decoration-danger="difference != 0"
+                  decoration-success="state == 'closed' and difference == 0">
+                <field name="name"/>
+                <field name="counter_id"/>
+                <field name="user_id"/>
+                <field name="opened_at"/>
+                <field name="closed_at"/>
+                <field name="opening_cash"/>
+                <field name="total_collected" sum="Total"/>
+                <field name="expected_cash"/>
+                <field name="difference" sum="Selisih"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_cashier_session_form" model="ir.ui.view">
+        <field name="name">hms.cashier.session.form</field>
+        <field name="model">hms.cashier.session</field>
+        <field name="arch" type="xml">
+            <form string="Shift Kasir">
+                <header>
+                    <button name="action_start_closing" type="object" string="Mulai Closing"
+                            class="btn-primary" invisible="state != 'open'"/>
+                    <button name="action_close" type="object" string="Tutup Shift"
+                            class="btn-primary" invisible="state != 'closing'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="counter_id"/>
+                            <field name="user_id"/>
+                            <field name="opening_cash"/>
+                        </group>
+                        <group>
+                            <field name="opened_at"/>
+                            <field name="closed_at" readonly="1"/>
+                            <field name="total_collected" readonly="1"/>
+                            <field name="expected_cash" readonly="1"/>
+                            <field name="difference" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Penghitungan Fisik" name="closing">
+                            <div class="alert alert-info" role="alert" invisible="state != 'closing'">
+                                Hitung tunai secara fisik dan cocokkan EDC/transfer/QRIS dengan
+                                struk. Selisih apa pun harus dijelaskan sebelum shift ditutup.
+                            </div>
+                            <field name="line_ids">
+                                <list editable="bottom" decoration-danger="difference != 0">
+                                    <field name="method" readonly="1"/>
+                                    <field name="expected_amount" readonly="1"/>
+                                    <field name="counted_amount"/>
+                                    <field name="difference" readonly="1"/>
+                                    <field name="note"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Pembayaran" name="payments">
+                            <field name="payment_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="paid_at"/>
+                                    <field name="patient_id"/>
+                                    <field name="method"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="state"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                    <field name="note"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_cashier_session" model="ir.actions.act_window">
+        <field name="name">Shift Kasir</field>
+        <field name="res_model">hms.cashier.session</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_cashier_session" name="Shift Kasir"
+              parent="custom_hms_base.menu_hms_billing_root" action="action_hms_cashier_session"
+              sequence="5"/>
+
+    <record id="action_hms_cashier_counter" model="ir.actions.act_window">
+        <field name="name">Loket Kasir</field>
+        <field name="res_model">hms.cashier.counter</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_cashier_counter" name="Loket Kasir"
+              parent="custom_hms_base.menu_hms_config_tariff" action="action_hms_cashier_counter"
+              sequence="50"/>
+
+    <record id="action_hms_bill_estimate" model="ir.actions.act_window">
+        <field name="name">Estimasi Biaya</field>
+        <field name="res_model">hms.bill.estimate</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_bill_estimate" name="Estimasi Biaya"
+              parent="custom_hms_base.menu_hms_billing_root" action="action_hms_bill_estimate"
+              sequence="50"/>
+
+    <record id="action_hms_receivable" model="ir.actions.act_window">
+        <field name="name">Piutang Pasien</field>
+        <field name="res_model">hms.patient.receivable</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_receivable" name="Piutang Pasien"
+              parent="custom_hms_base.menu_hms_billing_root" action="action_hms_receivable"
+              sequence="60" groups="custom_hms_base.group_hms_billing_supervisor"/>
+</odoo>

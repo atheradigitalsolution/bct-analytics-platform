@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Sumbu peran baru, jadi privilege-nya juga baru.
+
+            Odoo 19 merender semua res.groups yang berbagi satu
+            res.groups.privilege sebagai dropdown pilih-satu pada form
+            pengguna. Anggota tim KP hampir selalu juga perawat atau apoteker;
+            menempelkan grup ini pada privilege keperawatan/farmasi akan
+            membuang peran aslinya begitu form user disimpan.
+        -->
+        <record id="privilege_hms_patient_safety" model="res.groups.privilege">
+            <field name="name">SIMRS / Keselamatan Pasien</field>
+            <field name="category_id" ref="custom_hms_base.module_category_hms"/>
+            <field name="sequence">480</field>
+        </record>
+
+        <!--
+            Tim Keselamatan Pasien (KPRS).
+
+            Menyiratkan group_hms_staff saja — tidak ada hak klinis yang ikut,
+            dan sebaliknya tidak ada grup klinis yang menyiratkan grup ini.
+            Administrator SIMRS pun TIDAK otomatis menjadi anggota: matriks
+            hak akses menulis "Lihat insiden | grup tim KP saja", dan sebuah
+            grup rahasia yang diwarisi peran tertinggi bukan grup rahasia.
+            Keanggotaannya ditetapkan manusia, satu per satu.
+        -->
+        <record id="group_hms_patient_safety" model="res.groups">
+            <field name="name">Tim Keselamatan Pasien (KPRS)</field>
+            <field name="privilege_id" ref="privilege_hms_patient_safety"/>
+            <field name="implied_ids" eval="[(4, ref('custom_hms_base.group_hms_staff'))]"/>
+        </record>
+
+    </data>
+</odoo>

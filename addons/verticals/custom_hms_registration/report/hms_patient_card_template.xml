@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_patient_card_document">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="patient">
+                <t t-set="settings" t-value="patient.env['hms.settings'].get_settings()"/>
+                <div class="page" style="font-family: Arial, sans-serif; padding: 2mm;">
+                    <div style="border: 0.4mm solid #0d6e74; border-radius: 2mm; padding: 2mm; height: 48mm;">
+                        <div style="font-size: 9pt; font-weight: bold; color: #0d6e74;">
+                            <span t-esc="settings.hospital_name"/>
+                        </div>
+                        <div style="font-size: 5pt; color: #555;">KARTU IDENTITAS BEROBAT</div>
+                        <hr style="margin: 1mm 0; border-color: #0d6e74;"/>
+                        <table style="width: 100%; font-size: 7pt;">
+                            <tr>
+                                <td style="width: 62%; vertical-align: top;">
+                                    <div style="font-size: 12pt; font-weight: bold; letter-spacing: 0.4mm;">
+                                        <span t-field="patient.mrn"/>
+                                    </div>
+                                    <div style="font-size: 9pt; font-weight: bold; margin-top: 1mm;">
+                                        <span t-field="patient.name"/>
+                                    </div>
+                                    <div style="margin-top: 1mm;">
+                                        <span t-field="patient.birth_date" t-options='{"format": "dd/MM/yyyy"}'/>
+                                        ·
+                                        <span t-esc="dict(patient._fields['gender'].selection).get(patient.gender, '')"/>
+                                    </div>
+                                    <div t-if="patient.address_street" style="font-size: 6pt; color: #444;">
+                                        <span t-field="patient.address_street"/>
+                                    </div>
+                                </td>
+                                <td style="width: 38%; text-align: right; vertical-align: top;">
+                                    <!-- Code128 of the MRN: the wristband scanner at the
+                                         bedside reads the same symbology. -->
+                                    <img t-if="patient.mrn"
+                                         t-att-src="'/report/barcode/Code128/%s?width=300&amp;height=70' % patient.mrn"
+                                         style="width: 28mm; height: 8mm;"/>
+                                    <div style="font-size: 5pt; margin-top: 1mm;">
+                                        Simpan kartu ini.<br/>Bawa setiap kunjungan.
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

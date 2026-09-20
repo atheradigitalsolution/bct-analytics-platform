@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="cron_hms_daily_charge" model="ir.cron">
+            <field name="name">SIMRS: charge harian rawat inap</field>
+            <field name="model_id" ref="model_hms_daily_charge"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_generate()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now().replace(hour=17, minute=5, second=0) + timedelta(days=1))"/>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

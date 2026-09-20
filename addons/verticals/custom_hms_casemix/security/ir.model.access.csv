@@ -1,0 +1,22 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hms_claim_coder,hms.claim/group_hms_coder,model_hms_claim,custom_hms_casemix.group_hms_coder,1,1,1,0
+access_hms_claim_verifier,hms.claim/group_hms_casemix_verifier,model_hms_claim,custom_hms_casemix.group_hms_casemix_verifier,1,1,1,0
+access_hms_claim_manager,hms.claim/group_hms_manager,model_hms_claim,custom_hms_base.group_hms_manager,1,1,0,0
+access_hms_claim_medrec,hms.claim/group_hms_medrec (audit koding),model_hms_claim,custom_hms_medrec.group_hms_medrec,1,0,0,0
+access_hms_claim_cashier,hms.claim/group_hms_cashier (baca),model_hms_claim,custom_hms_base.group_hms_cashier,1,0,0,0
+access_hms_claim_code_coder,hms.claim.code/group_hms_coder,model_hms_claim_code,custom_hms_casemix.group_hms_coder,1,1,1,1
+access_hms_claim_code_medrec,hms.claim.code/group_hms_medrec (audit koding),model_hms_claim_code,custom_hms_medrec.group_hms_medrec,1,0,0,0
+access_hms_claim_code_clinician,hms.claim.code/group_hms_emr_clinician (baca),model_hms_claim_code,custom_hms_base.group_hms_emr_clinician,1,0,0,0
+access_hms_claim_code_manager,hms.claim.code/group_hms_manager (baca),model_hms_claim_code,custom_hms_base.group_hms_manager,1,0,0,0
+access_hms_coding_query_coder,hms.coding.query/group_hms_coder,model_hms_coding_query,custom_hms_casemix.group_hms_coder,1,1,1,0
+access_hms_coding_query_clinician,hms.coding.query/group_hms_emr_clinician (jawab),model_hms_coding_query,custom_hms_base.group_hms_emr_clinician,1,1,0,0
+access_hms_coding_query_medrec,hms.coding.query/group_hms_medrec (baca),model_hms_coding_query,custom_hms_medrec.group_hms_medrec,1,0,0,0
+access_hms_claim_batch_coder,hms.claim.batch/group_hms_coder,model_hms_claim_batch,custom_hms_casemix.group_hms_coder,1,1,1,0
+access_hms_claim_batch_manager,hms.claim.batch/group_hms_manager,model_hms_claim_batch,custom_hms_base.group_hms_manager,1,1,0,0
+access_hms_claim_batch_cashier,hms.claim.batch/group_hms_cashier (baca),model_hms_claim_batch,custom_hms_base.group_hms_cashier,1,0,0,0
+access_hms_claim_adjustment_coder,hms.claim.adjustment/group_hms_coder (usul),model_hms_claim_adjustment,custom_hms_casemix.group_hms_coder,1,1,1,0
+access_hms_claim_adjustment_manager,hms.claim.adjustment/group_hms_manager (usul + otorisasi),model_hms_claim_adjustment,custom_hms_base.group_hms_manager,1,1,1,0
+access_hms_eklaim_code_staff,hms.eklaim.code/group_hms_staff (baca),model_hms_eklaim_code,custom_hms_base.group_hms_staff,1,0,0,0
+access_hms_eklaim_code_coder,hms.eklaim.code/group_hms_coder,model_hms_eklaim_code,custom_hms_casemix.group_hms_coder,1,1,1,1
+access_hms_eklaim_config_coder,hms.eklaim.config/group_hms_coder (baca),model_hms_eklaim_config,custom_hms_casemix.group_hms_coder,1,0,0,0
+access_hms_eklaim_config_admin,hms.eklaim.config/group_hms_admin,model_hms_eklaim_config,custom_hms_base.group_hms_admin,1,1,1,0

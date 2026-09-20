@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_roi_request_list" model="ir.ui.view">
+        <field name="name">hms.roi.request.list</field>
+        <field name="model">hms.roi.request</field>
+        <field name="arch" type="xml">
+            <list string="Pelepasan Informasi"
+                  decoration-muted="state in ('rejected', 'cancelled')"
+                  decoration-success="state == 'delivered'">
+                <field name="name"/>
+                <field name="requested_at"/>
+                <field name="patient_id"/>
+                <field name="requester_type"/>
+                <field name="requester_name"/>
+                <field name="legal_basis"/>
+                <field name="anonymized" optional="show"/>
+                <field name="due_at" optional="show"/>
+                <field name="delivered_at" optional="hide"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_roi_request_form" model="ir.ui.view">
+        <field name="name">hms.roi.request.form</field>
+        <field name="model">hms.roi.request</field>
+        <field name="arch" type="xml">
+            <form string="Permintaan Pelepasan Informasi">
+                <header>
+                    <button name="action_submit" type="object" string="Ajukan ke Pimpinan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_approve" type="object" string="Setujui"
+                            class="btn-primary" invisible="state != 'submitted'"
+                            groups="custom_hms_base.group_hms_manager"/>
+                    <button name="action_reject" type="object" string="Tolak"
+                            invisible="state != 'submitted'"
+                            groups="custom_hms_base.group_hms_manager"/>
+                    <button name="action_deliver" type="object" string="Serahkan Dokumen"
+                            class="btn-primary" invisible="state != 'approved'"
+                            confirm="Penyerahan akan dicatat permanen di jejak akses rekam medis. Lanjutkan?"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('delivered', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,approved,delivered"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Pasien">
+                            <field name="patient_id" readonly="state != 'draft'"/>
+                            <field name="encounter_ids" widget="many2many_tags"
+                                   readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Pemohon">
+                            <field name="requester_type" readonly="state != 'draft'"/>
+                            <field name="requester_name" readonly="state != 'draft'"/>
+                            <field name="requester_identity_no"/>
+                            <field name="requester_organization"/>
+                            <field name="requester_contact"/>
+                        </group>
+                        <group string="Dasar Hukum (PMK 24/2022)">
+                            <field name="legal_basis" readonly="state not in ('draft',)"/>
+                            <field name="consent_id" invisible="legal_basis != 'art34'"
+                                   required="legal_basis == 'art34'"
+                                   readonly="state not in ('draft',)"/>
+                            <field name="anonymized"/>
+                        </group>
+                        <group string="Waktu">
+                            <field name="requested_at"/>
+                            <field name="due_at" readonly="1"/>
+                            <field name="approved_by_id" readonly="1"/>
+                            <field name="approved_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Tujuan Penggunaan">
+                        <field name="purpose" nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Dokumen yang Dilepas">
+                            <field name="document_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="doc_type"/>
+                                    <field name="description"/>
+                                    <field name="page_count"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Penyerahan &amp; Tanda Terima">
+                            <group>
+                                <group>
+                                    <field name="delivery_channel"/>
+                                    <field name="receipt_name"/>
+                                    <field name="receipt_identity_no"/>
+                                </group>
+                                <group>
+                                    <field name="delivered_at" readonly="1"/>
+                                    <field name="delivered_by_id" readonly="1"/>
+                                    <field name="access_log_id" readonly="1"/>
+                                </group>
+                            </group>
+                            <field name="receipt_note" placeholder="Catatan tanda terima..."/>
+                        </page>
+                        <page string="Keputusan Pimpinan">
+                            <field name="decision_note"
+                                   placeholder="Dasar persetujuan atau penolakan..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_roi_request_search" model="ir.ui.view">
+        <field name="name">hms.roi.request.search</field>
+        <field name="model">hms.roi.request</field>
+        <field name="arch" type="xml">
+            <search string="Cari Permintaan Pelepasan Informasi">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="requester_name"/>
+                <filter name="filter_pending" string="Belum Selesai"
+                        domain="[('state', 'in', ('draft', 'submitted', 'approved'))]"/>
+                <filter name="filter_art35" string="Tanpa Persetujuan (Ps. 35)"
+                        domain="[('legal_basis', '=', 'art35')]"/>
+                <separator/>
+                <filter name="group_requester" string="Jenis Pemohon"
+                        context="{'group_by': 'requester_type'}"/>
+                <filter name="group_basis" string="Dasar Hukum"
+                        context="{'group_by': 'legal_basis'}"/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_roi_request" model="ir.actions.act_window">
+        <field name="name">Pelepasan Informasi</field>
+        <field name="res_model">hms.roi.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_roi_request_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada permintaan pelepasan informasi.</p>
+            <p>Setiap penyerahan dokumen menulis satu baris permanen di jejak akses
+               rekam medis pasien, dengan aksi "Pelepasan Informasi".</p>
+        </field>
+    </record>
+</odoo>

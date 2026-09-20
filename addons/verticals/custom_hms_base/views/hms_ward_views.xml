@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_ward_list" model="ir.ui.view">
+        <field name="name">hms.ward.list</field>
+        <field name="model">hms.ward</field>
+        <field name="arch" type="xml">
+            <list string="Ruang Rawat">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="type"/>
+                <field name="unit_id"/>
+                <field name="head_nurse_id"/>
+                <field name="bed_count"/>
+                <field name="occupied_count"/>
+                <field name="available_count"/>
+                <field name="occupancy_rate" widget="percentage" digits="[5,1]"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_ward_form" model="ir.ui.view">
+        <field name="name">hms.ward.form</field>
+        <field name="model">hms.ward</field>
+        <field name="arch" type="xml">
+            <form string="Ruang Rawat">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="type"/>
+                            <field name="unit_id"/>
+                            <field name="head_nurse_id"/>
+                        </group>
+                        <group>
+                            <field name="building"/>
+                            <field name="floor"/>
+                            <field name="phone_ext"/>
+                            <field name="gender_policy"/>
+                        </group>
+                    </group>
+                    <group string="Okupansi">
+                        <field name="bed_count" readonly="1"/>
+                        <field name="occupied_count" readonly="1"/>
+                        <field name="available_count" readonly="1"/>
+                        <field name="occupancy_rate" readonly="1" widget="percentage" digits="[5,1]"/>
+                    </group>
+                    <notebook>
+                        <page string="Kamar">
+                            <field name="room_ids">
+                                <list editable="bottom">
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="class_id"/>
+                                    <field name="capacity"/>
+                                    <field name="gender"/>
+                                    <field name="is_isolation"/>
+                                    <field name="is_kris_compliant"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Tempat Tidur">
+                            <field name="bed_ids" readonly="1">
+                                <list>
+                                    <field name="code"/>
+                                    <field name="room_id"/>
+                                    <field name="class_id"/>
+                                    <field name="bed_type"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'vacant'"
+                                           decoration-danger="state == 'occupied'"
+                                           decoration-warning="state in ('cleaning', 'reserved')"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_ward" model="ir.actions.act_window">
+        <field name="name">Ruang Rawat</field>
+        <field name="res_model">hms.ward</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_ward" name="Ruang Rawat" parent="menu_hms_config_master"
+              action="action_hms_ward" sequence="40"/>
+
+    <record id="view_hms_bed_list" model="ir.ui.view">
+        <field name="name">hms.bed.list</field>
+        <field name="model">hms.bed</field>
+        <field name="arch" type="xml">
+            <list string="Tempat Tidur" decoration-success="state == 'vacant'"
+                  decoration-danger="state == 'occupied'" decoration-muted="state == 'maintenance'">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="ward_id"/>
+                <field name="room_id"/>
+                <field name="class_id"/>
+                <field name="bed_type"/>
+                <field name="state" widget="badge"/>
+                <button name="action_set_vacant" type="object" string="Kosongkan" icon="fa-check"
+                        invisible="state not in ('cleaning', 'maintenance', 'reserved')"/>
+                <button name="action_start_cleaning" type="object" string="Bersihkan" icon="fa-recycle"
+                        invisible="state != 'vacant'"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_bed_search" model="ir.ui.view">
+        <field name="name">hms.bed.search</field>
+        <field name="model">hms.bed</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="code"/>
+                <field name="ward_id"/>
+                <field name="room_id"/>
+                <filter name="f_vacant" string="Kosong" domain="[('state', '=', 'vacant')]"/>
+                <filter name="f_occupied" string="Terisi" domain="[('state', '=', 'occupied')]"/>
+                <separator/>
+                    <filter name="g_ward" string="Ruang" context="{'group_by': 'ward_id'}"/>
+                    <filter name="g_class" string="Kelas" context="{'group_by': 'class_id'}"/>
+                    <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_bed" model="ir.actions.act_window">
+        <field name="name">Tempat Tidur</field>
+        <field name="res_model">hms.bed</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_bed_search"/>
+    </record>
+    <menuitem id="menu_hms_bed" name="Tempat Tidur" parent="menu_hms_config_master"
+              action="action_hms_bed" sequence="50"/>
+</odoo>

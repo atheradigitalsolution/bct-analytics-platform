@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            no_gap, not standard.
+
+            The medical record number is a legal identifier that auditors
+            expect to be dense. `no_gap` makes Odoo take a row lock on the
+            sequence for the duration of the creating transaction, so twenty
+            concurrent registrations queue instead of racing. The cost is
+            serialisation on one row, which at hospital registration volumes
+            is irrelevant.
+        -->
+        <record id="seq_hms_patient_mrn" model="ir.sequence">
+            <field name="name">Nomor Rekam Medis</field>
+            <field name="code">hms.patient.mrn</field>
+            <field name="prefix">RM-%(year)s-</field>
+            <field name="padding">6</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+    </data>
+</odoo>

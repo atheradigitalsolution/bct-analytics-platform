@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ================= Jadwal tindakan / operasi ================= -->
+    <record id="view_hms_procedure_schedule_list" model="ir.ui.view">
+        <field name="name">hms.procedure.schedule.list</field>
+        <field name="model">hms.procedure.schedule</field>
+        <field name="arch" type="xml">
+            <list string="Jadwal Tindakan"
+                  decoration-warning="state == 'postponed'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="planned_start"/>
+                <field name="patient_id"/>
+                <field name="name"/>
+                <field name="unit_id"/>
+                <field name="room_id" optional="show"/>
+                <field name="practitioner_id"/>
+                <field name="is_elective" optional="hide"/>
+                <field name="postpone_count" optional="hide"/>
+                <field name="postpone_reason" optional="hide"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_procedure_schedule_form" model="ir.ui.view">
+        <field name="name">hms.procedure.schedule.form</field>
+        <field name="model">hms.procedure.schedule</field>
+        <field name="arch" type="xml">
+            <form string="Jadwal Tindakan">
+                <header>
+                    <button name="action_confirm" type="object" string="Konfirmasi"
+                            class="btn-primary" invisible="state not in ('planned', 'postponed')"/>
+                    <button name="action_start" type="object" string="Mulai"
+                            invisible="state not in ('planned', 'confirmed')"/>
+                    <button name="action_done" type="object" string="Selesai"
+                            class="btn-primary" invisible="state != 'in_progress'"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('done', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="planned,confirmed,in_progress,done"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="state != 'postponed'">
+                        Tindakan ini ditunda. Alasan penundaan wajib terisi — tanpa itu
+                        penundaannya tidak dapat dihitung sebagai indikator mutu.
+                    </div>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="order_line_id" readonly="1"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="encounter_id" readonly="1"/>
+                            <field name="practitioner_id"/>
+                            <field name="is_elective"/>
+                        </group>
+                        <group>
+                            <field name="unit_id"/>
+                            <field name="room_id"/>
+                            <field name="planned_start"/>
+                            <field name="planned_end"/>
+                            <field name="actual_start"/>
+                            <field name="actual_end"/>
+                            <field name="duration_minutes"/>
+                        </group>
+                    </group>
+                    <separator string="Tim Tindakan"/>
+                    <field name="team_ids" widget="many2many_tags"/>
+                    <separator string="Penundaan"/>
+                    <group>
+                        <group>
+                            <field name="postpone_reason"
+                                   required="state == 'postponed'"/>
+                            <field name="postpone_note"/>
+                        </group>
+                        <group>
+                            <field name="postpone_count"/>
+                            <field name="original_planned_start"/>
+                            <field name="postponed_at"/>
+                            <field name="postponed_by_id"/>
+                        </group>
+                    </group>
+                    <separator string="Catatan"/>
+                    <field name="note"/>
+                    <field name="cancel_reason" invisible="state != 'cancelled'"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_procedure_schedule_search" model="ir.ui.view">
+        <field name="name">hms.procedure.schedule.search</field>
+        <field name="model">hms.procedure.schedule</field>
+        <field name="arch" type="xml">
+            <search string="Jadwal Tindakan">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="practitioner_id"/>
+                <field name="room_id"/>
+                <filter name="f_open" string="Belum Selesai"
+                        domain="[('state', 'in', ('planned', 'confirmed', 'in_progress'))]"/>
+                <filter name="f_postponed" string="Ditunda"
+                        domain="[('state', '=', 'postponed')]"/>
+                <filter name="f_elective_postponed" string="Penundaan Operasi Elektif"
+                        domain="[('state', '=', 'postponed'), ('is_elective', '=', True)]"/>
+                <separator/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="g_reason" string="Alasan Penundaan"
+                        context="{'group_by': 'postpone_reason'}"/>
+                <filter name="g_unit" string="Unit" context="{'group_by': 'unit_id'}"/>
+                <filter name="g_day" string="Tanggal Rencana"
+                        context="{'group_by': 'planned_start:day'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_procedure_schedule" model="ir.actions.act_window">
+        <field name="name">Jadwal Tindakan</field>
+        <field name="res_model">hms.procedure.schedule</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_procedure_schedule_search"/>
+        <field name="context">{'search_default_f_open': 1}</field>
+    </record>
+    <menuitem id="menu_hms_procedure_schedule" name="Jadwal Tindakan"
+              parent="custom_hms_base.menu_hms_clinical" action="action_hms_procedure_schedule"
+              sequence="40"/>
+
+    <!-- ================= Rencana kontrol ================= -->
+    <record id="view_hms_followup_plan_list" model="ir.ui.view">
+        <field name="name">hms.followup.plan.list</field>
+        <field name="model">hms.followup.plan</field>
+        <field name="arch" type="xml">
+            <list string="Rencana Kontrol"
+                  decoration-danger="state == 'missed'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="planned_date"/>
+                <field name="patient_id"/>
+                <field name="kind"/>
+                <field name="unit_id"/>
+                <field name="practitioner_id"/>
+                <field name="bpjs_control_no" optional="hide"/>
+                <field name="days_late" optional="hide"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_followup_plan_form" model="ir.ui.view">
+        <field name="name">hms.followup.plan.form</field>
+        <field name="model">hms.followup.plan</field>
+        <field name="arch" type="xml">
+            <form string="Rencana Kontrol">
+                <header>
+                    <button name="action_schedule" type="object" string="Jadwalkan"
+                            class="btn-primary" invisible="state != 'planned'"/>
+                    <button name="action_mark_missed" type="object" string="Tidak Datang"
+                            invisible="state not in ('planned', 'scheduled')"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('fulfilled', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="planned,scheduled,fulfilled"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="encounter_id" readonly="1"/>
+                            <field name="summary_id" readonly="1"/>
+                            <field name="kind"/>
+                        </group>
+                        <group>
+                            <field name="planned_date"/>
+                            <field name="unit_id"/>
+                            <field name="practitioner_id"/>
+                            <field name="slot_id"/>
+                        </group>
+                    </group>
+                    <group string="Surat Kontrol BPJS">
+                        <field name="bpjs_control_no" placeholder="Diisi dari VClaim BPJS"/>
+                        <div class="text-muted" colspan="2">
+                            Nomor Surat Kontrol diterbitkan BPJS lewat VClaim, bukan oleh
+                            rumah sakit. Selama akses VClaim belum tersedia, kolom ini
+                            dibiarkan kosong — nomor yang dikarang akan ditolak di loket.
+                        </div>
+                    </group>
+                    <separator string="Anjuran untuk Pasien"/>
+                    <field name="instruction"/>
+                    <group>
+                        <field name="fulfilled_encounter_id"/>
+                        <field name="fulfilled_at"/>
+                        <field name="days_late"/>
+                        <field name="cancel_reason" invisible="state != 'cancelled'"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_followup_plan_search" model="ir.ui.view">
+        <field name="name">hms.followup.plan.search</field>
+        <field name="model">hms.followup.plan</field>
+        <field name="arch" type="xml">
+            <search string="Rencana Kontrol">
+                <field name="patient_id"/>
+                <field name="unit_id"/>
+                <field name="practitioner_id"/>
+                <filter name="f_open" string="Belum Ditindaklanjuti"
+                        domain="[('state', 'in', ('planned', 'scheduled'))]"/>
+                <filter name="f_missed" string="Tidak Datang"
+                        domain="[('state', '=', 'missed')]"/>
+                <separator/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="g_kind" string="Jenis" context="{'group_by': 'kind'}"/>
+                <filter name="g_unit" string="Poli" context="{'group_by': 'unit_id'}"/>
+                <filter name="g_date" string="Tanggal Rencana"
+                        context="{'group_by': 'planned_date:week'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_followup_plan" model="ir.actions.act_window">
+        <field name="name">Rencana Kontrol</field>
+        <field name="res_model">hms.followup.plan</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_followup_plan_search"/>
+        <field name="context">{'search_default_f_open': 1}</field>
+    </record>
+    <menuitem id="menu_hms_followup_plan" name="Rencana Kontrol"
+              parent="custom_hms_base.menu_hms_frontdesk" action="action_hms_followup_plan"
+              sequence="60"/>
+</odoo>

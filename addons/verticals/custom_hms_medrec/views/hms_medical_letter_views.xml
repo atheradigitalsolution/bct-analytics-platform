@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_medical_letter_list" model="ir.ui.view">
+        <field name="name">hms.medical.letter.list</field>
+        <field name="model">hms.medical.letter</field>
+        <field name="arch" type="xml">
+            <list string="Surat Keterangan Medis"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="type"/>
+                <field name="patient_id"/>
+                <field name="practitioner_id"/>
+                <field name="rest_from" optional="hide"/>
+                <field name="rest_to" optional="hide"/>
+                <field name="rest_days" optional="show"/>
+                <field name="issued_at"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_medical_letter_form" model="ir.ui.view">
+        <field name="name">hms.medical.letter.form</field>
+        <field name="model">hms.medical.letter</field>
+        <field name="arch" type="xml">
+            <form string="Surat Keterangan Medis">
+                <header>
+                    <button name="action_sign" type="object" string="Tandatangani &amp; Terbitkan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state == 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,signed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1" placeholder="(nomor terbit saat ditandatangani)"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="type" readonly="state != 'draft'"/>
+                            <field name="patient_id" readonly="state != 'draft'"/>
+                            <field name="encounter_id" readonly="state != 'draft'"/>
+                            <field name="practitioner_id" readonly="state != 'draft'"/>
+                            <field name="purpose"/>
+                        </group>
+                        <group>
+                            <field name="rest_from" invisible="type != 'sick_leave'"/>
+                            <field name="rest_to" invisible="type != 'sick_leave'"/>
+                            <field name="rest_days" invisible="type != 'sick_leave'" readonly="1"/>
+                            <field name="valid_until"/>
+                            <field name="issued_at" readonly="1"/>
+                            <field name="signed_by_id" readonly="1"/>
+                            <field name="signed_uid" readonly="1"/>
+                            <field name="signed_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Isi Keterangan">
+                        <field name="body" nolabel="1" readonly="state != 'draft'"/>
+                    </group>
+                    <group string="Pembatalan" invisible="state != 'cancelled'">
+                        <field name="cancel_reason"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_medical_letter_search" model="ir.ui.view">
+        <field name="name">hms.medical.letter.search</field>
+        <field name="model">hms.medical.letter</field>
+        <field name="arch" type="xml">
+            <search string="Cari Surat Keterangan">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="practitioner_id"/>
+                <filter name="filter_signed" string="Sudah Terbit"
+                        domain="[('state', '=', 'signed')]"/>
+                <separator/>
+                <filter name="group_type" string="Jenis Surat" context="{'group_by': 'type'}"/>
+                <filter name="group_practitioner" string="Dokter"
+                        context="{'group_by': 'practitioner_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_medical_letter" model="ir.actions.act_window">
+        <field name="name">Surat Keterangan Medis</field>
+        <field name="res_model">hms.medical.letter</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_medical_letter_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada surat keterangan.</p>
+            <p>Nomor surat diterbitkan saat ditandatangani, bukan saat draf dibuat,
+               supaya deret nomornya tidak berlubang.</p>
+        </field>
+    </record>
+</odoo>

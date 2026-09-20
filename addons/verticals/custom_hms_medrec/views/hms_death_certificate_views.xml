@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_death_certificate_list" model="ir.ui.view">
+        <field name="name">hms.death.certificate.list</field>
+        <field name="model">hms.death.certificate</field>
+        <field name="arch" type="xml">
+            <list string="Sertifikat Kematian" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="died_at"/>
+                <field name="place_of_death"/>
+                <field name="underlying_cause_id" string="Penyebab Dasar"/>
+                <field name="hours_since_admission" optional="hide"/>
+                <field name="is_ndr" string="NDR"/>
+                <field name="certified_by_id"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_death_certificate_form" model="ir.ui.view">
+        <field name="name">hms.death.certificate.form</field>
+        <field name="model">hms.death.certificate</field>
+        <field name="arch" type="xml">
+            <form string="Sertifikat Medis Penyebab Kematian">
+                <header>
+                    <button name="action_sign" type="object" string="Tandatangani &amp; Terbitkan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state == 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,signed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1" placeholder="(nomor terbit saat ditandatangani)"/></h1>
+                    </div>
+                    <group>
+                        <group string="Pasien &amp; Kejadian">
+                            <field name="patient_id" readonly="state != 'draft'"/>
+                            <field name="encounter_id" readonly="state != 'draft'"/>
+                            <field name="admitted_at"/>
+                            <field name="died_at" readonly="state != 'draft'"/>
+                            <field name="place_of_death"/>
+                            <field name="manner"/>
+                        </group>
+                        <group string="Statistik Mortalitas">
+                            <field name="underlying_cause_id" readonly="1"/>
+                            <field name="hours_since_admission" readonly="1"/>
+                            <field name="is_ndr" readonly="1"/>
+                            <field name="certified_by_id"/>
+                            <field name="certified_uid" readonly="1"/>
+                            <field name="certified_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Bagian I — Rantai Penyebab Kematian">
+                        <group>
+                            <field name="cause_a_id" readonly="state != 'draft'"/>
+                            <field name="cause_b_id" readonly="state != 'draft'"/>
+                            <field name="cause_c_id" readonly="state != 'draft'"/>
+                            <field name="cause_d_id" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="cause_a_interval"/>
+                            <field name="cause_b_interval"/>
+                            <field name="cause_c_interval"/>
+                            <field name="cause_d_interval"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Penyebab dasar kematian adalah baris <b>terakhir yang terisi</b>
+                        pada bagian I, bukan I(a). Isi berurutan dari I(a) ke bawah —
+                        rantai yang berlubang ditolak.
+                    </div>
+                    <group string="Bagian II — Kondisi Lain yang Berkontribusi">
+                        <field name="contributing_ids" widget="many2many_tags" nolabel="1"/>
+                    </group>
+                    <group string="Catatan">
+                        <field name="note" nolabel="1"/>
+                        <field name="cancel_reason" invisible="state != 'cancelled'"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_death_certificate_search" model="ir.ui.view">
+        <field name="name">hms.death.certificate.search</field>
+        <field name="model">hms.death.certificate</field>
+        <field name="arch" type="xml">
+            <search string="Cari Sertifikat Kematian">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="underlying_cause_id"/>
+                <filter name="filter_ndr" string="NDR (&gt;= 48 jam)"
+                        domain="[('is_ndr', '=', True)]"/>
+                <separator/>
+                <filter name="group_cause" string="Penyebab Dasar"
+                        context="{'group_by': 'underlying_cause_id'}"/>
+                <filter name="group_manner" string="Jenis Kematian"
+                        context="{'group_by': 'manner'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_death_certificate" model="ir.actions.act_window">
+        <field name="name">Sertifikat Kematian</field>
+        <field name="res_model">hms.death.certificate</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_death_certificate_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada sertifikat kematian.</p>
+        </field>
+    </record>
+</odoo>

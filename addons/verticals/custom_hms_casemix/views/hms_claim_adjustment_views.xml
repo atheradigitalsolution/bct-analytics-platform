@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_claim_adjustment_list" model="ir.ui.view">
+        <field name="name">hms.claim.adjustment.list</field>
+        <field name="model">hms.claim.adjustment</field>
+        <field name="arch" type="xml">
+            <list string="Penyesuaian Klaim" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="claim_id"/>
+                <field name="type"/>
+                <field name="amount" sum="Total"/>
+                <field name="reason"/>
+                <field name="proposed_by_id"/>
+                <field name="authorized_by_id"/>
+                <field name="requires_management" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_claim_adjustment_form" model="ir.ui.view">
+        <field name="name">hms.claim.adjustment.form</field>
+        <field name="model">hms.claim.adjustment</field>
+        <field name="arch" type="xml">
+            <form string="Penyesuaian Klaim">
+                <header>
+                    <!--
+                        Tombolnya terlihat oleh verifikator casemix juga, dan
+                        yang menolak adalah model: plafonnya bergantung pada
+                        jumlah baris ini, sesuatu yang atribut `groups` tidak
+                        bisa nyatakan. Menyembunyikan tombol berdasarkan grup
+                        saja akan salah di kedua arah.
+                    -->
+                    <button name="action_authorize" type="object" string="Otorisasi"
+                            class="btn-primary" invisible="state != 'draft'"
+                            groups="custom_hms_base.group_hms_manager,custom_hms_casemix.group_hms_casemix_verifier"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state == 'cancelled'"
+                            groups="custom_hms_base.group_hms_manager,custom_hms_casemix.group_hms_casemix_verifier"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,authorized"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="claim_id" readonly="state != 'draft'"/>
+                            <field name="encounter_id" readonly="1"/>
+                            <field name="type" readonly="state != 'draft'"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="amount" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="proposed_by_id" readonly="1"/>
+                            <field name="authorized_by_id" readonly="1"/>
+                            <field name="authorized_at" readonly="1"/>
+                            <field name="authorization_limit_applied" readonly="1"/>
+                            <field name="requires_management" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Alasan">
+                        <field name="reason" nolabel="1" readonly="state != 'draft'"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hms_claim_adjustment" model="ir.actions.act_window">
+        <field name="name">Penyesuaian Klaim</field>
+        <field name="res_model">hms.claim.adjustment</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada penyesuaian klaim.</p>
+            <p>Klaim yang sudah diajukan tidak pernah diedit di tempatnya; selisihnya
+               dibukukan di sini dan diotorisasi manajemen.</p>
+        </field>
+    </record>
+</odoo>

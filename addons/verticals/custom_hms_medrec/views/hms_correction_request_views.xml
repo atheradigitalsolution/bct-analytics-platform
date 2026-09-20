@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_correction_request_list" model="ir.ui.view">
+        <field name="name">hms.correction.request.list</field>
+        <field name="model">hms.correction.request</field>
+        <field name="arch" type="xml">
+            <list string="Permintaan Koreksi RME"
+                  decoration-muted="state in ('rejected', 'cancelled')"
+                  decoration-success="state == 'applied'">
+                <field name="name"/>
+                <field name="requested_at"/>
+                <field name="patient_id"/>
+                <field name="encounter_id" optional="hide"/>
+                <field name="target_label"/>
+                <field name="field_label"/>
+                <field name="requested_by_id"/>
+                <field name="grace_deadline" optional="show"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_correction_request_form" model="ir.ui.view">
+        <field name="name">hms.correction.request.form</field>
+        <field name="model">hms.correction.request</field>
+        <field name="arch" type="xml">
+            <form string="Permintaan Koreksi Rekam Medis">
+                <header>
+                    <button name="action_submit" type="object" string="Ajukan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_approve" type="object" string="Setujui"
+                            class="btn-primary" invisible="state != 'submitted'"
+                            groups="custom_hms_medrec.group_hms_medrec_manager,custom_hms_base.group_hms_manager"/>
+                    <button name="action_reject" type="object" string="Tolak"
+                            invisible="state != 'submitted'"
+                            groups="custom_hms_medrec.group_hms_medrec_manager,custom_hms_base.group_hms_manager"/>
+                    <button name="action_mark_applied" type="object"
+                            string="Tandai Sudah Diterapkan" class="btn-primary"
+                            invisible="state != 'approved'"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('applied', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,approved,applied"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Masih dalam masa tenggang"
+                            bg_color="text-bg-info" invisible="not within_grace"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Sasaran Koreksi">
+                            <field name="encounter_id" readonly="state != 'draft'"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="target_model" readonly="state != 'draft'"/>
+                            <field name="target_res_id" readonly="state != 'draft'"/>
+                            <field name="target_label" readonly="state != 'draft'"/>
+                            <field name="field_label" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Masa Tenggang (PMK 24/2022 Ps. 30)">
+                            <field name="entry_created_at" readonly="state != 'draft'"/>
+                            <field name="grace_hours_applied" readonly="1"/>
+                            <field name="grace_deadline" readonly="1"/>
+                            <field name="within_grace" readonly="1"/>
+                            <field name="requested_by_id" readonly="1"/>
+                            <field name="requested_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Isi Sekarang">
+                            <field name="old_value" nolabel="1" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Usulan Perbaikan">
+                            <field name="new_value" nolabel="1" readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+                    <group string="Alasan Koreksi">
+                        <field name="reason" nolabel="1" readonly="state != 'draft'"/>
+                    </group>
+                    <group>
+                        <group string="Keputusan">
+                            <field name="approved_by_id" readonly="1"/>
+                            <field name="approved_at" readonly="1"/>
+                            <field name="decision_note"/>
+                        </group>
+                        <group string="Penerapan">
+                            <field name="addendum_reference"/>
+                            <field name="applied_by_id" readonly="1"/>
+                            <field name="applied_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning" role="alert">
+                        Koreksi rekam medis tidak pernah menimpa entri lama. Perbaikannya
+                        ditulis sebagai entri baru (adendum) pada catatan aslinya, dan
+                        nomor adendum itu dicatat di sini.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_correction_request_search" model="ir.ui.view">
+        <field name="name">hms.correction.request.search</field>
+        <field name="model">hms.correction.request</field>
+        <field name="arch" type="xml">
+            <search string="Cari Permintaan Koreksi">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="requested_by_id"/>
+                <filter name="filter_open" string="Belum Selesai"
+                        domain="[('state', 'in', ('draft', 'submitted', 'approved'))]"/>
+                <separator/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="group_requester" string="Pemohon"
+                        context="{'group_by': 'requested_by_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_correction_request" model="ir.actions.act_window">
+        <field name="name">Koreksi Rekam Medis</field>
+        <field name="res_model">hms.correction.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_correction_request_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada permintaan koreksi.</p>
+            <p>Permintaan hanya perlu dibuat untuk entri yang sudah melewati masa
+               tenggang koreksi mandiri. Di dalam masa tenggang, penulisnya
+               mengoreksi sendiri lewat adendum.</p>
+        </field>
+    </record>
+</odoo>

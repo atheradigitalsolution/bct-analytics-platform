@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_delegation_list" model="ir.ui.view">
+        <field name="name">hms.delegation.list</field>
+        <field name="model">hms.delegation</field>
+        <field name="arch" type="xml">
+            <list string="Pelimpahan Wewenang"
+                  decoration-success="state == 'active'"
+                  decoration-muted="state in ('expired', 'revoked')">
+                <field name="name"/>
+                <field name="doctor_id"/>
+                <field name="nurse_id"/>
+                <field name="kind"/>
+                <field name="unit_id" optional="show"/>
+                <field name="valid_from"/>
+                <field name="valid_until"/>
+                <field name="is_currently_valid" string="Berlaku Hari Ini"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_delegation_form" model="ir.ui.view">
+        <field name="name">hms.delegation.form</field>
+        <field name="model">hms.delegation</field>
+        <field name="arch" type="xml">
+            <form string="Pelimpahan Wewenang">
+                <header>
+                    <button name="action_activate" type="object"
+                            string="Tandatangani &amp; Berlakukan" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_revoke" type="object" string="Cabut"
+                            invisible="state not in ('draft', 'active')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,active,expired"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Pihak">
+                            <field name="doctor_id"/>
+                            <field name="nurse_id"/>
+                            <field name="kind"/>
+                            <field name="supervision_required"/>
+                            <field name="unit_id"/>
+                        </group>
+                        <group string="Masa Berlaku">
+                            <field name="valid_from"/>
+                            <field name="valid_until"/>
+                            <field name="is_currently_valid"/>
+                            <field name="signed_at"/>
+                            <field name="signed_by_id"/>
+                            <field name="revoked_at" invisible="state != 'revoked'"/>
+                            <field name="revoke_reason" invisible="state != 'revoked'"/>
+                        </group>
+                    </group>
+                    <separator string="Lingkup Tindakan yang Dilimpahkan"/>
+                    <field name="procedure_ids" widget="many2many_tags"/>
+                    <field name="scope_note"
+                           placeholder="Tindakan keperawatan yang tidak punya kode ICD-9-CM."/>
+                    <separator string="Catatan"/>
+                    <field name="note"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_delegation_search" model="ir.ui.view">
+        <field name="name">hms.delegation.search</field>
+        <field name="model">hms.delegation</field>
+        <field name="arch" type="xml">
+            <search string="Cari Pelimpahan Wewenang">
+                <field name="name"/>
+                <field name="doctor_id"/>
+                <field name="nurse_id"/>
+                <field name="procedure_ids"/>
+                <filter name="filter_active" string="Berlaku"
+                        domain="[('state', '=', 'active')]"/>
+                <filter name="filter_expiring" string="Berakhir 30 Hari"
+                        domain="[('state', '=', 'active'),
+                                 ('valid_until', '&lt;=', (context_today() + datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                <separator/>
+                <filter name="group_nurse" string="Perawat" context="{'group_by': 'nurse_id'}"/>
+                <filter name="group_doctor" string="Dokter" context="{'group_by': 'doctor_id'}"/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_delegation" model="ir.actions.act_window">
+        <field name="name">Pelimpahan Wewenang</field>
+        <field name="res_model">hms.delegation</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_delegation_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada pelimpahan wewenang.</p>
+            <p>PMK 26/2019 mensyaratkan pelimpahan wewenang dokter kepada perawat
+               dibuat tertulis, dengan lingkup tindakan dan masa berlaku yang jelas.</p>
+        </field>
+    </record>
+    <menuitem id="menu_hms_delegation" name="Pelimpahan Wewenang"
+              parent="custom_hms_base.menu_hms_clinical"
+              action="action_hms_delegation" sequence="60"/>
+</odoo>

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_clinical_note_list" model="ir.ui.view">
+        <field name="name">hms.clinical.note.list</field>
+        <field name="model">hms.clinical.note</field>
+        <field name="arch" type="xml">
+            <list string="Catatan Klinis" decoration-muted="not is_current"
+                  decoration-warning="not signed">
+                <field name="noted_at"/>
+                <field name="note_type"/>
+                <field name="author_id"/>
+                <field name="author_role"/>
+                <field name="assessment" string="Asesmen"/>
+                <field name="signed" widget="boolean_toggle" readonly="1"/>
+                <field name="is_current" optional="hide" readonly="1"/>
+                <field name="revises_id" optional="hide" readonly="1"/>
+                <button name="action_sign" type="object" string="Tanda Tangani"
+                        icon="fa-pencil-square-o" invisible="signed"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_clinical_note_form" model="ir.ui.view">
+        <field name="name">hms.clinical.note.form</field>
+        <field name="model">hms.clinical.note</field>
+        <field name="arch" type="xml">
+            <form string="Catatan Klinis">
+                <header>
+                    <button name="action_sign" type="object" string="Tanda Tangani"
+                            class="btn-primary" invisible="signed"
+                            confirm="Setelah ditandatangani, catatan tidak dapat diubah. Lanjutkan?"/>
+                    <button name="action_revise" type="object" string="Buat Revisi"
+                            invisible="not signed or revised_by_id"/>
+                    <button name="action_cosign" type="object" string="Co-Sign DPJP"
+                            invisible="not requires_cosign or cosigned_by_id"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Versi Lama" bg_color="text-bg-secondary"
+                            invisible="is_current"/>
+                    <widget name="web_ribbon" title="Ditandatangani" bg_color="text-bg-success"
+                            invisible="not signed or not is_current"/>
+                    <group>
+                        <group>
+                            <field name="encounter_id" readonly="signed"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="note_type" readonly="signed"/>
+                            <field name="noted_at" readonly="signed"/>
+                        </group>
+                        <group>
+                            <field name="author_id" readonly="signed"/>
+                            <field name="author_role" readonly="signed"/>
+                            <field name="requires_cosign" readonly="signed"/>
+                            <field name="cosigned_by_id" readonly="1" invisible="not cosigned_by_id"/>
+                            <field name="is_current" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert" invisible="not revises_id">
+                        Catatan ini merevisi catatan sebelumnya
+                        (<field name="revises_id" readonly="1" class="oe_inline"/>).
+                        Alasan: <field name="revision_reason" class="oe_inline"/>
+                    </div>
+                    <group string="SOAP">
+                        <field name="subjective" readonly="signed" placeholder="Keluhan dan anamnesis"/>
+                        <field name="objective" readonly="signed" placeholder="Pemeriksaan fisik, TTV, hasil penunjang"/>
+                        <field name="assessment" readonly="signed" placeholder="Penilaian klinis"/>
+                        <field name="plan" readonly="signed" placeholder="Rencana diagnostik dan terapi"/>
+                        <field name="instruction" readonly="signed" placeholder="Instruksi untuk perawat"/>
+                    </group>
+                    <group string="Tanda Tangan Elektronik" invisible="not signed">
+                        <field name="signed_by_id" readonly="1"/>
+                        <field name="signed_at" readonly="1"/>
+                        <field name="signature_hash" readonly="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_clinical_note_search" model="ir.ui.view">
+        <field name="name">hms.clinical.note.search</field>
+        <field name="model">hms.clinical.note</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="patient_id"/>
+                <field name="encounter_id"/>
+                <field name="author_id"/>
+                <filter name="f_current" string="Versi Berlaku" domain="[('is_current', '=', True)]"/>
+                <filter name="f_unsigned" string="Belum Ditandatangani" domain="[('signed', '=', False)]"/>
+                <separator/>
+                <filter name="g_type" string="Jenis" context="{'group_by': 'note_type'}"/>
+                <filter name="g_author" string="Penulis" context="{'group_by': 'author_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_clinical_note" model="ir.actions.act_window">
+        <field name="name">Catatan Klinis (CPPT)</field>
+        <field name="res_model">hms.clinical.note</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_clinical_note_search"/>
+        <field name="context">{'search_default_f_current': 1}</field>
+    </record>
+    <menuitem id="menu_hms_clinical_note" name="Catatan Klinis"
+              parent="custom_hms_base.menu_hms_clinical" action="action_hms_clinical_note"
+              sequence="20"/>
+</odoo>

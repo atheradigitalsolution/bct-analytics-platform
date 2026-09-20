@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_complaint_list" model="ir.ui.view">
+        <field name="name">hms.complaint.list</field>
+        <field name="model">hms.complaint</field>
+        <field name="arch" type="xml">
+            <list string="Komplain Pasien"
+                  decoration-danger="grade == 'red'"
+                  decoration-warning="grade == 'yellow'"
+                  decoration-muted="state == 'closed'">
+                <field name="name"/>
+                <field name="received_at"/>
+                <field name="complainant_name"/>
+                <field name="patient_id" optional="show"/>
+                <field name="unit_id"/>
+                <field name="category"/>
+                <field name="channel" optional="hide"/>
+                <field name="grade" widget="badge"/>
+                <field name="due_at"/>
+                <field name="responded_at" optional="hide"/>
+                <field name="is_on_time" string="Tepat Waktu"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_complaint_form" model="ir.ui.view">
+        <field name="name">hms.complaint.form</field>
+        <field name="model">hms.complaint</field>
+        <field name="arch" type="xml">
+            <form string="Komplain Pasien">
+                <header>
+                    <button name="action_receive" type="object" string="Catat Diterima"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_start" type="object" string="Tangani"
+                            class="btn-primary" invisible="state not in ('draft', 'received')"/>
+                    <button name="action_respond" type="object" string="Kirim Tanggapan"
+                            class="btn-primary"
+                            invisible="state not in ('received', 'in_progress')"/>
+                    <button name="action_close" type="object" string="Tutup"
+                            invisible="state != 'responded'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,received,in_progress,responded,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Pelapor">
+                            <field name="complainant_name"/>
+                            <field name="complainant_relation"/>
+                            <field name="contact"/>
+                            <field name="patient_id"/>
+                            <field name="encounter_id"
+                                   domain="[('patient_id', '=', patient_id)]"/>
+                        </group>
+                        <group string="Tenggat Tanggap">
+                            <field name="received_at"/>
+                            <field name="grade"/>
+                            <field name="target_hours"/>
+                            <field name="due_at"/>
+                            <field name="responded_at"/>
+                            <field name="response_hours"/>
+                            <field name="is_on_time"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Isi Komplain">
+                            <field name="channel"/>
+                            <field name="category"/>
+                            <field name="unit_id"/>
+                        </group>
+                        <group string="Penanganan">
+                            <field name="handler_id"/>
+                            <field name="outcome"/>
+                            <field name="incident_report_id"
+                                   groups="custom_hms_safety.group_hms_patient_safety"/>
+                            <field name="closed_at"/>
+                        </group>
+                    </group>
+                    <field name="subject" placeholder="Pokok komplain dalam satu kalimat"/>
+                    <notebook>
+                        <page string="Uraian">
+                            <field name="detail"/>
+                        </page>
+                        <page string="Tanggapan &amp; Perbaikan">
+                            <separator string="Tanggapan kepada Pelapor"/>
+                            <field name="response"/>
+                            <separator string="Tindakan Perbaikan"/>
+                            <field name="corrective_action"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_complaint_search" model="ir.ui.view">
+        <field name="name">hms.complaint.search</field>
+        <field name="model">hms.complaint</field>
+        <field name="arch" type="xml">
+            <search string="Cari Komplain">
+                <field name="name"/>
+                <field name="complainant_name"/>
+                <field name="patient_id"/>
+                <field name="unit_id"/>
+                <filter name="filter_open" string="Belum Ditutup"
+                        domain="[('state', '!=', 'closed')]"/>
+                <filter name="filter_overdue" string="Lewat Batas Tanggap"
+                        domain="[('responded_at', '=', False), ('due_at', '&lt;', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))]"/>
+                <separator/>
+                <filter name="group_category" string="Kategori"
+                        context="{'group_by': 'category'}"/>
+                <filter name="group_channel" string="Kanal" context="{'group_by': 'channel'}"/>
+                <filter name="group_grade" string="Grading" context="{'group_by': 'grade'}"/>
+                <filter name="group_unit" string="Unit" context="{'group_by': 'unit_id'}"/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_complaint" model="ir.actions.act_window">
+        <field name="name">Komplain Pasien</field>
+        <field name="res_model">hms.complaint</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_complaint_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada komplain tercatat.</p>
+            <p>Target waktu tanggap mengikuti grading dan parameter mutu rumah sakit;
+               angkanya memberi makan Indikator Nasional Mutu "Kecepatan Waktu Tanggap
+               Komplain".</p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            `ack_state` adalah computed-stored yang salah satu cabangnya
+            (`overdue`) bergantung pada waktu berjalan. Tidak ada dependensi
+            ORM yang berubah ketika tenggat lewat, jadi tanpa penyapu ini
+            baris kritis akan selamanya tertulis `pending` di basis data
+            sementara layar mutu mengira semuanya tepat waktu.
+
+            Lima menit dipilih terhadap tenggat default 30 menit: galat
+            paling buruk 1/6 tenggat, dan pencarian per siklus hanya
+            menyentuh baris `pending` lewat indeks.
+        -->
+        <record id="cron_hms_lab_ack_overdue" model="ir.cron">
+            <field name="name">SIMRS: tandai nilai kritis lab yang terlambat diakui</field>
+            <field name="model_id" ref="model_hms_lab_result"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_refresh_ack_state()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

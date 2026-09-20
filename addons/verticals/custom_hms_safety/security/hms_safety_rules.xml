@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        SENGAJA TANPA noupdate.
+
+        Sebuah record rule adalah batas kerahasiaan, dan batas kerahasiaan
+        adalah hal yang paling sering perlu diperbaiki setelah dipakai. Dengan
+        noupdate="1", domain yang salah akan menetap di basis data yang sudah
+        terpasang selamanya meski sumbernya sudah dibetulkan — persis pola
+        kegagalan senyap yang sudah memakan waktu di grup hms_*.
+    -->
+    <data>
+
+        <!--
+            hms.incident.report
+
+            ir.model.access hanya bisa mengatakan "boleh menulis model ini";
+            pembagian sesungguhnya ada di sini. Aturan per-grup di Odoo
+            di-OR-kan, jadi anggota tim KP (yang juga group_hms_staff) tetap
+            mendapat cakupan penuh lewat aturannya sendiri.
+        -->
+        <record id="rule_hms_incident_report_own_read" model="ir.rule">
+            <field name="name">IKP: pelapor membaca laporannya sendiri</field>
+            <field name="model_id" ref="model_hms_incident_report"/>
+            <field name="domain_force">['|',
+                ('create_uid', '=', user.id),
+                ('reporter_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_staff'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!--
+            Menulis hanya selama masih draf.
+
+            Laporan yang sudah dikirim adalah bukti; pelapor yang masih bisa
+            menulis ulang kronologinya setelah tim KP membacanya membuat
+            seluruh berkas investigasi tidak bernilai. Odoo memeriksa record
+            rule terhadap nilai yang TERSIMPAN sebelum write, jadi
+            `action_report()` sendiri (draf -> dilaporkan) tetap lolos.
+        -->
+        <record id="rule_hms_incident_report_own_write_draft" model="ir.rule">
+            <field name="name">IKP: pelapor mengubah laporannya selama masih draf</field>
+            <field name="model_id" ref="model_hms_incident_report"/>
+            <field name="domain_force">['&amp;', ('state', '=', 'draft'), '|',
+                ('create_uid', '=', user.id),
+                ('reporter_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_staff'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_hms_incident_report_safety_team" model="ir.rule">
+            <field name="name">IKP: tim keselamatan pasien melihat seluruh laporan</field>
+            <field name="model_id" ref="model_hms_incident_report"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_hms_patient_safety'))]"/>
+        </record>
+
+        <!--
+            hms.complaint
+
+            Komplain bukan dokumen rahasia seperti IKP: manajemen membacanya
+            untuk INM "Kecepatan Waktu Tanggap Komplain". Yang dibatasi adalah
+            penulisannya — hanya pencatat sendiri (selama belum ditanggapi)
+            dan tim KP.
+        -->
+        <record id="rule_hms_complaint_own" model="ir.rule">
+            <field name="name">Komplain: pencatat membaca catatannya sendiri</field>
+            <field name="model_id" ref="model_hms_complaint"/>
+            <field name="domain_force">[('create_uid', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_staff'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_hms_complaint_safety_team" model="ir.rule">
+            <field name="name">Komplain: tim keselamatan pasien menangani seluruhnya</field>
+            <field name="model_id" ref="model_hms_complaint"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_hms_patient_safety'))]"/>
+        </record>
+
+        <record id="rule_hms_complaint_manager_read" model="ir.rule">
+            <field name="name">Komplain: manajemen membaca seluruhnya (INM)</field>
+            <field name="model_id" ref="model_hms_complaint"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_hms_base.group_hms_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

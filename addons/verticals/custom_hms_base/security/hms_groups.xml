@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="module_category_hms" model="ir.module.category">
+            <field name="name">SIMRS</field>
+            <field name="description">Sistem Informasi Manajemen Rumah Sakit</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <!--
+            Seven privileges, not one.
+
+            Odoo 19 renders every res.groups sharing a privilege as a single
+            pick-one dropdown on the user form. A hospital user legitimately
+            holds one level in several domains at once — a charge nurse who
+            also reads EMR, a cashier supervisor who registers patients — so
+            each domain needs its own selector. Collapsing these into one
+            privilege silently drops every role but the last on save.
+        -->
+        <record id="privilege_hms_registration" model="res.groups.privilege">
+            <field name="name">SIMRS / Pendaftaran &amp; Antrian</field>
+            <field name="category_id" ref="module_category_hms"/>
+            <field name="sequence">410</field>
+        </record>
+        <record id="privilege_hms_emr" model="res.groups.privilege">
+            <field name="name">SIMRS / Rekam Medis</field>
+            <field name="category_id" ref="module_category_hms"/>
+            <field name="sequence">420</field>
+        </record>
+        <record id="privilege_hms_pharmacy" model="res.groups.privilege">
+            <field name="name">SIMRS / Farmasi</field>
+            <field name="category_id" ref="module_category_hms"/>
+            <field name="sequence">430</field>
+        </record>
+        <record id="privilege_hms_diagnostic" model="res.groups.privilege">
+            <field name="name">SIMRS / Penunjang Diagnostik</field>
+            <field name="category_id" ref="module_category_hms"/>
+            <field name="sequence">440</field>
+        </record>
+        <record id="privilege_hms_nursing" model="res.groups.privilege">
+            <field name="name">SIMRS / Keperawatan</field>
+            <field name="category_id" ref="module_category_hms"/>
+            <field name="sequence">450</field>
+        </record>
+        <record id="privilege_hms_billing" model="res.groups.privilege">
+            <field name="name">SIMRS / Kasir &amp; Billing</field>
+            <field name="category_id" ref="module_category_hms"/>
+            <field name="sequence">460</field>
+        </record>
+        <record id="privilege_hms_management" model="res.groups.privilege">
+            <field name="name">SIMRS / Manajemen</field>
+            <field name="category_id" ref="module_category_hms"/>
+            <field name="sequence">470</field>
+        </record>
+
+        <!--
+            Technical base group. No privilege_id on purpose: it must never
+            appear as a selector, because every other SIMRS group implies it.
+        -->
+        <record id="group_hms_staff" model="res.groups">
+            <field name="name">SIMRS / Staf (teknis)</field>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+        <record id="group_hms_registration_user" model="res.groups">
+            <field name="name">Petugas Pendaftaran</field>
+            <field name="privilege_id" ref="privilege_hms_registration"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_staff'))]"/>
+        </record>
+        <record id="group_hms_registration_manager" model="res.groups">
+            <field name="name">Kepala Pendaftaran / Rekam Medis</field>
+            <field name="privilege_id" ref="privilege_hms_registration"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_registration_user'))]"/>
+        </record>
+
+        <record id="group_hms_emr_reader" model="res.groups">
+            <field name="name">Pembaca Rekam Medis</field>
+            <field name="privilege_id" ref="privilege_hms_emr"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_staff'))]"/>
+        </record>
+        <record id="group_hms_emr_clinician" model="res.groups">
+            <field name="name">Klinisi (menulis rekam medis)</field>
+            <field name="privilege_id" ref="privilege_hms_emr"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_emr_reader'))]"/>
+        </record>
+        <record id="group_hms_emr_full" model="res.groups">
+            <field name="name">Akses Rekam Medis Penuh</field>
+            <field name="privilege_id" ref="privilege_hms_emr"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_emr_clinician'))]"/>
+        </record>
+
+        <record id="group_hms_pharmacy_tech" model="res.groups">
+            <field name="name">Tenaga Teknis Kefarmasian</field>
+            <field name="privilege_id" ref="privilege_hms_pharmacy"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_staff'))]"/>
+        </record>
+        <record id="group_hms_pharmacist" model="res.groups">
+            <field name="name">Apoteker</field>
+            <field name="privilege_id" ref="privilege_hms_pharmacy"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_pharmacy_tech')), (4, ref('group_hms_emr_reader'))]"/>
+        </record>
+
+        <record id="group_hms_diagnostic_user" model="res.groups">
+            <field name="name">Petugas Lab / Radiologi</field>
+            <field name="privilege_id" ref="privilege_hms_diagnostic"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_staff'))]"/>
+        </record>
+        <record id="group_hms_diagnostic_verifier" model="res.groups">
+            <field name="name">Dokter Penanggung Jawab Penunjang</field>
+            <field name="privilege_id" ref="privilege_hms_diagnostic"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_diagnostic_user'))]"/>
+        </record>
+
+        <record id="group_hms_nurse" model="res.groups">
+            <field name="name">Perawat</field>
+            <field name="privilege_id" ref="privilege_hms_nursing"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_emr_clinician'))]"/>
+        </record>
+        <record id="group_hms_charge_nurse" model="res.groups">
+            <field name="name">Ketua Tim / Kepala Ruang</field>
+            <field name="privilege_id" ref="privilege_hms_nursing"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_nurse'))]"/>
+        </record>
+
+        <record id="group_hms_cashier" model="res.groups">
+            <field name="name">Kasir</field>
+            <field name="privilege_id" ref="privilege_hms_billing"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_staff'))]"/>
+        </record>
+        <record id="group_hms_billing_supervisor" model="res.groups">
+            <field name="name">Supervisor Kasir</field>
+            <field name="privilege_id" ref="privilege_hms_billing"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_cashier'))]"/>
+        </record>
+
+        <record id="group_hms_manager" model="res.groups">
+            <field name="name">Manajemen Rumah Sakit</field>
+            <field name="privilege_id" ref="privilege_hms_management"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_staff'))]"/>
+        </record>
+        <record id="group_hms_admin" model="res.groups">
+            <field name="name">Administrator SIMRS</field>
+            <field name="privilege_id" ref="privilege_hms_management"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_manager')),
+                                             (4, ref('group_hms_registration_manager')),
+                                             (4, ref('group_hms_emr_full')),
+                                             (4, ref('group_hms_pharmacist')),
+                                             (4, ref('group_hms_diagnostic_verifier')),
+                                             (4, ref('group_hms_charge_nurse')),
+                                             (4, ref('group_hms_billing_supervisor'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+    </data>
+</odoo>

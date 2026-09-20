@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_order_list" model="ir.ui.view">
+        <field name="name">hms.order.list</field>
+        <field name="model">hms.order</field>
+        <field name="arch" type="xml">
+            <list string="Order Klinis" decoration-danger="priority == 'cito'"
+                  decoration-warning="priority == 'urgent'" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="ordered_at"/>
+                <field name="patient_id"/>
+                <field name="encounter_id" optional="hide"/>
+                <field name="order_type"/>
+                <field name="target_unit_id"/>
+                <field name="practitioner_id"/>
+                <field name="priority"/>
+                <field name="line_count"/>
+                <field name="state" widget="badge" decoration-success="state == 'done'"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_order_form" model="ir.ui.view">
+        <field name="name">hms.order.form</field>
+        <field name="model">hms.order</field>
+        <field name="arch" type="xml">
+            <form string="Order Klinis">
+                <header>
+                    <button name="action_submit" type="object" string="Kirim Order"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Batalkan Order"
+                            invisible="state in ('done', 'cancelled')"
+                            confirm="Batalkan seluruh baris order yang belum selesai?"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,ordered,in_progress,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="encounter_id"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="order_type"/>
+                            <field name="target_unit_id"/>
+                        </group>
+                        <group>
+                            <field name="practitioner_id"/>
+                            <field name="ordered_at"/>
+                            <field name="priority"/>
+                        </group>
+                    </group>
+                    <field name="clinical_note" placeholder="Diagnosis kerja / alasan pemeriksaan"/>
+                    <field name="line_ids">
+                        <list editable="bottom" decoration-muted="state == 'cancelled'"
+                              decoration-success="state == 'done'">
+                            <field name="sequence" widget="handle"/>
+                            <field name="tariff_id"/>
+                            <field name="name"/>
+                            <field name="qty"/>
+                            <field name="unit_id"/>
+                            <field name="scheduled_at" optional="hide"/>
+                            <field name="performed_by_id" optional="hide"/>
+                            <field name="unit_price" readonly="1" optional="show"/>
+                            <field name="price_subtotal" readonly="1" sum="Total" optional="show"/>
+                            <field name="state" widget="badge" readonly="1"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <button name="action_start" type="object" string="Kerjakan"
+                                    icon="fa-play" invisible="state != 'ordered'"/>
+                            <button name="action_done" type="object" string="Selesai"
+                                    icon="fa-check" invisible="state not in ('ordered', 'in_progress')"/>
+                            <button name="action_cancel" type="object" string="Batal"
+                                    icon="fa-times" invisible="state in ('done', 'cancelled')"/>
+                        </list>
+                    </field>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_order_search" model="ir.ui.view">
+        <field name="name">hms.order.search</field>
+        <field name="model">hms.order</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="practitioner_id"/>
+                <field name="target_unit_id"/>
+                <filter name="f_open" string="Belum Selesai"
+                        domain="[('state', 'in', ('ordered', 'in_progress'))]"/>
+                <filter name="f_cito" string="CITO" domain="[('priority', '=', 'cito')]"/>
+                <separator/>
+                <filter name="g_type" string="Jenis" context="{'group_by': 'order_type'}"/>
+                <filter name="g_unit" string="Unit Pelaksana" context="{'group_by': 'target_unit_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_order" model="ir.actions.act_window">
+        <field name="name">Order Klinis</field>
+        <field name="res_model">hms.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_order_search"/>
+    </record>
+    <menuitem id="menu_hms_order" name="Order Klinis"
+              parent="custom_hms_base.menu_hms_clinical" action="action_hms_order" sequence="30"/>
+</odoo>

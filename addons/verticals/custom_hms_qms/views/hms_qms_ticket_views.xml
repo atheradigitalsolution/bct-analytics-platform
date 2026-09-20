@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_qms_ticket_list" model="ir.ui.view">
+        <field name="name">hms.qms.ticket.list</field>
+        <field name="model">hms.qms.ticket</field>
+        <field name="arch" type="xml">
+            <list string="Tiket Antrian" create="false"
+                  decoration-info="state in ('called', 'serving')"
+                  decoration-warning="priority != 'none'"
+                  decoration-muted="state in ('cancelled', 'expired', 'transferred')">
+                <field name="name"/>
+                <field name="created_at"/>
+                <field name="service_id"/>
+                <field name="priority"/>
+                <field name="patient_id" optional="show"/>
+                <field name="encounter_id" optional="hide"/>
+                <field name="counter_id"/>
+                <field name="stage_no" optional="hide"/>
+                <field name="call_count" optional="hide"/>
+                <field name="wait_seconds" optional="show" sum="Total tunggu"/>
+                <field name="service_seconds" optional="hide"/>
+                <field name="state" widget="badge"/>
+                <button name="action_recall" type="object" string="Panggil Ulang" icon="fa-repeat"
+                        invisible="state not in ('called', 'serving')"/>
+                <button name="action_no_show" type="object" string="Tidak Hadir" icon="fa-user-times"
+                        invisible="state not in ('called', 'serving')"/>
+                <button name="action_restore" type="object" string="Pulihkan" icon="fa-undo"
+                        invisible="state != 'no_show'"/>
+                <button name="action_finish" type="object" string="Selesai" icon="fa-check"
+                        invisible="state not in ('called', 'serving')"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_qms_ticket_search" model="ir.ui.view">
+        <field name="name">hms.qms.ticket.search</field>
+        <field name="model">hms.qms.ticket</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="service_id"/>
+                <field name="patient_id"/>
+                <field name="counter_id"/>
+                <filter name="f_today" string="Hari Ini"
+                        domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="f_waiting" string="Menunggu" domain="[('state', '=', 'waiting')]"/>
+                <filter name="f_active" string="Sedang Dilayani"
+                        domain="[('state', 'in', ('called', 'serving'))]"/>
+                <filter name="f_priority" string="Prioritas" domain="[('priority', '!=', 'none')]"/>
+                <filter name="f_no_show" string="Tidak Hadir" domain="[('state', '=', 'no_show')]"/>
+                <separator/>
+                <filter name="g_service" string="Layanan" context="{'group_by': 'service_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="g_counter" string="Loket" context="{'group_by': 'counter_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_qms_ticket" model="ir.actions.act_window">
+        <field name="name">Tiket Antrian</field>
+        <field name="res_model">hms.qms.ticket</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_qms_ticket_search"/>
+        <field name="context">{'search_default_f_today': 1, 'search_default_g_service': 1}</field>
+    </record>
+    <menuitem id="menu_hms_qms_ticket" name="Tiket Hari Ini" parent="menu_hms_qms_root"
+              action="action_hms_qms_ticket" sequence="20"/>
+
+    <record id="action_hms_qms_ticket_log" model="ir.actions.act_window">
+        <field name="name">Riwayat Tiket (KPI)</field>
+        <field name="res_model">hms.qms.ticket.log</field>
+        <field name="view_mode">list</field>
+    </record>
+    <menuitem id="menu_hms_qms_ticket_log" name="Riwayat Tiket" parent="menu_hms_qms_root"
+              action="action_hms_qms_ticket_log" sequence="30"
+              groups="custom_hms_base.group_hms_manager"/>
+</odoo>

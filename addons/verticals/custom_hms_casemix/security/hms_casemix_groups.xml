@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Sumbu peran tersendiri.
+
+            Koder casemix bukan petugas billing dan bukan PMIK, meski
+            pekerjaannya bersentuhan dengan keduanya. Digabung ke privilege
+            yang sudah ada, form pengguna Odoo 19 akan merendernya sebagai
+            dropdown pilih-satu dan membuang peran lain milik orang yang sama
+            begitu form disimpan.
+        -->
+        <record id="privilege_hms_casemix" model="res.groups.privilege">
+            <field name="name">SIMRS / Casemix &amp; Klaim</field>
+            <field name="category_id" ref="custom_hms_base.module_category_hms"/>
+            <field name="sequence">500</field>
+        </record>
+
+        <!--
+            Koder casemix.
+
+            Menyiratkan `group_hms_emr_reader`: mengoding tanpa membaca
+            resume, CPPT dan hasil penunjang adalah mengarang. Yang TIDAK
+            disiratkan adalah `group_hms_emr_clinician` — dan itu inti modul
+            ini: koder tidak boleh punya hak tulis ke hms.diagnosis.
+        -->
+        <record id="group_hms_coder" model="res.groups">
+            <field name="name">Koder Casemix</field>
+            <field name="privilege_id" ref="privilege_hms_casemix"/>
+            <field name="implied_ids" eval="[(4, ref('custom_hms_base.group_hms_emr_reader'))]"/>
+        </record>
+
+        <!--
+            Verifikator internal casemix.
+
+            Menyiratkan koder karena ia harus bisa membaca dan memperbaiki
+            pekerjaan yang diverifikasinya. Pemisahan empat matanya bukan di
+            grup, melainkan di record: `action_verify_internal` menolak
+            verifikasi oleh orang yang sama dengan `coder_id` ketika selisih
+            tarif melewati ambang. Grup tidak bisa menyatakan "bukan orang
+            ini", hanya record yang bisa.
+        -->
+        <record id="group_hms_casemix_verifier" model="res.groups">
+            <field name="name">Verifikator Internal Casemix</field>
+            <field name="privilege_id" ref="privilege_hms_casemix"/>
+            <field name="implied_ids" eval="[(4, ref('group_hms_coder'))]"/>
+        </record>
+
+    </data>
+</odoo>

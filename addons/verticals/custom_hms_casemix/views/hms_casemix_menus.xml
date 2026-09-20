@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_hms_casemix_root" name="Casemix &amp; Klaim"
+              parent="custom_hms_base.menu_hms_root" sequence="78"
+              groups="custom_hms_casemix.group_hms_coder,custom_hms_base.group_hms_manager"/>
+
+    <menuitem id="menu_hms_claim_worklist" name="Daftar Kerja Koding"
+              parent="menu_hms_casemix_root" action="action_hms_claim_worklist"
+              sequence="10"/>
+
+    <menuitem id="menu_hms_claim" name="Semua Klaim"
+              parent="menu_hms_casemix_root" action="action_hms_claim" sequence="20"/>
+
+    <menuitem id="menu_hms_coding_query" name="Pertanyaan ke DPJP"
+              parent="menu_hms_casemix_root" action="action_hms_coding_query"
+              sequence="30"/>
+
+    <menuitem id="menu_hms_claim_batch" name="Batch Pengajuan"
+              parent="menu_hms_casemix_root" action="action_hms_claim_batch"
+              sequence="40"/>
+
+    <menuitem id="menu_hms_claim_adjustment" name="Penyesuaian Klaim"
+              parent="menu_hms_casemix_root" action="action_hms_claim_adjustment"
+              sequence="50"/>
+
+    <!--
+        E-Klaim ditempatkan di bawah Konfigurasi, bukan di daftar kerja.
+
+        Keduanya bukan pekerjaan harian: satu master yang diimpor sekali dari
+        manual resmi, satu halaman parameter yang menunggu diisi. Menaruhnya
+        di antara daftar kerja koder memberi kesan ada tombol kirim di
+        sebelahnya — dan tidak ada.
+    -->
+    <menuitem id="menu_hms_eklaim" name="E-Klaim" parent="custom_hms_base.menu_hms_config"
+              sequence="40" groups="custom_hms_casemix.group_hms_coder"/>
+
+    <menuitem id="menu_hms_eklaim_code" name="Master Kode E-Klaim"
+              parent="menu_hms_eklaim" action="action_hms_eklaim_code" sequence="10"/>
+
+    <menuitem id="menu_hms_eklaim_config" name="Parameter E-Klaim"
+              parent="menu_hms_eklaim" action="action_hms_eklaim_config" sequence="20"
+              groups="custom_hms_base.group_hms_admin"/>
+</odoo>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_medicine_label_document">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="rx">
+                <t t-set="settings" t-value="rx.env['hms.settings'].get_settings()"/>
+                <!-- One label per dispensed line. A single label listing every
+                     drug is unusable at home, which is where the label is read. -->
+                <t t-foreach="rx.line_ids.filtered(lambda l: l.state != 'cancelled' and not l.parent_line_id)" t-as="line">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 7pt;">
+                        <div style="font-weight: bold; font-size: 6pt; border-bottom: 0.2mm solid #000;">
+                            <span t-esc="settings.hospital_name"/>
+                        </div>
+                        <div style="margin-top: 1mm;">
+                            <strong t-field="rx.patient_id.name"/>
+                            (<span t-field="rx.patient_id.mrn"/>)
+                        </div>
+                        <div>
+                            <span t-field="rx.dispensed_at" t-options='{"format": "dd/MM/yyyy"}'/>
+                            · No. <span t-field="rx.name"/>
+                        </div>
+                        <div style="margin-top: 1mm; font-size: 9pt; font-weight: bold;">
+                            <span t-field="line.medicine_id.display_name"/>
+                        </div>
+                        <div style="font-size: 8pt;">
+                            <span t-field="line.qty_dispense"/>
+                            <span t-field="line.medicine_id.unit_dispense_id.name"/>
+                        </div>
+                        <div style="margin-top: 1mm; font-size: 8pt; font-weight: bold;">
+                            <span t-if="line.frequency_id"><span t-field="line.frequency_id.name"/> · </span>
+                            <span t-field="line.sig"/>
+                        </div>
+                        <div t-if="line.is_prn" style="font-weight: bold;">BILA PERLU</div>
+                        <div t-if="line.medicine_id.is_high_alert"
+                             style="color: #b00; font-weight: bold;">HIGH ALERT</div>
+                        <div t-if="line.medicine_id.label_note" style="font-size: 6pt;">
+                            <span t-field="line.medicine_id.label_note"/>
+                        </div>
+                        <div t-if="line.is_compound" style="font-size: 6pt; font-style: italic;">
+                            Racikan: <span t-field="line.compound_instruction"/>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_prescription_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="rx">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 10pt;">
+                        <h4 style="text-align: center;">LEMBAR RESEP</h4>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td style="width: 18%;"><strong>No. Resep</strong></td>
+                                <td style="width: 32%;"><span t-field="rx.name"/></td>
+                                <td style="width: 18%;"><strong>Tanggal</strong></td>
+                                <td style="width: 32%;"><span t-field="rx.prescribed_at"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Pasien</strong></td>
+                                <td><span t-field="rx.patient_id.name"/></td>
+                                <td><strong>No. RM</strong></td>
+                                <td><span t-field="rx.patient_id.mrn"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dokter</strong></td>
+                                <td><span t-field="rx.practitioner_id.display_name"/></td>
+                                <td><strong>Depo</strong></td>
+                                <td><span t-field="rx.depot_id.name"/></td>
+                            </tr>
+                        </table>
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Obat</th><th>Dosis</th><th>Frekuensi</th>
+                                    <th>Rute</th><th>Durasi</th><th class="text-end">Jumlah</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="rx.line_ids.filtered(lambda l: not l.parent_line_id)" t-as="line">
+                                    <td>
+                                        <span t-field="line.medicine_id.display_name"/>
+                                        <t t-if="line.medicine_id.is_high_alert">
+                                            <strong style="color:#b00;"> [HIGH ALERT]</strong>
+                                        </t>
+                                    </td>
+                                    <td><span t-field="line.dose"/> <span t-field="line.dose_unit"/></td>
+                                    <td><span t-field="line.frequency_id.name"/></td>
+                                    <td><span t-field="line.route_id.name"/></td>
+                                    <td><span t-field="line.duration_days"/> hari</td>
+                                    <td class="text-end"><span t-field="line.qty_prescribed"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <table style="width: 100%; margin-top: 12mm;">
+                            <tr>
+                                <td style="width: 50%; text-align: center;">
+                                    Apoteker<br/><br/><br/>
+                                    (<span t-field="rx.verified_by_id.display_name"/>)
+                                </td>
+                                <td style="width: 50%; text-align: center;">
+                                    Dokter Penulis Resep<br/>
+                                    <img t-if="rx.practitioner_id.signature_image"
+                                         t-att-src="image_data_uri(rx.practitioner_id.signature_image)"
+                                         style="height: 16mm;"/>
+                                    <div t-else="" style="height: 16mm;"/>
+                                    (<span t-field="rx.practitioner_id.display_name"/>)
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

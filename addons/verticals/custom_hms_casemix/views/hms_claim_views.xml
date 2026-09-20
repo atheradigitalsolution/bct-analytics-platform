@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_claim_list" model="ir.ui.view">
+        <field name="name">hms.claim.list</field>
+        <field name="model">hms.claim</field>
+        <field name="arch" type="xml">
+            <list string="Klaim"
+                  decoration-danger="is_expired or state == 'expired'"
+                  decoration-warning="state in ('pending', 'dispute') or is_high_variance"
+                  decoration-muted="state in ('paid', 'rejected')">
+                <field name="name"/>
+                <field name="encounter_id"/>
+                <field name="patient_id"/>
+                <field name="payer_id"/>
+                <field name="kind"/>
+                <field name="care_type" optional="show"/>
+                <field name="klpcm_open_count" string="KLPCM"/>
+                <field name="hospital_bill_amount" sum="Tarif RS"/>
+                <field name="grouped_tariff" sum="Tarif Grouper"/>
+                <field name="variance_amount" sum="Selisih"/>
+                <field name="is_readmission" optional="show"/>
+                <field name="is_fragmentation" optional="hide"/>
+                <field name="deadline_at"/>
+                <field name="days_to_deadline" string="Sisa Hari"/>
+                <field name="submission_count" optional="hide"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="is_expired" column_invisible="1"/>
+                <field name="is_high_variance" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_claim_form" model="ir.ui.view">
+        <field name="name">hms.claim.form</field>
+        <field name="model">hms.claim</field>
+        <field name="arch" type="xml">
+            <form string="Klaim">
+                <header>
+                    <button name="action_start_coding" type="object" string="Mulai Koding"
+                            class="btn-primary" invisible="state != 'to_code'"/>
+                    <button name="action_code_done" type="object" string="Selesai Koding"
+                            class="btn-primary" invisible="state != 'coding'"/>
+                    <button name="action_verify_internal" type="object"
+                            string="Verifikasi Internal" class="btn-primary"
+                            invisible="state != 'internal_review'"/>
+                    <button name="action_return_to_coding" type="object"
+                            string="Kembalikan ke Koder"
+                            invisible="state != 'internal_review'"/>
+                    <button name="action_finalize" type="object" string="Finalkan"
+                            class="btn-primary" invisible="state != 'internal_verified'"/>
+                    <button name="action_submit" type="object" string="Ajukan"
+                            class="btn-primary" invisible="state != 'finalized'"/>
+                    <button name="action_start_verification" type="object"
+                            string="Masuk Verifikasi Penjamin"
+                            invisible="state not in ('submitted', 'resubmitted')"/>
+                    <button name="action_approve" type="object" string="Tetapkan Layak"
+                            class="btn-primary"
+                            invisible="state not in ('bpjs_verifying', 'dispute')"/>
+                    <button name="action_set_pending" type="object" string="Tandai Pending"
+                            invisible="state != 'bpjs_verifying'"/>
+                    <button name="action_resubmit" type="object" string="Ajukan Ulang"
+                            class="btn-primary" invisible="state != 'pending'"/>
+                    <button name="action_open_dispute" type="object" string="Buka Dispute"
+                            invisible="state not in ('bpjs_verifying', 'pending', 'rejected')"/>
+                    <button name="action_reject" type="object" string="Tetapkan Tidak Layak"
+                            invisible="state not in ('bpjs_verifying', 'dispute')"/>
+                    <button name="action_mark_paid" type="object" string="Catat Pembayaran"
+                            class="btn-primary" invisible="state != 'approved'"/>
+                    <button name="action_refresh_hospital_bill" type="object"
+                            string="Ambil Ulang Tarif RS"
+                            invisible="state in ('paid', 'expired', 'rejected')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="to_code,coding,internal_review,internal_verified,finalized,submitted,bpjs_verifying,paid"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Kedaluwarsa" bg_color="text-bg-danger"
+                            invisible="state != 'expired'"/>
+                    <widget name="web_ribbon" title="Readmisi" bg_color="text-bg-warning"
+                            invisible="not is_readmission"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Episode">
+                            <field name="encounter_id" readonly="state != 'to_code'"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="care_type" readonly="1"/>
+                            <field name="payer_id" readonly="state != 'to_code'"/>
+                            <field name="cob_payer_id"/>
+                            <field name="sep_id"/>
+                            <field name="kind" readonly="state != 'to_code'"/>
+                            <field name="klpcm_open_count" readonly="1"/>
+                        </group>
+                        <group string="Tenggat &amp; Pengajuan">
+                            <field name="discharge_at" readonly="1"/>
+                            <field name="expiry_months_applied" readonly="1"/>
+                            <field name="deadline_at" readonly="1"/>
+                            <field name="days_to_deadline" readonly="1"/>
+                            <field name="batch_id"/>
+                            <field name="submission_count" readonly="1"/>
+                            <field name="submitted_at" readonly="1"/>
+                        </group>
+                        <group string="Nilai">
+                            <field name="currency_id" invisible="1"/>
+                            <field name="bill_id" readonly="1"/>
+                            <field name="hospital_bill_amount"/>
+                            <field name="grouped_tariff"/>
+                            <field name="topup_amount"/>
+                            <field name="variance_amount" readonly="1"/>
+                            <field name="is_high_variance" readonly="1"/>
+                            <field name="approved_amount" readonly="1"/>
+                            <field name="paid_amount" readonly="1"/>
+                            <field name="adjustment_total" readonly="1"/>
+                        </group>
+                        <group string="Pelaksana">
+                            <field name="coder_id" readonly="1"/>
+                            <field name="coded_at" readonly="1"/>
+                            <field name="verifier_id" readonly="1"/>
+                            <field name="verified_at" readonly="1"/>
+                            <field name="finalized_by_id" readonly="1"/>
+                            <field name="finalized_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Tarif grouper diisi manusia dari aplikasi E-Klaim. Sistem ini
+                        <b>belum</b> memanggil E-Klaim: enumerasi dan format payloadnya
+                        menunggu manual resmi WS E-Klaim 5.10.x.
+                    </div>
+                    <notebook>
+                        <page string="Kode Klaim">
+                            <div class="alert alert-warning" role="alert">
+                                Kode di sini <b>tidak pernah</b> mengubah diagnosis dokter
+                                (<code>hms.diagnosis</code>). Bila kode berbeda dari catatan
+                                klinis sumbernya, alasan perbedaan wajib diisi.
+                            </div>
+                            <field name="code_ids" readonly="state not in ('coding', 'internal_review')">
+                                <list editable="bottom">
+                                    <field name="seq" widget="handle"/>
+                                    <field name="kind"/>
+                                    <field name="icd10_id" invisible="kind != 'icd10'"/>
+                                    <field name="icd9_id" invisible="kind != 'icd9'"/>
+                                    <field name="role"/>
+                                    <field name="source_diagnosis_id" invisible="kind != 'icd10'"/>
+                                    <field name="source_procedure_id" invisible="kind != 'icd9'"/>
+                                    <field name="changed_by_coder" readonly="1"/>
+                                    <field name="change_reason"
+                                           required="changed_by_coder"/>
+                                    <field name="note" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Pertanyaan ke DPJP">
+                            <field name="query_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="topic"/>
+                                    <field name="question"/>
+                                    <field name="addressed_to_id"/>
+                                    <field name="answer"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Pre-grouping">
+                            <group>
+                                <group string="Readmisi">
+                                    <field name="is_readmission" readonly="1"/>
+                                    <field name="readmission_source_id" readonly="1"/>
+                                    <field name="readmission_reason"
+                                           required="is_readmission"/>
+                                </group>
+                                <group string="Fragmentasi">
+                                    <field name="is_fragmentation" readonly="1"/>
+                                    <field name="fragmentation_note"/>
+                                </group>
+                            </group>
+                            <button name="action_run_pregrouping" type="object"
+                                    string="Jalankan Ulang Aturan Pre-grouping"
+                                    class="btn-secondary"/>
+                        </page>
+                        <page string="Hasil Penjamin">
+                            <group>
+                                <group string="Pending">
+                                    <field name="pending_category"/>
+                                    <field name="pending_reason"/>
+                                    <field name="pending_at" readonly="1"/>
+                                    <field name="pending_age_days" readonly="1"/>
+                                    <field name="needs_escalation" readonly="1"/>
+                                    <field name="correction_note"/>
+                                </group>
+                                <group string="Dispute &amp; Penolakan">
+                                    <field name="dispute_level"/>
+                                    <field name="dispute_opened_at" readonly="1"/>
+                                    <field name="rejection_reason"/>
+                                </group>
+                            </group>
+                            <field name="review_note" placeholder="Catatan review internal..."/>
+                        </page>
+                        <page string="Penyesuaian">
+                            <field name="adjustment_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="type"/>
+                                    <field name="amount"/>
+                                    <field name="reason"/>
+                                    <field name="authorized_by_id"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_claim_search" model="ir.ui.view">
+        <field name="name">hms.claim.search</field>
+        <field name="model">hms.claim</field>
+        <field name="arch" type="xml">
+            <search string="Cari Klaim">
+                <field name="name"/>
+                <field name="encounter_id"/>
+                <field name="patient_id"/>
+                <field name="payer_id"/>
+                <field name="batch_id"/>
+                <filter name="filter_worklist" string="Menunggu Koding"
+                        domain="[('state', '=', 'to_code')]"/>
+                <filter name="filter_in_progress" string="Belum Diajukan"
+                        domain="[('state', 'in', ('to_code', 'coding', 'internal_review', 'internal_verified', 'finalized'))]"/>
+                <filter name="filter_pending" string="Pending"
+                        domain="[('state', '=', 'pending')]"/>
+                <filter name="filter_expired" string="Kedaluwarsa"
+                        domain="[('state', '=', 'expired')]"/>
+                <filter name="filter_readmission" string="Readmisi"
+                        domain="[('is_readmission', '=', True)]"/>
+                <filter name="filter_variance" string="Selisih di Atas Ambang"
+                        domain="[('is_high_variance', '=', True)]"/>
+                <separator/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="group_payer" string="Penjamin" context="{'group_by': 'payer_id'}"/>
+                <filter name="group_kind" string="Jenis Klaim" context="{'group_by': 'kind'}"/>
+                <filter name="group_care" string="Jenis Rawat"
+                        context="{'group_by': 'care_type'}"/>
+                <filter name="group_coder" string="Koder" context="{'group_by': 'coder_id'}"/>
+                <filter name="group_batch" string="Batch" context="{'group_by': 'batch_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_claim" model="ir.actions.act_window">
+        <field name="name">Klaim</field>
+        <field name="res_model">hms.claim</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_claim_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada klaim.</p>
+            <p>Klaim dibuka petugas casemix untuk episode yang memang akan
+               ditagihkan, bukan otomatis untuk setiap kunjungan. Kunjungan yang
+               masih punya temuan KLPCM terbuka tidak dapat masuk koding.</p>
+        </field>
+    </record>
+
+    <record id="action_hms_claim_worklist" model="ir.actions.act_window">
+        <field name="name">Daftar Kerja Koding</field>
+        <field name="res_model">hms.claim</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_in_progress': 1}</field>
+        <field name="search_view_id" ref="view_hms_claim_search"/>
+    </record>
+</odoo>

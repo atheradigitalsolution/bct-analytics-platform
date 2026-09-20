@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_hms_order" model="ir.sequence">
+            <field name="name">Nomor Order Klinis</field>
+            <field name="code">hms.order</field>
+            <field name="prefix">ORD-%(year)s%(month)s-</field>
+            <field name="padding">5</field>
+            <field name="implementation">standard</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_depot_list" model="ir.ui.view">
+        <field name="name">hms.depot.list</field>
+        <field name="model">hms.depot</field>
+        <field name="arch" type="xml">
+            <list string="Depo Farmasi">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="type"/>
+                <field name="unit_id"/>
+                <field name="location_id"/>
+                <field name="is_active_queue"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_depot_form" model="ir.ui.view">
+        <field name="name">hms.depot.form</field>
+        <field name="model">hms.depot</field>
+        <field name="arch" type="xml">
+            <form string="Depo Farmasi">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="type"/>
+                            <field name="unit_id"/>
+                            <field name="is_active_queue"/>
+                        </group>
+                        <group>
+                            <field name="location_id"/>
+                            <field name="consumption_location_id"/>
+                            <field name="picking_type_id"/>
+                        </group>
+                    </group>
+                    <field name="pharmacist_ids" widget="many2many_tags"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_depot" model="ir.actions.act_window">
+        <field name="name">Depo Farmasi</field>
+        <field name="res_model">hms.depot</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_depot" name="Depo Farmasi"
+              parent="custom_hms_base.menu_hms_config_master" action="action_hms_depot"
+              sequence="70"/>
+</odoo>

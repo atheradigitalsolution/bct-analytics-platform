@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_unit_list" model="ir.ui.view">
+        <field name="name">hms.unit.list</field>
+        <field name="model">hms.unit</field>
+        <field name="arch" type="xml">
+            <list string="Unit Layanan">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="type"/>
+                <field name="specialty_id"/>
+                <field name="head_id"/>
+                <field name="queue_mode"/>
+                <field name="is_revenue_unit"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_unit_form" model="ir.ui.view">
+        <field name="name">hms.unit.form</field>
+        <field name="model">hms.unit</field>
+        <field name="arch" type="xml">
+            <form string="Unit Layanan">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identitas">
+                            <field name="code"/>
+                            <field name="type"/>
+                            <field name="specialty_id"/>
+                            <field name="head_id"/>
+                            <field name="bpjs_poli_code"/>
+                            <field name="ihs_location_id"/>
+                        </group>
+                        <group string="Lokasi &amp; Operasional">
+                            <field name="building"/>
+                            <field name="floor"/>
+                            <field name="phone_ext"/>
+                            <field name="queue_mode"/>
+                            <field name="requires_referral"/>
+                            <field name="default_consult_tariff_id"/>
+                        </group>
+                        <group string="Akuntansi Manajemen">
+                            <field name="is_revenue_unit"/>
+                            <field name="area_m2"/>
+                            <field name="color" widget="color_picker"/>
+                        </group>
+                    </group>
+                    <field name="practitioner_ids" widget="many2many_tags"/>
+                    <field name="operating_hours" placeholder='{"mon": ["08:00", "14:00"]}'/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_unit" model="ir.actions.act_window">
+        <field name="name">Unit Layanan</field>
+        <field name="res_model">hms.unit</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_unit" name="Unit Layanan" parent="menu_hms_config_master"
+              action="action_hms_unit" sequence="20"/>
+
+    <record id="view_hms_care_class_list" model="ir.ui.view">
+        <field name="name">hms.care.class.list</field>
+        <field name="model">hms.care.class</field>
+        <field name="arch" type="xml">
+            <list string="Kelas Perawatan" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="rank"/>
+                <field name="jkn_class_code"/>
+                <field name="is_intensive"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_hms_care_class" model="ir.actions.act_window">
+        <field name="name">Kelas Perawatan</field>
+        <field name="res_model">hms.care.class</field>
+        <field name="view_mode">list</field>
+    </record>
+    <menuitem id="menu_hms_care_class" name="Kelas Perawatan" parent="menu_hms_config_master"
+              action="action_hms_care_class" sequence="30"/>
+</odoo>

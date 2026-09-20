@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_encounter_form_emr" model="ir.ui.view">
+        <field name="name">hms.encounter.form.emr</field>
+        <field name="model">hms.encounter</field>
+        <field name="inherit_id" ref="custom_hms_registration.view_hms_encounter_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_close']" position="after">
+                <button name="action_generate_summary" type="object" string="Buat Resume"
+                        invisible="state == 'cancelled'"
+                        groups="custom_hms_base.group_hms_emr_clinician"/>
+            </xpath>
+            <xpath expr="//field[@name='note']" position="before">
+                <notebook>
+                    <page string="TTV &amp; Observasi" name="observations">
+                        <field name="observation_ids" context="{'default_encounter_id': id}">
+                            <list editable="bottom">
+                                <field name="taken_at"/>
+                                <field name="context"/>
+                                <field name="systolic"/>
+                                <field name="diastolic"/>
+                                <field name="pulse"/>
+                                <field name="respiratory_rate"/>
+                                <field name="temperature"/>
+                                <field name="spo2"/>
+                                <field name="pain_score"/>
+                                <field name="taken_by_id"/>
+                            </list>
+                        </field>
+                    </page>
+                    <page string="CPPT" name="notes">
+                        <field name="note_ids" context="{'default_encounter_id': id}">
+                            <list decoration-warning="not signed">
+                                <field name="noted_at"/>
+                                <field name="note_type"/>
+                                <field name="author_id"/>
+                                <field name="assessment"/>
+                                <field name="signed" widget="boolean_toggle" readonly="1"/>
+                            </list>
+                        </field>
+                    </page>
+                    <page string="Diagnosis" name="diagnoses">
+                        <field name="diagnosis_ids" context="{'default_encounter_id': id}">
+                            <list editable="bottom">
+                                <field name="icd10_id"/>
+                                <field name="rank"/>
+                                <field name="stage"/>
+                                <field name="practitioner_id"/>
+                                <field name="note"/>
+                            </list>
+                        </field>
+                    </page>
+                    <page string="Tindakan" name="procedures">
+                        <field name="procedure_ids" context="{'default_encounter_id': id}">
+                            <list editable="bottom">
+                                <field name="performed_at"/>
+                                <field name="name"/>
+                                <field name="icd9_id"/>
+                                <field name="tariff_id"/>
+                                <field name="practitioner_id"/>
+                                <field name="outcome"/>
+                            </list>
+                        </field>
+                    </page>
+                    <page string="Persetujuan" name="consents">
+                        <field name="consent_ids" context="{'default_encounter_id': id, 'default_patient_id': patient_id}">
+                            <list>
+                                <field name="template_id"/>
+                                <field name="signer_name"/>
+                                <field name="state"/>
+                                <field name="signed_at"/>
+                            </list>
+                        </field>
+                    </page>
+                    <page string="Resume" name="summaries">
+                        <field name="summary_ids">
+                            <list>
+                                <field name="type"/>
+                                <field name="diagnosis_primary_id"/>
+                                <field name="condition_at_discharge"/>
+                                <field name="state"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+            </xpath>
+            <xpath expr="//field[@name='chief_complaint']" position="after">
+                <field name="primary_diagnosis_id" readonly="1"/>
+                <field name="unsigned_note_count" readonly="1"
+                       invisible="unsigned_note_count == 0"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_hms_summary_form" model="ir.ui.view">
+        <field name="name">hms.summary.form</field>
+        <field name="model">hms.summary</field>
+        <field name="arch" type="xml">
+            <form string="Resume Medis">
+                <header>
+                    <button name="action_finalize" type="object" string="Finalkan"
+                            class="btn-primary" invisible="state == 'final'"
+                            confirm="Resume final tidak dapat diubah lagi. Lanjutkan?"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="encounter_id" readonly="1"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="type"/>
+                            <field name="practitioner_id"/>
+                        </group>
+                        <group>
+                            <field name="admitted_at"/>
+                            <field name="discharged_at"/>
+                            <field name="length_of_stay" readonly="1"/>
+                            <field name="condition_at_discharge"/>
+                            <field name="disposition"/>
+                        </group>
+                    </group>
+                    <group string="Diagnosis">
+                        <field name="diagnosis_primary_id"/>
+                        <field name="diagnosis_secondary_ids" widget="many2many_tags"/>
+                    </group>
+                    <notebook>
+                        <page string="Perjalanan Penyakit">
+                            <field name="chief_complaint"/>
+                            <field name="history"/>
+                            <field name="physical_exam"/>
+                            <field name="lab_summary"/>
+                        </page>
+                        <page string="Tindakan &amp; Terapi">
+                            <field name="procedure_summary"/>
+                            <field name="treatment"/>
+                            <field name="discharge_medication"/>
+                        </page>
+                        <page string="Anjuran">
+                            <field name="followup_instruction"/>
+                            <group>
+                                <field name="followup_date"/>
+                                <field name="followup_unit_id"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_summary" model="ir.actions.act_window">
+        <field name="name">Resume Medis</field>
+        <field name="res_model">hms.summary</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_hms_summary" name="Resume Medis"
+              parent="custom_hms_base.menu_hms_clinical" action="action_hms_summary" sequence="50"/>
+    <menuitem id="menu_hms_observation" name="Observasi / TTV"
+              parent="custom_hms_base.menu_hms_clinical" action="action_hms_observation"
+              sequence="15"/>
+</odoo>

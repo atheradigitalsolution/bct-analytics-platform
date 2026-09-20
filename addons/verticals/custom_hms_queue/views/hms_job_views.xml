@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_job_list" model="ir.ui.view">
+        <field name="name">hms.job.list</field>
+        <field name="model">hms.job</field>
+        <field name="arch" type="xml">
+            <list string="Job Integrasi" create="false"
+                  decoration-danger="state == 'dead'" decoration-warning="state == 'failed'"
+                  decoration-success="state == 'done'" decoration-muted="state == 'cancelled'">
+                <field name="id"/>
+                <field name="create_date" string="Dibuat"/>
+                <field name="name"/>
+                <field name="model_name" optional="hide"/>
+                <field name="res_id" optional="hide"/>
+                <field name="state" widget="badge"/>
+                <field name="attempts"/>
+                <field name="max_attempts"/>
+                <field name="next_run"/>
+                <field name="duration_ms" optional="hide"/>
+                <field name="last_error"/>
+                <button name="action_retry" type="object" string="Ulangi" icon="fa-refresh"
+                        invisible="state not in ('failed', 'dead', 'cancelled')"/>
+                <button name="action_cancel" type="object" string="Batalkan" icon="fa-times"
+                        invisible="state in ('done', 'cancelled')"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hms_job_form" model="ir.ui.view">
+        <field name="name">hms.job.form</field>
+        <field name="model">hms.job</field>
+        <field name="arch" type="xml">
+            <form string="Job Integrasi">
+                <header>
+                    <button name="action_retry" type="object" string="Ulangi" class="btn-primary"
+                            invisible="state not in ('failed', 'dead', 'cancelled')"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('done', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,running,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="model_name" readonly="1"/>
+                            <field name="res_id" readonly="1"/>
+                            <field name="priority"/>
+                            <field name="attempts" readonly="1"/>
+                            <field name="max_attempts"/>
+                        </group>
+                        <group>
+                            <field name="next_run"/>
+                            <field name="started_at" readonly="1"/>
+                            <field name="finished_at" readonly="1"/>
+                            <field name="duration_ms" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Payload"><field name="payload" readonly="1"/></page>
+                        <page string="Hasil"><field name="result" readonly="1"/></page>
+                        <page string="Galat"><field name="last_error" readonly="1"/></page>
+                        <page string="Log Panggilan">
+                            <field name="log_ids" readonly="1">
+                                <list>
+                                    <field name="called_at"/>
+                                    <field name="service"/>
+                                    <field name="method"/>
+                                    <field name="endpoint"/>
+                                    <field name="response_code"/>
+                                    <field name="duration_ms"/>
+                                    <field name="is_mock"/>
+                                    <field name="error"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_hms_job_search" model="ir.ui.view">
+        <field name="name">hms.job.search</field>
+        <field name="model">hms.job</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter name="f_open" string="Belum selesai"
+                        domain="[('state', 'in', ('pending', 'running', 'failed'))]"/>
+                <filter name="f_dead" string="Berhenti" domain="[('state', '=', 'dead')]"/>
+                <separator/>
+                <filter name="g_name" string="Handler" context="{'group_by': 'name'}"/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_job" model="ir.actions.act_window">
+        <field name="name">Job Integrasi</field>
+        <field name="res_model">hms.job</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_job_search"/>
+    </record>
+    <menuitem id="menu_hms_job" name="Job Integrasi" parent="menu_hms_integration"
+              action="action_hms_job" sequence="20"/>
+
+    <record id="action_hms_bridging_log" model="ir.actions.act_window">
+        <field name="name">Log Bridging</field>
+        <field name="res_model">hms.bridging.log</field>
+        <field name="view_mode">list</field>
+    </record>
+    <record id="view_hms_bridging_log_list" model="ir.ui.view">
+        <field name="name">hms.bridging.log.list</field>
+        <field name="model">hms.bridging.log</field>
+        <field name="arch" type="xml">
+            <list string="Log Bridging" create="false" edit="false">
+                <field name="called_at"/>
+                <field name="service"/>
+                <field name="method"/>
+                <field name="endpoint"/>
+                <field name="response_code"/>
+                <field name="duration_ms"/>
+                <field name="is_mock"/>
+                <field name="error"/>
+            </list>
+        </field>
+    </record>
+    <menuitem id="menu_hms_bridging_log" name="Log Bridging" parent="menu_hms_integration"
+              action="action_hms_bridging_log" sequence="40"/>
+</odoo>

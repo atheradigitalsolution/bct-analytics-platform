@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_coding_query_list" model="ir.ui.view">
+        <field name="name">hms.coding.query.list</field>
+        <field name="model">hms.coding.query</field>
+        <field name="arch" type="xml">
+            <list string="Pertanyaan Koder"
+                  decoration-warning="state == 'open'"
+                  decoration-muted="state in ('closed', 'withdrawn')">
+                <field name="name"/>
+                <field name="asked_at"/>
+                <field name="claim_id"/>
+                <field name="patient_id"/>
+                <field name="topic"/>
+                <field name="question"/>
+                <field name="addressed_to_id"/>
+                <field name="answered_at" optional="show"/>
+                <field name="outcome" optional="hide"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_coding_query_form" model="ir.ui.view">
+        <field name="name">hms.coding.query.form</field>
+        <field name="model">hms.coding.query</field>
+        <field name="arch" type="xml">
+            <form string="Pertanyaan Koder ke DPJP">
+                <header>
+                    <button name="action_answer" type="object" string="Kirim Jawaban"
+                            class="btn-primary" invisible="state != 'open'"/>
+                    <button name="action_close" type="object" string="Tutup Pertanyaan"
+                            class="btn-primary" invisible="state != 'answered'"/>
+                    <button name="action_withdraw" type="object" string="Tarik"
+                            invisible="state in ('closed', 'withdrawn')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="open,answered,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="claim_id" readonly="state != 'open'"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="topic"/>
+                            <field name="addressed_to_id" readonly="state != 'open'"/>
+                        </group>
+                        <group>
+                            <field name="asked_by_id" readonly="1"/>
+                            <field name="asked_at" readonly="1"/>
+                            <field name="answered_by_id" readonly="1"/>
+                            <field name="answered_at" readonly="1"/>
+                            <field name="outcome"/>
+                        </group>
+                    </group>
+                    <group string="Pertanyaan">
+                        <field name="question" nolabel="1" readonly="state != 'open'"/>
+                    </group>
+                    <group string="Jawaban DPJP">
+                        <field name="answer" nolabel="1"/>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Jawaban DPJP tidak mengubah kode dengan sendirinya. Koder yang
+                        memutuskan, dan perbedaannya tetap harus beralasan.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_coding_query_search" model="ir.ui.view">
+        <field name="name">hms.coding.query.search</field>
+        <field name="model">hms.coding.query</field>
+        <field name="arch" type="xml">
+            <search string="Cari Pertanyaan Koder">
+                <field name="name"/>
+                <field name="claim_id"/>
+                <field name="patient_id"/>
+                <field name="addressed_to_id"/>
+                <filter name="filter_open" string="Menunggu Jawaban"
+                        domain="[('state', '=', 'open')]"/>
+                <separator/>
+                <filter name="group_topic" string="Pokok" context="{'group_by': 'topic'}"/>
+                <filter name="group_dpjp" string="DPJP"
+                        context="{'group_by': 'addressed_to_id'}"/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hms_coding_query" model="ir.actions.act_window">
+        <field name="name">Pertanyaan Koder</field>
+        <field name="res_model">hms.coding.query</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_open': 1}</field>
+        <field name="search_view_id" ref="view_hms_coding_query_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Tidak ada pertanyaan koder yang menggantung.</p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_registration_wizard_form" model="ir.ui.view">
+        <field name="name">hms.registration.wizard.form</field>
+        <field name="model">hms.registration.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Registrasi Pasien">
+                <group>
+                    <group>
+                        <field name="mode" widget="radio" options="{'horizontal': true}"/>
+                        <field name="encounter_type"/>
+                    </group>
+                </group>
+                <group string="Data Pasien" invisible="mode != 'existing'">
+                    <field name="patient_id" options="{'no_create': True}"
+                           placeholder="Ketik no. RM, NIK, nama, atau no. kartu JKN"
+                           required="mode == 'existing'"/>
+                </group>
+                <group string="Data Pasien Baru" invisible="mode != 'new'">
+                    <group>
+                        <field name="new_is_anonymous"/>
+                        <field name="new_name" required="mode == 'new' and not new_is_anonymous"/>
+                        <field name="new_nik"/>
+                        <field name="new_birth_date" required="mode == 'new' and not new_is_anonymous"/>
+                        <field name="new_gender" required="mode == 'new' and not new_is_anonymous"/>
+                    </group>
+                    <group>
+                        <field name="new_phone"/>
+                        <field name="new_address"/>
+                        <field name="new_bpjs_no"/>
+                    </group>
+                </group>
+                <group string="Kunjungan">
+                    <group>
+                        <field name="unit_id"/>
+                        <field name="practitioner_id"/>
+                        <field name="visit_type"/>
+                        <field name="arrival_mode"/>
+                    </group>
+                    <group>
+                        <field name="payer_id"/>
+                        <field name="payer_plan_id"/>
+                        <field name="chief_complaint"/>
+                        <field name="triage_level"
+                               invisible="encounter_type != 'emergency'"
+                               required="encounter_type == 'emergency'"/>
+                    </group>
+                </group>
+                <group string="Rujukan" invisible="arrival_mode != 'referral'">
+                    <field name="referral_no"/>
+                    <field name="referral_source"/>
+                </group>
+                <footer>
+                    <button name="action_register" type="object" string="Daftarkan"
+                            class="btn-primary"/>
+                    <button string="Batal" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    <record id="action_hms_registration_wizard" model="ir.actions.act_window">
+        <field name="name">Registrasi Pasien</field>
+        <field name="res_model">hms.registration.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+    <menuitem id="menu_hms_registration_wizard" name="Registrasi Baru"
+              parent="custom_hms_base.menu_hms_frontdesk"
+              action="action_hms_registration_wizard" sequence="5"/>
+</odoo>

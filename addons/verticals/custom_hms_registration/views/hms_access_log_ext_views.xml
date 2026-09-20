@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_access_log_list_encounter" model="ir.ui.view">
+        <field name="name">hms.access.log.list.encounter</field>
+        <field name="model">hms.access.log</field>
+        <field name="inherit_id" ref="custom_hms_audit.view_hms_access_log_list"/>
+        <field name="arch" type="xml">
+            <field name="model_name" position="before">
+                <field name="encounter_id" optional="show"/>
+            </field>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hms_bill_list" model="ir.ui.view">
+        <field name="name">hms.bill.list</field>
+        <field name="model">hms.bill</field>
+        <field name="arch" type="xml">
+            <list string="Tagihan" decoration-success="state == 'paid'"
+                  decoration-muted="state == 'cancelled'" decoration-info="state == 'closed'">
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="encounter_id"/>
+                <field name="unit_id" optional="show"/>
+                <field name="payer_id"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="amount_payer" sum="Penjamin" optional="show"/>
+                <field name="amount_patient" sum="Pasien"/>
+                <field name="amount_deposit" optional="hide"/>
+                <field name="amount_paid" optional="show"/>
+                <field name="amount_due" sum="Sisa"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hms_bill_form" model="ir.ui.view">
+        <field name="name">hms.bill.form</field>
+        <field name="model">hms.bill</field>
+        <field name="arch" type="xml">
+            <form string="Tagihan">
+                <header>
+                    <button name="action_open" type="object" string="Siapkan Pembayaran"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="%(action_hms_payment_wizard)d" type="action"
+                            string="Terima Pembayaran" class="btn-primary"
+                            invisible="state not in ('open', 'paid', 'closed')"
+                            context="{'default_bill_id': id}"/>
+                    <button name="action_close" type="object" string="Tutup &amp; Terbitkan Invoice"
+                            invisible="state not in ('open', 'paid')"
+                            groups="custom_hms_base.group_hms_billing_supervisor"
+                            confirm="Tagihan akan ditutup dan invoice diposting. Lanjutkan?"/>
+                    <button name="%(action_hms_discount_wizard)d" type="action"
+                            string="Minta Otorisasi Diskon"
+                            invisible="state in ('closed', 'cancelled')"
+                            context="{'default_bill_id': id}"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('closed', 'cancelled')"
+                            groups="custom_hms_base.group_hms_billing_supervisor"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,open,paid,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_moves" type="object" class="oe_stat_button"
+                                icon="fa-file-text-o" invisible="move_count == 0">
+                            <field name="move_count" widget="statinfo" string="Invoice"/>
+                        </button>
+                    </div>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="unpriced_line_count == 0">
+                        <field name="unpriced_line_count" readonly="1" class="oe_inline"/>
+                        layanan belum punya tarif yang berlaku. Tagihan tidak dapat dibuka
+                        untuk pembayaran sampai harganya dilengkapi atau barisnya dibatalkan.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="encounter_id" readonly="1"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="admission_id" readonly="1"/>
+                            <field name="unit_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="payer_id" readonly="1"/>
+                            <field name="payer_plan_id" readonly="1"/>
+                            <field name="closed_at" readonly="1" invisible="state != 'closed'"/>
+                            <field name="closed_by_id" readonly="1" invisible="state != 'closed'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Rincian" name="lines">
+                            <field name="line_ids">
+                                <list decoration-muted="state == 'cancelled'">
+                                    <field name="service_date"/>
+                                    <field name="report_section"/>
+                                    <field name="name"/>
+                                    <field name="unit_id" optional="show"/>
+                                    <field name="practitioner_id" optional="hide"/>
+                                    <field name="qty"/>
+                                    <field name="unit_price"/>
+                                    <field name="price_subtotal" sum="Bruto"/>
+                                    <field name="discount_percent" optional="hide"/>
+                                    <field name="discount_amount" optional="hide" sum="Diskon"/>
+                                    <field name="coverage_percent" optional="show"/>
+                                    <field name="amount_payer" sum="Penjamin"/>
+                                    <field name="amount_patient" sum="Pasien"/>
+                                    <field name="coverage_note" optional="show"/>
+                                    <field name="amount_medical" optional="hide" sum="Jasa Medis"/>
+                                    <field name="price_missing" optional="show"/>
+                                    <field name="state" widget="badge" optional="hide"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="amount_gross"/>
+                                <field name="amount_discount"/>
+                                <field name="amount_total" class="oe_subtotal_footer_separator"/>
+                                <field name="amount_payer"/>
+                                <field name="amount_patient"/>
+                                <field name="amount_deposit"/>
+                                <field name="amount_paid"/>
+                                <field name="amount_due" class="oe_subtotal_footer_separator"/>
+                            </group>
+                        </page>
+                        <page string="Pembayaran" name="payments">
+                            <field name="payment_ids" readonly="1">
+                                <list decoration-muted="state == 'void'">
+                                    <field name="name"/>
+                                    <field name="paid_at"/>
+                                    <field name="method"/>
+                                    <field name="amount"/>
+                                    <field name="reference"/>
+                                    <field name="cashier_id"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Deposit" name="deposits">
+                            <field name="deposit_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="received_at"/>
+                                    <field name="amount"/>
+                                    <field name="used_amount"/>
+                                    <field name="balance"/>
+                                    <field name="state"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Otorisasi" name="auth">
+                            <field name="authorization_ids">
+                                <list>
+                                    <field name="action"/>
+                                    <field name="percent"/>
+                                    <field name="amount"/>
+                                    <field name="reason"/>
+                                    <field name="requested_by_id"/>
+                                    <field name="authorized_by_id"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <button name="action_approve" type="object" string="Setujui"
+                                            icon="fa-check" invisible="state != 'pending'"
+                                            groups="custom_hms_base.group_hms_billing_supervisor"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                    <field name="note"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hms_bill_search" model="ir.ui.view">
+        <field name="name">hms.bill.search</field>
+        <field name="model">hms.bill</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="patient_id"/>
+                <field name="encounter_id"/>
+                <field name="payer_id"/>
+                <filter name="f_open" string="Siap Bayar" domain="[('state', '=', 'open')]"/>
+                <filter name="f_running" string="Masih Berjalan" domain="[('state', '=', 'draft')]"/>
+                <filter name="f_due" string="Ada Sisa Bayar" domain="[('amount_due', '&gt;', 0)]"/>
+                <separator/>
+                <filter name="g_payer" string="Penjamin" context="{'group_by': 'payer_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="g_unit" string="Unit" context="{'group_by': 'unit_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_hms_bill" model="ir.actions.act_window">
+        <field name="name">Tagihan</field>
+        <field name="res_model">hms.bill</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_bill_search"/>
+    </record>
+    <record id="action_hms_bill_cashier" model="ir.actions.act_window">
+        <field name="name">Kasir — Siap Bayar</field>
+        <field name="res_model">hms.bill</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hms_bill_search"/>
+        <field name="context">{'search_default_f_open': 1}</field>
+    </record>
+    <menuitem id="menu_hms_bill_cashier" name="Kasir — Siap Bayar"
+              parent="custom_hms_base.menu_hms_billing_root" action="action_hms_bill_cashier"
+              sequence="10"/>
+    <menuitem id="menu_hms_bill" name="Semua Tagihan"
+              parent="custom_hms_base.menu_hms_billing_root" action="action_hms_bill" sequence="20"/>
+</odoo>

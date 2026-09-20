@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_hms_qms_ticket" model="report.paperformat">
+        <field name="name">SIMRS Struk Antrian (80 mm)</field>
+        <field name="format">custom</field>
+        <field name="page_width">80</field>
+        <field name="page_height">120</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">3</field>
+        <field name="margin_bottom">3</field>
+        <field name="margin_left">3</field>
+        <field name="margin_right">3</field>
+        <field name="dpi">203</field>
+    </record>
+    <record id="report_hms_qms_ticket" model="ir.actions.report">
+        <field name="name">Struk Antrian</field>
+        <field name="model">hms.qms.ticket</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_hms_qms.report_qms_ticket_document</field>
+        <field name="report_file">custom_hms_qms.report_qms_ticket_document</field>
+        <field name="paperformat_id" ref="paperformat_hms_qms_ticket"/>
+        <field name="binding_model_id" ref="model_hms_qms_ticket"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_qms_ticket_document">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="ticket">
+                <t t-set="settings" t-value="ticket.env['hms.settings'].get_settings()"/>
+                <div class="page" style="font-family: Arial, sans-serif; text-align: center;">
+                    <div style="font-size: 10pt; font-weight: bold;">
+                        <span t-esc="settings.hospital_name"/>
+                    </div>
+                    <hr style="border-top: 0.3mm dashed #000;"/>
+                    <div style="font-size: 9pt;">
+                        <span t-esc="ticket.service_id.display_label or ticket.service_id.name"/>
+                    </div>
+                    <div style="font-size: 48pt; font-weight: bold; line-height: 1.1;">
+                        <span t-field="ticket.name"/>
+                    </div>
+                    <div t-if="ticket.priority != 'none'"
+                         style="font-size: 10pt; font-weight: bold;">
+                        <span t-esc="dict(ticket._fields['priority'].selection).get(ticket.priority)"/>
+                    </div>
+                    <hr style="border-top: 0.3mm dashed #000;"/>
+                    <table style="width: 100%; font-size: 8pt; text-align: left;">
+                        <tr>
+                            <td>Tanggal</td>
+                            <td style="text-align: right;">
+                                <span t-field="ticket.created_at" t-options='{"format": "dd/MM/yyyy HH:mm"}'/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Antrean di depan</td>
+                            <td style="text-align: right;">
+                                <span t-esc="max(ticket.position - 1, 0)"/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Estimasi</td>
+                            <td style="text-align: right;">
+                                <span t-esc="ticket.service_id.estimated_wait_minutes(ticket.position)"/> menit
+                            </td>
+                        </tr>
+                    </table>
+                    <div style="margin-top: 2mm;">
+                        <img t-att-src="'/report/barcode/QR/%s?width=120&amp;height=120' % ticket.id"
+                             style="width: 20mm; height: 20mm;"/>
+                    </div>
+                    <div style="font-size: 7pt; margin-top: 2mm;">
+                        Simpan struk ini. Nomor dipanggil lewat layar dan pengeras suara.
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
