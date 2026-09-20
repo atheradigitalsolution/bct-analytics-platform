@@ -195,7 +195,11 @@ class LgxApiService(models.AbstractModel):
         driver = self._current_driver()
         if not driver and driver_id and self.env.user.has_group(
                 "custom_lgx_base.group_lgx_trucking_dispatcher"):
-            driver = self.env["lgx.driver"].browse(int(driver_id))
+            # .exists() dan bukan sekadar browse(): recordset atas id yang tidak
+            # ada bernilai TRUTHY, jadi `if not driver` di bawah melewatkannya,
+            # dan yang meledak adalah `driver.name` di badan jawaban — sebagai
+            # MissingError yang tidak ditangkap siapa pun.
+            driver = self.env["lgx.driver"].browse(int(driver_id)).exists()
         if not driver:
             return self._error("no_driver", _("Pengguna ini tidak terhubung ke data pengemudi."))
         trips = self.env["lgx.trip"].search([
@@ -345,7 +349,18 @@ class LgxApiService(models.AbstractModel):
             return self._error("unknown_barcode", _("Barcode '%s' tidak dikenal.", barcode))
         owner = picking.owner_id
         if owner_id:
-            owner = self.env["res.partner"].browse(int(owner_id))
+            # Tanpa .exists(), id yang tidak ada lolos penjaga di bawah dan
+            # ditulis ke stock.move.line — lalu basis data yang menolaknya
+            # sebagai pelanggaran foreign key, jauh dari sini, sebagai 500.
+            owner = self.env["res.partner"].browse(int(owner_id)).exists()
+            if not owner:
+                return self._error(
+                    "unknown_owner",
+                    _("Pemilik barang dengan id %s tidak ditemukan. Kemungkinan "
+                      "besar daftar di perangkat sudah usang — muat ulang sebelum "
+                      "memindai lagi.", owner_id),
+                    {"owner_id": _("tidak dikenal")},
+                )
         if not owner:
             return self._error(
                 "missing_owner",
