@@ -155,6 +155,22 @@ Tiga pemeriksaan yang terlihat setara dan menjawab tiga pertanyaan berbeda:
 Dua sesi yang saling memeriksa seharian memakai ketiganya, dan tidak satu pun
 menyadari yang pertama sampai ia menggigit.
 
+**10. Komentar adalah pernyataan NIAT penulisnya, bukan pengamatan atas
+perilakunya.** Keduanya bisa benar; keduanya bisa berpisah setelah refaktor yang
+tidak menyentuh komentarnya, dan tidak ada yang akan memberi tahu.
+
+Dibayar dua kali hari ini. `models.Constraint` diganti `_sql_constraints` di
+Odoo 19 dan bentuk lama tetap **diterima tanpa keluhan** — dokumentasi dan
+perilaku berpisah, dan yang tertinggal centang hijau. Dan komentar di sumber
+Odoo yang menyebut sebuah field ada di daftar "untuk mekanisme invalidasi
+cache" adalah alasan penulisnya menaruhnya di sana, bukan bukti bahwa
+invalidasinya masih terjadi.
+
+Berlaku ke dalam juga: komentar yang KAMI tulis di berkas ini menjelaskan apa
+yang kami maksudkan saat menulisnya. Kalau sebuah butir di sini penting, ia
+harus punya tes — dan kalau ia tidak dapat dites, sebutkan itu alih-alih
+membiarkan pembaca mengira ia dijaga.
+
 **Dan aturan tentang aturannya: "sudah ada pemeriksaannya" bukan jawaban.**
 Pemeriksaan menangkap BENTUK, bukan AKIBAT. Tiga bentuk "tes yang tidak berjalan"
 di bawah berakibat identik, dan tidak satu pun dari tiga pemeriksaannya menangkap
