@@ -171,6 +171,36 @@ yang kami maksudkan saat menulisnya. Kalau sebuah butir di sini penting, ia
 harus punya tes — dan kalau ia tidak dapat dites, sebutkan itu alih-alih
 membiarkan pembaca mengira ia dijaga.
 
+### Mana dari sepuluh butir ini yang benar-benar dijaga
+
+Butir 10 diterapkan pada daftar ini sendiri, dan jawabannya tidak nyaman:
+
+| Butir | Penegak |
+|---|---|
+| 2 — nama bukan jumlah | `test_every_declared_constraint_exists_in_postgres`, `test_unused_parameters_are_exactly_the_documented_ones` |
+| 3 — dua arah | `test_no_orphan_lgx_constraints_in_postgres`, dan assertion kedua di audit parameter |
+| **1, 4, 5, 6, 7, 8, 9, 10** | **tidak ada — hanya disiplin** |
+
+**Dua dari sepuluh.** Sembilan pemindai di `tests/test_odoo19_traps.py` menjaga
+JEBAKAN ODOO di bagian bawah dokumen ini, bukan butir metode di atas. Jangan
+membaca kedekatan keduanya di berkas yang sama sebagai jaminan.
+
+Sebagian dari delapan itu memang tidak dapat ditegakkan: tidak ada alat yang
+tahu bahwa nama database di sebuah probe dikarang (butir 4), atau bahwa sebuah
+laporan menyebut nilai untuk keadaan yang berubah cepat (butir 8). Keduanya
+menuntut langkah yang benar-benar dijalankan, bukan pemeriksaan.
+
+Dan bukti paling keras tentang seberapa jauh disiplin saja membawa: **kesepuluh
+butir ini dilanggar belasan kali dalam SATU HARI KERJA, oleh dua sesi yang
+sedang secara aktif saling memeriksa untuk bentuk-bentuk itu.** Termasuk di
+dalam pekerjaan yang isinya memeriksa bentuk itu, dan termasuk beberapa jam
+setelah butirnya ditulis.
+
+Jadi nilai daftar ini bukan pencegahan. Ia **mengenali gejalanya lebih cepat** —
+kolom NULL tanpa galat, keluaran kosong yang terbaca aman, 200 dari container
+yang salah — dan memangkas jam menjadi menit setelah sesuatu menggigit. Itu
+nilai yang jujur, dan ia tetap layak ditulis.
+
 **Dan aturan tentang aturannya: "sudah ada pemeriksaannya" bukan jawaban.**
 Pemeriksaan menangkap BENTUK, bukan AKIBAT. Tiga bentuk "tes yang tidak berjalan"
 di bawah berakibat identik, dan tidak satu pun dari tiga pemeriksaannya menangkap
