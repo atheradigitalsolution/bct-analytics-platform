@@ -119,6 +119,42 @@ punya petunjuk apa pun — lebih sulit didiagnosis daripada ketiadaan batas.
 lebih dulu. Kalau ada, upgrade gagal di tengah dan Anda menemukannya sebagai
 kerusakan, bukan sebagai temuan.
 
+**8. Laporkan VARIANSNYA, bukan nilainya, untuk keadaan yang berubah cepat.**
+
+Bentuk yang paling halus dari semuanya, karena tidak ada yang salah di dalamnya:
+perintahnya benar, jawabannya benar, dan ia **kedaluwarsa sebelum dipakai**.
+Tidak ada ketelitian yang memperbaikinya.
+
+Ditemukan saat sesi sebelah mengambil tiga sampel jendela restart dan
+mendapat `0, 0, 1` — satu pemeriksaan akan menjawab "bebas" atau "sibuk"
+tergantung detik mana ia jatuh. Mereka tidak melaporkan salah satunya; mereka
+melaporkan variansnya lalu menilai risikonya.
+
+Itu berlaku untuk hampir semua yang dilaporkan sepanjang hari: "jendela bebas",
+"0 berkas basi", "container sehat" adalah nilai sesaat yang mudah disampaikan
+sebagai keadaan. Ambil lebih dari satu sampel untuk apa pun yang bisa berubah
+di antara pengukuran dan tindakan, dan kalau sampelnya berbeda, **sebutkan
+bahwa ia berbeda.**
+
+Bentuk terkait yang dibayar hari yang sama: "berkas sudah di disk" juga hanya
+benar pada satu titik waktu. Menawarkan restart gabungan sambil menjalankan
+kontrol negatif yang mengubah berkas bolak-balik adalah tawaran yang tidak
+dapat ditepati — dan tidak ada yang terasa salah saat menawarkannya.
+
+**9. "Kode terbaca di dalam container" BUKAN bukti proses memuatnya.**
+
+Tiga pemeriksaan yang terlihat setara dan menjawab tiga pertanyaan berbeda:
+
+* `docker exec grep` membaca **berkas yang di-mount** — membuktikan bind-mount
+  bekerja, bukan bahwa proses memuatnya;
+* probe perilaku lewat container `run --rm` memuat kode segar dari disk —
+  membuktikan **berkasnya** benar, bukan **prosesnya**;
+* perbandingan mtime berkas versus `StartedAt` container — **inilah** yang
+  menjawabnya, dan ia yang paling sederhana di antara ketiganya.
+
+Dua sesi yang saling memeriksa seharian memakai ketiganya, dan tidak satu pun
+menyadari yang pertama sampai ia menggigit.
+
 **Dan aturan tentang aturannya: "sudah ada pemeriksaannya" bukan jawaban.**
 Pemeriksaan menangkap BENTUK, bukan AKIBAT. Tiga bentuk "tes yang tidak berjalan"
 di bawah berakibat identik, dan tidak satu pun dari tiga pemeriksaannya menangkap
