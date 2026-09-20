@@ -68,3 +68,70 @@ Seluruh modul `custom_lgx_*` lain berdiri di atas modul ini. `lgx.charge.code.pr
 **CBM, Ton dan Km TIDAK dibuat ulang** — Odoo sudah punya `uom.product_uom_cubic_meter`, `_ton`, `_km`. Satuan tagih yang memang tidak ada (pallet-hari, CBM-hari, SKU-bulan, ritase) dibuat sebagai AKAR pohon UoM sendiri, tanpa induk, karena pallet-hari tidak dapat dikonversi ke CBM dan tidak boleh bisa.
 
 **Kode simpul boleh memuat tanda hubung.** UN/LOCODE murni lima huruf, tetapi depo dan CFS diberi kode turunan seperti `IDJKT-D1`. Melarang tanda hubung memaksa kode internal menjadi rangkaian huruf yang tidak terbaca.
+
+## Jebakan Odoo 19 yang sudah kami bayar
+
+Dikumpulkan di sini, bukan di memori sesi, karena tiap satu di antaranya sudah
+dibayar lebih dari sekali. Semuanya punya bentuk yang sama: **Odoo menerima kode
+yang salah tanpa mengeluh, lalu tidak mengerjakan apa yang tertulis.**
+
+**`_sql_constraints` diterima tanpa keluhan dan TIDAK membuat apa pun.** Odoo 19
+hanya menulis WARNING lalu jalan terus. Modul terpasang "sukses" sementara
+keunikan yang Anda kira dijaga tidak dijaga sama sekali. Pakai
+`models.Constraint`. Dan jangan percaya bahwa ia terpasang — rekonsiliasikan:
+
+```
+# jumlah yang dideklarasikan di kode
+grep -rc "models.Constraint(" addons/verticals/custom_lgx_*/models/*.py | awk -F: '{s+=$2} END {print s}'
+# dan yang benar-benar ada, DIPERIKSA PER NAMA
+docker exec odoo19-bct-postgres psql -U odoo -d athera_lgx -t -A \
+  -c "SELECT conname FROM pg_constraint WHERE contype IN ('c','u');"
+```
+
+Nama di Postgres adalah `<tabel>_<atribut tanpa garis bawah awal>`: `_rates_sane`
+pada `lgx.hs.code` menjadi `lgx_hs_code_rates_sane`. Terakhir direkonsiliasi
+2026-09-20: **67 dideklarasikan, 67 ada, selisih 0.** Periksa per nama, bukan
+dengan mencoba menyimpan data jelek — uji perilaku menjawab "sesuatu menolak
+ini", yang bisa saja ACL atau kebetulan.
+
+**`browse(id)` atas id yang tidak ada bernilai TRUTHY.** Jadi `if not record`
+melewatkannya, dan yang meledak adalah pembacaan field jauh sesudahnya sebagai
+`MissingError`, atau basis data saat menulis sebagai pelanggaran foreign key.
+Selalu `.exists()` untuk id yang datang dari luar.
+
+**`stock.move.name` dihapus.** Penggantinya `description_picking`. Gejalanya
+`KeyError: 'name'` saat `create`, yang terbaca seperti kesalahan fixture.
+
+**`stock.valuation.layer` dihapus**; pakai `account.move.line`. **`product.packaging`
+dan `uom.category` dihapus**; UoM kini berjenjang lewat `relative_factor`.
+**`property_valuation`** memakai nilai `periodic`, bukan `manual_periodic`.
+
+**`<tree>` menjadi `<list>`**, dan `<group>` TIDAK sah di dalam `<search>` —
+pakai `<separator/>` dengan filter datar. `create="false"` tidak sah pada
+`<pivot>`.
+
+**`res.users.groups_id` menjadi `group_ids`.**
+
+**`<record model="res.groups">` pada grup yang lahir di blok `noupdate="1"`
+dilewati diam-diam.** Untuk menambah implikasi grup, pakai `<function>` yang
+memanggil method ber-`@api.model` — tanpa dekorator itu ia gagal dengan
+`not enough values to unpack`.
+
+**`HttpCase` menuntut server threaded.** Dengan `PreforkServer` ia gagal di
+`setUpClass` dengan `AttributeError: 'PreforkServer' object has no attribute
+'httpd'`, dan SELURUH kelas tidak berjalan — sementara pencacah kegagalan yang
+hanya mencari `FAIL: Kelas.metode` melaporkan nol. Jalankan dengan
+`--workers=0`, dan longgarkan `--db-filter='.*'` di harness saja: dbfilter
+produksi `^%d` membuat `HttpCase` yang memanggil `127.0.0.1` mendapat label
+`"127"`, tidak menemukan database, dan menjawab **404 di setiap rute**.
+
+**Perubahan templat/view tidak ikut `restart`.** Arch hidup di `ir_ui_view` dan
+hanya ditulis ulang saat `-u`. Gejalanya identik dengan kode basi. Periksa ke
+basis datanya:
+
+```
+SELECT count(*) FROM ir_ui_view WHERE key='<modul>.<template>' AND arch_db::text LIKE '%<penanda>%';
+```
+
+**Hook data demo hanya berjalan saat INSTALL.** Menyunting `hooks.py` tidak
+menyentuh database yang sudah terpasang; baris lama perlu dikoreksi lewat ORM.
