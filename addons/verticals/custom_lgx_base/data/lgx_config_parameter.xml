@@ -10,10 +10,17 @@
             bukan rilis modul — dan itulah alasan strukturalnya, bukan kerapian.
 
             ================================================================
-            AUDIT 2026-09-20: 15 dari 26 parameter benar-benar dibaca kode.
+            AUDIT 2026-09-20: 18 dari 31 parameter benar-benar dibaca kode.
             ================================================================
 
-            Sebelas sisanya tidak dibaca di mana pun, dan itu HARUS diketahui
+            Dihitung dari PEMAKAIAN, bukan penyebutan: hanya `get_param(` atau
+            `set_param(` dengan kuncinya di berkas .py. Metode pertama saya
+            memakai grep polos dan melaporkan 19 — satu di antaranya hanya
+            DISEBUT di komentar A13 pada berkas data lain. Audit yang menghitung
+            komentar sebagai pemakaian akan menyusut sendiri tiap kali seseorang
+            menulis dokumentasi yang benar.
+
+            Tiga belas sisanya tidak dibaca di mana pun, dan itu HARUS diketahui
             sebelum ada yang mengubahnya lalu menunggu sistem berubah:
 
               lgx.kir_validity_months          rujukan; tanggal KIR disalin dari
@@ -21,7 +28,7 @@
               lgx.vat_besaran_tertentu_rate    rujukan; nilai PPN datang dari
                                                account.tax di sale_tax_ids (A1)
               lgx.stamp_duty_amount            belum ada yang memakainya
-              lgx.stamp_duty_receipt_threshold belum ada yang memakainya
+              lgx.stamp_duty_receipt_threshold belum ada yang memakainya (A13)
               lgx.coretax_xml_batch_size       belum ada yang memakainya
               lgx.coretax_xml_max_bytes        belum ada yang memakainya (A10)
               lgx.coretax_sign_batch_size      belum ada yang memakainya (A10)
@@ -305,6 +312,23 @@
         <record id="param_kir_validity_months" model="ir.config_parameter">
             <field name="key">lgx.kir_validity_months</field>
             <field name="value">6</field>
+        </record>
+        <!-- Batas penerbitan kunci perangkat: DUA dimensi, bukan satu.
+             Berapa banyak yang hidup sekaligus adalah KEADAAN; berapa cepat
+             diterbitkan adalah LAJU. Batas pertama saja melewatkan pencetakan
+             cepat yang diselingi pencabutan; batas kedua saja melewatkan
+             penumpukan lambat berbulan-bulan. -->
+        <record id="param_device_max_active" model="ir.config_parameter">
+            <field name="key">lgx.device_max_active</field>
+            <field name="value">5</field>
+        </record>
+        <record id="param_device_issue_window_hours" model="ir.config_parameter">
+            <field name="key">lgx.device_issue_window_hours</field>
+            <field name="value">24</field>
+        </record>
+        <record id="param_device_issue_max_per_window" model="ir.config_parameter">
+            <field name="key">lgx.device_issue_max_per_window</field>
+            <field name="value">10</field>
         </record>
         <record id="param_occupancy_retention_months" model="ir.config_parameter">
             <field name="key">lgx.occupancy_retention_months</field>

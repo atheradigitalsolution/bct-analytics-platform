@@ -18,6 +18,7 @@ Satu pengguna, satu perangkat, satu kunci — dan kunci itu dapat dicabut
 sendiri-sendiri tanpa mengganggu perangkat lain.
 """
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class LgxApiDevice(models.Model):
@@ -75,6 +76,61 @@ class LgxApiDevice(models.Model):
         })
 
     @api.model
+    def _lgx_check_issue_limits(self, user, kind):
+        """Batas penerbitan kunci: DUA dimensi, karena aturannya memang dua.
+
+        Ditemukan lewat pola yang dilaporkan sesi SIMRS: satu angka untuk dua
+        batas. Endpoint ini sebelumnya tidak punya batas SAMA SEKALI — perangkat
+        yang mendaftar dengan nama berbeda tiap kali mencetak kunci baru tanpa
+        henti, masing-masing hidup 90 hari.
+
+        Dedup nama saja tidak menutupnya: ia mencabut kunci lama hanya bila
+        NAMANYA sama. "hp-budi", "hp-budi-2", "hp budi" adalah tiga perangkat.
+
+        Dua batas yang berbeda sifat, dan satu angka tidak dapat menyatakan
+        keduanya:
+
+        * BERAPA BANYAK yang hidup sekaligus — keadaan, bukan laju. Menjawab
+          "berapa perangkat yang boleh dipegang satu pengemudi".
+        * BERAPA CEPAT diterbitkan — laju, bukan keadaan. Menjawab "berapa kali
+          dalam rentang berapa lama", dan inilah yang menangkap akun yang
+          disalahgunakan: ia mencetak banyak dalam waktu singkat, sementara
+          pengemudi sungguhan mendaftar sekali lalu berhenti.
+
+        Batas pertama saja akan melewatkan pencetakan cepat yang diselingi
+        pencabutan. Batas kedua saja akan melewatkan penumpukan lambat selama
+        berbulan-bulan. Keduanya diperlukan, dan keduanya dapat dikonfigurasi.
+        """
+        params = self.env["ir.config_parameter"].sudo()
+        max_aktif = int(params.get_param("lgx.device_max_active", 5))
+        jam = int(params.get_param("lgx.device_issue_window_hours", 24))
+        max_terbit = int(params.get_param("lgx.device_issue_max_per_window", 10))
+
+        aktif = self.sudo().search_count([
+            ("user_id", "=", user.id), ("kind", "=", kind), ("state", "=", "active"),
+        ])
+        if max_aktif and aktif >= max_aktif:
+            raise UserError(_(
+                "Pengguna %s sudah memegang %s perangkat %s yang aktif, dan batasnya "
+                "%s. Cabut perangkat yang sudah tidak dipakai lebih dulu — kunci yang "
+                "tertinggal hidup di perangkat yang sudah dihapus aplikasinya adalah "
+                "kunci yang tidak ada yang merasa memilikinya.",
+                user.name, aktif, kind, max_aktif,
+            ))
+        if jam and max_terbit:
+            sejak = fields.Datetime.subtract(fields.Datetime.now(), hours=jam)
+            baru = self.sudo().search_count([
+                ("user_id", "=", user.id), ("create_date", ">=", sejak),
+            ])
+            if baru >= max_terbit:
+                raise UserError(_(
+                    "Pengguna %s sudah menerbitkan %s kunci perangkat dalam %s jam "
+                    "terakhir, dan batasnya %s. Pendaftaran secepat ini bukan pola "
+                    "pengemudi yang mengganti telepon; periksa akunnya.",
+                    user.name, baru, jam, max_terbit,
+                ))
+
+    @api.model
     def lgx_issue_key(self, user, kind, device_name, remote_addr=None):
         """Terbitkan kunci untuk perangkat. Mengembalikan (device, kunci_mentah).
 
@@ -85,6 +141,8 @@ class LgxApiDevice(models.Model):
         device = self.sudo().search([
             ("user_id", "=", user.id), ("kind", "=", kind), ("name", "=", device_name),
         ], limit=1)
+        if not device:
+            self._lgx_check_issue_limits(user, kind)
         if device and device.apikey_id:
             # Perangkat yang sama mendaftar ulang: kunci lama dicabut supaya
             # tidak ada dua kunci hidup untuk satu perangkat. Kunci yang
