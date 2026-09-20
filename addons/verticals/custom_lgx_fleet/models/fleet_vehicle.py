@@ -40,6 +40,21 @@ class FleetVehicle(models.Model):
     lgx_body_width_mm = fields.Integer("Lebar Bak (mm)")
     lgx_body_height_mm = fields.Integer("Tinggi Bak (mm)")
     lgx_body_volume_cbm = fields.Float("Volume Bak (CBM)", compute="_compute_body_volume", store=True)
+
+    # Dimensi SESUAI TIPE, disalin dari SRUT / sertifikat uji tipe. Berbeda dari
+    # dimensi bak di atas, yang mencatat keadaan kendaraan sebagaimana adanya.
+    # Selisih antara keduanya itulah over-dimension.
+    lgx_type_length_mm = fields.Integer(
+        "Panjang Sesuai Tipe (mm)",
+        help="Dari SRUT atau sertifikat uji tipe, bukan hasil ukur di pool.")
+    lgx_type_width_mm = fields.Integer("Lebar Sesuai Tipe (mm)")
+    lgx_type_height_mm = fields.Integer("Tinggi Sesuai Tipe (mm)")
+    lgx_dimension_status = fields.Selection(
+        [("ok", "Sesuai tipe"), ("unknown", "Tidak dapat divalidasi"),
+         ("warning", "Melebihi tipe"), ("blocked", "Melebihi tipe — diblokir")],
+        string="Status Dimensi", compute="_compute_dimension_status", store=True)
+    lgx_dimension_message = fields.Char(
+        "Keterangan Dimensi", compute="_compute_dimension_status", store=True)
     lgx_axle_configuration = fields.Char("Konfigurasi Sumbu")
 
     # --- dokumen -----------------------------------------------------------
@@ -166,6 +181,74 @@ class FleetVehicle(models.Model):
         if on_date >= self.lgx_odol_enforcement_date():
             return "blocked", message
         return "warning", message
+
+    def lgx_check_dimensions(self, on_date=None):
+        """Over-DIMENSION, yang secara hukum BUKAN hal yang sama dengan over-load.
+
+        Butir A12 (diperiksa 2026-09-20). UU 22/2009 memisahkan keduanya, dan
+        jaraknya jauh:
+
+        * Pasal 307 — muatan, daya angkut, tata cara pemuatan menyimpang dari
+          Pasal 169 ayat (1): kurungan paling lama 2 bulan atau denda paling
+          banyak Rp500.000.
+        * Pasal 277 — membuat, merakit, atau memodifikasi kendaraan sehingga
+          berubah tipe tanpa memenuhi kewajiban uji tipe: penjara paling lama
+          1 tahun atau denda paling banyak Rp24.000.000.
+
+        Empat puluh delapan kali lipat, dan pidananya enam kali lebih panjang.
+        Sampai perbaikan ini, modul hanya memeriksa yang Rp500.000 sementara
+        namanya "ODOL" — dan nama itu membuat separuh yang lebih mahal tampak
+        sudah tertangani.
+
+        Perbedaan sifat yang ikut menentukan bentuknya: over-load adalah keadaan
+        SATU PERJALANAN, over-dimension adalah keadaan KENDARAAN. Bak yang lebih
+        panjang dari tipenya tetap lebih panjang besok pagi, dengan muatan apa
+        pun. Karena itu statusnya disimpan di kendaraan, bukan dihitung ulang
+        per trip.
+
+        ``unknown`` bukan ``ok``, dengan alasan yang sama seperti pada JBI:
+        kendaraan yang dimensi tipenya belum diisi TIDAK lolos, ia dinyatakan
+        tidak dapat divalidasi.
+        """
+        self.ensure_one()
+        on_date = on_date or fields.Date.context_today(self)
+        pasangan = [
+            (_("panjang"), self.lgx_body_length_mm, self.lgx_type_length_mm),
+            (_("lebar"), self.lgx_body_width_mm, self.lgx_type_width_mm),
+            (_("tinggi"), self.lgx_body_height_mm, self.lgx_type_height_mm),
+        ]
+        if not any(tipe for _label, _aktual, tipe in pasangan):
+            return "unknown", _(
+                "Kendaraan %s belum punya dimensi sesuai tipe, jadi over-dimension "
+                "tidak dapat divalidasi. Salin dari SRUT atau sertifikat uji tipe.",
+                self.display_name,
+            )
+        lebih = []
+        for label, aktual, tipe in pasangan:
+            if aktual and tipe and aktual > tipe:
+                lebih.append(_(
+                    "%s bak %s mm melebihi tipe %s mm (selisih %s mm)",
+                    label, aktual, tipe, aktual - tipe,
+                ))
+        if not lebih:
+            return "ok", ""
+        message = _(
+            "Dimensi bak menyimpang dari tipe yang disahkan: %s. Ini pelanggaran "
+            "Pasal 277 UU 22/2009, bukan Pasal 307 — sanksinya sampai "
+            "Rp24.000.000, dan ia melekat pada kendaraan, bukan pada muatan "
+            "hari ini.", "; ".join(lebih),
+        )
+        if on_date >= self.lgx_odol_enforcement_date():
+            return "blocked", message
+        return "warning", message
+
+    @api.depends("lgx_body_length_mm", "lgx_body_width_mm", "lgx_body_height_mm",
+                 "lgx_type_length_mm", "lgx_type_width_mm", "lgx_type_height_mm")
+    def _compute_dimension_status(self):
+        for vehicle in self:
+            status, message = vehicle.lgx_check_dimensions()
+            vehicle.lgx_dimension_status = status
+            vehicle.lgx_dimension_message = message or _("Dimensi bak sesuai tipe.")
 
     @api.model
     def _cron_warn_vehicle_documents(self):

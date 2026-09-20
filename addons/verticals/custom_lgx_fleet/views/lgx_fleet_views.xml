@@ -34,11 +34,19 @@
                         </group>
                     </group>
                     <group invisible="not lgx_is_freight">
-                        <group string="Dimensi Bak">
+                        <group string="Dimensi Bak (keadaan sebenarnya)">
                             <field name="lgx_body_length_mm"/>
                             <field name="lgx_body_width_mm"/>
                             <field name="lgx_body_height_mm"/>
                             <field name="lgx_body_volume_cbm" readonly="1"/>
+                        </group>
+                        <group string="Dimensi Sesuai Tipe (SRUT / uji tipe)">
+                            <field name="lgx_type_length_mm"/>
+                            <field name="lgx_type_width_mm"/>
+                            <field name="lgx_type_height_mm"/>
+                            <field name="lgx_dimension_status" widget="badge" readonly="1"/>
+                            <field name="lgx_dimension_message" readonly="1"
+                                   invisible="lgx_dimension_status == 'ok'"/>
                         </group>
                         <group string="GPS (persyaratan izin)">
                             <field name="lgx_gps_device_id"/>

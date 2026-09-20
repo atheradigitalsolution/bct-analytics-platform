@@ -46,6 +46,9 @@ def post_init_hook(env):
             "lgx_category_id": env.ref("custom_lgx_fleet.vcat_tronton").id,
             "lgx_jbb_kg": 26000, "lgx_jbi_kg": 24000, "lgx_kerb_weight_kg": 8600,
             "lgx_body_length_mm": 8200, "lgx_body_width_mm": 2400, "lgx_body_height_mm": 2200,
+            # Dimensi tipe WAJIB diisi sejak A12: tanpanya kendaraan
+            # berstatus "tidak dapat divalidasi", dan itu bukan "aman".
+            "lgx_type_length_mm": 8200, "lgx_type_width_mm": 2400, "lgx_type_height_mm": 2200,
             "lgx_axle_configuration": "1.22",
             "lgx_kir_number": "KIR-JKT-118822", "lgx_kir_expiry_date": today + timedelta(days=45),
             "lgx_stnk_number": "STNK-0091827", "lgx_stnk_expiry_date": today + timedelta(days=210),
@@ -59,6 +62,7 @@ def post_init_hook(env):
             "lgx_category_id": env.ref("custom_lgx_fleet.vcat_cdd").id,
             "lgx_jbb_kg": 8250, "lgx_jbi_kg": 8000, "lgx_kerb_weight_kg": 3100,
             "lgx_body_length_mm": 4300, "lgx_body_width_mm": 2000, "lgx_body_height_mm": 1900,
+            "lgx_type_length_mm": 4300, "lgx_type_width_mm": 2000, "lgx_type_height_mm": 1900,
             "lgx_axle_configuration": "1.2",
             "lgx_kir_number": "KIR-JKT-118901", "lgx_kir_expiry_date": today - timedelta(days=5),
             "lgx_stnk_number": "STNK-0091833", "lgx_stnk_expiry_date": today + timedelta(days=90),

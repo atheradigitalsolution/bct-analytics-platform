@@ -37,6 +37,16 @@ class TestDispatchAndAdvance(TransactionCase):
             "lgx_kerb_weight_kg": 9000,
             "lgx_kir_expiry_date": "2030-01-01",
             "lgx_stnk_expiry_date": "2030-01-01",
+            # Dimensi bak DAN dimensi tipe, keduanya. Sejak over-dimension ikut
+            # diperiksa (A12), kendaraan tanpa dimensi tipe berstatus "unknown"
+            # dan bukan "ok" — jadi fixture yang tidak mengisinya akan menguji
+            # jalur tidak-dapat-divalidasi, bukan jalur muatan yang dimaksud.
+            "lgx_body_length_mm": 9000,
+            "lgx_body_width_mm": 2400,
+            "lgx_body_height_mm": 2100,
+            "lgx_type_length_mm": 9000,
+            "lgx_type_width_mm": 2400,
+            "lgx_type_height_mm": 2100,
         })
         cls.origin = cls.env.ref("custom_lgx_base.loc_idjkt")
         cls.destination = cls.env.ref("custom_lgx_base.loc_bandung")

@@ -66,7 +66,35 @@
              Konsekuensi desainnya: tanggal ini hampir pasti akan bergeser.
              Karena ia parameter, pergeseran itu satu baris konfigurasi - dan
              LGX-D02 berubah dari memblokir menjadi memperingatkan tanpa rilis
-             modul. Jangan pindahkan ke konstanta di kode. -->
+             modul. Jangan pindahkan ke konstanta di kode.
+
+             A12 DITUTUP (diperiksa 2026-09-20), dan hasilnya mengubah kode.
+             "ODOL" adalah DUA pelanggaran, bukan satu, dan UU 22/2009
+             memisahkannya dengan jarak yang jauh:
+
+               Pasal 307  over-LOAD: muatan/daya angkut menyimpang dari
+                          Pasal 169 ayat (1). Kurungan paling lama 2 bulan
+                          atau denda paling banyak Rp500.000.
+               Pasal 277  over-DIMENSION: kendaraan dibuat/dirakit/dimodifikasi
+                          sehingga berubah tipe tanpa memenuhi uji tipe.
+                          Penjara paling lama 1 tahun atau denda paling banyak
+                          Rp24.000.000.
+
+             Empat puluh delapan kali lipat, dan pidananya enam kali lebih
+             panjang. Sampai butir ini diperiksa, modul hanya memeriksa berat
+             terhadap JBI - yang Rp500.000 - sementara statusnya bernama
+             "odol_status". Nama itulah yang membuat separuh yang lebih mahal
+             tampak sudah tertangani.
+
+             Sekarang fleet.vehicle menyimpan dimensi SESUAI TIPE (dari SRUT)
+             terpisah dari dimensi bak sebenarnya, dan lgx.trip mengambil yang
+             TERBURUK dari kedua pemeriksaan. Tanggal penegakan yang sama
+             mengatur keduanya.
+
+             Perbedaan sifat yang ikut menentukan bentuknya: over-load adalah
+             keadaan satu perjalanan, over-dimension keadaan kendaraan. Bak yang
+             lebih panjang dari tipenya tetap lebih panjang besok pagi, dengan
+             muatan apa pun. -->
         <record id="param_odol_enforcement_date" model="ir.config_parameter">
             <field name="key">lgx.odol_enforcement_date</field>
             <field name="value">2027-01-01</field>

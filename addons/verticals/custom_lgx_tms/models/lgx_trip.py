@@ -18,6 +18,12 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 
+# Urutan keparahan status ODOL. "unknown" di atas "ok" dengan sengaja:
+# belum-diperiksa yang diperlakukan sebagai aman adalah cara armada berangkat
+# melanggar dengan sistem yang tampak hijau.
+ODOL_SEVERITY = {"ok": 0, "unknown": 1, "warning": 2, "blocked": 3}
+
+
 class LgxTrip(models.Model):
     _name = "lgx.trip"
     _description = "Trip Angkutan Darat"
@@ -129,8 +135,22 @@ class LgxTrip(models.Model):
             trip.pod_complete = bool(dropoffs) and not missing
 
     @api.depends("cargo_weight_kg", "vehicle_id", "vehicle_id.lgx_jbi_kg",
-                 "vehicle_id.lgx_kerb_weight_kg", "planned_start")
+                 "vehicle_id.lgx_kerb_weight_kg", "planned_start",
+                 "vehicle_id.lgx_body_length_mm", "vehicle_id.lgx_body_width_mm",
+                 "vehicle_id.lgx_body_height_mm", "vehicle_id.lgx_type_length_mm",
+                 "vehicle_id.lgx_type_width_mm", "vehicle_id.lgx_type_height_mm")
     def _compute_odol(self):
+        """ODOL adalah DUA pelanggaran, dan status ini menggabungkan keduanya.
+
+        Butir A12: over-load itu Pasal 307 UU 22/2009 (denda sampai Rp500.000),
+        over-dimension itu Pasal 277 (sampai Rp24.000.000). Sampai perbaikan
+        ini hanya yang pertama diperiksa, sementara namanya "ODOL" — dan nama
+        itu membuat separuh yang lebih mahal tampak sudah tertangani.
+
+        Yang diambil adalah yang TERBURUK dari keduanya, bukan yang pertama
+        gagal: trip dengan muatan sah di atas kendaraan yang baknya menyimpang
+        dari tipe tetap tidak boleh berangkat, dan alasannya harus disebut.
+        """
         for trip in self:
             if not trip.vehicle_id:
                 trip.odol_status = "unknown"
@@ -138,9 +158,15 @@ class LgxTrip(models.Model):
                 continue
             on_date = (trip.planned_start.date() if trip.planned_start
                        else fields.Date.context_today(trip))
-            status, message = trip.vehicle_id.lgx_check_load(trip.cargo_weight_kg, on_date)
+            hasil = [
+                trip.vehicle_id.lgx_check_load(trip.cargo_weight_kg, on_date),
+                trip.vehicle_id.lgx_check_dimensions(on_date),
+            ]
+            status = max((h[0] for h in hasil), key=lambda s: ODOL_SEVERITY[s])
+            pesan = [h[1] for h in hasil if h[1] and ODOL_SEVERITY[h[0]] > 0]
             trip.odol_status = status
-            trip.odol_message = message or _("Muatan dalam batas JBI.")
+            trip.odol_message = "\n\n".join(pesan) or _(
+                "Muatan dalam batas JBI dan dimensi bak sesuai tipe.")
 
     @api.depends("actual_start", "actual_end")
     def _compute_duration(self):
