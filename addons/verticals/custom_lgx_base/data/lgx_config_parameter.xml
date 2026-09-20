@@ -10,9 +10,25 @@
             bukan rilis modul — dan itulah alasan strukturalnya, bukan kerapian.
         -->
 
-        <!-- Zero ODOL. ⚠ A12b: 1 Januari 2027 berasal dari pernyataan pejabat
-             dan siaran pers, BUKAN peraturan yang sudah terbit. Perlakukan
-             sebagai kebijakan yang diumumkan sampai dasar hukumnya ditemukan. -->
+        <!-- Zero ODOL. A12b SEBAGIAN TERTUTUP (diperiksa 2026-09-20).
+
+             Larangan ODOL itu sendiri sudah punya dasar hukum yang terbit:
+             UU 22/2009, PP 55/2012, Permenhub 60/2019, dan Permenhub 18/2021
+             tentang pengawasan muatan angkutan barang. Penindakan di jembatan
+             timbang berjalan atas dasar itu, hari ini, tanpa menunggu 2027.
+
+             Yang BELUM terbit adalah dasar hukum penegakan penuh per
+             1 Januari 2027. Perpres Penguatan Logistik Nasional yang memuat
+             sembilan aksi ODOL masih berstatus rancangan (finalisasi sejak
+             November 2025), dan yang berjalan sejauh ini hanya uji coba
+             terbatas 27 Januari - 31 Mei 2026 di ruas tol menuju kawasan
+             industri. Jadi 2027-01-01 tetap TARGET KEBIJAKAN, bukan tanggal
+             yang mengikat, dan ⚠ awal saya benar.
+
+             Konsekuensi desainnya: tanggal ini hampir pasti akan bergeser.
+             Karena ia parameter, pergeseran itu satu baris konfigurasi - dan
+             LGX-D02 berubah dari memblokir menjadi memperingatkan tanpa rilis
+             modul. Jangan pindahkan ke konstanta di kode. -->
         <record id="param_odol_enforcement_date" model="ir.config_parameter">
             <field name="key">lgx.odol_enforcement_date</field>
             <field name="value">2027-01-01</field>
@@ -42,8 +58,24 @@
             <field name="value">100000</field>
         </record>
 
-        <!-- Jam kerja pengemudi. ⚠ A12c: keempat angka ini baru bersumber
-             sekunder; Pasal 90 dan 92 UU 22/2009 harus dibaca langsung. -->
+        <!-- Jam kerja pengemudi. A12c TERTUTUP (diperiksa 2026-09-20).
+
+             UU 22/2009 Pasal 90: waktu kerja pengemudi paling lama 8 jam
+             sehari; setelah mengemudi 4 jam berturut-turut wajib istirahat
+             sekurang-kurangnya setengah jam; dalam hal tertentu paling lama
+             12 jam sehari termasuk 1 jam istirahat. Keempat angka di bawah
+             cocok dengan bunyi pasal itu - 240 / 30 / 480 / 720 menit.
+
+             Perhatikan 720 sudah TERMASUK 1 jam istirahat, jadi ia batas
+             rentang tugas, bukan 12 jam mengemudi murni.
+
+             Pasal 92: perusahaan angkutan umum yang tidak mematuhi Pasal 90
+             dikenai sanksi administratif - peringatan tertulis, denda
+             administratif, pembekuan izin, sampai pencabutan izin. Sanksinya
+             jatuh ke PERUSAHAAN, bukan ke pengemudi. Itulah alasan struktural
+             lgx.driver.duty.log disimpan dan dipertahankan: ia bukan sekadar
+             alat keselamatan internal, ia bukti kepatuhan milik perusahaan
+             saat ditanya. -->
         <record id="param_duty_max_continuous_driving" model="ir.config_parameter">
             <field name="key">lgx.duty_max_continuous_driving_minutes</field>
             <field name="value">240</field>
@@ -123,7 +155,25 @@
             <field name="key">lgx.doc_expiry_warning_days</field>
             <field name="value">30</field>
         </record>
-        <!-- ⚠ A5: masa berlaku KIR belum terkonfirmasi ke PM 19/2021 fulltext. -->
+        <!-- A5 TERTUTUP (diperiksa 2026-09-20), dengan satu kejutan.
+
+             Permenhub PM 19/2021 TIDAK memberi satu angka. Masa berlakunya
+             bertingkat: uji berkala pendaftaran berlaku 1 TAHUN sejak STNK
+             terbit, lalu uji berkala pertama dan seluruh perpanjangan
+             berikutnya berlaku 6 BULAN. Jadi 6 adalah nilai kondisi tunak,
+             benar untuk hampir semua kendaraan yang sudah beroperasi, dan
+             SALAH untuk kendaraan yang baru keluar dealer.
+
+             Parameter ini ada karena spesifikasi §10 meminta masa berlaku
+             disimpan sebagai parameter, bukan konstanta. TETAPI: tidak ada
+             kode yang membacanya, dan itu disengaja. fleet.vehicle menyimpan
+             lgx_kir_expiry_date apa adanya, disalin dari kartu lulus uji -
+             kartunya membawa tanggalnya sendiri, jadi menurunkan tanggal dari
+             masa berlaku hanya menambah cara untuk salah.
+
+             Kalau suatu saat ada yang ingin menurunkan tanggal dari angka ini,
+             bacalah paragraf pertama dulu: satu skalar tidak cukup, dan
+             kendaraan barulah yang akan salah dihitung. -->
         <record id="param_kir_validity_months" model="ir.config_parameter">
             <field name="key">lgx.kir_validity_months</field>
             <field name="value">6</field>

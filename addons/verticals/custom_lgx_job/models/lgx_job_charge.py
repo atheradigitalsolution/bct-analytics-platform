@@ -231,9 +231,39 @@ class LgxJobCharge(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        """Warisi keputusan pajak dari master juga saat baris dibuat dari kode.
+
+        `_onchange_charge_code` hanya berjalan di formulir. Setiap baris yang
+        lahir dari API, impor, konversi penawaran, billing gudang, atau data
+        demo karena itu melewatinya sama sekali — dan yang hilang bukan
+        kosmetik: `wht_type` jatuh ke "none" sehingga PPh 23 tidak pernah
+        terhitung, dan `nature` jatuh ke "service" sehingga baris talangan ikut
+        masuk jumlah bruto pemotongan.
+
+        Terukur di athera_lgx sebelum perbaikan ini: baris TRK menyimpan
+        wht_type='none' padahal masternya 'pph23', dan is_freight_charge kosong
+        padahal masternya benar.
+
+        `setdefault` dan bukan penimpaan: pemanggil yang menyebut nilainya
+        secara eksplisit tetap menang. Billing gudang memang sengaja memaksa
+        nature='service', dan kepabeanan memaksa nature='disbursement'.
+        """
+        Code = self.env["lgx.charge.code"]
         for vals in vals_list:
-            if vals.get("charge_code_id") and not vals.get("name"):
-                vals["name"] = self.env["lgx.charge.code"].browse(vals["charge_code_id"]).name
+            code = Code.browse(vals["charge_code_id"]) if vals.get("charge_code_id") else Code
+            if code:
+                if not vals.get("name"):
+                    vals["name"] = code.name
+                vals.setdefault("nature", code.default_nature)
+                vals.setdefault("is_freight_charge", code.is_freight_charge)
+                vals.setdefault("wht_type", code.default_wht_type)
+                if code.uom_id:
+                    vals.setdefault("uom_id", code.uom_id.id)
+                if "tax_ids" not in vals:
+                    taxes = (code.sale_tax_ids if vals.get("kind") == "revenue"
+                             else code.purchase_tax_ids)
+                    if taxes:
+                        vals["tax_ids"] = [(6, 0, taxes.ids)]
             if not vals.get("amount_estimated") and vals.get("quantity") and vals.get("unit_price"):
                 vals["amount_estimated"] = vals["quantity"] * vals["unit_price"]
         return super().create(vals_list)

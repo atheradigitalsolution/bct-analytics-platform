@@ -7,11 +7,17 @@ ALUR KEPUTUSAN PPN (§11.1), diterapkan persis seperti tertulis
 2. Ada minimal satu ``is_freight_charge`` DAN job_type termasuk kelompok JPT
    → besaran tertentu, kode faktur 05, pajak masukan terkait ditandai tidak
    dapat dikreditkan.
-3. Tidak ada freight charge → **TAMPILKAN PERINGATAN**, jangan putuskan
-   diam-diam. ⚠ Tidak ditemukan aturan eksplisit yang menyatakan tarif apa yang
-   berlaku; praktisi umumnya kembali ke PPN normal, tetapi itu belum
-   terkonfirmasi sumber resmi (butir A3). Defaultnya karena itu adalah
-   PARAMETER, bukan keputusan modul ini.
+3. Tidak ada freight charge → PPN normal, dan **TAMPILKAN PERINGATAN**.
+   Butir A3 DITUTUP (diperiksa 2026-09-20): PMK 71/2022 menjadikan "jasa
+   pengurusan transportasi yang tagihannya MEMUAT biaya transportasi" sebagai
+   JKP Tertentu. Tanpa freight charge di tagihan, syarat itu tidak terpenuhi,
+   penyerahannya bukan JKP Tertentu, dan tarif umum yang berlaku. Defaultnya
+   tetap PARAMETER supaya perubahan tarif umum tidak menyentuh kode.
+
+   Peringatannya tetap ada, bukan karena aturannya tidak pasti, melainkan
+   karena akibatnya besar: tarifnya berubah 1,1% → 11% dan pajak masukan
+   terkait berubah dari tidak dapat dikreditkan menjadi dapat dikreditkan.
+   Selisih sepuluh kali lipat tidak boleh terjadi tanpa seorang pun melihatnya.
 4. Tujuan ekspor DAN kontrak + bukti pembayaran luar negeri terlampir
    → ekspor jasa 0%. **BLOKIR posting** bila salah satu dokumen belum ada.
 5. Seluruh baris angkutan umum darat/air yang memenuhi syarat → dibebaskan,
@@ -119,11 +125,12 @@ class AccountMove(models.Model):
                 move.lgx_input_vat_not_creditable = False
                 move.lgx_vat_warning = _(
                     "Tagihan JPT ini TIDAK memuat satu pun freight charge, jadi syarat "
-                    "penerapan PPN besaran tertentu tidak terpenuhi. Default yang dipakai "
-                    "adalah '%s' dari parameter 'lgx.vat_default_without_freight'.\n\n"
-                    "Tidak ditemukan aturan eksplisit yang menyatakan tarif apa yang "
-                    "berlaku dalam keadaan ini; periksa ke konsultan pajak sebelum "
-                    "faktur diterbitkan.", default_without_freight,
+                    "JKP Tertentu menurut PMK 71/2022 tidak terpenuhi dan PPN besaran "
+                    "tertentu 1,1%% tidak berlaku. Perlakuan yang dipakai adalah '%s' "
+                    "dari parameter 'lgx.vat_default_without_freight'.\n\n"
+                    "Periksa sekali lagi apakah freight charge memang seharusnya tidak "
+                    "ada: tarifnya berbeda sepuluh kali lipat, dan pajak masukan terkait "
+                    "menjadi dapat dikreditkan.", default_without_freight,
                 )
                 continue
             move.lgx_vat_treatment = "standard"
@@ -219,7 +226,10 @@ class AccountMove(models.Model):
             missing.append(_("bukti pembayaran dari penerima jasa di luar negeri"))
         if missing:
             raise UserError(_(
-                "Faktur ekspor jasa 0% tidak dapat diposting: %s belum dilampirkan.\n\n"
+                # "0%%" dan bukan "0%": string ini dibawa ke `%`-formatting karena
+                # ia membawa argumen, dan "% t" adalah spesifier tidak sah yang
+                # melempar ValueError menggantikan pesan ini.
+                "Faktur ekspor jasa 0%% tidak dapat diposting: %s belum dilampirkan.\n\n"
                 "Keduanya adalah syarat PMK 32/PMK.010/2019. Fasilitas tarif nol yang "
                 "tidak dapat dibuktikan akan gugur saat pemeriksaan.",
                 " dan ".join(missing),

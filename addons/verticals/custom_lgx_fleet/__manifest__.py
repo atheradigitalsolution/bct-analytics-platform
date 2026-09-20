@@ -12,15 +12,23 @@ trucking: tarif harus dihitung di atas JBI, bukan di atas apa yang sebenarnya
 muat. Karena itu JBI dan dimensi bak adalah field master, dan perencanaan muatan
 memvalidasi terhadapnya.
 
-⚠ Tanggal penegakan disimpan sebagai ``ir.config_parameter``
-``lgx.odol_enforcement_date`` dengan default 1 Januari 2027. Tanggal itu berasal
-dari pernyataan pejabat dan siaran pers, **bukan peraturan yang sudah terbit**
-(Lampiran A butir A12b). Sebelum tanggal itu sistem hanya memperingatkan; sejak
-tanggal itu ia menolak. Keduanya diubah lewat konfigurasi, tanpa menyentuh kode.
+Tanggal penegakan disimpan sebagai ``ir.config_parameter``
+``lgx.odol_enforcement_date`` dengan default 1 Januari 2027. Sebelum tanggal itu
+sistem hanya memperingatkan; sejak tanggal itu ia menolak. Keduanya diubah lewat
+konfigurasi, tanpa menyentuh kode — dan itu bukan kerapian, melainkan antisipasi.
 
-Masa berlaku dokumen kendaraan diperlakukan sebagai DATA, bukan konstanta:
-angka "6 bulan" untuk KIR beredar luas di sumber sekunder dan belum terkonfirmasi
-ke PM 19/2021 fulltext (butir A5).
+Pemeriksaan A12b (2026-09-20): larangan ODOL sudah punya dasar hukum terbit —
+UU 22/2009, PP 55/2012, Permenhub 60/2019, Permenhub 18/2021 — dan ditegakkan di
+jembatan timbang hari ini. Yang **belum** terbit adalah dasar penegakan penuh per
+1 Januari 2027: Perpres Penguatan Logistik Nasional masih rancangan, dan yang
+berjalan baru uji coba terbatas 27 Januari - 31 Mei 2026. Tanggal itu target
+kebijakan, jadi harapkan ia bergeser.
+
+Masa berlaku dokumen kendaraan diperlakukan sebagai DATA, bukan konstanta, dan
+pemeriksaan A5 (2026-09-20) menunjukkan mengapa. PM 19/2021 tidak memberi satu
+angka: uji berkala pendaftaran berlaku 1 tahun, perpanjangan berikutnya 6 bulan.
+Karena itu ``lgx_kir_expiry_date`` disalin dari kartu lulus uji dan tidak pernah
+dihitung dari masa berlaku — kartunya membawa tanggalnya sendiri.
 """,
     "author": "Athera Digital Solution",
     "website": "https://athera-digital.com",
