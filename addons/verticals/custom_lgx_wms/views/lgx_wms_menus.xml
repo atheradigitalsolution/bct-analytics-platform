@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_wms_root" name="Gudang 3PL" parent="custom_lgx_base.menu_lgx_operations"
+              sequence="70" groups="custom_lgx_base.group_lgx_wh_operator"/>
+    <menuitem id="menu_lgx_wms_client" name="Pemilik Barang" parent="menu_lgx_wms_root"
+              action="action_lgx_wms_client" sequence="10"/>
+    <menuitem id="menu_lgx_stock_by_client" name="Stok per Pemilik" parent="menu_lgx_wms_root"
+              action="action_lgx_stock_by_client" sequence="20"/>
+    <menuitem id="menu_lgx_wms_count_task" name="Tugas Hitung" parent="menu_lgx_wms_root"
+              action="action_lgx_wms_count_task" sequence="30"/>
+    <menuitem id="menu_lgx_wms_sla_measurement" name="Pencapaian SLA" parent="custom_lgx_base.menu_lgx_reporting"
+              action="action_lgx_wms_sla_measurement" sequence="50"/>
+    <menuitem id="menu_lgx_wms_count_program" name="Program Stock Opname"
+              parent="custom_lgx_base.menu_lgx_config_reference"
+              action="action_lgx_wms_count_program" sequence="100"/>
+    <menuitem id="menu_lgx_wms_sla" name="SLA Gudang" parent="custom_lgx_base.menu_lgx_config_commercial"
+              action="action_lgx_wms_sla" sequence="30"/>
+</odoo>

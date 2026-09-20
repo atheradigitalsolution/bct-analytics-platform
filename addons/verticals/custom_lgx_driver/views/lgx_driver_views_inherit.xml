@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_driver_form_hr" model="ir.ui.view">
+        <field name="name">lgx.driver.form.hr</field>
+        <field name="model">lgx.driver</field>
+        <field name="inherit_id" ref="custom_lgx_tms.view_lgx_driver_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_duty_logs" type="object" class="oe_stat_button"
+                        icon="fa-clock-o">
+                    <field name="violation_count_30d" widget="statinfo" string="Pelanggaran 30 Hari"/>
+                </button>
+            </xpath>
+            <field name="user_id" position="after">
+                <field name="employee_id"/>
+                <field name="is_outsourced"/>
+            </field>
+            <xpath expr="//sheet" position="inside">
+                <notebook>
+                    <page string="Pelatihan">
+                        <field name="training_ids">
+                            <list editable="bottom">
+                                <field name="name"/>
+                                <field name="training_type"/>
+                                <field name="date"/>
+                                <field name="valid_until"/>
+                                <field name="provider"/>
+                                <field name="certificate_no"/>
+                                <field name="attachment_ids" widget="many2many_binary"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+            </xpath>
+        </field>
+    </record>
+</odoo>

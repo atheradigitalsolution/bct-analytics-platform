@@ -1,0 +1,1034 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Produk jasa dan kode charge, berpasangan.
+
+            product_id WAJIB pada lgx.charge.code: account.move.line menuntutnya,
+            jadi kode charge tanpa produk adalah baris yang tidak punya jalan ke
+            akuntansi. Memasangkannya di sini, sekali, lebih murah daripada
+            menemukan pasangan yang hilang saat faktur pertama ditolak.
+        -->
+        <record id="product_ofr" model="product.product">
+            <field name="name">Ocean Freight</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-OFR</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_ofr" model="lgx.charge.code">
+            <field name="code">OFR</field>
+            <field name="name">Ocean Freight</field>
+            <field name="category">freight</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_ofr"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_ofr_lcl" model="product.product">
+            <field name="name">Ocean Freight LCL (W/M)</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-OFR-LCL</field>
+            <field name="uom_id" ref="uom.product_uom_cubic_meter"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_ofr_lcl" model="lgx.charge.code">
+            <field name="code">OFR-LCL</field>
+            <field name="name">Ocean Freight LCL (W/M)</field>
+            <field name="category">freight</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_ofr_lcl"/>
+            <field name="uom_id" ref="uom.product_uom_cubic_meter"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_afr" model="product.product">
+            <field name="name">Air Freight</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-AFR</field>
+            <field name="uom_id" ref="uom.product_uom_kgm"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_afr" model="lgx.charge.code">
+            <field name="code">AFR</field>
+            <field name="name">Air Freight</field>
+            <field name="category">freight</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_afr"/>
+            <field name="uom_id" ref="uom.product_uom_kgm"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_baf" model="product.product">
+            <field name="name">Bunker Adjustment Factor</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-BAF</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_baf" model="lgx.charge.code">
+            <field name="code">BAF</field>
+            <field name="name">Bunker Adjustment Factor</field>
+            <field name="category">freight</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_baf"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_caf" model="product.product">
+            <field name="name">Currency Adjustment Factor</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-CAF</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_caf" model="lgx.charge.code">
+            <field name="code">CAF</field>
+            <field name="name">Currency Adjustment Factor</field>
+            <field name="category">freight</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_caf"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_ebs" model="product.product">
+            <field name="name">Emergency Bunker Surcharge</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-EBS</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_ebs" model="lgx.charge.code">
+            <field name="code">EBS</field>
+            <field name="name">Emergency Bunker Surcharge</field>
+            <field name="category">freight</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_ebs"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_pss" model="product.product">
+            <field name="name">Peak Season Surcharge</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-PSS</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_pss" model="lgx.charge.code">
+            <field name="code">PSS</field>
+            <field name="name">Peak Season Surcharge</field>
+            <field name="category">freight</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_pss"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_thc_o" model="product.product">
+            <field name="name">THC Origin</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-THC-O</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_thc_o" model="lgx.charge.code">
+            <field name="code">THC-O</field>
+            <field name="name">THC Origin</field>
+            <field name="category">thc</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_thc_o"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_thc_d" model="product.product">
+            <field name="name">THC Destination</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-THC-D</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_thc_d" model="lgx.charge.code">
+            <field name="code">THC-D</field>
+            <field name="name">THC Destination</field>
+            <field name="category">thc</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_thc_d"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_doc" model="product.product">
+            <field name="name">Documentation Fee</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-DOC</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_bl"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_doc" model="lgx.charge.code">
+            <field name="code">DOC</field>
+            <field name="name">Documentation Fee</field>
+            <field name="category">documentation</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_doc"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_bl"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_blf" model="product.product">
+            <field name="name">Bill of Lading Fee</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-BLF</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_bl"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_blf" model="lgx.charge.code">
+            <field name="code">BLF</field>
+            <field name="name">Bill of Lading Fee</field>
+            <field name="category">documentation</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_blf"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_bl"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_ams" model="product.product">
+            <field name="name">AMS / ENS Filing Fee</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-AMS</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_bl"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_ams" model="lgx.charge.code">
+            <field name="code">AMS</field>
+            <field name="name">AMS / ENS Filing Fee</field>
+            <field name="category">documentation</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_ams"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_bl"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_dof" model="product.product">
+            <field name="name">Delivery Order Fee</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-DOF</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_bl"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_dof" model="lgx.charge.code">
+            <field name="code">DOF</field>
+            <field name="name">Delivery Order Fee</field>
+            <field name="category">documentation</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_dof"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_bl"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_hdl" model="product.product">
+            <field name="name">Handling Fee</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-HDL</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_shipment"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_hdl" model="lgx.charge.code">
+            <field name="code">HDL</field>
+            <field name="name">Handling Fee</field>
+            <field name="category">handling</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_hdl"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_shipment"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_cfs" model="product.product">
+            <field name="name">CFS Charge</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-CFS</field>
+            <field name="uom_id" ref="uom.product_uom_cubic_meter"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_cfs" model="lgx.charge.code">
+            <field name="code">CFS</field>
+            <field name="name">CFS Charge</field>
+            <field name="category">handling</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_cfs"/>
+            <field name="uom_id" ref="uom.product_uom_cubic_meter"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_stuf" model="product.product">
+            <field name="name">Stuffing / Destuffing</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-STUF</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_stuf" model="lgx.charge.code">
+            <field name="code">STUF</field>
+            <field name="name">Stuffing / Destuffing</field>
+            <field name="category">handling</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_stuf"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_lolo" model="product.product">
+            <field name="name">Lift On / Lift Off</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-LOLO</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_lolo" model="lgx.charge.code">
+            <field name="code">LOLO</field>
+            <field name="name">Lift On / Lift Off</field>
+            <field name="category">handling</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_lolo"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_cln" model="product.product">
+            <field name="name">Container Cleaning</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-CLN</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_cln" model="lgx.charge.code">
+            <field name="code">CLN</field>
+            <field name="name">Container Cleaning</field>
+            <field name="category">handling</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_cln"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_seal" model="product.product">
+            <field name="name">Seal Fee</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-SEAL</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_seal" model="lgx.charge.code">
+            <field name="code">SEAL</field>
+            <field name="name">Seal Fee</field>
+            <field name="category">handling</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_seal"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_vgm" model="product.product">
+            <field name="name">VGM Fee</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-VGM</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_vgm" model="lgx.charge.code">
+            <field name="code">VGM</field>
+            <field name="name">VGM Fee</field>
+            <field name="category">documentation</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_vgm"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_container"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_cus" model="product.product">
+            <field name="name">Jasa Pengurusan Kepabeanan</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-CUS</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_shipment"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_cus" model="lgx.charge.code">
+            <field name="code">CUS</field>
+            <field name="name">Jasa Pengurusan Kepabeanan</field>
+            <field name="category">customs</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_cus"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_shipment"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_bm" model="product.product">
+            <field name="name">Bea Masuk</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-BM</field>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_bm" model="lgx.charge.code">
+            <field name="code">BM</field>
+            <field name="name">Bea Masuk</field>
+            <field name="category">customs</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_bm"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_ppnimp" model="product.product">
+            <field name="name">PPN Impor</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-PPNIMP</field>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_ppnimp" model="lgx.charge.code">
+            <field name="code">PPNIMP</field>
+            <field name="name">PPN Impor</field>
+            <field name="category">customs</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_ppnimp"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_ppnbm" model="product.product">
+            <field name="name">PPnBM Impor</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-PPNBM</field>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_ppnbm" model="lgx.charge.code">
+            <field name="code">PPNBM</field>
+            <field name="name">PPnBM Impor</field>
+            <field name="category">customs</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_ppnbm"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_pph22" model="product.product">
+            <field name="name">PPh 22 Impor</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-PPH22</field>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_pph22" model="lgx.charge.code">
+            <field name="code">PPH22</field>
+            <field name="name">PPh 22 Impor</field>
+            <field name="category">customs</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_pph22"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_pnbp" model="product.product">
+            <field name="name">PNBP / Retribusi Pabean</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-PNBP</field>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_pnbp" model="lgx.charge.code">
+            <field name="code">PNBP</field>
+            <field name="name">PNBP / Retribusi Pabean</field>
+            <field name="category">customs</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_pnbp"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_karantina" model="product.product">
+            <field name="name">Biaya Karantina</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-KARANTINA</field>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_karantina" model="lgx.charge.code">
+            <field name="code">KARANTINA</field>
+            <field name="name">Biaya Karantina</field>
+            <field name="category">customs</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_karantina"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_strg_port" model="product.product">
+            <field name="name">Storage Pelabuhan</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-STRG-PORT</field>
+            <field name="uom_id" ref="uom.product_uom_day"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_strg_port" model="lgx.charge.code">
+            <field name="code">STRG-PORT</field>
+            <field name="name">Storage Pelabuhan</field>
+            <field name="category">storage</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_strg_port"/>
+            <field name="uom_id" ref="uom.product_uom_day"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_dem" model="product.product">
+            <field name="name">Demurrage</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-DEM</field>
+            <field name="uom_id" ref="uom.product_uom_day"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_dem" model="lgx.charge.code">
+            <field name="code">DEM</field>
+            <field name="name">Demurrage</field>
+            <field name="category">demurrage</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_dem"/>
+            <field name="uom_id" ref="uom.product_uom_day"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_det" model="product.product">
+            <field name="name">Detensi</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-DET</field>
+            <field name="uom_id" ref="uom.product_uom_day"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_det" model="lgx.charge.code">
+            <field name="code">DET</field>
+            <field name="name">Detensi</field>
+            <field name="category">detention</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_det"/>
+            <field name="uom_id" ref="uom.product_uom_day"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_ins" model="product.product">
+            <field name="name">Asuransi Kargo</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-INS</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_shipment"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_ins" model="lgx.charge.code">
+            <field name="code">INS</field>
+            <field name="name">Asuransi Kargo</field>
+            <field name="category">insurance</field>
+            <field name="default_nature">disbursement</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_ins"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_shipment"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_agn" model="product.product">
+            <field name="name">Bagi Hasil Agen</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-AGN</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_shipment"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_agn" model="lgx.charge.code">
+            <field name="code">AGN</field>
+            <field name="name">Bagi Hasil Agen</field>
+            <field name="category">other</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_agn"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_shipment"/>
+            <field name="applies_to">ff</field>
+        </record>
+        <record id="product_trk" model="product.product">
+            <field name="name">Trucking / Angkutan Darat</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-TRK</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_trk" model="lgx.charge.code">
+            <field name="code">TRK</field>
+            <field name="name">Trucking / Angkutan Darat</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_trk"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="applies_to">all</field>
+        </record>
+        <record id="product_trk_ton" model="product.product">
+            <field name="name">Trucking per Ton</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-TRK-TON</field>
+            <field name="uom_id" ref="uom.product_uom_ton"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_trk_ton" model="lgx.charge.code">
+            <field name="code">TRK-TON</field>
+            <field name="name">Trucking per Ton</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_trk_ton"/>
+            <field name="uom_id" ref="uom.product_uom_ton"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_trk_rit" model="product.product">
+            <field name="name">Trucking per Ritase</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-TRK-RIT</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_ritase"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_trk_rit" model="lgx.charge.code">
+            <field name="code">TRK-RIT</field>
+            <field name="name">Trucking per Ritase</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">1</field>
+            <field name="vat_treatment">besaran_tertentu</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_trk_rit"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_ritase"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_multi" model="product.product">
+            <field name="name">Biaya Multi-Drop</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-MULTI</field>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_multi" model="lgx.charge.code">
+            <field name="code">MULTI</field>
+            <field name="name">Biaya Multi-Drop</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_multi"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_wait" model="product.product">
+            <field name="name">Waiting Time Kendaraan</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-WAIT</field>
+            <field name="uom_id" ref="uom.product_uom_hour"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_wait" model="lgx.charge.code">
+            <field name="code">WAIT</field>
+            <field name="name">Waiting Time Kendaraan</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_wait"/>
+            <field name="uom_id" ref="uom.product_uom_hour"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_kuli" model="product.product">
+            <field name="name">Ongkos Bongkar Muat</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-KULI</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_manhour"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_kuli" model="lgx.charge.code">
+            <field name="code">KULI</field>
+            <field name="name">Ongkos Bongkar Muat</field>
+            <field name="category">handling</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_kuli"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_manhour"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_uj" model="product.product">
+            <field name="name">Uang Jalan Pengemudi</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-UJ</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_uj" model="lgx.charge.code">
+            <field name="code">UJ</field>
+            <field name="name">Uang Jalan Pengemudi</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_uj"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_bbm" model="product.product">
+            <field name="name">BBM</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-BBM</field>
+            <field name="uom_id" ref="uom.product_uom_litre"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_bbm" model="lgx.charge.code">
+            <field name="code">BBM</field>
+            <field name="name">BBM</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_bbm"/>
+            <field name="uom_id" ref="uom.product_uom_litre"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_tol" model="product.product">
+            <field name="name">Tol dan Retribusi</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-TOL</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_tol" model="lgx.charge.code">
+            <field name="code">TOL</field>
+            <field name="name">Tol dan Retribusi</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_tol"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_parkir" model="product.product">
+            <field name="name">Parkir</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-PARKIR</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_parkir" model="lgx.charge.code">
+            <field name="code">PARKIR</field>
+            <field name="name">Parkir</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_parkir"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_makan" model="product.product">
+            <field name="name">Uang Makan Pengemudi</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-MAKAN</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_makan" model="lgx.charge.code">
+            <field name="code">MAKAN</field>
+            <field name="name">Uang Makan Pengemudi</field>
+            <field name="category">trucking</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">out_of_scope</field>
+            <field name="default_wht_type">none</field>
+            <field name="product_id" ref="product_makan"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_trip"/>
+            <field name="applies_to">tms</field>
+        </record>
+        <record id="product_sto_pal" model="product.product">
+            <field name="name">Penyimpanan per Pallet-Hari</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-STO-PAL</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_pallet_day"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_sto_pal" model="lgx.charge.code">
+            <field name="code">STO-PAL</field>
+            <field name="name">Penyimpanan per Pallet-Hari</field>
+            <field name="category">storage</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_sto_pal"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_pallet_day"/>
+            <field name="applies_to">wms</field>
+        </record>
+        <record id="product_sto_cbm" model="product.product">
+            <field name="name">Penyimpanan per CBM-Hari</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-STO-CBM</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_cbm_day"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_sto_cbm" model="lgx.charge.code">
+            <field name="code">STO-CBM</field>
+            <field name="name">Penyimpanan per CBM-Hari</field>
+            <field name="category">storage</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_sto_cbm"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_cbm_day"/>
+            <field name="applies_to">wms</field>
+        </record>
+        <record id="product_sto_sku" model="product.product">
+            <field name="name">Penyimpanan per SKU-Bulan</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-STO-SKU</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_sku_month"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_sto_sku" model="lgx.charge.code">
+            <field name="code">STO-SKU</field>
+            <field name="name">Penyimpanan per SKU-Bulan</field>
+            <field name="category">storage</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_sto_sku"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_sku_month"/>
+            <field name="applies_to">wms</field>
+        </record>
+        <record id="product_sto_kg" model="product.product">
+            <field name="name">Penyimpanan per Kg-Hari</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-STO-KG</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_kg_day"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_sto_kg" model="lgx.charge.code">
+            <field name="code">STO-KG</field>
+            <field name="name">Penyimpanan per Kg-Hari</field>
+            <field name="category">storage</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_sto_kg"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_kg_day"/>
+            <field name="applies_to">wms</field>
+        </record>
+        <record id="product_hnd_in" model="product.product">
+            <field name="name">Handling Masuk</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-HND-IN</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_pallet"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_hnd_in" model="lgx.charge.code">
+            <field name="code">HND-IN</field>
+            <field name="name">Handling Masuk</field>
+            <field name="category">handling</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_hnd_in"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_pallet"/>
+            <field name="applies_to">wms</field>
+        </record>
+        <record id="product_hnd_out" model="product.product">
+            <field name="name">Handling Keluar</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-HND-OUT</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_order_line"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_hnd_out" model="lgx.charge.code">
+            <field name="code">HND-OUT</field>
+            <field name="name">Handling Keluar</field>
+            <field name="category">handling</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_hnd_out"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_order_line"/>
+            <field name="applies_to">wms</field>
+        </record>
+        <record id="product_vas" model="product.product">
+            <field name="name">Value Added Service</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-VAS</field>
+            <field name="uom_id" ref="custom_lgx_base.uom_manhour"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_vas" model="lgx.charge.code">
+            <field name="code">VAS</field>
+            <field name="name">Value Added Service</field>
+            <field name="category">vas</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_vas"/>
+            <field name="uom_id" ref="custom_lgx_base.uom_manhour"/>
+            <field name="applies_to">wms</field>
+        </record>
+        <record id="product_adm" model="product.product">
+            <field name="name">Biaya Administrasi</field>
+            <field name="type">service</field>
+            <field name="default_code">LGX-ADM</field>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="purchase_ok">1</field>
+            <field name="sale_ok">1</field>
+        </record>
+        <record id="charge_adm" model="lgx.charge.code">
+            <field name="code">ADM</field>
+            <field name="name">Biaya Administrasi</field>
+            <field name="category">other</field>
+            <field name="default_nature">service</field>
+            <field name="is_freight_charge">0</field>
+            <field name="vat_treatment">standard</field>
+            <field name="default_wht_type">pph23</field>
+            <field name="product_id" ref="product_adm"/>
+            <field name="uom_id" ref="uom.product_uom_unit"/>
+            <field name="applies_to">all</field>
+        </record>
+    </data>
+</odoo>

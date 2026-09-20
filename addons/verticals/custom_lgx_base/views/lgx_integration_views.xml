@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_integration_message_list" model="ir.ui.view">
+        <field name="name">lgx.integration.message.list</field>
+        <field name="model">lgx.integration.message</field>
+        <field name="arch" type="xml">
+            <list string="Pesan Integrasi" decoration-danger="state == 'failed'"
+                  decoration-muted="state == 'cancelled'" decoration-info="state == 'pending'">
+                <field name="create_date"/>
+                <field name="channel"/>
+                <field name="direction"/>
+                <field name="document_model"/>
+                <field name="document_id"/>
+                <field name="endpoint" optional="hide"/>
+                <field name="http_status"/>
+                <field name="attempt_count"/>
+                <field name="next_retry_at" optional="show"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_integration_message_form" model="ir.ui.view">
+        <field name="name">lgx.integration.message.form</field>
+        <field name="model">lgx.integration.message</field>
+        <field name="arch" type="xml">
+            <form string="Pesan Integrasi">
+                <header>
+                    <button name="action_retry" type="object" string="Coba Lagi"
+                            class="btn-primary" invisible="state not in ('failed','cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,sent,acked,failed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="channel"/>
+                            <field name="direction"/>
+                            <field name="endpoint"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="document_model"/>
+                            <field name="document_id"/>
+                            <field name="http_status"/>
+                            <field name="attempt_count"/>
+                            <field name="next_retry_at"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Permintaan"><field name="request_payload" widget="text"/></page>
+                        <page string="Respons"><field name="response_payload" widget="text"/></page>
+                        <page string="Galat" invisible="not error_message">
+                            <field name="error_message"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_integration_message" model="ir.actions.act_window">
+        <field name="name">Pesan Integrasi</field>
+        <field name="res_model">lgx.integration.message</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

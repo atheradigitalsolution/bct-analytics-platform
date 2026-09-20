@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_wms_billing_run" name="Penagihan Gudang" parent="custom_lgx_base.menu_lgx_finance"
+              action="action_lgx_wms_billing_run" sequence="70"/>
+    <menuitem id="menu_lgx_occupancy" name="Potret Okupansi" parent="custom_lgx_wms.menu_lgx_wms_root"
+              action="action_lgx_occupancy" sequence="40"/>
+</odoo>

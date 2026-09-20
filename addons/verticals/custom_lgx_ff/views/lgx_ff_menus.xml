@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_shipment" name="Shipment" parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_shipment" sequence="10"/>
+    <menuitem id="menu_lgx_container" name="Kontainer" parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_container" sequence="20"/>
+    <menuitem id="menu_lgx_container_risk" name="Kontainer Berisiko" parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_container_at_risk" sequence="30"/>
+</odoo>

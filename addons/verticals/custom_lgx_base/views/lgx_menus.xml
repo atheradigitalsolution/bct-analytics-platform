@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Kerangka menu untuk seluruh vertical. Modul segmen menggantung item
+        operasinya di bawah menu_lgx_operations; tidak ada modul segmen yang
+        membuat menu akarnya sendiri, supaya memasang dua segmen sekaligus tidak
+        menghasilkan dua aplikasi "Logistik" berdampingan di layar utama.
+    -->
+    <menuitem id="menu_lgx_root" name="Logistik" sequence="52"
+              groups="group_lgx_staff,group_lgx_management_viewer"/>
+
+    <menuitem id="menu_lgx_operations" name="Operasi" parent="menu_lgx_root" sequence="10"/>
+    <menuitem id="menu_lgx_commercial" name="Komersial" parent="menu_lgx_root" sequence="20"/>
+    <menuitem id="menu_lgx_finance" name="Keuangan" parent="menu_lgx_root" sequence="30"
+              groups="group_lgx_finance_billing,group_lgx_management_viewer"/>
+    <menuitem id="menu_lgx_reporting" name="Laporan" parent="menu_lgx_root" sequence="40"/>
+    <menuitem id="menu_lgx_config" name="Konfigurasi" parent="menu_lgx_root" sequence="90"
+              groups="base.group_system,group_lgx_ff_manager,group_lgx_finance_manager"/>
+
+    <menuitem id="menu_lgx_config_network" name="Jaringan" parent="menu_lgx_config" sequence="10"/>
+    <menuitem id="menu_lgx_config_commercial" name="Komersial" parent="menu_lgx_config" sequence="20"/>
+    <menuitem id="menu_lgx_config_reference" name="Referensi" parent="menu_lgx_config" sequence="30"/>
+    <menuitem id="menu_lgx_config_technical" name="Teknis" parent="menu_lgx_config" sequence="90"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_lgx_location" name="Simpul Jaringan" parent="menu_lgx_config_network"
+              action="action_lgx_location" sequence="10"/>
+    <menuitem id="menu_lgx_customs_office" name="Kantor Pabean" parent="menu_lgx_config_network"
+              action="action_lgx_customs_office" sequence="20"/>
+    <menuitem id="menu_lgx_charge_code" name="Kode Charge" parent="menu_lgx_config_commercial"
+              action="action_lgx_charge_code" sequence="10"/>
+    <menuitem id="menu_lgx_container_type" name="Tipe Kontainer" parent="menu_lgx_config_reference"
+              action="action_lgx_container_type" sequence="10"/>
+    <menuitem id="menu_lgx_commodity" name="Komoditas" parent="menu_lgx_config_reference"
+              action="action_lgx_commodity" sequence="20"/>
+    <menuitem id="menu_lgx_document_type" name="Jenis Dokumen" parent="menu_lgx_config_reference"
+              action="action_lgx_document_type" sequence="30"/>
+    <menuitem id="menu_lgx_milestone_type" name="Jenis Milestone" parent="menu_lgx_config_reference"
+              action="action_lgx_milestone_type" sequence="40"/>
+    <menuitem id="menu_lgx_milestone_template" name="Template Milestone" parent="menu_lgx_config_reference"
+              action="action_lgx_milestone_template" sequence="50"/>
+    <menuitem id="menu_lgx_integration_message" name="Pesan Integrasi" parent="menu_lgx_config_technical"
+              action="action_lgx_integration_message" sequence="10"/>
+</odoo>

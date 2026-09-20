@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_customs_root" name="Kepabeanan" parent="custom_lgx_base.menu_lgx_operations"
+              sequence="40" groups="custom_lgx_base.group_lgx_customs_user"/>
+    <menuitem id="menu_lgx_customs_declaration" name="Deklarasi" parent="menu_lgx_customs_root"
+              action="action_lgx_customs_declaration" sequence="10"/>
+    <menuitem id="menu_lgx_customs_guarantee" name="Jaminan" parent="menu_lgx_customs_root"
+              action="action_lgx_customs_guarantee" sequence="20"/>
+    <menuitem id="menu_lgx_guarantee_releasable" name="Jaminan Dapat Ditarik" parent="menu_lgx_customs_root"
+              action="action_lgx_guarantee_releasable" sequence="30"/>
+    <menuitem id="menu_lgx_ppjk_exposure" name="Eksposur PPJK" parent="custom_lgx_base.menu_lgx_reporting"
+              action="action_lgx_ppjk_exposure" sequence="30"/>
+    <menuitem id="menu_lgx_hs_code" name="HS Code / BTKI" parent="custom_lgx_base.menu_lgx_config_reference"
+              action="action_lgx_hs_code" sequence="60"/>
+    <menuitem id="menu_lgx_customs_expert" name="Ahli Kepabeanan" parent="custom_lgx_base.menu_lgx_config_reference"
+              action="action_lgx_customs_expert" sequence="70"/>
+</odoo>

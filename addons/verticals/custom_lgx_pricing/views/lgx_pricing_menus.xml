@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_quote" name="Penawaran" parent="custom_lgx_base.menu_lgx_commercial"
+              action="action_lgx_quote" sequence="5"/>
+    <menuitem id="menu_lgx_contract" name="Kontrak" parent="custom_lgx_base.menu_lgx_commercial"
+              action="action_lgx_contract" sequence="20"/>
+    <menuitem id="menu_lgx_rate_card" name="Rate Card" parent="custom_lgx_base.menu_lgx_config_commercial"
+              action="action_lgx_rate_card" sequence="5"/>
+</odoo>

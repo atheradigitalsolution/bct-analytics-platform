@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_job_form_pricing" model="ir.ui.view">
+        <field name="name">lgx.job.form.pricing</field>
+        <field name="model">lgx.job</field>
+        <field name="inherit_id" ref="custom_lgx_job.view_lgx_job_form"/>
+        <field name="arch" type="xml">
+            <field name="customer_reference" position="after">
+                <field name="quote_id" readonly="1"/>
+                <field name="contract_id"/>
+            </field>
+        </field>
+    </record>
+</odoo>

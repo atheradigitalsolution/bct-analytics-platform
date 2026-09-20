@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_occupancy_list" model="ir.ui.view">
+        <field name="name">lgx.wms.occupancy.snapshot.list</field>
+        <field name="model">lgx.wms.occupancy.snapshot</field>
+        <field name="arch" type="xml">
+            <list string="Potret Okupansi" decoration-muted="is_free_period">
+                <field name="date"/>
+                <field name="client_id"/>
+                <field name="product_id"/>
+                <field name="lot_id" optional="hide"/>
+                <field name="location_id"/>
+                <field name="quantity" sum="Kuantitas"/>
+                <field name="pallet_count" sum="Pallet"/>
+                <field name="volume_cbm" sum="CBM"/>
+                <field name="weight_kg" sum="Kg"/>
+                <field name="is_free_period"/>
+                <field name="billing_run_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_occupancy_search" model="ir.ui.view">
+        <field name="name">lgx.wms.occupancy.snapshot.search</field>
+        <field name="model">lgx.wms.occupancy.snapshot</field>
+        <field name="arch" type="xml">
+            <search string="Potret Okupansi">
+                <field name="client_id"/>
+                <field name="product_id"/>
+                <field name="date"/>
+                <filter name="f_unbilled" string="Belum Ditagihkan" domain="[('billing_run_id','=',False)]"/>
+                <filter name="f_free" string="Dalam Masa Bebas" domain="[('is_free_period','=',True)]"/>
+                <separator/>
+                <filter name="g_client" string="Klien" context="{'group_by':'client_id'}"/>
+                <filter name="g_date" string="Tanggal" context="{'group_by':'date'}"/>
+                <filter name="g_product" string="Produk" context="{'group_by':'product_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_occupancy" model="ir.actions.act_window">
+        <field name="name">Potret Okupansi Harian</field>
+        <field name="res_model">lgx.wms.occupancy.snapshot</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_g_client': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Penyimpanan ditagih atas ruang dikali waktu. Saldo akhir bulan tidak cukup:
+                pallet yang masuk tanggal 3 dan keluar tanggal 27 tidak muncul di saldo akhir
+                bulan, padahal ia menempati rak 24 hari.
+            </p>
+        </field>
+    </record>
+</odoo>

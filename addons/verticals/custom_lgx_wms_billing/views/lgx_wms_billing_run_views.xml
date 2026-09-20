@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_wms_billing_run_list" model="ir.ui.view">
+        <field name="name">lgx.wms.billing.run.list</field>
+        <field name="model">lgx.wms.billing.run</field>
+        <field name="arch" type="xml">
+            <list string="Proses Penagihan Gudang" decoration-success="state == 'posted'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="client_id"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="amount_storage" sum="Penyimpanan"/>
+                <field name="amount_handling" sum="Handling"/>
+                <field name="amount_minimum_topup" sum="Minimum"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_wms_billing_run_form" model="ir.ui.view">
+        <field name="name">lgx.wms.billing.run.form</field>
+        <field name="model">lgx.wms.billing.run</field>
+        <field name="arch" type="xml">
+            <form string="Proses Penagihan Gudang">
+                <header>
+                    <button name="action_compute" type="object" string="Hitung Pratinjau"
+                            class="btn-primary" invisible="state == 'posted'"/>
+                    <button name="action_post_to_job" type="object" string="Posting ke Job"
+                            class="btn-primary" invisible="state != 'preview'"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('draft','cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,preview,posted"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_snapshots" type="object" class="oe_stat_button"
+                                icon="fa-calendar">
+                            <field name="snapshot_count" widget="statinfo" string="Hari Potret"/>
+                        </button>
+                    </div>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="client_id"/>
+                            <field name="job_id"/>
+                            <field name="currency_id"/>
+                        </group>
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                    </group>
+                    <field name="line_ids" readonly="1">
+                        <list>
+                            <field name="category"/>
+                            <field name="name"/>
+                            <field name="quantity"/>
+                            <field name="rate"/>
+                            <field name="amount" sum="Total"/>
+                            <field name="snapshot_count"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                    <group class="oe_subtotal_footer">
+                        <field name="amount_storage"/>
+                        <field name="amount_handling"/>
+                        <field name="amount_minimum_topup"/>
+                        <field name="amount_total" class="oe_subtotal_footer_separator"/>
+                    </group>
+                    <group><field name="note"/></group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_wms_billing_run" model="ir.actions.act_window">
+        <field name="name">Penagihan Gudang</field>
+        <field name="res_model">lgx.wms.billing.run</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

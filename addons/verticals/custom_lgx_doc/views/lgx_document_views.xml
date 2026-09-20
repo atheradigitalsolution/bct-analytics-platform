@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_document_list" model="ir.ui.view">
+        <field name="name">lgx.document.list</field>
+        <field name="model">lgx.document</field>
+        <field name="arch" type="xml">
+            <list string="Dokumen" decoration-danger="status == 'expired'"
+                  decoration-warning="status == 'warning'">
+                <field name="name"/>
+                <field name="document_type_id"/>
+                <field name="category"/>
+                <field name="owner_label"/>
+                <field name="job_id" optional="hide"/>
+                <field name="issue_date"/>
+                <field name="expiry_date"/>
+                <field name="days_to_expiry"/>
+                <field name="responsible_id"/>
+                <field name="requires_stamp_duty" optional="hide"/>
+                <field name="stamp_duty_applied" optional="hide"/>
+                <field name="status" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_document_form" model="ir.ui.view">
+        <field name="name">lgx.document.form</field>
+        <field name="model">lgx.document</field>
+        <field name="arch" type="xml">
+            <form string="Dokumen">
+                <sheet>
+                    <div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
+                    <div class="alert alert-danger" role="alert" invisible="status != 'expired'">
+                        Dokumen ini sudah lewat masa berlaku. Operasi yang bersandar padanya
+                        menjadi risiko hukum pada perusahaan.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="document_type_id"/>
+                            <field name="job_id"/>
+                            <field name="partner_id"/>
+                            <field name="res_model" readonly="1" invisible="not res_model"/>
+                            <field name="res_id" readonly="1" invisible="not res_model"/>
+                            <field name="owner_label" readonly="1"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="issue_date"/>
+                            <field name="expiry_date"/>
+                            <field name="warning_days"/>
+                            <field name="days_to_expiry" readonly="1"/>
+                            <field name="status" readonly="1"/>
+                            <field name="responsible_id"/>
+                            <field name="is_customer_visible"/>
+                        </group>
+                    </group>
+                    <group string="Bea Meterai" invisible="not requires_stamp_duty">
+                        <div class="alert alert-info" role="alert" colspan="2">
+                            Jenis dokumen ini adalah objek bea meterai. Bila e-signing dipakai,
+                            <b>bubuhkan e-meterai SEBELUM tanda tangan digital</b> — urutannya
+                            tidak dapat dibalik.
+                        </div>
+                        <field name="requires_stamp_duty" readonly="1"/>
+                        <field name="stamp_duty_applied"/>
+                    </group>
+                    <field name="attachment_ids" widget="many2many_binary"/>
+                    <group><field name="note"/></group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_document_search" model="ir.ui.view">
+        <field name="name">lgx.document.search</field>
+        <field name="model">lgx.document</field>
+        <field name="arch" type="xml">
+            <search string="Dokumen">
+                <field name="name"/>
+                <field name="document_type_id"/>
+                <field name="owner_label"/>
+                <field name="job_id"/>
+                <filter name="f_expired" string="Kedaluwarsa" domain="[('status','=','expired')]"/>
+                <filter name="f_warning" string="Mendekati Kedaluwarsa" domain="[('status','=','warning')]"/>
+                <filter name="f_stamp" string="Perlu Meterai, Belum Dibubuhkan"
+                        domain="[('requires_stamp_duty','=',True),('stamp_duty_applied','=',False)]"/>
+                <separator/>
+                <filter name="g_type" string="Jenis" context="{'group_by':'document_type_id'}"/>
+                <filter name="g_category" string="Kategori" context="{'group_by':'category'}"/>
+                <filter name="g_status" string="Status" context="{'group_by':'status'}"/>
+                <filter name="g_responsible" string="Penanggung Jawab" context="{'group_by':'responsible_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_document" model="ir.actions.act_window">
+        <field name="name">Dokumen</field>
+        <field name="res_model">lgx.document</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_lgx_document_expiring" model="ir.actions.act_window">
+        <field name="name">Dokumen Mendekati / Lewat Masa Berlaku</field>
+        <field name="res_model">lgx.document</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('status','in',('warning','expired'))]</field>
+        <field name="context">{'search_default_g_category': 1}</field>
+    </record>
+    <record id="view_lgx_checklist_template_list" model="ir.ui.view">
+        <field name="name">lgx.document.checklist.template.list</field>
+        <field name="model">lgx.document.checklist.template</field>
+        <field name="arch" type="xml">
+            <list string="Template Checklist" editable="bottom">
+                <field name="job_type"/>
+                <field name="transport_mode"/>
+                <field name="sequence"/>
+                <field name="document_type_id"/>
+                <field name="is_mandatory"/>
+                <field name="blocks_milestone_code"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_checklist_template" model="ir.actions.act_window">
+        <field name="name">Template Checklist Dokumen</field>
+        <field name="res_model">lgx.document.checklist.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="view_lgx_job_form_doc" model="ir.ui.view">
+        <field name="name">lgx.job.form.doc</field>
+        <field name="model">lgx.job</field>
+        <field name="inherit_id" ref="custom_lgx_job.view_lgx_job_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='milestones']" position="after">
+                <page string="Dokumen" name="documents">
+                    <button name="action_generate_checklist" type="object"
+                            string="Isi Checklist dari Template" class="btn-secondary mb-2"/>
+                    <field name="checklist_ids">
+                        <list editable="bottom" decoration-warning="is_mandatory and not is_satisfied">
+                            <field name="sequence" widget="handle"/>
+                            <field name="document_type_id"/>
+                            <field name="is_mandatory"/>
+                            <field name="blocks_milestone_code"/>
+                            <field name="document_id"/>
+                            <field name="is_satisfied"/>
+                            <field name="note"/>
+                        </list>
+                    </field>
+                    <field name="document_ids" context="{'default_job_id': id}">
+                        <list editable="bottom">
+                            <field name="document_type_id"/>
+                            <field name="name"/>
+                            <field name="issue_date"/>
+                            <field name="expiry_date"/>
+                            <field name="status"/>
+                            <field name="is_customer_visible"/>
+                            <field name="attachment_ids" widget="many2many_binary"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

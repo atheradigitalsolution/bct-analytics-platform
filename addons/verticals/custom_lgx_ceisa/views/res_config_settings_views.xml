@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_lgx_ceisa" model="ir.ui.view">
+        <field name="name">res.config.settings.form.lgx.ceisa</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="custom_lgx_billing.res_config_settings_view_form_lgx"/>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='custom_lgx_billing']" position="inside">
+                <block title="Integrasi CEISA 4.0"
+                       help="Pengiriman dokumen pabean host-to-host. Selama mati, deklarasi dikerjakan lewat mode manual.">
+                    <setting string="Aktifkan CEISA 4.0">
+                        <field name="lgx_ceisa_enabled"/>
+                    </setting>
+                    <setting string="Base URL"
+                             help="Arahkan ke http://lgx-mock:4020 saat pengembangan; ganti ke endpoint DJBC setelah kredensial produksi terbit.">
+                        <field name="lgx_ceisa_base_url"/>
+                    </setting>
+                    <setting string="Client ID">
+                        <field name="lgx_ceisa_client_id"/>
+                    </setting>
+                    <setting string="Client Secret">
+                        <field name="lgx_ceisa_client_secret" password="True"/>
+                    </setting>
+                    <setting string="Margin Perbarui Token"
+                             help="Token diperbarui sebelum benar-benar mati sebanyak margin ini. Nol berarti sebagian request berangkat dengan token yang baru saja kedaluwarsa.">
+                        <field name="lgx_ceisa_token_leeway"/> detik
+                    </setting>
+                    <setting string="Uji Koneksi">
+                        <button name="action_lgx_ceisa_test_connection" type="object"
+                                string="Ambil Token Sekarang" class="btn-secondary"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>

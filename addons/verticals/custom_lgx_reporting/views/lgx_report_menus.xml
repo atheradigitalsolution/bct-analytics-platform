@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_report_job_profit" name="Laba per Job &amp; Segmen"
+              parent="custom_lgx_base.menu_lgx_reporting"
+              action="action_lgx_report_job_profit" sequence="10"/>
+    <menuitem id="menu_lgx_report_cycle_time" name="Waktu Siklus"
+              parent="custom_lgx_base.menu_lgx_reporting"
+              action="action_lgx_report_cycle_time" sequence="20"/>
+    <menuitem id="menu_lgx_report_provision" name="Akurasi Provisi"
+              parent="custom_lgx_base.menu_lgx_reporting"
+              action="action_lgx_report_provision" sequence="25"/>
+</odoo>

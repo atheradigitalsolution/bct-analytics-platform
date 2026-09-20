@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_fleet_vehicle_form_lgx" model="ir.ui.view">
+        <field name="name">fleet.vehicle.form.lgx</field>
+        <field name="model">fleet.vehicle</field>
+        <field name="inherit_id" ref="fleet.fleet_vehicle_view_form"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="Angkutan Barang" name="lgx_freight">
+                    <div class="alert alert-danger" role="alert"
+                         invisible="lgx_document_status != 'expired'">
+                        Dokumen <field name="lgx_document_issue" nolabel="1" readonly="1"
+                                       class="oe_inline"/> sudah lewat masa berlaku. Kendaraan
+                        dengan dokumen mati yang tetap beroperasi adalah risiko hukum pada
+                        PERUSAHAAN, bukan hanya pada pengemudi.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="lgx_document_status != 'warning'">
+                        Mendekati kedaluwarsa: <field name="lgx_document_issue" nolabel="1"
+                                                      readonly="1" class="oe_inline"/>.
+                    </div>
+                    <group>
+                        <group string="Klasifikasi">
+                            <field name="lgx_is_freight"/>
+                            <field name="lgx_category_id" invisible="not lgx_is_freight"/>
+                            <field name="lgx_axle_configuration" invisible="not lgx_is_freight"/>
+                            <field name="lgx_pool_location_id" invisible="not lgx_is_freight"/>
+                        </group>
+                        <group string="Kapasitas Legal" invisible="not lgx_is_freight">
+                            <field name="lgx_jbb_kg"/>
+                            <field name="lgx_jbi_kg"/>
+                            <field name="lgx_kerb_weight_kg"/>
+                            <field name="lgx_payload_capacity_kg" readonly="1"/>
+                        </group>
+                    </group>
+                    <group invisible="not lgx_is_freight">
+                        <group string="Dimensi Bak">
+                            <field name="lgx_body_length_mm"/>
+                            <field name="lgx_body_width_mm"/>
+                            <field name="lgx_body_height_mm"/>
+                            <field name="lgx_body_volume_cbm" readonly="1"/>
+                        </group>
+                        <group string="GPS (persyaratan izin)">
+                            <field name="lgx_gps_device_id"/>
+                            <field name="lgx_gps_provider"/>
+                        </group>
+                    </group>
+                    <group string="Dokumen" invisible="not lgx_is_freight">
+                        <group>
+                            <field name="lgx_kir_number"/>
+                            <field name="lgx_kir_expiry_date"/>
+                            <field name="lgx_stnk_number"/>
+                            <field name="lgx_stnk_expiry_date"/>
+                        </group>
+                        <group>
+                            <field name="lgx_tax_expiry_date"/>
+                            <field name="lgx_kp_number"/>
+                            <field name="lgx_kp_expiry_date"/>
+                            <field name="lgx_document_status" readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+    <record id="view_lgx_vehicle_category_list" model="ir.ui.view">
+        <field name="name">lgx.vehicle.category.list</field>
+        <field name="model">lgx.vehicle.category</field>
+        <field name="arch" type="xml">
+            <list string="Kategori Kendaraan" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="axle_configuration"/>
+                <field name="typical_jbi_kg"/>
+                <field name="typical_payload_kg"/>
+                <field name="typical_volume_cbm"/>
+                <field name="can_carry_container"/>
+                <field name="container_size_ft"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_vehicle_category" model="ir.actions.act_window">
+        <field name="name">Kategori Kendaraan</field>
+        <field name="res_model">lgx.vehicle.category</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_lgx_vehicle_documents" model="ir.actions.act_window">
+        <field name="name">Dokumen Kendaraan Bermasalah</field>
+        <field name="res_model">fleet.vehicle</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('lgx_is_freight','=',True),('lgx_document_status','in',('warning','expired'))]</field>
+    </record>
+    <menuitem id="menu_lgx_vehicle_category" name="Kategori Kendaraan"
+              parent="custom_lgx_base.menu_lgx_config_reference"
+              action="action_lgx_vehicle_category" sequence="80"/>
+    <menuitem id="menu_lgx_vehicle_documents" name="Dokumen Kendaraan"
+              parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_vehicle_documents" sequence="55"
+              groups="custom_lgx_base.group_lgx_trucking_dispatcher"/>
+</odoo>

@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Delapan privilege, bukan satu.
+
+            Odoo 19 merender setiap res.groups yang berbagi satu privilege
+            sebagai SATU dropdown pilih-satu pada form user. Seorang staf
+            logistik sah memegang beberapa peran sekaligus — kepala cabang yang
+            menjadi dispatcher sekaligus penyetuju uang jalan, staf operasi yang
+            juga mengurus dokumen pabean. Menggabungkan semuanya ke satu
+            privilege membuat setiap penyimpanan form user diam-diam mencabut
+            semua peran kecuali yang terakhir dipilih.
+
+            Kategorinya dipinjam dari custom_core, bukan kategori baru, supaya
+            seluruh platform tampil sebagai satu blok di form user.
+        -->
+
+        <record id="privilege_lgx_sales" model="res.groups.privilege">
+            <field name="name">LGX / Penjualan &amp; Tarif</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+            <field name="sequence">610</field>
+        </record>
+        <record id="privilege_lgx_ff" model="res.groups.privilege">
+            <field name="name">LGX / Operasi Forwarding</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+            <field name="sequence">620</field>
+        </record>
+        <record id="privilege_lgx_customs" model="res.groups.privilege">
+            <field name="name">LGX / Kepabeanan</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+            <field name="sequence">630</field>
+        </record>
+        <record id="privilege_lgx_trucking" model="res.groups.privilege">
+            <field name="name">LGX / Trucking &amp; Armada</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+            <field name="sequence">640</field>
+        </record>
+        <record id="privilege_lgx_warehouse" model="res.groups.privilege">
+            <field name="name">LGX / Gudang 3PL</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+            <field name="sequence">650</field>
+        </record>
+        <record id="privilege_lgx_finance" model="res.groups.privilege">
+            <field name="name">LGX / Keuangan &amp; Pajak</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+            <field name="sequence">660</field>
+        </record>
+        <record id="privilege_lgx_management" model="res.groups.privilege">
+            <field name="name">LGX / Manajemen</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+            <field name="sequence">670</field>
+        </record>
+        <record id="privilege_lgx_driver" model="res.groups.privilege">
+            <field name="name">LGX / Pengemudi</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+            <field name="sequence">680</field>
+        </record>
+
+        <!--
+            Grup teknis. TIDAK punya privilege_id, dengan sengaja: ia tidak boleh
+            pernah muncul sebagai selector, karena setiap grup LGX lain
+            menyiratkannya. Memberinya privilege akan membuatnya bersaing dengan
+            grup yang menyiratkannya di dropdown yang sama.
+        -->
+        <record id="group_lgx_staff" model="res.groups">
+            <field name="name">LGX / Staf (teknis)</field>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+        <!-- Penjualan -->
+        <record id="group_lgx_sales_user" model="res.groups">
+            <field name="name">Staf Penjualan Logistik</field>
+            <field name="privilege_id" ref="privilege_lgx_sales"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_staff'))]"/>
+        </record>
+        <record id="group_lgx_sales_manager" model="res.groups">
+            <field name="name">Manajer Penjualan Logistik</field>
+            <field name="privilege_id" ref="privilege_lgx_sales"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_sales_user'))]"/>
+        </record>
+
+        <!-- Forwarding -->
+        <record id="group_lgx_ff_user" model="res.groups">
+            <field name="name">Staf Operasi Forwarding</field>
+            <field name="privilege_id" ref="privilege_lgx_ff"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_staff'))]"/>
+        </record>
+        <record id="group_lgx_ff_manager" model="res.groups">
+            <field name="name">Manajer Operasi Forwarding</field>
+            <field name="privilege_id" ref="privilege_lgx_ff"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_ff_user'))]"/>
+        </record>
+
+        <!-- Kepabeanan -->
+        <record id="group_lgx_customs_user" model="res.groups">
+            <field name="name">Staf Kepabeanan</field>
+            <field name="privilege_id" ref="privilege_lgx_customs"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_staff'))]"/>
+        </record>
+        <record id="group_lgx_customs_expert" model="res.groups">
+            <field name="name">Ahli Kepabeanan</field>
+            <field name="privilege_id" ref="privilege_lgx_customs"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_customs_user'))]"/>
+        </record>
+        <record id="group_lgx_customs_manager" model="res.groups">
+            <field name="name">Manajer Kepabeanan</field>
+            <field name="privilege_id" ref="privilege_lgx_customs"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_customs_expert'))]"/>
+        </record>
+
+        <!-- Trucking -->
+        <record id="group_lgx_trucking_dispatcher" model="res.groups">
+            <field name="name">Dispatcher</field>
+            <field name="privilege_id" ref="privilege_lgx_trucking"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_staff'))]"/>
+        </record>
+        <record id="group_lgx_trucking_manager" model="res.groups">
+            <field name="name">Manajer Armada</field>
+            <field name="privilege_id" ref="privilege_lgx_trucking"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_trucking_dispatcher'))]"/>
+        </record>
+
+        <!-- Gudang -->
+        <record id="group_lgx_wh_operator" model="res.groups">
+            <field name="name">Operator Gudang</field>
+            <field name="privilege_id" ref="privilege_lgx_warehouse"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_staff'))]"/>
+        </record>
+        <record id="group_lgx_wh_supervisor" model="res.groups">
+            <field name="name">Supervisor Gudang</field>
+            <field name="privilege_id" ref="privilege_lgx_warehouse"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_wh_operator'))]"/>
+        </record>
+        <record id="group_lgx_wh_manager" model="res.groups">
+            <field name="name">Manajer Gudang</field>
+            <field name="privilege_id" ref="privilege_lgx_warehouse"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_wh_supervisor'))]"/>
+        </record>
+
+        <!-- Keuangan -->
+        <record id="group_lgx_finance_billing" model="res.groups">
+            <field name="name">Staf Penagihan</field>
+            <field name="privilege_id" ref="privilege_lgx_finance"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_staff'))]"/>
+        </record>
+        <record id="group_lgx_finance_accountant" model="res.groups">
+            <field name="name">Akuntan Logistik</field>
+            <field name="privilege_id" ref="privilege_lgx_finance"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_finance_billing'))]"/>
+        </record>
+        <record id="group_lgx_finance_manager" model="res.groups">
+            <field name="name">Manajer Keuangan Logistik</field>
+            <field name="privilege_id" ref="privilege_lgx_finance"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_finance_accountant'))]"/>
+        </record>
+
+        <!-- Manajemen: baca saja, lintas segmen -->
+        <record id="group_lgx_management_viewer" model="res.groups">
+            <field name="name">Manajemen (baca saja)</field>
+            <field name="privilege_id" ref="privilege_lgx_management"/>
+            <field name="implied_ids" eval="[(4, ref('group_lgx_staff'))]"/>
+        </record>
+
+        <!--
+            Pengemudi. TIDAK menyiratkan group_lgx_staff: aksesnya lewat API
+            aplikasi pengemudi dan terbatas pada trip miliknya sendiri. Memberi
+            akses staf penuh kepada perangkat yang dibawa keluar kantor adalah
+            hal yang justru ingin dihindari pemisahan ini.
+        -->
+        <record id="group_lgx_driver" model="res.groups">
+            <field name="name">Pengemudi</field>
+            <field name="privilege_id" ref="privilege_lgx_driver"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+    </data>
+</odoo>

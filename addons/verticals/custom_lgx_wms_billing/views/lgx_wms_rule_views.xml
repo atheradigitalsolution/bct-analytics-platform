@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_wms_client_form_billing" model="ir.ui.view">
+        <field name="name">lgx.wms.client.form.billing</field>
+        <field name="model">lgx.wms.client</field>
+        <field name="inherit_id" ref="custom_lgx_wms.view_lgx_wms_client_form"/>
+        <field name="arch" type="xml">
+            <field name="minimum_monthly_charge" position="after">
+                <field name="units_per_pallet_default"/>
+            </field>
+            <xpath expr="//sheet" position="inside">
+                <notebook>
+                    <page string="Tarif Penyimpanan">
+                        <field name="storage_rule_ids">
+                            <list editable="bottom">
+                                <field name="name"/>
+                                <field name="basis"/>
+                                <field name="rate"/>
+                                <field name="free_days"/>
+                                <field name="minimum_charge"/>
+                                <field name="product_category_id" optional="hide"/>
+                                <field name="valid_from"/>
+                                <field name="valid_to"/>
+                                <field name="currency_id" column_invisible="True"/>
+                            </list>
+                            <form>
+                                <group>
+                                    <group>
+                                        <field name="name"/>
+                                        <field name="basis"/>
+                                        <field name="rate"/>
+                                        <field name="free_days"/>
+                                    </group>
+                                    <group>
+                                        <field name="minimum_charge"/>
+                                        <field name="product_category_id"/>
+                                        <field name="valid_from"/>
+                                        <field name="valid_to"/>
+                                    </group>
+                                </group>
+                                <group string="Tarif Berjenjang menurut Volume">
+                                    <field name="tier_ids" nolabel="1">
+                                        <list editable="bottom">
+                                            <field name="min_volume"/>
+                                            <field name="rate"/>
+                                            <field name="currency_id" column_invisible="True"/>
+                                        </list>
+                                    </field>
+                                </group>
+                            </form>
+                        </field>
+                    </page>
+                    <page string="Tarif Handling">
+                        <field name="handling_rule_ids">
+                            <list editable="bottom">
+                                <field name="name"/>
+                                <field name="operation"/>
+                                <field name="basis"/>
+                                <field name="rate"/>
+                                <field name="minimum_charge"/>
+                                <field name="valid_from"/>
+                                <field name="valid_to"/>
+                                <field name="currency_id" column_invisible="True"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+            </xpath>
+        </field>
+    </record>
+    <record id="view_product_template_form_lgx_pallet" model="ir.ui.view">
+        <field name="name">product.template.form.lgx.pallet</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <field name="categ_id" position="after">
+                <field name="lgx_units_per_pallet"/>
+            </field>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_duty_log_list" model="ir.ui.view">
+        <field name="name">lgx.driver.duty.log.list</field>
+        <field name="model">lgx.driver.duty.log</field>
+        <field name="arch" type="xml">
+            <list string="Log Jam Kerja" decoration-danger="violation_12h_absolute"
+                  decoration-warning="has_violation and not violation_12h_absolute">
+                <field name="date"/>
+                <field name="driver_id"/>
+                <field name="driving_minutes" sum="Menit Mengemudi"/>
+                <field name="rest_minutes"/>
+                <field name="working_minutes" sum="Menit Kerja"/>
+                <field name="max_continuous_driving_minutes"/>
+                <field name="violation_4h_rest"/>
+                <field name="violation_8h_daily"/>
+                <field name="violation_12h_absolute"/>
+                <field name="needs_justification"/>
+                <field name="approved_by_id" optional="show"/>
+                <field name="has_violation" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_duty_log_form" model="ir.ui.view">
+        <field name="name">lgx.driver.duty.log.form</field>
+        <field name="model">lgx.driver.duty.log</field>
+        <field name="arch" type="xml">
+            <form string="Log Jam Kerja">
+                <header>
+                    <button name="action_approve_extension" type="object" string="Setujui Perpanjangan"
+                            class="btn-primary" invisible="not needs_justification"
+                            groups="custom_lgx_base.group_lgx_trucking_manager"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="not needs_justification">
+                        Jam kerja melewati batas harian dan belum punya alasan serta penyetuju.
+                        Sanksi Pasal 92 UU 22/2009 jatuh pada <b>perusahaan</b>, jadi jejak ini
+                        adalah kepentingan perusahaan, bukan formalitas.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="driver_id"/>
+                            <field name="date"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="driving_minutes"/>
+                            <field name="rest_minutes"/>
+                            <field name="working_minutes"/>
+                            <field name="max_continuous_driving_minutes"/>
+                        </group>
+                    </group>
+                    <group string="Pelanggaran">
+                        <group>
+                            <field name="violation_4h_rest"/>
+                            <field name="violation_8h_daily"/>
+                            <field name="violation_12h_absolute"/>
+                        </group>
+                        <group>
+                            <field name="violation_summary" readonly="1"/>
+                            <field name="needs_justification" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Pembenaran">
+                        <field name="justification" nolabel="1"/>
+                        <field name="approved_by_id" readonly="1"/>
+                        <field name="approved_at" readonly="1"/>
+                    </group>
+                    <field name="trip_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="vehicle_id"/>
+                            <field name="actual_start"/>
+                            <field name="actual_end"/>
+                            <field name="duration_hours"/>
+                        </list>
+                    </field>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_duty_log" model="ir.actions.act_window">
+        <field name="name">Log Jam Kerja</field>
+        <field name="res_model">lgx.driver.duty.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_lgx_duty_violation" model="ir.actions.act_window">
+        <field name="name">Pelanggaran Jam Kerja</field>
+        <field name="res_model">lgx.driver.duty.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('has_violation','=',True)]</field>
+    </record>
+</odoo>

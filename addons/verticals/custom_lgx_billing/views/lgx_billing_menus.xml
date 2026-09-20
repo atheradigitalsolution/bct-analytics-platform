@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_provision" name="Provisi Berjalan" parent="custom_lgx_base.menu_lgx_finance"
+              action="action_lgx_provision_open" sequence="40"/>
+    <menuitem id="menu_lgx_disb_balance" name="Talangan Belum Tertagih" parent="custom_lgx_base.menu_lgx_finance"
+              action="action_lgx_disbursement_balance" sequence="50"/>
+</odoo>

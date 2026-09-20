@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_wht_rate_staff,lgx.wht.rate/staff,model_lgx_wht_rate,custom_lgx_base.group_lgx_staff,1,0,0,0
+access_lgx_wht_rate_billing,lgx.wht.rate/billing,model_lgx_wht_rate,custom_lgx_base.group_lgx_finance_billing,1,0,0,0
+access_lgx_wht_rate_accountant,lgx.wht.rate/accountant,model_lgx_wht_rate,custom_lgx_base.group_lgx_finance_accountant,1,1,1,0
+access_lgx_wht_rate_manager,lgx.wht.rate/finance_manager,model_lgx_wht_rate,custom_lgx_base.group_lgx_finance_manager,1,1,1,1

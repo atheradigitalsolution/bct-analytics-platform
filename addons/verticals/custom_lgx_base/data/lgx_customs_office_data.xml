@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Kantor pabean yang paling sering dipakai. Daftar lengkap (~120)
+             masuk lewat jalur kerja master data, bukan lewat modul. -->
+        <record id="office_040300" model="lgx.customs.office">
+            <field name="code">040300</field><field name="name">KPU Bea dan Cukai Tanjung Priok</field>
+            <field name="office_type">kpu</field><field name="city">Jakarta Utara</field>
+            <field name="ceisa_mandatory">1</field>
+        </record>
+        <record id="office_040100" model="lgx.customs.office">
+            <field name="code">040100</field><field name="name">KPU Bea dan Cukai Soekarno-Hatta</field>
+            <field name="office_type">kpu</field><field name="city">Tangerang</field>
+            <field name="ceisa_mandatory">1</field>
+        </record>
+        <record id="office_050100" model="lgx.customs.office">
+            <field name="code">050100</field><field name="name">KPPBC TMP Tanjung Perak</field>
+            <field name="city">Surabaya</field><field name="ceisa_mandatory">1</field>
+        </record>
+        <record id="office_020100" model="lgx.customs.office">
+            <field name="code">020100</field><field name="name">KPPBC TMP Belawan</field>
+            <field name="city">Medan</field><field name="ceisa_mandatory">1</field>
+        </record>
+        <record id="office_060100" model="lgx.customs.office">
+            <field name="code">060100</field><field name="name">KPPBC TMP Makassar</field>
+            <field name="city">Makassar</field>
+        </record>
+        <record id="office_041100" model="lgx.customs.office">
+            <field name="code">041100</field><field name="name">KPPBC TMP A Bandung</field>
+            <field name="city">Bandung</field>
+        </record>
+        <record id="office_051200" model="lgx.customs.office">
+            <field name="code">051200</field><field name="name">KPPBC TMP Semarang</field>
+            <field name="city">Semarang</field>
+        </record>
+        <record id="office_010100" model="lgx.customs.office">
+            <field name="code">010100</field><field name="name">KPPBC TMP B Batam</field>
+            <field name="city">Batam</field>
+        </record>
+    </data>
+</odoo>

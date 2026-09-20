@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="rule_lgx_wms_client_company" model="ir.rule">
+            <field name="name">Klien gudang: per perusahaan</field>
+            <field name="model_id" ref="model_lgx_wms_client"/>
+            <field name="domain_force">[('company_id','in',company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+        <!--
+            Pemisahan stok antar pemilik barang.
+
+            Aturan ini adalah janji kontraktual, bukan preferensi: klien A tidak
+            boleh dapat mengakses record stok klien B, dan itu diuji lewat API
+            maupun UI. Ia dipasang pada portal karena di situlah klien benar-benar
+            masuk; staf gudang justru HARUS melihat semuanya untuk bisa bekerja.
+        -->
+        <record id="rule_lgx_quant_portal_own_client" model="ir.rule">
+            <field name="name">Quant: pengguna portal hanya melihat stok kliennya</field>
+            <field name="model_id" ref="stock.model_stock_quant"/>
+            <field name="domain_force">[('lgx_wms_client_id.portal_user_ids','in',[user.id])]</field>
+            <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        </record>
+        <record id="rule_lgx_picking_portal_own_client" model="ir.rule">
+            <field name="name">Picking: pengguna portal hanya melihat kliennya</field>
+            <field name="model_id" ref="stock.model_stock_picking"/>
+            <field name="domain_force">[('lgx_wms_client_id.portal_user_ids','in',[user.id])]</field>
+            <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Kanal terpisah dari CEISA: keduanya bisa mati sendiri-sendiri, dan
+             gangguan di satu sisi tidak boleh menghentikan yang lain. -->
+        <record id="channel_lgx_nle" model="queue.job.channel">
+            <field name="name">lgx_nle</field>
+            <field name="parent_id" ref="queue_job.channel_root"/>
+        </record>
+
+        <record id="job_function_nle_do" model="queue.job.function">
+            <field name="model_id" ref="custom_lgx_ff.model_lgx_shipment"/>
+            <field name="method">_job_request_do_online</field>
+            <field name="channel_id" ref="channel_lgx_nle"/>
+            <field name="edit_retry_pattern">{1: 60, 3: 300, 5: 900}</field>
+        </record>
+        <record id="job_function_nle_sp2" model="queue.job.function">
+            <field name="model_id" ref="custom_lgx_ff.model_lgx_shipment"/>
+            <field name="method">_job_request_sp2</field>
+            <field name="channel_id" ref="channel_lgx_nle"/>
+            <field name="edit_retry_pattern">{1: 60, 3: 300, 5: 900}</field>
+        </record>
+        <record id="job_function_nle_pull" model="queue.job.function">
+            <field name="model_id" ref="custom_lgx_ff.model_lgx_shipment"/>
+            <field name="method">_job_pull_nle_status</field>
+            <field name="channel_id" ref="channel_lgx_nle"/>
+            <field name="edit_retry_pattern">{1: 120, 3: 600, 5: 1800}</field>
+        </record>
+
+        <record id="cron_lgx_nle_pull_status" model="ir.cron">
+            <field name="name">LGX: rekonsiliasi status dokumen &amp; kontainer dari NLE</field>
+            <field name="model_id" ref="custom_lgx_ff.model_lgx_shipment"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_pull_nle_status()</field>
+            <field name="interval_number">2</field>
+            <field name="interval_type">hours</field>
+            <!-- MATI secara default: cron yang menarik ke endpoint yang belum
+                 dikonfigurasi hanya mengisi antrian dengan galat. -->
+            <field name="active" eval="False"/>
+        </record>
+    </data>
+</odoo>

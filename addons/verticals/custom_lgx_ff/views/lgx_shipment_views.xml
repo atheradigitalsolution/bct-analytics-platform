@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_shipment_list" model="ir.ui.view">
+        <field name="name">lgx.shipment.list</field>
+        <field name="model">lgx.shipment</field>
+        <field name="arch" type="xml">
+            <list string="Shipment" decoration-muted="state == 'cancelled'"
+                  decoration-bf="is_master">
+                <field name="name"/>
+                <field name="job_id"/>
+                <field name="is_master"/>
+                <field name="transport_mode"/>
+                <field name="direction"/>
+                <field name="load_type"/>
+                <field name="master_doc_no"/>
+                <field name="house_doc_no"/>
+                <field name="pol_id"/>
+                <field name="pod_id"/>
+                <field name="etd"/>
+                <field name="eta"/>
+                <field name="chargeable_weight" optional="show"/>
+                <field name="container_count" optional="show"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_shipment_form" model="ir.ui.view">
+        <field name="name">lgx.shipment.form</field>
+        <field name="model">lgx.shipment</field>
+        <field name="arch" type="xml">
+            <form string="Shipment">
+                <header>
+                    <button name="action_book" type="object" string="Booking"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_depart" type="object" string="Berangkat"
+                            class="btn-primary" invisible="state != 'booked'"/>
+                    <button name="action_arrive" type="object" string="Tiba"
+                            class="btn-primary" invisible="state != 'in_transit'"/>
+                    <button name="action_complete" type="object" string="Selesai"
+                            invisible="state not in ('arrived','released')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,booked,in_transit,arrived,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group string="Job &amp; Konsolidasi">
+                            <field name="job_id"/>
+                            <field name="is_master"/>
+                            <field name="parent_shipment_id" invisible="is_master"/>
+                            <field name="house_count" invisible="not is_master"/>
+                            <field name="load_type"/>
+                            <field name="direction"/>
+                            <field name="transport_mode"/>
+                        </group>
+                        <group string="Dokumen Angkut">
+                            <field name="doc_label_master" invisible="1"/>
+                            <field name="doc_label_house" invisible="1"/>
+                            <label for="master_doc_no"/>
+                            <div class="o_row">
+                                <field name="master_doc_no" placeholder="Nomor master"/>
+                                <span class="text-muted ms-2"><field name="doc_label_master" readonly="1" nolabel="1"/></span>
+                            </div>
+                            <label for="house_doc_no"/>
+                            <div class="o_row">
+                                <field name="house_doc_no" placeholder="Nomor house"/>
+                                <span class="text-muted ms-2"><field name="doc_label_house" readonly="1" nolabel="1"/></span>
+                            </div>
+                            <field name="carrier_id"/>
+                            <field name="vessel_name" invisible="transport_mode == 'air'"/>
+                            <field name="voyage_no" invisible="transport_mode == 'air'"/>
+                            <field name="flight_no" invisible="transport_mode != 'air'"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Rute">
+                            <field name="place_of_receipt_id"/>
+                            <field name="pol_id"/>
+                            <field name="pod_id"/>
+                            <field name="place_of_delivery_id"/>
+                        </group>
+                        <group string="Jadwal">
+                            <field name="etd"/>
+                            <field name="eta"/>
+                            <field name="atd"/>
+                            <field name="ata"/>
+                        </group>
+                    </group>
+                    <group string="Muatan dan Berat yang Ditagih">
+                        <group>
+                            <field name="commodity_id"/>
+                            <field name="package_count"/>
+                            <field name="gross_weight_kg"/>
+                            <field name="volume_cbm"/>
+                        </group>
+                        <group>
+                            <field name="rate_card_id"/>
+                            <field name="chargeable_weight"/>
+                            <field name="chargeable_uom"/>
+                            <field name="chargeable_basis"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Kontainer">
+                            <field name="container_ids" context="{'default_shipment_id': id}">
+                                <list editable="bottom" decoration-danger="at_risk"
+                                      decoration-success="is_returned">
+                                    <field name="container_no"/>
+                                    <field name="seal_no"/>
+                                    <field name="container_type_id"/>
+                                    <field name="gross_weight"/>
+                                    <field name="vgm_weight" optional="show"/>
+                                    <field name="discharge_date"/>
+                                    <field name="free_days_demurrage"/>
+                                    <field name="demurrage_days" sum="Hari"/>
+                                    <field name="gate_out_date"/>
+                                    <field name="free_days_detention"/>
+                                    <field name="detention_days" sum="Hari"/>
+                                    <field name="gate_in_date"/>
+                                    <field name="is_returned"/>
+                                    <field name="at_risk" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Kemasan">
+                            <field name="package_ids">
+                                <list editable="bottom">
+                                    <field name="description"/>
+                                    <field name="package_type"/>
+                                    <field name="container_id"/>
+                                    <field name="quantity"/>
+                                    <field name="length_cm"/>
+                                    <field name="width_cm"/>
+                                    <field name="height_cm"/>
+                                    <field name="gross_weight_kg" sum="Berat"/>
+                                    <field name="volume_cbm" sum="CBM"/>
+                                    <field name="marks" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="House Shipment" invisible="not is_master">
+                            <div class="alert alert-info" role="alert">
+                                P&amp;L konsol = pendapatan SELURUH house dikurangi biaya pada master.
+                                Menjumlahkan margin per house akan menghitung biaya master sebanyak
+                                jumlah house-nya.
+                            </div>
+                            <field name="child_shipment_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="job_id"/>
+                                    <field name="house_doc_no"/>
+                                    <field name="gross_weight_kg" sum="Berat"/>
+                                    <field name="volume_cbm" sum="CBM"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="consol_revenue"/>
+                                <field name="consol_cost"/>
+                                <field name="consol_margin" class="oe_subtotal_footer_separator"/>
+                                <field name="fill_rate" widget="percentage"/>
+                                <field name="teu_total"/>
+                                <field name="currency_id" invisible="1"/>
+                            </group>
+                        </page>
+                        <page string="Barang">
+                            <group>
+                                <field name="goods_description" nolabel="1" placeholder="Uraian barang untuk B/L"/>
+                            </group>
+                            <group>
+                                <field name="marks_and_numbers" nolabel="1" placeholder="Marks &amp; numbers"/>
+                            </group>
+                            <group><field name="hs_code_note"/></group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_shipment_search" model="ir.ui.view">
+        <field name="name">lgx.shipment.search</field>
+        <field name="model">lgx.shipment</field>
+        <field name="arch" type="xml">
+            <search string="Shipment">
+                <field name="name"/>
+                <field name="master_doc_no"/>
+                <field name="house_doc_no"/>
+                <field name="job_id"/>
+                <field name="pol_id"/>
+                <field name="pod_id"/>
+                <filter name="f_master" string="Master (Konsol)" domain="[('is_master','=',True)]"/>
+                <filter name="f_transit" string="Dalam Perjalanan" domain="[('state','=','in_transit')]"/>
+                <filter name="f_open" string="Belum Selesai" domain="[('state','not in',('completed','cancelled'))]"/>
+                <separator/>
+                <filter name="g_mode" string="Moda" context="{'group_by':'transport_mode'}"/>
+                <filter name="g_direction" string="Arah" context="{'group_by':'direction'}"/>
+                <filter name="g_carrier" string="Carrier" context="{'group_by':'carrier_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by':'state'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_shipment" model="ir.actions.act_window">
+        <field name="name">Shipment</field>
+        <field name="res_model">lgx.shipment</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_f_open': 1}</field>
+    </record>
+</odoo>

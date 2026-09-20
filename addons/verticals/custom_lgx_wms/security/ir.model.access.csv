@@ -1,0 +1,17 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_wms_client_operator,lgx.wms.client/operator,model_lgx_wms_client,custom_lgx_base.group_lgx_wh_operator,1,0,0,0
+access_lgx_wms_client_supervisor,lgx.wms.client/supervisor,model_lgx_wms_client,custom_lgx_base.group_lgx_wh_supervisor,1,1,1,0
+access_lgx_wms_client_manager,lgx.wms.client/manager,model_lgx_wms_client,custom_lgx_base.group_lgx_wh_manager,1,1,1,1
+access_lgx_wms_client_finance,lgx.wms.client/finance,model_lgx_wms_client,custom_lgx_base.group_lgx_finance_billing,1,0,0,0
+access_lgx_wms_client_mgmt,lgx.wms.client/management,model_lgx_wms_client,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_wms_sla_operator,lgx.wms.sla/operator,model_lgx_wms_sla,custom_lgx_base.group_lgx_wh_operator,1,0,0,0
+access_lgx_wms_sla_manager,lgx.wms.sla/manager,model_lgx_wms_sla,custom_lgx_base.group_lgx_wh_manager,1,1,1,1
+access_lgx_wms_sla_meas_supervisor,lgx.wms.sla.measurement/supervisor,model_lgx_wms_sla_measurement,custom_lgx_base.group_lgx_wh_supervisor,1,1,1,0
+access_lgx_wms_sla_meas_manager,lgx.wms.sla.measurement/manager,model_lgx_wms_sla_measurement,custom_lgx_base.group_lgx_wh_manager,1,1,1,1
+access_lgx_wms_sla_meas_mgmt,lgx.wms.sla.measurement/management,model_lgx_wms_sla_measurement,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_wms_count_program_supervisor,lgx.wms.count.program/supervisor,model_lgx_wms_count_program,custom_lgx_base.group_lgx_wh_supervisor,1,1,1,0
+access_lgx_wms_count_program_manager,lgx.wms.count.program/manager,model_lgx_wms_count_program,custom_lgx_base.group_lgx_wh_manager,1,1,1,1
+access_lgx_wms_count_task_operator,lgx.wms.count.task/operator,model_lgx_wms_count_task,custom_lgx_base.group_lgx_wh_operator,1,1,1,0
+access_lgx_wms_count_task_supervisor,lgx.wms.count.task/supervisor,model_lgx_wms_count_task,custom_lgx_base.group_lgx_wh_supervisor,1,1,1,1
+access_lgx_wms_count_line_operator,lgx.wms.count.line/operator,model_lgx_wms_count_line,custom_lgx_base.group_lgx_wh_operator,1,1,1,1
+access_lgx_wms_count_line_supervisor,lgx.wms.count.line/supervisor,model_lgx_wms_count_line,custom_lgx_base.group_lgx_wh_supervisor,1,1,1,1

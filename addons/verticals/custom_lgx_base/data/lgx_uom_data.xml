@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Satuan tagih logistik, masing-masing sebagai AKAR pohon UoM sendiri.
+
+            Odoo 19 menghapus uom.category dan menggantinya dengan pohon
+            hierarkis (relative_uom_id / relative_factor). Satuan di bawah ini
+            sengaja tidak punya induk: pallet-hari tidak dapat dikonversi ke CBM
+            dan tidak boleh bisa. Menautkannya ke satu akar hanya untuk
+            "kerapian" akan membuat Odoo menawarkan konversi yang tidak punya
+            arti fisik, dan konversi itu akan dipakai orang.
+        -->
+        <record id="uom_container" model="uom.uom">
+            <field name="name">Kontainer</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">1.0</field>
+        </record>
+        <record id="uom_bl" model="uom.uom">
+            <field name="name">B/L</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">1.0</field>
+        </record>
+        <record id="uom_shipment" model="uom.uom">
+            <field name="name">Shipment</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">1.0</field>
+        </record>
+        <record id="uom_trip" model="uom.uom">
+            <field name="name">Trip</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">1.0</field>
+        </record>
+        <record id="uom_ritase" model="uom.uom">
+            <field name="name">Ritase</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">1.0</field>
+        </record>
+        <record id="uom_pallet" model="uom.uom">
+            <field name="name">Pallet</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">1.0</field>
+        </record>
+        <record id="uom_pallet_day" model="uom.uom">
+            <field name="name">Pallet-Hari</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">0.01</field>
+        </record>
+        <record id="uom_cbm_day" model="uom.uom">
+            <field name="name">CBM-Hari</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">0.001</field>
+        </record>
+        <record id="uom_kg_day" model="uom.uom">
+            <field name="name">Kg-Hari</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">0.01</field>
+        </record>
+        <record id="uom_sku_month" model="uom.uom">
+            <field name="name">SKU-Bulan</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">0.01</field>
+        </record>
+        <record id="uom_carton" model="uom.uom">
+            <field name="name">Karton</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">1.0</field>
+        </record>
+        <record id="uom_order_line" model="uom.uom">
+            <field name="name">Baris Order</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">1.0</field>
+        </record>
+        <record id="uom_manhour" model="uom.uom">
+            <field name="name">Jam-Orang</field>
+            <field name="relative_factor">1.0</field>
+            <field name="rounding">0.25</field>
+        </record>
+    </data>
+</odoo>

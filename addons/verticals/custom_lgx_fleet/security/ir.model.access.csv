@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_vehicle_category_staff,lgx.vehicle.category/staff,model_lgx_vehicle_category,custom_lgx_base.group_lgx_staff,1,0,0,0
+access_lgx_vehicle_category_dispatcher,lgx.vehicle.category/dispatcher,model_lgx_vehicle_category,custom_lgx_base.group_lgx_trucking_dispatcher,1,0,0,0
+access_lgx_vehicle_category_manager,lgx.vehicle.category/manager,model_lgx_vehicle_category,custom_lgx_base.group_lgx_trucking_manager,1,1,1,1
+access_lgx_vehicle_category_system,lgx.vehicle.category/system,model_lgx_vehicle_category,base.group_system,1,1,1,1

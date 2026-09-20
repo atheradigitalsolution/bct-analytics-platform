@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Simpul yang cukup untuk mendemokan ketiga segmen. Daftar UN/LOCODE
+             penuh (~150 Indonesia + ~300 dunia) masuk lewat jalur master data. -->
+
+        <!-- Pelabuhan laut Indonesia -->
+        <record id="loc_idjkt" model="lgx.location">
+            <field name="code">IDJKT</field><field name="name">Tanjung Priok, Jakarta</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.id"/>
+            <field name="city">Jakarta Utara</field>
+            <field name="customs_office_id" ref="office_040300"/>
+            <field name="latitude">-6.104</field><field name="longitude">106.880</field>
+        </record>
+        <record id="loc_idsub" model="lgx.location">
+            <field name="code">IDSUB</field><field name="name">Tanjung Perak, Surabaya</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.id"/>
+            <field name="city">Surabaya</field><field name="customs_office_id" ref="office_050100"/>
+            <field name="latitude">-7.203</field><field name="longitude">112.733</field>
+        </record>
+        <record id="loc_idmes" model="lgx.location">
+            <field name="code">IDBLW</field><field name="name">Belawan, Medan</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.id"/>
+            <field name="city">Medan</field><field name="customs_office_id" ref="office_020100"/>
+        </record>
+        <record id="loc_idsmg" model="lgx.location">
+            <field name="code">IDSRG</field><field name="name">Tanjung Emas, Semarang</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.id"/>
+            <field name="city">Semarang</field><field name="customs_office_id" ref="office_051200"/>
+        </record>
+        <record id="loc_idupg" model="lgx.location">
+            <field name="code">IDUPG</field><field name="name">Soekarno-Hatta, Makassar</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.id"/>
+            <field name="city">Makassar</field><field name="customs_office_id" ref="office_060100"/>
+        </record>
+        <record id="loc_idbtm" model="lgx.location">
+            <field name="code">IDBTM</field><field name="name">Batu Ampar, Batam</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.id"/>
+            <field name="city">Batam</field><field name="customs_office_id" ref="office_010100"/>
+        </record>
+
+        <!-- Bandara -->
+        <record id="loc_idcgk" model="lgx.location">
+            <field name="code">IDCGK</field><field name="name">Soekarno-Hatta (CGK), Tangerang</field>
+            <field name="location_type">airport</field><field name="country_id" ref="base.id"/>
+            <field name="city">Tangerang</field><field name="customs_office_id" ref="office_040100"/>
+        </record>
+        <record id="loc_idsub_air" model="lgx.location">
+            <field name="code">IDSUB-A</field><field name="name">Juanda (SUB), Surabaya</field>
+            <field name="location_type">airport</field><field name="country_id" ref="base.id"/>
+            <field name="city">Sidoarjo</field>
+        </record>
+
+        <!-- Depo dan CFS -->
+        <record id="loc_depo_cakung" model="lgx.location">
+            <field name="code">IDJKT-D1</field><field name="name">Depo Kontainer Cakung</field>
+            <field name="location_type">depot</field><field name="country_id" ref="base.id"/>
+            <field name="city">Jakarta Timur</field>
+        </record>
+        <record id="loc_cfs_marunda" model="lgx.location">
+            <field name="code">IDJKT-C1</field><field name="name">CFS Marunda</field>
+            <field name="location_type">cfs</field><field name="country_id" ref="base.id"/>
+            <field name="city">Jakarta Utara</field>
+        </record>
+
+        <!-- Kota / titik darat untuk trucking -->
+        <record id="loc_bandung" model="lgx.location">
+            <field name="code">IDBDO</field><field name="name">Bandung</field>
+            <field name="location_type">city</field><field name="country_id" ref="base.id"/>
+            <field name="city">Bandung</field>
+        </record>
+        <record id="loc_cikarang" model="lgx.location">
+            <field name="code">IDCKR</field><field name="name">Cikarang</field>
+            <field name="location_type">city</field><field name="country_id" ref="base.id"/>
+            <field name="city">Bekasi</field>
+        </record>
+        <record id="loc_semarang_city" model="lgx.location">
+            <field name="code">IDSMG</field><field name="name">Semarang (kota)</field>
+            <field name="location_type">city</field><field name="country_id" ref="base.id"/>
+            <field name="city">Semarang</field>
+        </record>
+        <record id="loc_gudang_cibitung" model="lgx.location">
+            <field name="code">IDCBT-W1</field><field name="name">Gudang Cibitung</field>
+            <field name="location_type">warehouse</field><field name="country_id" ref="base.id"/>
+            <field name="city">Bekasi</field>
+        </record>
+
+        <!-- Pelabuhan luar negeri yang paling sering jadi lawan rute -->
+        <record id="loc_sgsin" model="lgx.location">
+            <field name="code">SGSIN</field><field name="name">Singapore</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.sg"/>
+        </record>
+        <record id="loc_cnsha" model="lgx.location">
+            <field name="code">CNSHA</field><field name="name">Shanghai</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.cn"/>
+        </record>
+        <record id="loc_cnnbo" model="lgx.location">
+            <field name="code">CNNGB</field><field name="name">Ningbo</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.cn"/>
+        </record>
+        <record id="loc_myport" model="lgx.location">
+            <field name="code">MYPKG</field><field name="name">Port Klang</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.my"/>
+        </record>
+        <record id="loc_nlrtm" model="lgx.location">
+            <field name="code">NLRTM</field><field name="name">Rotterdam</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.nl"/>
+        </record>
+        <record id="loc_uslax" model="lgx.location">
+            <field name="code">USLAX</field><field name="name">Los Angeles</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.us"/>
+        </record>
+        <record id="loc_jptyo" model="lgx.location">
+            <field name="code">JPTYO</field><field name="name">Tokyo</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.jp"/>
+        </record>
+        <record id="loc_hkhkg" model="lgx.location">
+            <field name="code">HKHKG</field><field name="name">Hong Kong</field>
+            <field name="location_type">seaport</field><field name="country_id" ref="base.hk"/>
+        </record>
+    </data>
+</odoo>

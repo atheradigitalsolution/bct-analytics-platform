@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_driver_training_dispatcher,lgx.driver.training/dispatcher,model_lgx_driver_training,custom_lgx_base.group_lgx_trucking_dispatcher,1,1,1,0
+access_lgx_driver_training_manager,lgx.driver.training/manager,model_lgx_driver_training,custom_lgx_base.group_lgx_trucking_manager,1,1,1,1
+access_lgx_driver_training_self,lgx.driver.training/driver,model_lgx_driver_training,custom_lgx_base.group_lgx_driver,1,0,0,0
+access_lgx_duty_log_dispatcher,lgx.driver.duty.log/dispatcher,model_lgx_driver_duty_log,custom_lgx_base.group_lgx_trucking_dispatcher,1,1,1,0
+access_lgx_duty_log_manager,lgx.driver.duty.log/manager,model_lgx_driver_duty_log,custom_lgx_base.group_lgx_trucking_manager,1,1,1,1
+access_lgx_duty_log_self,lgx.driver.duty.log/driver,model_lgx_driver_duty_log,custom_lgx_base.group_lgx_driver,1,0,0,0
+access_lgx_duty_log_mgmt,lgx.driver.duty.log/management,model_lgx_driver_duty_log,custom_lgx_base.group_lgx_management_viewer,1,0,0,0

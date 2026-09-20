@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Master logistik dibagi per perusahaan, bukan per cabang.
+
+            Pelabuhan, tipe kontainer dan kode charge adalah pengetahuan yang
+            dipakai seluruh cabang; memisahkannya per operating unit hanya akan
+            memaksa setiap cabang mengetik ulang daftar yang sama, lalu berbeda
+            diam-diam. Pemisahan per cabang berlaku pada DOKUMEN (job, trip,
+            deklarasi), bukan pada master — lihat record rule di modul masing-masing.
+        -->
+        <record id="rule_lgx_integration_message_company" model="ir.rule">
+            <field name="name">Pesan integrasi: per perusahaan</field>
+            <field name="model_id" ref="model_lgx_integration_message"/>
+            <field name="domain_force">['|',('company_id','=',False),('company_id','in',company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+    </data>
+</odoo>

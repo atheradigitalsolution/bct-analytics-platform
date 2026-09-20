@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_lgx" model="ir.ui.view">
+        <field name="name">res.config.settings.form.lgx</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Logistik" name="custom_lgx_billing" logo="/base/static/img/icon.png">
+                    <block title="Peta Akun Logistik"
+                           help="Empat akun ini menentukan apakah margin per job, dasar PPh 23, dan laporan laba rugi benar. Tanpa keempatnya, posting job akan ditolak.">
+                        <setting string="Kliring Talangan"
+                                 help="Akun NERACA. Talangan masuk dan keluar lewat sini sehingga dampaknya ke laba rugi nol.">
+                            <field name="lgx_disbursement_account_id"/>
+                        </setting>
+                        <setting string="Akrual Biaya Belum Ditagih"
+                                 help="Estimasi biaya yang tagihan vendornya belum datang. Dibalik oleh tagihannya, bukan oleh pembalikan otomatis awal periode.">
+                            <field name="lgx_accrual_account_id"/>
+                        </setting>
+                        <setting string="Provisi Job Tertutup"
+                                 help="Sisa akrual pada job yang ditutup finansial. Tagihan yang datang kemudian membebani provisi, bukan laba rugi periode berjalan.">
+                            <field name="lgx_provision_account_id"/>
+                        </setting>
+                        <setting string="Varians Biaya Job"
+                                 help="Selisih estimasi versus tagihan sesungguhnya, berdiri sendiri supaya bisa ditanyakan.">
+                            <field name="lgx_variance_account_id"/>
+                        </setting>
+                        <setting string="Jurnal Akrual &amp; Provisi">
+                            <field name="lgx_accrual_journal_id"/>
+                        </setting>
+                    </block>
+                    <block title="Ambang Operasional">
+                        <setting string="Umur Provisi Dilaporkan"
+                                 help="Provisi yang lebih tua dari ini muncul sebagai aktivitas pada penanggung jawab job.">
+                            <field name="lgx_provision_age_days"/> hari
+                        </setting>
+                        <setting string="Ambang Margin Penawaran"
+                                 help="Penawaran di bawah ambang ini tidak dapat dikirim tanpa persetujuan manajer, dengan alasan tercatat.">
+                            <field name="lgx_min_margin_pct"/> %
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

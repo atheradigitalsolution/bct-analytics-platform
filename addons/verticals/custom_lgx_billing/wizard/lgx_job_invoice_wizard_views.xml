@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_job_invoice_wizard_form" model="ir.ui.view">
+        <field name="name">lgx.job.invoice.wizard.form</field>
+        <field name="model">lgx.job.invoice.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Buat Faktur dari Job">
+                <group>
+                    <field name="job_id"/>
+                    <field name="currency_id" invisible="1"/>
+                </group>
+                <div class="alert alert-danger" role="alert" invisible="missing_proof_count == 0">
+                    <field name="missing_proof_count" nolabel="1" class="oe_inline"/>
+                    baris talangan belum punya bukti pihak ketiga. Faktur akan ditolak sampai
+                    buktinya dilampirkan — itulah dasar pengecualiannya dari jumlah bruto PPh 23.
+                </div>
+                <field name="charge_ids" widget="many2many">
+                    <list>
+                        <field name="charge_code_id"/>
+                        <field name="name"/>
+                        <field name="nature"/>
+                        <field name="quantity"/>
+                        <field name="amount_effective" sum="Total"/>
+                        <field name="currency_id" column_invisible="True"/>
+                    </list>
+                </field>
+                <group class="oe_subtotal_footer">
+                    <field name="disbursement_total"/>
+                    <field name="amount_total"/>
+                </group>
+                <footer>
+                    <button name="action_create_invoice" type="object" string="Buat Faktur"
+                            class="btn-primary"/>
+                    <button string="Batal" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

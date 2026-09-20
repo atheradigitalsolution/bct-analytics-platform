@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_job_charge_list" model="ir.ui.view">
+        <field name="name">lgx.job.charge.list</field>
+        <field name="model">lgx.job.charge</field>
+        <field name="arch" type="xml">
+            <list string="Baris Charge">
+                <field name="job_id"/>
+                <field name="kind"/>
+                <field name="charge_code_id"/>
+                <field name="nature"/>
+                <field name="partner_id"/>
+                <field name="amount_estimated" sum="Estimasi"/>
+                <field name="amount_actual" sum="Aktual"/>
+                <field name="amount_variance" sum="Varians"/>
+                <field name="is_actual_known"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_job_charge_form" model="ir.ui.view">
+        <field name="name">lgx.job.charge.form</field>
+        <field name="model">lgx.job.charge</field>
+        <field name="arch" type="xml">
+            <form string="Baris Charge">
+                <sheet>
+                    <group>
+                        <group string="Identitas">
+                            <field name="job_id"/>
+                            <field name="charge_code_id"/>
+                            <field name="name"/>
+                            <field name="kind"/>
+                            <field name="nature"/>
+                            <field name="is_freight_charge"/>
+                            <field name="partner_id"/>
+                            <field name="state"/>
+                        </group>
+                        <group string="Nilai">
+                            <field name="quantity"/>
+                            <field name="uom_id"/>
+                            <field name="unit_price"/>
+                            <field name="currency_id"/>
+                            <field name="amount_estimated"/>
+                            <field name="is_actual_known"/>
+                            <field name="amount_actual"/>
+                            <field name="amount_variance"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="nature != 'disbursement' or third_party_proof_ids">
+                        Baris talangan ini belum punya bukti pihak ketiga. Tanpa faktur tagihan
+                        atau bukti pembayaran dari pihak ketiga, baris ini <b>tidak dapat
+                        difakturkan</b> dan pengecualiannya dari dasar PPh 23 tidak dapat
+                        dipertahankan saat pemeriksaan.
+                    </div>
+                    <group>
+                        <group string="Pajak">
+                            <field name="tax_ids" widget="many2many_tags"/>
+                            <field name="wht_type"/>
+                            <field name="wht_override_reason"
+                                   invisible="wht_type == charge_code_id.default_wht_type"/>
+                        </group>
+                        <group string="Kurs">
+                            <field name="fx_rate_book"/>
+                            <field name="fx_rate_tax"/>
+                            <field name="fx_rate_date"/>
+                            <field name="fx_rate_source"/>
+                        </group>
+                    </group>
+                    <group string="Bukti Pihak Ketiga" invisible="nature != 'disbursement'">
+                        <field name="third_party_proof_ids" widget="many2many_binary" nolabel="1"/>
+                    </group>
+                    <group string="Jejak Akuntansi">
+                        <field name="invoice_line_id" readonly="1"/>
+                        <field name="bill_line_id" readonly="1"/>
+                        <field name="note"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_job_charge_search" model="ir.ui.view">
+        <field name="name">lgx.job.charge.search</field>
+        <field name="model">lgx.job.charge</field>
+        <field name="arch" type="xml">
+            <search string="Baris Charge">
+                <field name="job_id"/>
+                <field name="charge_code_id"/>
+                <field name="partner_id"/>
+                <filter name="f_open_accrual" string="Akrual Terbuka"
+                        domain="[('kind','=','cost'),('is_actual_known','=',False),('state','in',('confirmed','estimated'))]"/>
+                <filter name="f_disb_no_proof" string="Talangan Tanpa Bukti"
+                        domain="[('nature','=','disbursement'),('third_party_proof_ids','=',False)]"/>
+                <filter name="f_variance" string="Ada Varians" domain="[('amount_variance','!=',0)]"/>
+                <separator/>
+                <filter name="g_job" string="Job" context="{'group_by':'job_id'}"/>
+                <filter name="g_code" string="Kode Charge" context="{'group_by':'charge_code_id'}"/>
+                <filter name="g_nature" string="Sifat" context="{'group_by':'nature'}"/>
+                <filter name="g_partner" string="Vendor" context="{'group_by':'partner_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_job_charge" model="ir.actions.act_window">
+        <field name="name">Baris Charge</field>
+        <field name="res_model">lgx.job.charge</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_lgx_charge_accrual_open" model="ir.actions.act_window">
+        <field name="name">Akrual Biaya Belum Ditagih</field>
+        <field name="res_model">lgx.job.charge</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('kind','=','cost'),('is_actual_known','=',False),('state','in',('confirmed','provisioned'))]</field>
+        <field name="context">{'search_default_g_partner': 1}</field>
+    </record>
+    <record id="action_lgx_disbursement_no_proof" model="ir.actions.act_window">
+        <field name="name">Talangan Tanpa Bukti Pihak Ketiga</field>
+        <field name="res_model">lgx.job.charge</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('nature','=','disbursement'),('third_party_proof_ids','=',False),('state','!=','cancelled')]</field>
+    </record>
+</odoo>

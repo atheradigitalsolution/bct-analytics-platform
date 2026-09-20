@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_container_type_list" model="ir.ui.view">
+        <field name="name">lgx.container.type.list</field>
+        <field name="model">lgx.container.type</field>
+        <field name="arch" type="xml">
+            <list string="Tipe Kontainer" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="size_ft"/>
+                <field name="teu"/>
+                <field name="max_payload_kg"/>
+                <field name="tare_weight_kg"/>
+                <field name="internal_volume_cbm"/>
+                <field name="is_reefer"/>
+                <field name="is_high_cube"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_container_type" model="ir.actions.act_window">
+        <field name="name">Tipe Kontainer</field>
+        <field name="res_model">lgx.container.type</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_lgx_commodity_list" model="ir.ui.view">
+        <field name="name">lgx.commodity.list</field>
+        <field name="model">lgx.commodity</field>
+        <field name="arch" type="xml">
+            <list string="Komoditas">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="parent_id"/>
+                <field name="is_dangerous"/>
+                <field name="imdg_class"/>
+                <field name="requires_temperature_control"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_commodity_form" model="ir.ui.view">
+        <field name="name">lgx.commodity.form</field>
+        <field name="model">lgx.commodity</field>
+        <field name="arch" type="xml">
+            <form string="Komoditas">
+                <sheet>
+                    <div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="parent_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Penanganan Khusus">
+                            <field name="is_dangerous"/>
+                            <field name="imdg_class" invisible="not is_dangerous"/>
+                            <field name="un_number" invisible="not is_dangerous"/>
+                            <field name="requires_temperature_control"/>
+                            <field name="temperature_min_c" invisible="not requires_temperature_control"/>
+                            <field name="temperature_max_c" invisible="not requires_temperature_control"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_commodity" model="ir.actions.act_window">
+        <field name="name">Komoditas</field>
+        <field name="res_model">lgx.commodity</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_lgx_document_type_list" model="ir.ui.view">
+        <field name="name">lgx.document.type.list</field>
+        <field name="model">lgx.document.type</field>
+        <field name="arch" type="xml">
+            <list string="Jenis Dokumen" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="category"/>
+                <field name="requires_stamp_duty"/>
+                <field name="is_customer_visible"/>
+                <field name="has_expiry"/>
+                <field name="default_warning_days"/>
+                <field name="blocks_milestone_code" optional="show"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_document_type" model="ir.actions.act_window">
+        <field name="name">Jenis Dokumen</field>
+        <field name="res_model">lgx.document.type</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Default bea meterai mengikuti UU 10/2020 Pasal 7: konosemen, surat angkutan
+                barang, surat penyimpanan barang, serta bukti pengiriman dan penerimaan barang
+                DIKECUALIKAN. Ubah per jenis dokumen di sini, jangan di kode.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_lgx_milestone_type_list" model="ir.ui.view">
+        <field name="name">lgx.milestone.type.list</field>
+        <field name="model">lgx.milestone.type</field>
+        <field name="arch" type="xml">
+            <list string="Jenis Milestone" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="segment"/>
+                <field name="is_customer_visible"/>
+                <field name="is_exception"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_milestone_type" model="ir.actions.act_window">
+        <field name="name">Jenis Milestone</field>
+        <field name="res_model">lgx.milestone.type</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_lgx_milestone_template_list" model="ir.ui.view">
+        <field name="name">lgx.milestone.template.list</field>
+        <field name="model">lgx.milestone.template</field>
+        <field name="arch" type="xml">
+            <list string="Template Milestone" editable="bottom">
+                <field name="job_type"/>
+                <field name="transport_mode"/>
+                <field name="sequence"/>
+                <field name="milestone_type_id"/>
+                <field name="offset_days"/>
+                <field name="is_mandatory"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_milestone_template" model="ir.actions.act_window">
+        <field name="name">Template Milestone</field>
+        <field name="res_model">lgx.milestone.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_job_type': 1}</field>
+    </record>
+</odoo>

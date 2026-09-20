@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_customs_declaration_form_ceisa" model="ir.ui.view">
+        <field name="name">lgx.customs.declaration.form.ceisa</field>
+        <field name="model">lgx.customs.declaration</field>
+        <field name="inherit_id" ref="custom_lgx_customs.view_lgx_customs_declaration_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_send_ceisa" type="object" string="Kirim ke CEISA 4.0"
+                        class="btn-primary"
+                        invisible="state == 'draft' or submission_mode != 'ceisa'"/>
+                <button name="action_pull_ceisa_status" type="object" string="Tarik Status"
+                        invisible="not aju_number or submission_mode != 'ceisa'"/>
+            </xpath>
+            <field name="submission_mode" position="after">
+                <field name="ceisa_last_state" readonly="1"
+                       invisible="submission_mode != 'ceisa'"/>
+            </field>
+            <xpath expr="//notebook" position="inside">
+                <page string="Pesan CEISA" name="ceisa_messages"
+                      invisible="ceisa_message_count == 0">
+                    <div class="alert alert-info" role="alert">
+                        Setiap pengiriman meninggalkan payload mentah dan responsnya. Saat Bea
+                        Cukai menolak sebuah PIB tiga minggu kemudian, yang dibutuhkan adalah
+                        byte yang benar-benar dikirim — bukan rekonstruksi dari record yang
+                        sejak itu sudah berubah.
+                    </div>
+                    <field name="ceisa_message_ids" readonly="1">
+                        <list decoration-danger="state == 'failed'"
+                              decoration-info="state == 'pending'">
+                            <field name="create_date"/>
+                            <field name="direction"/>
+                            <field name="endpoint"/>
+                            <field name="http_status"/>
+                            <field name="attempt_count"/>
+                            <field name="next_retry_at"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

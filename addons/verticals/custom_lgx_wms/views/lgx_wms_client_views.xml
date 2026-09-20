@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_wms_client_list" model="ir.ui.view">
+        <field name="name">lgx.wms.client.list</field>
+        <field name="model">lgx.wms.client</field>
+        <field name="arch" type="xml">
+            <list string="Pemilik Barang">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="owner_partner_id"/>
+                <field name="warehouse_id"/>
+                <field name="job_id"/>
+                <field name="sla_id"/>
+                <field name="free_days_storage"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_wms_client_form" model="ir.ui.view">
+        <field name="name">lgx.wms.client.form</field>
+        <field name="model">lgx.wms.client</field>
+        <field name="arch" type="xml">
+            <form string="Pemilik Barang">
+                <header>
+                    <button name="action_activate" type="object" string="Aktifkan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
+                    <div class="alert alert-info" role="alert">
+                        Barang di kategori ini <b>bukan aset perusahaan</b>. Kategori produknya
+                        harus non-valuasi — <code>owner_id</code> saja tidak mengecualikan quant
+                        dari valuasi, dan barang klien yang ikut dinilai baru ketahuan saat tutup
+                        buku pertama.
+                    </div>
+                    <group>
+                        <group string="Identitas">
+                            <field name="code"/>
+                            <field name="partner_id"/>
+                            <field name="owner_partner_id"/>
+                            <field name="contract_id"/>
+                            <field name="job_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Gudang &amp; Segregasi">
+                            <field name="warehouse_id"/>
+                            <field name="product_category_id"/>
+                            <field name="location_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Komersial">
+                            <field name="sla_id"/>
+                            <field name="free_days_storage"/>
+                            <field name="minimum_monthly_charge"/>
+                            <field name="currency_id"/>
+                        </group>
+                        <group string="Portal Klien">
+                            <field name="portal_user_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <group><field name="note"/></group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_wms_client" model="ir.actions.act_window">
+        <field name="name">Pemilik Barang</field>
+        <field name="res_model">lgx.wms.client</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_lgx_wms_sla_list" model="ir.ui.view">
+        <field name="name">lgx.wms.sla.list</field>
+        <field name="model">lgx.wms.sla</field>
+        <field name="arch" type="xml">
+            <list string="SLA" editable="bottom">
+                <field name="name"/>
+                <field name="receiving_hours"/>
+                <field name="putaway_hours"/>
+                <field name="order_cutoff_time"/>
+                <field name="dispatch_same_day"/>
+                <field name="inventory_accuracy_target"/>
+                <field name="order_accuracy_target"/>
+                <field name="on_time_delivery_target"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_wms_sla" model="ir.actions.act_window">
+        <field name="name">SLA Gudang</field>
+        <field name="res_model">lgx.wms.sla</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="view_lgx_wms_sla_measurement_list" model="ir.ui.view">
+        <field name="name">lgx.wms.sla.measurement.list</field>
+        <field name="model">lgx.wms.sla.measurement</field>
+        <field name="arch" type="xml">
+            <list string="Pencapaian SLA" editable="bottom" decoration-danger="breach_count > 0">
+                <field name="date"/>
+                <field name="client_id"/>
+                <field name="sla_id"/>
+                <field name="receiving_ontime_pct"/>
+                <field name="dispatch_ontime_pct"/>
+                <field name="inventory_accuracy_pct"/>
+                <field name="order_accuracy_pct"/>
+                <field name="breach_count"/>
+                <field name="breach_summary"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_wms_sla_measurement" model="ir.actions.act_window">
+        <field name="name">Pencapaian SLA</field>
+        <field name="res_model">lgx.wms.sla.measurement</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

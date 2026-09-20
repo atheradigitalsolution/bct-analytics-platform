@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_charge_code_list" model="ir.ui.view">
+        <field name="name">lgx.charge.code.list</field>
+        <field name="model">lgx.charge.code</field>
+        <field name="arch" type="xml">
+            <list string="Kode Charge">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="category"/>
+                <field name="default_nature"/>
+                <field name="is_freight_charge"/>
+                <field name="vat_treatment"/>
+                <field name="default_wht_type"/>
+                <field name="applies_to" optional="show"/>
+                <field name="product_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_charge_code_form" model="ir.ui.view">
+        <field name="name">lgx.charge.code.form</field>
+        <field name="model">lgx.charge.code</field>
+        <field name="arch" type="xml">
+            <form string="Kode Charge">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identitas">
+                            <field name="code"/>
+                            <field name="category"/>
+                            <field name="applies_to"/>
+                            <field name="product_id"/>
+                            <field name="uom_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Perlakuan Pajak">
+                            <field name="default_nature"/>
+                            <field name="is_freight_charge"/>
+                            <field name="vat_treatment"/>
+                            <field name="default_wht_type"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert"
+                         invisible="default_nature != 'disbursement'">
+                        Baris dengan sifat <b>talangan pihak ketiga</b> dikeluarkan dari dasar
+                        pemotongan PPh 23, dan karena itu tidak dapat difakturkan tanpa lampiran
+                        bukti dari pihak ketiga (PMK 141/2015).
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="not is_freight_charge">
+                        Kode ini dihitung sebagai <b>freight charge</b>. Adanya minimal satu baris
+                        seperti ini di dalam tagihan adalah syarat penerapan PPN besaran tertentu
+                        untuk jasa pengurusan transportasi.
+                    </div>
+                    <group>
+                        <group string="Akun (opsional, menimpa produk)">
+                            <field name="revenue_account_id"/>
+                            <field name="expense_account_id"/>
+                        </group>
+                        <group string="Pajak Default">
+                            <field name="sale_tax_ids" widget="many2many_tags"/>
+                            <field name="purchase_tax_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <group string="Catatan">
+                        <field name="note" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_charge_code_search" model="ir.ui.view">
+        <field name="name">lgx.charge.code.search</field>
+        <field name="model">lgx.charge.code</field>
+        <field name="arch" type="xml">
+            <search string="Kode Charge">
+                <field name="code"/>
+                <field name="name"/>
+                <filter name="f_freight" string="Freight Charge" domain="[('is_freight_charge','=',True)]"/>
+                <filter name="f_disb" string="Talangan" domain="[('default_nature','=','disbursement')]"/>
+                <filter name="f_service" string="Jasa Sendiri" domain="[('default_nature','=','service')]"/>
+                <separator/>
+                    <filter name="g_cat" string="Kategori" context="{'group_by':'category'}"/>
+                    <filter name="g_vat" string="Perlakuan PPN" context="{'group_by':'vat_treatment'}"/>
+                    <filter name="g_nature" string="Sifat" context="{'group_by':'default_nature'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_charge_code" model="ir.actions.act_window">
+        <field name="name">Kode Charge</field>
+        <field name="res_model">lgx.charge.code</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_g_cat': 1}</field>
+    </record>
+</odoo>

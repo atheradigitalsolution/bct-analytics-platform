@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_job_invoice_wizard,lgx.job.invoice.wizard/billing,model_lgx_job_invoice_wizard,custom_lgx_base.group_lgx_finance_billing,1,1,1,1
+access_lgx_job_invoice_wizard_sales,lgx.job.invoice.wizard/sales,model_lgx_job_invoice_wizard,custom_lgx_base.group_lgx_sales_manager,1,1,1,1

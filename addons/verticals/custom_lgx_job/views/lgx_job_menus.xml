@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_job" name="Job" parent="custom_lgx_base.menu_lgx_commercial"
+              action="action_lgx_job" sequence="10"/>
+    <menuitem id="menu_lgx_job_charge" name="Baris Charge" parent="custom_lgx_base.menu_lgx_finance"
+              action="action_lgx_job_charge" sequence="10"/>
+    <menuitem id="menu_lgx_accrual_open" name="Akrual Belum Ditagih" parent="custom_lgx_base.menu_lgx_finance"
+              action="action_lgx_charge_accrual_open" sequence="20"/>
+    <menuitem id="menu_lgx_disb_no_proof" name="Talangan Tanpa Bukti" parent="custom_lgx_base.menu_lgx_finance"
+              action="action_lgx_disbursement_no_proof" sequence="30"/>
+    <menuitem id="menu_lgx_milestone" name="Milestone" parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_milestone" sequence="90"/>
+</odoo>

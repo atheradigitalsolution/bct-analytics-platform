@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Masa berlaku kunci perangkat lapangan.
+
+            90 hari, bukan selamanya. Perangkat lapangan hilang, dijual, atau
+            dipakai orang lain setelah pengemudi berhenti; kunci yang tidak
+            pernah mati akan hidup lebih lama daripada hubungan kerjanya.
+            Pencabutan per perangkat tetap tersedia kapan saja — ini hanya batas
+            atas untuk perangkat yang tidak ada yang ingat mencabutnya.
+        -->
+        <record id="param_device_key_days" model="ir.config_parameter">
+            <field name="key">lgx.device_key_days</field>
+            <field name="value">90</field>
+        </record>
+    </data>
+</odoo>

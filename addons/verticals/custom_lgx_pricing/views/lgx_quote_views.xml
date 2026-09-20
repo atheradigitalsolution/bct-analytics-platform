@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_quote_list" model="ir.ui.view">
+        <field name="name">lgx.quote.list</field>
+        <field name="model">lgx.quote</field>
+        <field name="arch" type="xml">
+            <list string="Penawaran" decoration-muted="state in ('rejected','expired')"
+                  decoration-success="state == 'accepted'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="customer_id"/>
+                <field name="job_type"/>
+                <field name="origin_id"/>
+                <field name="destination_id"/>
+                <field name="revenue_total" sum="Total Jual"/>
+                <field name="cost_total" sum="Total Beli"/>
+                <field name="margin" sum="Margin"/>
+                <field name="margin_pct" widget="percentage"/>
+                <field name="has_manual_price" optional="show"/>
+                <field name="validity_date"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_quote_form" model="ir.ui.view">
+        <field name="name">lgx.quote.form</field>
+        <field name="model">lgx.quote</field>
+        <field name="arch" type="xml">
+            <form string="Penawaran">
+                <header>
+                    <button name="action_load_rates" type="object" string="Ambil dari Rate Card"
+                            invisible="state != 'draft'"/>
+                    <button name="action_approve_margin" type="object" string="Setujui Margin"
+                            invisible="state != 'draft' or approval_user_id"
+                            groups="custom_lgx_base.group_lgx_sales_manager"/>
+                    <button name="action_send" type="object" string="Kirim"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_accept" type="object" string="Diterima"
+                            class="btn-primary" invisible="state != 'sent'"/>
+                    <button name="action_reject" type="object" string="Ditolak"
+                            invisible="state != 'sent'"/>
+                    <button name="action_create_job" type="object" string="Buat Job"
+                            class="btn-primary" invisible="state != 'accepted' or job_id"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,sent,accepted"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_price_history" type="object" class="oe_stat_button"
+                                icon="fa-history">
+                            <div class="o_stat_info"><span class="o_stat_text">Riwayat Harga</span></div>
+                        </button>
+                    </div>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="alert alert-warning" role="alert" invisible="not has_manual_price">
+                        Penawaran ini memuat baris berharga manual — tidak ada rate card yang cocok
+                        saat dibuat. Harganya tidak dapat direkonstruksi dari tarif mana pun.
+                    </div>
+                    <div class="alert alert-success" role="alert" invisible="not approval_user_id">
+                        Margin di bawah ambang telah disetujui oleh
+                        <field name="approval_user_id" readonly="1" nolabel="1" class="oe_inline"/>:
+                        <field name="approval_reason" readonly="1" nolabel="1" class="oe_inline"/>
+                    </div>
+                    <group>
+                        <group string="Pelanggan">
+                            <field name="customer_id"/>
+                            <field name="salesperson_id"/>
+                            <field name="contract_id"/>
+                            <field name="operating_unit_id"/>
+                            <field name="date"/>
+                            <field name="validity_date"/>
+                        </group>
+                        <group string="Lingkup">
+                            <field name="job_type"/>
+                            <field name="transport_mode"/>
+                            <field name="load_type"/>
+                            <field name="origin_id"/>
+                            <field name="destination_id"/>
+                            <field name="incoterm_id"/>
+                            <field name="commodity_id"/>
+                            <field name="currency_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Baris">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="charge_code_id"/>
+                                    <field name="name"/>
+                                    <field name="basis"/>
+                                    <field name="container_type_id" optional="hide"/>
+                                    <field name="quantity"/>
+                                    <field name="uom_id" optional="hide"/>
+                                    <field name="buy_price"/>
+                                    <field name="sell_price"/>
+                                    <field name="buy_amount" sum="Beli"/>
+                                    <field name="sell_amount" sum="Jual"/>
+                                    <field name="margin" sum="Margin"/>
+                                    <field name="margin_pct" widget="percentage"/>
+                                    <field name="vendor_id" optional="hide"/>
+                                    <field name="manual_price"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="cost_total"/>
+                                <field name="revenue_total"/>
+                                <field name="margin" class="oe_subtotal_footer_separator"/>
+                                <field name="margin_pct" widget="percentage"/>
+                            </group>
+                        </page>
+                        <page string="Tarif yang Dipakai">
+                            <div class="alert alert-info" role="alert">
+                                Versi rate card yang dipakai disimpan, sehingga penawaran lama tetap
+                                dapat direkonstruksi setelah tarif carrier naik.
+                            </div>
+                            <group>
+                                <field name="sell_rate_card_id"/>
+                                <field name="buy_rate_card_id"/>
+                            </group>
+                        </page>
+                        <page string="Catatan"><field name="note" nolabel="1"/></page>
+                    </notebook>
+                    <group invisible="not job_id">
+                        <field name="job_id" readonly="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_quote_search" model="ir.ui.view">
+        <field name="name">lgx.quote.search</field>
+        <field name="model">lgx.quote</field>
+        <field name="arch" type="xml">
+            <search string="Penawaran">
+                <field name="name"/>
+                <field name="customer_id"/>
+                <field name="origin_id"/>
+                <field name="destination_id"/>
+                <filter name="f_open" string="Belum Diputus" domain="[('state','in',('draft','sent'))]"/>
+                <filter name="f_accepted" string="Diterima" domain="[('state','=','accepted')]"/>
+                <filter name="f_unconverted" string="Diterima, Belum Jadi Job"
+                        domain="[('state','=','accepted'),('job_id','=',False)]"/>
+                <filter name="f_manual" string="Ada Harga Manual" domain="[('has_manual_price','=',True)]"/>
+                <separator/>
+                <filter name="f_mine" string="Milik Saya" domain="[('salesperson_id','=',uid)]"/>
+                <separator/>
+                <filter name="g_customer" string="Pelanggan" context="{'group_by':'customer_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by':'state'}"/>
+                <filter name="g_type" string="Jenis Job" context="{'group_by':'job_type'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_quote" model="ir.actions.act_window">
+        <field name="name">Penawaran</field>
+        <field name="res_model">lgx.quote</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

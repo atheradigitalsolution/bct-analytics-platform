@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_wht_rate" name="Tarif Pot-Put" parent="custom_lgx_base.menu_lgx_config_commercial"
+              action="action_lgx_wht_rate" sequence="40"/>
+</odoo>

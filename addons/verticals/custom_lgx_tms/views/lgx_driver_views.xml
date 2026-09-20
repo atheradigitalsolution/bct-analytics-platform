@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_driver_list" model="ir.ui.view">
+        <field name="name">lgx.driver.list</field>
+        <field name="model">lgx.driver</field>
+        <field name="arch" type="xml">
+            <list string="Pengemudi" decoration-danger="sim_is_expired">
+                <field name="name"/>
+                <field name="employee_code"/>
+                <field name="phone"/>
+                <field name="sim_number"/>
+                <field name="sim_class"/>
+                <field name="sim_expiry_date"/>
+                <field name="sim_days_to_expiry"/>
+                <field name="home_pool_id" optional="show"/>
+                <field name="performance_score" optional="hide"/>
+                <field name="sim_is_expired" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_driver_form" model="ir.ui.view">
+        <field name="name">lgx.driver.form</field>
+        <field name="model">lgx.driver</field>
+        <field name="arch" type="xml">
+            <form string="Pengemudi">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_open_advances" type="object"
+                                class="oe_stat_button" icon="fa-money">
+                            <field name="open_advance_count" widget="statinfo" string="Uang Jalan Terbuka"/>
+                        </button>
+                    </div>
+                    <div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
+                    <div class="alert alert-danger" role="alert" invisible="not sim_is_expired">
+                        SIM sudah lewat masa berlaku. Penugasan trip kepada pengemudi ini akan
+                        ditolak sistem.
+                    </div>
+                    <group>
+                        <group string="Identitas">
+                            <field name="partner_id"/>
+                            <field name="user_id"/>
+                            <field name="employee_code"/>
+                            <field name="phone"/>
+                            <field name="home_pool_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="SIM &amp; Kesehatan">
+                            <field name="sim_number"/>
+                            <field name="sim_class"/>
+                            <field name="sim_expiry_date"/>
+                            <field name="sim_days_to_expiry" readonly="1"/>
+                            <field name="medical_check_date"/>
+                            <field name="medical_valid_until"/>
+                            <field name="performance_score"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_driver" model="ir.actions.act_window">
+        <field name="name">Pengemudi</field>
+        <field name="res_model">lgx.driver</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

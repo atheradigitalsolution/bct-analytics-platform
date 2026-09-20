@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_lgx_quote" model="ir.sequence">
+            <field name="name">Penawaran Logistik</field>
+            <field name="code">lgx.quote</field>
+            <field name="prefix">QT/%(year)s/%(month)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="x_monthly_reset" eval="True"/>
+        </record>
+        <record id="seq_lgx_contract" model="ir.sequence">
+            <field name="name">Kontrak Logistik</field>
+            <field name="code">lgx.contract</field>
+            <field name="prefix">KTR/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+        <record id="cron_lgx_quote_expire" model="ir.cron">
+            <field name="name">LGX: kedaluwarsakan penawaran yang lewat masa berlaku</field>
+            <field name="model_id" ref="model_lgx_quote"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_expire_quotes()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

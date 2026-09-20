@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_container_list" model="ir.ui.view">
+        <field name="name">lgx.container.list</field>
+        <field name="model">lgx.container</field>
+        <field name="arch" type="xml">
+            <list string="Kontainer" decoration-danger="at_risk" decoration-success="is_returned">
+                <field name="container_no"/>
+                <field name="container_type_id"/>
+                <field name="job_id"/>
+                <field name="shipment_id"/>
+                <field name="discharge_date"/>
+                <field name="demurrage_deadline"/>
+                <field name="demurrage_days" sum="Hari Demurrage"/>
+                <field name="gate_out_date"/>
+                <field name="detention_deadline"/>
+                <field name="detention_days" sum="Hari Detensi"/>
+                <field name="gate_in_date"/>
+                <field name="depot_id" optional="hide"/>
+                <field name="is_returned"/>
+                <field name="at_risk" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_container_form" model="ir.ui.view">
+        <field name="name">lgx.container.form</field>
+        <field name="model">lgx.container</field>
+        <field name="arch" type="xml">
+            <form string="Kontainer">
+                <sheet>
+                    <div class="oe_title"><h1><field name="container_no" placeholder="MSKU1234567"/></h1></div>
+                    <div class="alert alert-danger" role="alert" invisible="not at_risk">
+                        Kontainer ini sudah melewati atau akan melewati masa bebas dalam tiga hari,
+                        dan belum dikembalikan. Demurrage dan detensi yang tidak diteruskan ke
+                        pelanggan sebelum job ditutup adalah kebocoran margin paling umum di forwarding.
+                    </div>
+                    <group>
+                        <group string="Identitas">
+                            <field name="shipment_id"/>
+                            <field name="job_id" readonly="1"/>
+                            <field name="container_type_id"/>
+                            <field name="seal_no"/>
+                            <field name="depot_id"/>
+                        </group>
+                        <group string="Berat">
+                            <field name="tare_weight"/>
+                            <field name="gross_weight"/>
+                            <field name="vgm_weight"/>
+                            <field name="vgm_method"/>
+                            <field name="vgm_date"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Demurrage — di DALAM terminal">
+                            <field name="discharge_date"/>
+                            <field name="free_days_demurrage"/>
+                            <field name="demurrage_deadline" readonly="1"/>
+                            <field name="gate_out_date"/>
+                            <field name="demurrage_days" readonly="1"/>
+                        </group>
+                        <group string="Detensi — sudah KELUAR terminal">
+                            <field name="free_days_detention"/>
+                            <field name="detention_deadline" readonly="1"/>
+                            <field name="gate_in_date"/>
+                            <field name="detention_days" readonly="1"/>
+                            <field name="is_returned"/>
+                        </group>
+                    </group>
+                    <group string="Stuffing">
+                        <group>
+                            <field name="stuffing_date"/>
+                            <field name="destuffing_date"/>
+                        </group>
+                        <group><field name="note"/></group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_container_search" model="ir.ui.view">
+        <field name="name">lgx.container.search</field>
+        <field name="model">lgx.container</field>
+        <field name="arch" type="xml">
+            <search string="Kontainer">
+                <field name="container_no"/>
+                <field name="job_id"/>
+                <field name="shipment_id"/>
+                <filter name="f_at_risk" string="Berisiko Demurrage/Detensi" domain="[('at_risk','=',True)]"/>
+                <filter name="f_open" string="Belum Dikembalikan" domain="[('is_returned','=',False)]"/>
+                <filter name="f_dem" string="Kena Demurrage" domain="[('demurrage_days','>',0)]"/>
+                <filter name="f_det" string="Kena Detensi" domain="[('detention_days','>',0)]"/>
+                <separator/>
+                <filter name="g_job" string="Job" context="{'group_by':'job_id'}"/>
+                <filter name="g_type" string="Tipe" context="{'group_by':'container_type_id'}"/>
+                <filter name="g_depot" string="Depo" context="{'group_by':'depot_id'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_container" model="ir.actions.act_window">
+        <field name="name">Kontainer</field>
+        <field name="res_model">lgx.container</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_lgx_container_at_risk" model="ir.actions.act_window">
+        <field name="name">Kontainer Berisiko</field>
+        <field name="res_model">lgx.container</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('at_risk','=',True),('is_returned','=',False)]</field>
+    </record>
+</odoo>

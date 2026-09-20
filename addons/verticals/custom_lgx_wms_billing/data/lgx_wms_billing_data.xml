@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_lgx_wms_billing_run" model="ir.sequence">
+            <field name="name">Proses Penagihan Gudang</field>
+            <field name="code">lgx.wms.billing.run</field>
+            <field name="prefix">WBR/%(year)s/%(month)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="x_monthly_reset" eval="True"/>
+        </record>
+        <!--
+            Potret diambil pada jam sepi. Bukan preferensi: cron ini membaca
+            seluruh quant setiap klien aktif, dan menjalankannya saat gudang
+            sedang memvalidasi picking berarti dua beban besar bertabrakan.
+        -->
+        <record id="cron_lgx_occupancy_snapshot" model="ir.cron">
+            <field name="name">LGX: potret okupansi gudang harian</field>
+            <field name="model_id" ref="model_lgx_wms_occupancy_snapshot"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_take_snapshot()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now().replace(hour=19, minute=30, second=0) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="active" eval="True"/>
+        </record>
+        <record id="cron_lgx_occupancy_prune" model="ir.cron">
+            <field name="name">LGX: pangkas potret okupansi melewati masa retensi</field>
+            <field name="model_id" ref="model_lgx_wms_occupancy_snapshot"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_prune_snapshots()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">months</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

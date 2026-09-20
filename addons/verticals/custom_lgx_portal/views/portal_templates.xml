@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Pintu masuk di beranda portal -->
+    <template id="portal_my_home_lgx" name="Portal: Logistik" inherit_id="portal.portal_my_home"
+              customize_show="True" priority="45">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Kiriman &amp; Job Logistik</t>
+                <t t-set="url" t-value="'/my/logistik'"/>
+                <t t-set="placeholder_count" t-value="'lgx_job_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- Daftar job -->
+    <template id="portal_my_jobs" name="Job Logistik Saya">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Kiriman Saya</t>
+            </t>
+            <div class="mb-3">
+                <a href="/my/logistik/booking" class="btn btn-primary btn-sm">
+                    Ajukan Booking Baru
+                </a>
+            </div>
+            <t t-if="not jobs">
+                <div class="alert alert-info">Belum ada kiriman yang tercatat atas nama Anda.</div>
+            </t>
+            <t t-if="jobs" t-call="portal.portal_table">
+                <thead>
+                    <tr>
+                        <th>Nomor Job</th>
+                        <th>Referensi Anda</th>
+                        <th>Rute</th>
+                        <th>ETD</th>
+                        <th>ETA</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="jobs" t-as="job">
+                        <td><a t-attf-href="/my/logistik/job/#{job.id}"><span t-field="job.name"/></a></td>
+                        <td><span t-field="job.customer_reference"/></td>
+                        <td>
+                            <span t-field="job.origin_location_id.name"/>
+                            <span class="text-muted"> → </span>
+                            <span t-field="job.destination_location_id.name"/>
+                        </td>
+                        <td><span t-field="job.etd"/></td>
+                        <td><span t-field="job.eta"/></td>
+                        <td><span class="badge text-bg-secondary" t-field="job.state"/></td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+    <!-- Detail job: dipakai portal DAN tautan pelacakan publik -->
+    <template id="portal_job_detail" name="Detail Kiriman">
+        <t t-call="portal.portal_layout">
+            <div class="row mb-4">
+                <div class="col">
+                    <h3>
+                        <span t-field="job.name"/>
+                        <small class="text-muted ms-2" t-field="job.customer_reference"/>
+                    </h3>
+                    <p class="mb-1">
+                        <span t-field="job.origin_location_id.display_name"/>
+                        <span class="text-muted"> → </span>
+                        <span t-field="job.destination_location_id.display_name"/>
+                    </p>
+                    <p class="text-muted mb-0">
+                        ETD <span t-field="job.etd"/> · ETA <span t-field="job.eta"/>
+                        <t t-if="job.ata"> · Tiba <span t-field="job.ata"/></t>
+                    </p>
+                </div>
+            </div>
+
+            <h5>Riwayat</h5>
+            <t t-if="not milestones">
+                <div class="alert alert-info">Belum ada kejadian yang tercatat.</div>
+            </t>
+            <table t-if="milestones" class="table table-sm">
+                <thead><tr><th>Waktu</th><th>Kejadian</th><th>Lokasi</th></tr></thead>
+                <tbody>
+                    <tr t-foreach="milestones" t-as="milestone">
+                        <td><span t-field="milestone.actual_date"/></td>
+                        <td><span t-field="milestone.milestone_type_id.name"/></td>
+                        <td><span t-field="milestone.location_id.name"/></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <t t-if="pending_milestones">
+                <h6 class="text-muted">Berikutnya</h6>
+                <ul class="list-unstyled text-muted">
+                    <li t-foreach="pending_milestones[:3]" t-as="milestone">
+                        <span t-field="milestone.milestone_type_id.name"/>
+                        <t t-if="milestone.planned_date">
+                            — rencana <span t-field="milestone.planned_date"/>
+                        </t>
+                    </li>
+                </ul>
+            </t>
+
+            <t t-if="containers">
+                <h5 class="mt-4">Kontainer</h5>
+                <table class="table table-sm">
+                    <thead><tr><th>Nomor</th><th>Tipe</th><th>Status</th></tr></thead>
+                    <tbody>
+                        <tr t-foreach="containers" t-as="container">
+                            <td><span t-field="container.container_no"/></td>
+                            <td><span t-field="container.container_type_id.code"/></td>
+                            <td>
+                                <span t-if="container.is_returned" class="badge text-bg-success">Dikembalikan</span>
+                                <span t-if="not container.is_returned" class="badge text-bg-secondary">Dalam perjalanan</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
+
+            <t t-if="documents">
+                <h5 class="mt-4">Dokumen</h5>
+                <table class="table table-sm">
+                    <thead><tr><th>Jenis</th><th>Nomor</th><th>Terbit</th><th></th></tr></thead>
+                    <tbody>
+                        <tr t-foreach="documents" t-as="document">
+                            <td><span t-field="document.document_type_id.name"/></td>
+                            <td><span t-field="document.name"/></td>
+                            <td><span t-field="document.issue_date"/></td>
+                            <td>
+                                <a t-if="document.attachment_ids"
+                                   t-attf-href="/my/logistik/dokumen/#{document.id}#{'?access_token=%s' % access_token if access_token else ''}"
+                                   class="btn btn-sm btn-secondary">Unduh</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
+        </t>
+    </template>
+
+    <!-- Pencarian publik: RINGKASAN saja, tanpa dokumen -->
+    <template id="public_track_page" name="Lacak Kiriman">
+        <t t-call="portal.frontend_layout">
+            <div class="container my-5">
+                <h3>Lacak Kiriman</h3>
+                <form method="post" action="/lgx/lacak" class="row g-2 mb-4">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <div class="col-auto">
+                        <input type="text" name="reference" class="form-control"
+                               t-att-value="reference"
+                               placeholder="Nomor job, B/L, kontainer, atau referensi Anda"
+                               style="min-width: 22rem;"/>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">Lacak</button>
+                    </div>
+                </form>
+
+                <div t-if="error" class="alert alert-warning"><span t-esc="error"/></div>
+
+                <t t-if="result">
+                    <t t-set="job" t-value="result['job']"/>
+                    <t t-set="milestones" t-value="result['milestones']"/>
+                    <h4>
+                        <span t-field="job.name"/>
+                        <small class="text-muted ms-2" t-field="job.customer_reference"/>
+                    </h4>
+                    <p>
+                        <span t-field="job.origin_location_id.display_name"/>
+                        <span class="text-muted"> → </span>
+                        <span t-field="job.destination_location_id.display_name"/>
+                    </p>
+                    <p class="text-muted">
+                        ETA <span t-field="job.eta"/>
+                        <t t-if="milestones">
+                            · pembaruan terakhir <span t-field="milestones[-1].actual_date"/>
+                        </t>
+                    </p>
+                    <table t-if="milestones" class="table table-sm">
+                        <thead><tr><th>Waktu</th><th>Kejadian</th><th>Lokasi</th></tr></thead>
+                        <tbody>
+                            <tr t-foreach="milestones" t-as="milestone">
+                                <td><span t-field="milestone.actual_date"/></td>
+                                <td><span t-field="milestone.milestone_type_id.name"/></td>
+                                <td><span t-field="milestone.location_id.name"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="alert alert-light border">
+                        Dokumen kiriman tidak ditampilkan di halaman publik. Mintalah tautan
+                        pelacakan bertanda tangan kepada penanggung jawab operasi, atau masuk ke
+                        portal pelanggan.
+                    </div>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="public_track_expired" name="Tautan Pelacakan Tidak Berlaku">
+        <t t-call="portal.frontend_layout">
+            <div class="container my-5">
+                <h3>Tautan tidak berlaku</h3>
+                <p class="text-muted">
+                    Tautan pelacakan ini sudah kedaluwarsa atau dicabut. Mintalah tautan baru
+                    kepada penanggung jawab operasi.
+                </p>
+                <a href="/lgx/lacak" class="btn btn-secondary">Lacak dengan nomor referensi</a>
+            </div>
+        </t>
+    </template>
+
+    <!-- Booking -->
+    <template id="portal_booking_form" name="Ajukan Booking">
+        <t t-call="portal.portal_layout">
+            <h4>Ajukan Booking</h4>
+            <p class="text-muted">
+                Pengajuan ini menjadi permintaan yang menunggu konfirmasi tim operasi.
+                Anda menerima nomor referensi seketika.
+            </p>
+            <form method="post" action="/my/logistik/booking">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Jenis</label>
+                        <select name="job_type" class="form-select">
+                            <option value="ff_import">Forwarding — Impor</option>
+                            <option value="ff_export">Forwarding — Ekspor</option>
+                            <option value="ff_domestic">Forwarding — Domestik</option>
+                            <option value="trucking">Trucking</option>
+                            <option value="warehouse">Gudang 3PL</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Moda</label>
+                        <select name="transport_mode" class="form-select">
+                            <option value="sea">Laut</option>
+                            <option value="air">Udara</option>
+                            <option value="land">Darat</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Referensi Anda</label>
+                        <input type="text" name="customer_reference" class="form-control"/>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Asal</label>
+                        <select name="origin_id" class="form-select">
+                            <option value="">—</option>
+                            <option t-foreach="locations" t-as="location"
+                                    t-att-value="location.id"
+                                    t-esc="location.display_name"/>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Tujuan</label>
+                        <select name="destination_id" class="form-select">
+                            <option value="">—</option>
+                            <option t-foreach="locations" t-as="location"
+                                    t-att-value="location.id"
+                                    t-esc="location.display_name"/>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Perkiraan Siap Muat</label>
+                        <input type="date" name="etd" class="form-control"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Catatan</label>
+                        <textarea name="note" class="form-control" rows="3"
+                                  placeholder="Komoditas, jumlah koli, berat, penanganan khusus"/>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Kirim Pengajuan</button>
+            </form>
+        </t>
+    </template>
+
+    <template id="portal_booking_done" name="Booking Terkirim">
+        <t t-call="portal.portal_layout">
+            <div class="alert alert-success">
+                <h5>Pengajuan diterima</h5>
+                <p class="mb-1">
+                    Nomor referensi Anda: <b><span t-field="job.name"/></b>
+                </p>
+                <p class="mb-0 text-muted">
+                    Tim operasi akan mengonfirmasi rute, tarif, dan kapasitas sebelum
+                    pengajuan ini menjadi kiriman berjalan.
+                </p>
+            </div>
+            <a t-attf-href="/my/logistik/job/#{job.id}" class="btn btn-secondary">Lihat pengajuan</a>
+        </t>
+    </template>
+</odoo>

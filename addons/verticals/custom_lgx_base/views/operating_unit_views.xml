@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Identitas pajak cabang. Dimensi cabangnya sendiri (operating_unit_id
+        pada account.move dan kawan-kawan) sudah disediakan custom_operating_unit;
+        yang ditambahkan di sini hanya NITKU, NPWP 16 digit, kantor pabean, dan
+        KBLI dua versi selama masa transisi 2020 -> 2025.
+    -->
+    <record id="view_operating_unit_form_lgx" model="ir.ui.view">
+        <field name="name">operating.unit.form.lgx</field>
+        <field name="model">operating.unit</field>
+        <field name="inherit_id" ref="custom_operating_unit.view_operating_unit_form"/>
+        <field name="arch" type="xml">
+            <sheet position="inside">
+                <group string="Identitas Pajak &amp; Logistik" name="lgx_tax">
+                    <group>
+                        <field name="lgx_is_logistics_branch"/>
+                        <field name="lgx_nitku" placeholder="22 digit"/>
+                        <field name="lgx_npwp" placeholder="16 digit"/>
+                    </group>
+                    <group>
+                        <field name="lgx_address_id"/>
+                        <field name="lgx_customs_office_id"/>
+                        <field name="lgx_kbli_2020"/>
+                        <field name="lgx_kbli_2025"/>
+                    </group>
+                </group>
+            </sheet>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_lgx_trip" model="ir.sequence">
+            <field name="name">Trip</field>
+            <field name="code">lgx.trip</field>
+            <field name="prefix">TRP/%(year)s/%(month)s/</field>
+            <field name="padding">5</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="x_monthly_reset" eval="True"/>
+        </record>
+        <record id="seq_lgx_trip_advance" model="ir.sequence">
+            <field name="name">Uang Jalan</field>
+            <field name="code">lgx.trip.advance</field>
+            <field name="prefix">UJ/%(year)s/%(month)s/</field>
+            <field name="padding">5</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="x_monthly_reset" eval="True"/>
+        </record>
+        <record id="param_block_dispatch_expired_kir" model="ir.config_parameter">
+            <field name="key">lgx.block_dispatch_on_expired_kir</field>
+            <field name="value">0</field>
+        </record>
+    </data>
+</odoo>

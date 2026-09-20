@@ -1,0 +1,17 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_shipment_ff_user,lgx.shipment/ff_user,model_lgx_shipment,custom_lgx_base.group_lgx_ff_user,1,1,1,0
+access_lgx_shipment_ff_manager,lgx.shipment/ff_manager,model_lgx_shipment,custom_lgx_base.group_lgx_ff_manager,1,1,1,1
+access_lgx_shipment_customs,lgx.shipment/customs,model_lgx_shipment,custom_lgx_base.group_lgx_customs_user,1,1,0,0
+access_lgx_shipment_sales,lgx.shipment/sales,model_lgx_shipment,custom_lgx_base.group_lgx_sales_user,1,0,0,0
+access_lgx_shipment_finance,lgx.shipment/finance,model_lgx_shipment,custom_lgx_base.group_lgx_finance_billing,1,0,0,0
+access_lgx_shipment_mgmt,lgx.shipment/management,model_lgx_shipment,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_container_ff_user,lgx.container/ff_user,model_lgx_container,custom_lgx_base.group_lgx_ff_user,1,1,1,0
+access_lgx_container_ff_manager,lgx.container/ff_manager,model_lgx_container,custom_lgx_base.group_lgx_ff_manager,1,1,1,1
+access_lgx_container_customs,lgx.container/customs,model_lgx_container,custom_lgx_base.group_lgx_customs_user,1,1,0,0
+access_lgx_container_trucking,lgx.container/trucking,model_lgx_container,custom_lgx_base.group_lgx_trucking_dispatcher,1,1,0,0
+access_lgx_container_finance,lgx.container/finance,model_lgx_container,custom_lgx_base.group_lgx_finance_billing,1,0,0,0
+access_lgx_container_mgmt,lgx.container/management,model_lgx_container,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_package_ff_user,lgx.package/ff_user,model_lgx_package,custom_lgx_base.group_lgx_ff_user,1,1,1,1
+access_lgx_package_ff_manager,lgx.package/ff_manager,model_lgx_package,custom_lgx_base.group_lgx_ff_manager,1,1,1,1
+access_lgx_package_customs,lgx.package/customs,model_lgx_package,custom_lgx_base.group_lgx_customs_user,1,0,0,0
+access_lgx_package_mgmt,lgx.package/management,model_lgx_package,custom_lgx_base.group_lgx_management_viewer,1,0,0,0

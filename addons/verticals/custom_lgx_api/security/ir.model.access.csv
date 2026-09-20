@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_api_device_staff,lgx.api.device/staff,model_lgx_api_device,custom_lgx_base.group_lgx_staff,1,0,0,0
+access_lgx_api_device_dispatcher,lgx.api.device/dispatcher,model_lgx_api_device,custom_lgx_base.group_lgx_trucking_dispatcher,1,1,1,1
+access_lgx_api_device_wh,lgx.api.device/warehouse,model_lgx_api_device,custom_lgx_base.group_lgx_wh_supervisor,1,1,1,1
+access_lgx_api_device_system,lgx.api.device/system,model_lgx_api_device,base.group_system,1,1,1,1

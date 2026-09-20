@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_lgx_shipment" model="ir.sequence">
+            <field name="name">Shipment</field>
+            <field name="code">lgx.shipment</field>
+            <field name="prefix">SHP/%(year)s/%(month)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="x_monthly_reset" eval="True"/>
+        </record>
+        <!-- Nomor House B/L berasal dari custom_doc_numbering, BUKAN ir.sequence
+             yang dipanggil langsung dari model. Bentuknya sama, tetapi reset
+             bulanan dan pemisahan per perusahaan hidup di sana. -->
+        <record id="seq_lgx_hbl" model="ir.sequence">
+            <field name="name">House B/L</field>
+            <field name="code">lgx.hbl</field>
+            <field name="prefix">HBL/%(year)s/%(month)s/</field>
+            <field name="padding">5</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="x_monthly_reset" eval="True"/>
+        </record>
+        <record id="cron_lgx_container_risk" model="ir.cron">
+            <field name="name">LGX: peringatan kontainer melewati masa bebas</field>
+            <field name="model_id" ref="model_lgx_container"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_warn_containers_at_risk()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

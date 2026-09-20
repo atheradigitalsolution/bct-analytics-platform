@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Nomor job memakai ir.sequence dengan x_monthly_reset dari
+            custom_doc_numbering, bukan next_by_code polos. Reset bulanan adalah
+            bentuk yang dipakai seluruh dokumen di repo ini; Odoo sendiri hanya
+            membuat date range tahunan.
+
+            implementation = no_gap: nomor job muncul di dokumen yang keluar ke
+            pihak ketiga, dan nomor yang melompat adalah pertanyaan yang harus
+            dijawab ke auditor.
+        -->
+        <record id="seq_lgx_job" model="ir.sequence">
+            <field name="name">Job Logistik</field>
+            <field name="code">lgx.job</field>
+            <field name="prefix">JOB/%(year)s/%(month)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="x_monthly_reset" eval="True"/>
+        </record>
+    </data>
+</odoo>

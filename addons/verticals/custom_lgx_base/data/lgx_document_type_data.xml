@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            requires_stamp_duty mengikuti UU 10/2020 Pasal 7, yang MENGECUALIKAN
+            konosemen, surat angkutan barang, surat penyimpanan barang, serta
+            bukti pengiriman dan penerimaan barang dari bea meterai. Itu
+            pengecualian yang menguntungkan logistik dan sering terlewat — B/L,
+            surat jalan, DO, POD dan tanda terima gudang tidak perlu meterai.
+            Yang perlu adalah kontrak dan pengakuan pelunasan.
+        -->
+        <record id="doctype_mbl" model="lgx.document.type">
+            <field name="code">MBL</field><field name="name">Master Bill of Lading</field>
+            <field name="category">transport</field><field name="is_customer_visible">0</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="doctype_hbl" model="lgx.document.type">
+            <field name="code">HBL</field><field name="name">House Bill of Lading</field>
+            <field name="category">transport</field><field name="is_customer_visible">1</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="doctype_mawb" model="lgx.document.type">
+            <field name="code">MAWB</field><field name="name">Master Air Waybill</field>
+            <field name="category">transport</field><field name="sequence">30</field>
+        </record>
+        <record id="doctype_hawb" model="lgx.document.type">
+            <field name="code">HAWB</field><field name="name">House Air Waybill</field>
+            <field name="category">transport</field><field name="is_customer_visible">1</field>
+            <field name="sequence">40</field>
+        </record>
+        <record id="doctype_do" model="lgx.document.type">
+            <field name="code">DO</field><field name="name">Delivery Order</field>
+            <field name="category">transport</field><field name="is_customer_visible">1</field>
+            <field name="sequence">50</field>
+        </record>
+        <record id="doctype_sj" model="lgx.document.type">
+            <field name="code">SJ</field><field name="name">Surat Jalan</field>
+            <field name="category">transport</field><field name="is_customer_visible">1</field>
+            <field name="sequence">60</field>
+        </record>
+        <record id="doctype_pod" model="lgx.document.type">
+            <field name="code">POD</field><field name="name">Proof of Delivery</field>
+            <field name="category">proof</field><field name="is_customer_visible">1</field>
+            <field name="sequence">70</field>
+        </record>
+        <record id="doctype_grn" model="lgx.document.type">
+            <field name="code">GRN</field><field name="name">Tanda Terima Gudang</field>
+            <field name="category">proof</field><field name="is_customer_visible">1</field>
+            <field name="sequence">80</field>
+        </record>
+        <record id="doctype_packing" model="lgx.document.type">
+            <field name="code">PL</field><field name="name">Packing List</field>
+            <field name="category">commercial</field><field name="is_customer_visible">1</field>
+            <field name="sequence">90</field>
+        </record>
+        <record id="doctype_ci" model="lgx.document.type">
+            <field name="code">CI</field><field name="name">Commercial Invoice</field>
+            <field name="category">commercial</field><field name="is_customer_visible">1</field>
+            <field name="sequence">100</field>
+            <!-- ⚠ A13: apakah faktur komersial biasa objek bea meterai belum
+                 dikonfirmasi ke konsultan pajak. Default: tidak. -->
+        </record>
+        <record id="doctype_coo" model="lgx.document.type">
+            <field name="code">COO</field><field name="name">Certificate of Origin</field>
+            <field name="category">permit</field><field name="is_customer_visible">1</field>
+            <field name="has_expiry">1</field><field name="sequence">110</field>
+        </record>
+        <record id="doctype_pib" model="lgx.document.type">
+            <field name="code">PIB</field><field name="name">PIB (BC 2.0)</field>
+            <field name="category">customs</field><field name="is_customer_visible">1</field>
+            <field name="sequence">120</field>
+        </record>
+        <record id="doctype_peb" model="lgx.document.type">
+            <field name="code">PEB</field><field name="name">PEB (BC 3.0)</field>
+            <field name="category">customs</field><field name="is_customer_visible">1</field>
+            <field name="sequence">130</field>
+        </record>
+        <record id="doctype_sppb" model="lgx.document.type">
+            <field name="code">SPPB</field><field name="name">SPPB / Surat Persetujuan Pengeluaran Barang</field>
+            <field name="category">customs</field><field name="is_customer_visible">1</field>
+            <field name="sequence">140</field>
+            <field name="blocks_milestone_code">customs_released</field>
+        </record>
+        <record id="doctype_lartas" model="lgx.document.type">
+            <field name="code">LARTAS</field><field name="name">Izin Lartas</field>
+            <field name="category">permit</field><field name="has_expiry">1</field>
+            <field name="blocks_milestone_code">customs_submitted</field>
+            <field name="sequence">150</field>
+        </record>
+        <record id="doctype_kontrak" model="lgx.document.type">
+            <field name="code">KONTRAK</field><field name="name">Kontrak Jasa Logistik</field>
+            <field name="category">contract</field><field name="requires_stamp_duty">1</field>
+            <field name="has_expiry">1</field><field name="sequence">160</field>
+        </record>
+        <record id="doctype_kuitansi" model="lgx.document.type">
+            <field name="code">KUITANSI</field><field name="name">Kuitansi / Pengakuan Pelunasan</field>
+            <field name="category">commercial</field><field name="requires_stamp_duty">1</field>
+            <field name="sequence">170</field>
+        </record>
+        <record id="doctype_bukti_bayar_lm" model="lgx.document.type">
+            <field name="code">PAYPROOF-LN</field>
+            <field name="name">Bukti Pembayaran dari Penerima Jasa Luar Negeri</field>
+            <field name="category">commercial</field><field name="sequence">180</field>
+        </record>
+        <record id="doctype_kir" model="lgx.document.type">
+            <field name="code">KIR</field><field name="name">Bukti Lulus Uji Berkala (KIR)</field>
+            <field name="category">vehicle</field><field name="has_expiry">1</field>
+            <field name="default_warning_days">30</field><field name="sequence">200</field>
+        </record>
+        <record id="doctype_stnk" model="lgx.document.type">
+            <field name="code">STNK</field><field name="name">STNK</field>
+            <field name="category">vehicle</field><field name="has_expiry">1</field>
+            <field name="default_warning_days">45</field><field name="sequence">210</field>
+        </record>
+        <record id="doctype_kp" model="lgx.document.type">
+            <field name="code">KP</field><field name="name">Kartu Pengawasan</field>
+            <field name="category">vehicle</field><field name="has_expiry">1</field>
+            <field name="default_warning_days">30</field><field name="sequence">220</field>
+        </record>
+        <record id="doctype_sim" model="lgx.document.type">
+            <field name="code">SIM</field><field name="name">SIM Pengemudi</field>
+            <field name="category">personnel</field><field name="has_expiry">1</field>
+            <field name="default_warning_days">60</field><field name="sequence">230</field>
+        </record>
+        <record id="doctype_ahli_pabean" model="lgx.document.type">
+            <field name="code">SERT-AK</field><field name="name">Sertifikat Ahli Kepabeanan</field>
+            <field name="category">personnel</field><field name="has_expiry">1</field>
+            <field name="default_warning_days">90</field><field name="sequence">240</field>
+        </record>
+        <record id="doctype_nib" model="lgx.document.type">
+            <field name="code">NIB</field><field name="name">Nomor Induk Berusaha</field>
+            <field name="category">permit</field><field name="sequence">250</field>
+        </record>
+    </data>
+</odoo>

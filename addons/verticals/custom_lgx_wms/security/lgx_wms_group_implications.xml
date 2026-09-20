@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        SENGAJA TANPA noupdate.
+
+        Grup LGX lahir di custom_lgx_base/security/lgx_groups.xml di dalam
+        <data noupdate="1">. Flag itu tersimpan pada baris ir.model.data MILIK
+        GRUPNYA, bukan pada modul penulisnya, sehingga <record model="res.groups">
+        yang mencoba menambah implied_ids ke grup itu DILEWATI DIAM-DIAM pada
+        setiap install dan update — termasuk dari modul ini sendiri. Tidak ada
+        galat; hibahnya sekadar tidak pernah mendarat.
+
+        <function> di blok tanpa noupdate dijalankan ulang setiap kali modul
+        di-update, jadi hibahnya mendarat baik pada basis data yang sudah
+        terpasang maupun pada install bersih.
+
+        INGAT: perubahan grup yang bersifat keamanan menuntut RESTART container
+        odoo. Worker HTTP menyimpan cache grup sendiri-sendiri, dan gejalanya
+        adalah hak yang "kadang ada kadang tidak" tergantung worker mana yang
+        kebetulan melayani permintaan itu.
+    -->
+    <data>
+        <function model="res.groups" name="_lgx_apply_group_implications"/>
+    </data>
+</odoo>

@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_customs_declaration_list" model="ir.ui.view">
+        <field name="name">lgx.customs.declaration.list</field>
+        <field name="model">lgx.customs.declaration</field>
+        <field name="arch" type="xml">
+            <list string="Deklarasi Pabean" decoration-danger="channel == 'red'"
+                  decoration-warning="channel == 'yellow'" decoration-success="state == 'released'">
+                <field name="name"/>
+                <field name="doc_type"/>
+                <field name="job_id"/>
+                <field name="principal_id"/>
+                <field name="registration_number"/>
+                <field name="registration_date"/>
+                <field name="customs_office_id"/>
+                <field name="total_bm" sum="Bea Masuk"/>
+                <field name="total_ppn_impor" sum="PPN Impor"/>
+                <field name="total_pph22" sum="PPh 22"/>
+                <field name="total_duty_tax" sum="Total Pungutan"/>
+                <field name="channel" widget="badge"/>
+                <field name="company_currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_customs_declaration_form" model="ir.ui.view">
+        <field name="name">lgx.customs.declaration.form</field>
+        <field name="model">lgx.customs.declaration</field>
+        <field name="arch" type="xml">
+            <form string="Deklarasi Pabean">
+                <header>
+                    <button name="action_submit" type="object" string="Ajukan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_receive" type="object" string="Diterima Bea Cukai"
+                            invisible="state != 'submitted'"/>
+                    <button name="action_respond" type="object" string="Catat Respons"
+                            invisible="state != 'received'"/>
+                    <button name="action_release" type="object" string="SPPB Terbit"
+                            class="btn-primary" invisible="state != 'responded'"/>
+                    <button name="action_generate_job_charges" type="object"
+                            string="Salin Pungutan ke Job"
+                            invisible="state == 'draft' or charge_ids"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,received,responded,released"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="alert alert-warning" role="alert" invisible="not has_lartas">
+                        Deklarasi memuat pos tarif berstatus <b>lartas</b>. Izin yang dibutuhkan
+                        tercantum pada masing-masing HS code — barang tidak akan keluar tanpa izin
+                        itu, berapa pun lengkapnya dokumen lain.
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="submission_mode != 'manual'">
+                        Kantor pabean ini belum diwajibkan CEISA 4.0. Dokumen dikerjakan lewat jalur
+                        manual; sistem tidak mencoba mengirim otomatis.
+                    </div>
+                    <group>
+                        <group string="Dokumen">
+                            <field name="doc_type"/>
+                            <field name="job_id"/>
+                            <field name="shipment_id"/>
+                            <field name="customs_office_id"/>
+                            <field name="submission_mode"/>
+                            <field name="aju_number"/>
+                            <field name="registration_number"/>
+                            <field name="registration_date"/>
+                            <field name="channel"/>
+                        </group>
+                        <group string="Prinsipal &amp; PPJK">
+                            <field name="principal_id"/>
+                            <field name="principal_nib"/>
+                            <field name="principal_npwp"/>
+                            <field name="customs_access_type"/>
+                            <field name="importer_has_api"/>
+                            <field name="ppjk_id"/>
+                            <field name="customs_expert_id"/>
+                            <field name="guarantee_id"/>
+                        </group>
+                    </group>
+                    <group string="Kurs">
+                        <group>
+                            <field name="currency_id"/>
+                            <field name="fx_rate_tax"/>
+                        </group>
+                        <group>
+                            <div class="text-muted">
+                                Kurs KMK, bukan kurs pembukuan. Nilai rupiah PIB yang dihitung
+                                dengan kurs pembukuan adalah kesalahan yang langsung terlihat
+                                saat pemeriksaan.
+                            </div>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Barang">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="hs_code_id"/>
+                                    <field name="description"/>
+                                    <field name="country_of_origin_id"/>
+                                    <field name="quantity"/>
+                                    <field name="uom_id" optional="hide"/>
+                                    <field name="customs_value" sum="CIF"/>
+                                    <field name="bm_rate"/>
+                                    <field name="bm_amount" sum="BM"/>
+                                    <field name="import_tax_base" optional="show"/>
+                                    <field name="ppn_rate" optional="hide"/>
+                                    <field name="ppn_amount" sum="PPN"/>
+                                    <field name="pph22_rate" optional="hide"/>
+                                    <field name="pph22_amount" sum="PPh 22"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                    <field name="company_currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="total_cif"/>
+                                <field name="total_cif_idr"/>
+                                <field name="total_bm"/>
+                                <field name="total_ppn_impor"/>
+                                <field name="total_ppnbm"/>
+                                <field name="total_pph22"/>
+                                <field name="total_duty_tax" class="oe_subtotal_footer_separator"/>
+                            </group>
+                        </page>
+                        <page string="Talangan di Job">
+                            <div class="alert alert-info" role="alert">
+                                Bea masuk dan pajak impor masuk job sebagai <b>talangan</b>, bukan
+                                sebagai biaya. Ia dibayarkan atas nama importir dan ditagihkan
+                                kembali apa adanya; melewatkannya ke laba rugi menggelembungkan HPP
+                                berkali lipat pada job impor.
+                            </div>
+                            <field name="charge_ids" readonly="1">
+                                <list>
+                                    <field name="charge_code_id"/>
+                                    <field name="nature"/>
+                                    <field name="partner_id"/>
+                                    <field name="amount_estimated" sum="Estimasi"/>
+                                    <field name="amount_actual" sum="Aktual"/>
+                                    <field name="state"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Catatan"><field name="note" nolabel="1"/></page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_customs_declaration_search" model="ir.ui.view">
+        <field name="name">lgx.customs.declaration.search</field>
+        <field name="model">lgx.customs.declaration</field>
+        <field name="arch" type="xml">
+            <search string="Deklarasi">
+                <field name="name"/>
+                <field name="registration_number"/>
+                <field name="aju_number"/>
+                <field name="principal_id"/>
+                <field name="job_id"/>
+                <filter name="f_open" string="Berjalan"
+                        domain="[('state','in',('submitted','received','responded','released'))]"/>
+                <filter name="f_red" string="Jalur Merah" domain="[('channel','=','red')]"/>
+                <filter name="f_lartas" string="Ada Lartas" domain="[('has_lartas','=',True)]"/>
+                <separator/>
+                <filter name="g_principal" string="Prinsipal" context="{'group_by':'principal_id'}"/>
+                <filter name="g_office" string="Kantor Pabean" context="{'group_by':'customs_office_id'}"/>
+                <filter name="g_doctype" string="Jenis Dokumen" context="{'group_by':'doc_type'}"/>
+                <filter name="g_state" string="Status" context="{'group_by':'state'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_customs_declaration" model="ir.actions.act_window">
+        <field name="name">Deklarasi Pabean</field>
+        <field name="res_model">lgx.customs.declaration</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_lgx_ppjk_exposure" model="ir.actions.act_window">
+        <field name="name">Eksposur PPJK per Prinsipal</field>
+        <field name="res_model">lgx.customs.declaration</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state','in',('submitted','received','responded','released'))]</field>
+        <field name="context">{'search_default_g_principal': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                PMK 219/2019 Pasal 24 ayat 2: PPJK bertanggung jawab atas bea masuk terutang
+                bila importir tidak ditemukan. Total di sini adalah nilai risiko yang benar-benar
+                dapat ditagihkan ke perusahaan, bukan statistik.
+            </p>
+        </field>
+    </record>
+</odoo>

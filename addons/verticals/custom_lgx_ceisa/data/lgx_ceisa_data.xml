@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Kanal antrian TERPISAH untuk CEISA.
+
+            Alasannya bukan kerapian: CEISA lambat dan kadang mati, dan job yang
+            menunggu socket menahan slot runner. Tanpa kanal sendiri, satu
+            gangguan di Bea Cukai akan menghentikan SELURUH antrian — termasuk
+            pekerjaan yang tidak ada hubungannya, seperti potret okupansi gudang.
+        -->
+        <record id="channel_lgx_ceisa" model="queue.job.channel">
+            <field name="name">lgx_ceisa</field>
+            <field name="parent_id" ref="queue_job.channel_root"/>
+            <!--
+                Kapasitas kanal TIDAK diatur di sini: di queue_job versi ini ia
+                bukan field pada model, melainkan konfigurasi runner lewat
+                ODOO_QUEUE_JOB_CHANNELS (mis. "root:4,root.lgx_ceisa:2").
+                Mencantumkannya sebagai field membuat modul gagal dipasang.
+            -->
+        </record>
+
+        <record id="job_function_ceisa_submit" model="queue.job.function">
+            <field name="model_id" ref="custom_lgx_customs.model_lgx_customs_declaration"/>
+            <field name="method">_job_submit_to_ceisa</field>
+            <field name="channel_id" ref="channel_lgx_ceisa"/>
+            <!--
+                Backoff yang melebar. Angkanya dipilih supaya percobaan terakhir
+                jatuh sekitar dua jam setelah yang pertama: cukup lama untuk
+                melewati pemeliharaan terjadwal di sisi mereka, cukup pendek
+                untuk tidak menahan dokumen semalaman tanpa ada yang tahu.
+            -->
+            <field name="edit_retry_pattern">{1: 60, 3: 300, 5: 900, 7: 1800}</field>
+        </record>
+        <record id="job_function_ceisa_pull" model="queue.job.function">
+            <field name="model_id" ref="custom_lgx_customs.model_lgx_customs_declaration"/>
+            <field name="method">_job_pull_ceisa_status</field>
+            <field name="channel_id" ref="channel_lgx_ceisa"/>
+            <field name="edit_retry_pattern">{1: 120, 3: 600, 5: 1800}</field>
+        </record>
+
+        <record id="cron_lgx_ceisa_pull_status" model="ir.cron">
+            <field name="name">LGX: tarik status dokumen dari CEISA 4.0</field>
+            <field name="model_id" ref="custom_lgx_customs.model_lgx_customs_declaration"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_pull_ceisa_status()</field>
+            <field name="interval_number">2</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="False"/>
+            <!--
+                MATI secara default. Cron yang menarik ke endpoint yang belum
+                dikonfigurasi hanya menghasilkan antrian penuh galat pada
+                database yang belum memakai CEISA sama sekali.
+            -->
+        </record>
+    </data>
+</odoo>

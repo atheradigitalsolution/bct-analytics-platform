@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_api_device_list" model="ir.ui.view">
+        <field name="name">lgx.api.device.list</field>
+        <field name="model">lgx.api.device</field>
+        <field name="arch" type="xml">
+            <list string="Perangkat Lapangan" decoration-muted="state == 'revoked'">
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="user_id"/>
+                <field name="key_prefix"/>
+                <field name="key_expiry"/>
+                <field name="last_seen"/>
+                <field name="last_ip" optional="hide"/>
+                <field name="state" widget="badge"/>
+                <button name="action_revoke" type="object" string="Cabut" icon="fa-ban"
+                        invisible="state != 'active'"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_api_device" model="ir.actions.act_window">
+        <field name="name">Perangkat Lapangan</field>
+        <field name="res_model">lgx.api.device</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Satu pengguna, satu perangkat, satu kunci. Kunci bersama membuat setiap
+                perangkat menjadi pengguna yang sama — dan perangkat yang hilang lalu berarti
+                seluruh jadwal armada ikut hilang.
+            </p>
+        </field>
+    </record>
+    <menuitem id="menu_lgx_api_device" name="Perangkat Lapangan"
+              parent="custom_lgx_base.menu_lgx_config_technical"
+              action="action_lgx_api_device" sequence="20"/>
+</odoo>

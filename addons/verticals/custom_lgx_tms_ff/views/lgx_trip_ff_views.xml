@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_trip_form_ff" model="ir.ui.view">
+        <field name="name">lgx.trip.form.ff</field>
+        <field name="model">lgx.trip</field>
+        <field name="inherit_id" ref="custom_lgx_tms.view_lgx_trip_form"/>
+        <field name="arch" type="xml">
+            <field name="container_no" position="before">
+                <field name="container_id" invisible="trip_type != 'container_haulage'"/>
+            </field>
+        </field>
+    </record>
+</odoo>

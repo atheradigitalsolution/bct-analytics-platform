@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="rule_lgx_shipment_company" model="ir.rule">
+            <field name="name">Shipment: per perusahaan</field>
+            <field name="model_id" ref="model_lgx_shipment"/>
+            <field name="domain_force">[('company_id','in',company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+        <record id="rule_lgx_container_company" model="ir.rule">
+            <field name="name">Kontainer: per perusahaan</field>
+            <field name="model_id" ref="model_lgx_container"/>
+            <field name="domain_force">[('company_id','in',company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+    </data>
+</odoo>

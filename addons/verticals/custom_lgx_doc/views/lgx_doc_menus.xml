@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_document" name="Dokumen" parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_document" sequence="80"/>
+    <menuitem id="menu_lgx_document_expiring" name="Masa Berlaku Dokumen"
+              parent="custom_lgx_base.menu_lgx_reporting"
+              action="action_lgx_document_expiring" sequence="60"/>
+    <menuitem id="menu_lgx_checklist_template" name="Template Checklist Dokumen"
+              parent="custom_lgx_base.menu_lgx_config_reference"
+              action="action_lgx_checklist_template" sequence="110"/>
+</odoo>

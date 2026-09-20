@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Setiap angka yang berasal dari regulasi hidup di sini, bukan di kode.
+
+            Tanda ⚠ di spesifikasi berarti angka itu berasal dari riset sekunder
+            dan belum dikonfirmasi ke sumber primer (Lampiran A). Menaruhnya di
+            ir.config_parameter membuat koreksi menjadi satu baris konfigurasi,
+            bukan rilis modul — dan itulah alasan strukturalnya, bukan kerapian.
+        -->
+
+        <!-- Zero ODOL. ⚠ A12b: 1 Januari 2027 berasal dari pernyataan pejabat
+             dan siaran pers, BUKAN peraturan yang sudah terbit. Perlakukan
+             sebagai kebijakan yang diumumkan sampai dasar hukumnya ditemukan. -->
+        <record id="param_odol_enforcement_date" model="ir.config_parameter">
+            <field name="key">lgx.odol_enforcement_date</field>
+            <field name="value">2027-01-01</field>
+        </record>
+
+        <!-- Komersial -->
+        <record id="param_min_margin_pct" model="ir.config_parameter">
+            <field name="key">lgx.min_margin_pct</field>
+            <field name="value">10.0</field>
+        </record>
+        <record id="param_provision_age_days" model="ir.config_parameter">
+            <field name="key">lgx.provision_age_days</field>
+            <field name="value">90</field>
+        </record>
+
+        <!-- Uang jalan -->
+        <record id="param_driver_single_open_advance" model="ir.config_parameter">
+            <field name="key">lgx.driver_single_open_advance</field>
+            <field name="value">1</field>
+        </record>
+        <record id="param_advance_tolerance_pct" model="ir.config_parameter">
+            <field name="key">lgx.advance_tolerance_pct</field>
+            <field name="value">10.0</field>
+        </record>
+        <record id="param_expense_proof_threshold" model="ir.config_parameter">
+            <field name="key">lgx.expense_proof_threshold</field>
+            <field name="value">100000</field>
+        </record>
+
+        <!-- Jam kerja pengemudi. ⚠ A12c: keempat angka ini baru bersumber
+             sekunder; Pasal 90 dan 92 UU 22/2009 harus dibaca langsung. -->
+        <record id="param_duty_max_continuous_driving" model="ir.config_parameter">
+            <field name="key">lgx.duty_max_continuous_driving_minutes</field>
+            <field name="value">240</field>
+        </record>
+        <record id="param_duty_required_rest" model="ir.config_parameter">
+            <field name="key">lgx.duty_required_rest_minutes</field>
+            <field name="value">30</field>
+        </record>
+        <record id="param_duty_max_daily_working" model="ir.config_parameter">
+            <field name="key">lgx.duty_max_daily_working_minutes</field>
+            <field name="value">480</field>
+        </record>
+        <record id="param_duty_absolute_max_working" model="ir.config_parameter">
+            <field name="key">lgx.duty_absolute_max_working_minutes</field>
+            <field name="value">720</field>
+        </record>
+
+        <!-- Pajak. Tarif efektif, bukan konstanta di kode (§11, LGX-F02). -->
+        <record id="param_vat_besaran_tertentu_rate" model="ir.config_parameter">
+            <field name="key">lgx.vat_besaran_tertentu_rate</field>
+            <field name="value">1.1</field>
+        </record>
+        <record id="param_vat_default_without_freight" model="ir.config_parameter">
+            <field name="key">lgx.vat_default_without_freight</field>
+            <field name="value">standard</field>
+        </record>
+        <record id="param_pph23_rate" model="ir.config_parameter">
+            <field name="key">lgx.pph23_rate</field>
+            <field name="value">2.0</field>
+        </record>
+        <record id="param_pph23_rate_no_npwp" model="ir.config_parameter">
+            <field name="key">lgx.pph23_rate_no_npwp</field>
+            <field name="value">4.0</field>
+        </record>
+        <record id="param_pph15_sea_rate" model="ir.config_parameter">
+            <field name="key">lgx.pph15_sea_rate</field>
+            <field name="value">1.2</field>
+        </record>
+        <record id="param_pph15_air_rate" model="ir.config_parameter">
+            <field name="key">lgx.pph15_air_rate</field>
+            <field name="value">1.8</field>
+        </record>
+        <record id="param_pph15_foreign_rate" model="ir.config_parameter">
+            <field name="key">lgx.pph15_foreign_rate</field>
+            <field name="value">2.64</field>
+        </record>
+        <!-- A4 TERTUTUP: sumber DJP (SE-35/PJ.4/1996) menyatakan 1,8%
+             penerbangan dalam negeri TIDAK final dan dapat dikreditkan.
+             Sumber sekunder yang menyebut final keliru. -->
+        <record id="param_pph15_air_is_final" model="ir.config_parameter">
+            <field name="key">lgx.pph15_air_is_final</field>
+            <field name="value">0</field>
+        </record>
+        <record id="param_stamp_duty_amount" model="ir.config_parameter">
+            <field name="key">lgx.stamp_duty_amount</field>
+            <field name="value">10000</field>
+        </record>
+        <record id="param_stamp_duty_receipt_threshold" model="ir.config_parameter">
+            <field name="key">lgx.stamp_duty_receipt_threshold</field>
+            <field name="value">5000000</field>
+        </record>
+        <record id="param_coretax_xml_batch_size" model="ir.config_parameter">
+            <field name="key">lgx.coretax_xml_batch_size</field>
+            <field name="value">1000</field>
+        </record>
+
+        <!-- Operasional -->
+        <record id="param_volumetric_divisor_air" model="ir.config_parameter">
+            <field name="key">lgx.volumetric_divisor_air</field>
+            <field name="value">6000</field>
+        </record>
+        <record id="param_air_weight_rounding" model="ir.config_parameter">
+            <field name="key">lgx.air_weight_rounding_kg</field>
+            <field name="value">0.5</field>
+        </record>
+        <record id="param_doc_expiry_warning_days" model="ir.config_parameter">
+            <field name="key">lgx.doc_expiry_warning_days</field>
+            <field name="value">30</field>
+        </record>
+        <!-- ⚠ A5: masa berlaku KIR belum terkonfirmasi ke PM 19/2021 fulltext. -->
+        <record id="param_kir_validity_months" model="ir.config_parameter">
+            <field name="key">lgx.kir_validity_months</field>
+            <field name="value">6</field>
+        </record>
+        <record id="param_occupancy_retention_months" model="ir.config_parameter">
+            <field name="key">lgx.occupancy_retention_months</field>
+            <field name="value">13</field>
+        </record>
+    </data>
+</odoo>

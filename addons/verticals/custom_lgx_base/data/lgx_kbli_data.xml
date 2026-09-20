@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Kode KBLI yang relevan untuk logistik, KEDUA versi.
+            
+            Ini BUKAN KBLI lengkap (~1.700 kode per versi). Yang lengkap dimuat
+            lewat `lgx.kbli.lgx_import_csv` dari ekspor resmi BPS/OSS — butir A9
+            dan A25 di Lampiran A. Daftar di sini sengaja kecil dan jelas-jelas
+            kecil, supaya tidak ada yang mengira ia lengkap.
+
+            `is_verified` menandai mana yang sudah dikonfirmasi ke sumber primer.
+            Yang False TERLIHAT begitu di layar — bukan disembunyikan di komentar
+            kode yang tidak dibaca siapa pun.
+        -->
+
+        <!-- Jasa Pengurusan Transportasi -->
+        <record id="kbli_2020_52291" model="lgx.kbli">
+            <field name="version">2020</field><field name="code">52291</field>
+            <field name="name">Jasa Pengurusan Transportasi (JPT)</field>
+            <field name="section">H</field>
+            <field name="is_verified">1</field>
+            <field name="source_note">oss.go.id/kbli/detail</field>
+        </record>
+        <record id="kbli_2025_52311" model="lgx.kbli">
+            <field name="version">2025</field><field name="code">52311</field>
+            <field name="name">Jasa Pengurusan Transportasi (JPT)</field>
+            <field name="section">H</field>
+            <field name="is_verified">1</field>
+            <field name="source_note">oss.go.id/kbli/detail</field>
+        </record>
+
+        <!-- Angkutan bermotor untuk barang umum -->
+        <record id="kbli_2020_49431" model="lgx.kbli">
+            <field name="version">2020</field><field name="code">49431</field>
+            <field name="name">Angkutan Bermotor untuk Barang Umum</field>
+            <field name="section">H</field>
+            <field name="risk_level">menengah_tinggi</field>
+            <field name="permit_form">NIB + Sertifikat Standar</field>
+            <field name="requirement_note">Bukti lulus uji berkala (KIR); denah dan foto pool; fasilitas bongkar muat; GPS terpasang di kendaraan.</field>
+            <field name="is_verified">1</field>
+            <field name="source_note">oss.go.id/kbli/detail</field>
+        </record>
+        <record id="kbli_2025_49231" model="lgx.kbli">
+            <field name="version">2025</field><field name="code">49231</field>
+            <field name="name">Angkutan Bermotor untuk Barang Umum</field>
+            <field name="section">H</field>
+            <field name="risk_level">menengah_tinggi</field>
+            <field name="permit_form">NIB + Sertifikat Standar</field>
+            <field name="requirement_note">Bukti lulus uji berkala (KIR); denah dan foto pool; fasilitas bongkar muat; GPS terpasang di kendaraan.</field>
+            <field name="is_verified">1</field>
+            <field name="source_note">oss.go.id/kbli/detail</field>
+        </record>
+
+        <!-- Pergudangan — ⚠ KONVERSI BELUM TERKONFIRMASI (butir A9) -->
+        <record id="kbli_2020_52101" model="lgx.kbli">
+            <field name="version">2020</field><field name="code">52101</field>
+            <field name="name">Pergudangan dan Penyimpanan</field>
+            <field name="section">H</field>
+            <field name="is_verified">1</field>
+        </record>
+        <record id="kbli_2025_52109" model="lgx.kbli">
+            <field name="version">2025</field><field name="code">52109</field>
+            <field name="name">Pergudangan dan Penyimpanan (padanan dugaan)</field>
+            <field name="section">H</field>
+            <field name="is_verified">0</field>
+            <field name="source_note">⚠ Belum dikonfirmasi ke OSS/BPS — Lampiran A butir A9</field>
+        </record>
+
+        <!-- Aktivitas kepabeanan / PPJK -->
+        <record id="kbli_2020_52292" model="lgx.kbli">
+            <field name="version">2020</field><field name="code">52292</field>
+            <field name="name">Jasa Pengurusan Jasa Kepabeanan (PPJK)</field>
+            <field name="section">H</field>
+            <field name="is_verified">0</field>
+            <field name="source_note">⚠ Belum dikonfirmasi ke OSS</field>
+        </record>
+
+        <!-- Bongkar muat -->
+        <record id="kbli_2020_52240" model="lgx.kbli">
+            <field name="version">2020</field><field name="code">52240</field>
+            <field name="name">Penanganan Kargo (Bongkar Muat Barang)</field>
+            <field name="section">H</field>
+            <field name="is_verified">0</field>
+            <field name="source_note">⚠ Belum dikonfirmasi ke OSS</field>
+        </record>
+
+        <!-- Pelayaran dalam negeri — ⚠ konversi belum terkonfirmasi (butir A9) -->
+        <record id="kbli_2020_50131" model="lgx.kbli">
+            <field name="version">2020</field><field name="code">50131</field>
+            <field name="name">Angkutan Laut Dalam Negeri untuk Barang Umum</field>
+            <field name="section">H</field>
+            <field name="is_verified">0</field>
+            <field name="source_note">⚠ Konversi ke KBLI 2025 belum dikonfirmasi — Lampiran A butir A9</field>
+        </record>
+
+        <!--
+            Pemetaan antar versi. Dijalankan lewat <function> supaya ia
+            idempoten dan berjalan ulang setiap update — pemetaan yang lahir di
+            noupdate="1" tidak akan pernah diperbaiki ketika konversinya
+            akhirnya terkonfirmasi.
+        -->
+    </data>
+    <data>
+        <function model="lgx.kbli" name="_lgx_seed_version_mapping"/>
+    </data>
+</odoo>

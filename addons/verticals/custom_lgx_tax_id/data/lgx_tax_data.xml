@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Tarif pot-put dengan masa berlaku. TIDAK ada ir.sequence di modul ini:
+            NSFP 17 digit datang dari respons DJP dan disimpan custom_coretax,
+            tidak pernah dihasilkan sendiri (PER-11/PJ/2025 Pasal 37).
+        -->
+        <record id="wht_pph23" model="lgx.wht.rate">
+            <field name="name">PPh 23 — jasa freight forwarding, logistik, ekspedisi</field>
+            <field name="wht_type">pph23</field>
+            <field name="rate">2.0</field>
+            <field name="rate_no_npwp">4.0</field>
+            <field name="is_final">0</field>
+            <field name="legal_basis">PMK 141/PMK.03/2015; UU PPh Pasal 23 ayat 1a untuk kenaikan 100% tanpa NPWP</field>
+            <field name="valid_from">2015-12-24</field>
+        </record>
+        <record id="wht_pph15_sea" model="lgx.wht.rate">
+            <field name="name">PPh 15 — pelayaran dalam negeri</field>
+            <field name="wht_type">pph15_sea</field>
+            <field name="rate">1.2</field>
+            <field name="rate_no_npwp">1.2</field>
+            <field name="is_final">1</field>
+            <field name="legal_basis">KMK-416/KMK.04/1996 — bersifat FINAL</field>
+            <field name="valid_from">1996-06-14</field>
+        </record>
+        <record id="wht_pph15_air" model="lgx.wht.rate">
+            <field name="name">PPh 15 — penerbangan dalam negeri (charter)</field>
+            <field name="wht_type">pph15_air</field>
+            <field name="rate">1.8</field>
+            <field name="rate_no_npwp">1.8</field>
+            <!--
+                TIDAK final. Butir A4 Lampiran A sudah ditutup: sumber DJP
+                (SE-35/PJ.4/1996) menyatakan tarif ini dapat dikreditkan terhadap
+                PPh terutang di SPT Tahunan. Banyak sumber sekunder menyebutnya
+                final; sumber sekunder itu keliru, dan mengikutinya berarti
+                kehilangan kredit pajak yang sah.
+            -->
+            <field name="is_final">0</field>
+            <field name="legal_basis">KMK-475/KMK.04/1996; SE-35/PJ.4/1996 — TIDAK final, dapat dikreditkan</field>
+            <field name="valid_from">1996-06-14</field>
+        </record>
+        <record id="wht_pph15_foreign" model="lgx.wht.rate">
+            <field name="name">PPh 15 — pelayaran/penerbangan luar negeri (BUT)</field>
+            <field name="wht_type">pph15_foreign</field>
+            <field name="rate">2.64</field>
+            <field name="rate_no_npwp">2.64</field>
+            <field name="is_final">1</field>
+            <field name="legal_basis">KMK-417/KMK.04/1996 — bersifat FINAL</field>
+            <field name="valid_from">1996-06-14</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_rate_card_list" model="ir.ui.view">
+        <field name="name">lgx.rate.card.list</field>
+        <field name="model">lgx.rate.card</field>
+        <field name="arch" type="xml">
+            <list string="Rate Card" decoration-muted="state == 'expired'">
+                <field name="name"/>
+                <field name="direction"/>
+                <field name="partner_id"/>
+                <field name="transport_mode"/>
+                <field name="load_type"/>
+                <field name="origin_id"/>
+                <field name="destination_id"/>
+                <field name="valid_from"/>
+                <field name="valid_to"/>
+                <field name="version"/>
+                <field name="currency_id" optional="hide"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_rate_card_form" model="ir.ui.view">
+        <field name="name">lgx.rate.card.form</field>
+        <field name="model">lgx.rate.card</field>
+        <field name="arch" type="xml">
+            <form string="Rate Card">
+                <header>
+                    <button name="action_activate" type="object" string="Aktifkan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_new_version" type="object" string="Versi Baru"
+                            invisible="state != 'active'"/>
+                    <button name="action_expire" type="object" string="Kedaluwarsakan"
+                            invisible="state != 'active'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Lingkup">
+                            <field name="code"/>
+                            <field name="direction"/>
+                            <field name="partner_id"/>
+                            <field name="transport_mode"/>
+                            <field name="load_type"/>
+                            <field name="currency_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Rute &amp; Masa Berlaku">
+                            <field name="origin_id"/>
+                            <field name="destination_id"/>
+                            <field name="origin_country_id"/>
+                            <field name="destination_country_id"/>
+                            <field name="valid_from"/>
+                            <field name="valid_to"/>
+                            <field name="version" readonly="1"/>
+                            <field name="supersedes_id" readonly="1" invisible="not supersedes_id"/>
+                            <field name="superseded_by_id" readonly="1" invisible="not superseded_by_id"/>
+                        </group>
+                    </group>
+                    <group string="Berat yang Ditagih">
+                        <group>
+                            <field name="volumetric_divisor"/>
+                            <field name="weight_rounding"/>
+                        </group>
+                        <group>
+                            <field name="minimum_charge"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Baris Tarif">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="charge_code_id"/>
+                                    <field name="basis"/>
+                                    <field name="container_type_id"/>
+                                    <field name="price"/>
+                                    <field name="minimum_charge"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="charge_code_id"/>
+                                        <field name="basis"/>
+                                        <field name="container_type_id"/>
+                                        <field name="price"/>
+                                        <field name="minimum_charge"/>
+                                    </group>
+                                    <group string="Tarif Berjenjang">
+                                        <field name="break_ids" nolabel="1">
+                                            <list editable="bottom">
+                                                <field name="min_quantity"/>
+                                                <field name="price"/>
+                                                <field name="currency_id" column_invisible="True"/>
+                                            </list>
+                                        </field>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Surcharge">
+                            <div class="alert alert-info" role="alert">
+                                BAF, CAF, emergency surcharge dan biaya musiman berubah jauh lebih
+                                sering daripada tarif pokoknya. Menaruhnya di sini membuat perubahan
+                                itu tidak menuntut versi baru seluruh rate card.
+                            </div>
+                            <field name="surcharge_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="charge_code_id"/>
+                                    <field name="calculation"/>
+                                    <field name="value"/>
+                                    <field name="applies_to_ids" widget="many2many_tags"/>
+                                    <field name="valid_from"/>
+                                    <field name="valid_to"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Catatan"><field name="note" nolabel="1"/></page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_rate_card_search" model="ir.ui.view">
+        <field name="name">lgx.rate.card.search</field>
+        <field name="model">lgx.rate.card</field>
+        <field name="arch" type="xml">
+            <search string="Rate Card">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="origin_id"/>
+                <field name="destination_id"/>
+                <filter name="f_sell" string="Jual" domain="[('direction','=','sell')]"/>
+                <filter name="f_buy" string="Beli" domain="[('direction','=','buy')]"/>
+                <filter name="f_active" string="Aktif" domain="[('state','=','active')]"/>
+                <separator/>
+                <filter name="g_direction" string="Arah" context="{'group_by':'direction'}"/>
+                <filter name="g_partner" string="Mitra" context="{'group_by':'partner_id'}"/>
+                <filter name="g_mode" string="Moda" context="{'group_by':'transport_mode'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_rate_card" model="ir.actions.act_window">
+        <field name="name">Rate Card</field>
+        <field name="res_model">lgx.rate.card</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_f_active': 1, 'search_default_g_direction': 1}</field>
+    </record>
+</odoo>

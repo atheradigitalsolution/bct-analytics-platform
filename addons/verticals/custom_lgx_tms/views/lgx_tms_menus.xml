@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_trip" name="Trip" parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_trip" sequence="50"
+              groups="custom_lgx_base.group_lgx_trucking_dispatcher,custom_lgx_base.group_lgx_management_viewer"/>
+    <menuitem id="menu_lgx_trip_pod" name="POD Belum Lengkap" parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_trip_pod_missing" sequence="52"
+              groups="custom_lgx_base.group_lgx_trucking_dispatcher"/>
+    <menuitem id="menu_lgx_advance" name="Uang Jalan" parent="custom_lgx_base.menu_lgx_finance"
+              action="action_lgx_trip_advance" sequence="60"/>
+    <menuitem id="menu_lgx_advance_open" name="Uang Jalan Terbuka" parent="custom_lgx_base.menu_lgx_finance"
+              action="action_lgx_advance_open" sequence="65"/>
+    <menuitem id="menu_lgx_driver" name="Pengemudi" parent="custom_lgx_base.menu_lgx_config_reference"
+              action="action_lgx_driver" sequence="90"/>
+    <menuitem id="menu_lgx_route" name="Rute &amp; Tarif Darat" parent="custom_lgx_base.menu_lgx_config_commercial"
+              action="action_lgx_route" sequence="20"/>
+</odoo>

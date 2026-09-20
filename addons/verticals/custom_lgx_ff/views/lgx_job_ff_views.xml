@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_job_form_ff" model="ir.ui.view">
+        <field name="name">lgx.job.form.ff</field>
+        <field name="model">lgx.job</field>
+        <field name="inherit_id" ref="custom_lgx_job.view_lgx_job_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_generate_agent_share" type="object" string="Hitung Bagian Agen"
+                        invisible="not is_nomination or state in ('draft','cancelled')"/>
+            </xpath>
+            <xpath expr="//page[@name='milestones']" position="before">
+                <page string="Shipment" name="shipments">
+                    <field name="shipment_ids" context="{'default_job_id': id}">
+                        <list>
+                            <field name="name"/>
+                            <field name="is_master"/>
+                            <field name="transport_mode"/>
+                            <field name="master_doc_no"/>
+                            <field name="house_doc_no"/>
+                            <field name="pol_id"/>
+                            <field name="pod_id"/>
+                            <field name="etd"/>
+                            <field name="eta"/>
+                            <field name="chargeable_weight"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                    <group class="oe_subtotal_footer">
+                        <field name="container_open_count"/>
+                        <field name="demurrage_days_total"/>
+                        <field name="detention_days_total"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

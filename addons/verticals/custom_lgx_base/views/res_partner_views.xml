@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_lgx" model="ir.ui.view">
+        <field name="name">res.partner.form.lgx</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="Logistik" name="lgx" groups="custom_lgx_base.group_lgx_staff">
+                    <group>
+                        <group string="Peran">
+                            <field name="lgx_is_carrier"/>
+                            <field name="lgx_is_agent"/>
+                            <field name="lgx_is_shipper"/>
+                            <field name="lgx_is_consignee"/>
+                            <field name="lgx_is_depot"/>
+                            <field name="lgx_is_ppjk"/>
+                            <field name="lgx_is_warehouse_client"/>
+                        </group>
+                        <group string="Identitas Kepabeanan">
+                            <field name="lgx_nib"/>
+                            <field name="lgx_customs_access_type"/>
+                            <field name="lgx_nitku"/>
+                            <field name="lgx_scac" invisible="not lgx_is_carrier"/>
+                            <field name="lgx_iata_code" invisible="not lgx_is_carrier"/>
+                        </group>
+                    </group>
+                    <group invisible="not lgx_is_carrier and not lgx_is_agent">
+                        <group string="Syarat Carrier" invisible="not lgx_is_carrier">
+                            <field name="lgx_free_days_demurrage"/>
+                            <field name="lgx_free_days_detention"/>
+                        </group>
+                        <group string="Agen" invisible="not lgx_is_agent">
+                            <field name="lgx_agent_profit_share"/>
+                        </group>
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+</odoo>

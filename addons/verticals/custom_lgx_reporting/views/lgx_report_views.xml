@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_report_job_profit_list" model="ir.ui.view">
+        <field name="name">lgx.report.job.profit.list</field>
+        <field name="model">lgx.report.job.profit</field>
+        <field name="arch" type="xml">
+            <list string="Laba per Job" create="false">
+                <field name="job_name"/>
+                <field name="segment"/>
+                <field name="job_type" optional="hide"/>
+                <field name="customer_id"/>
+                <field name="origin_id" optional="show"/>
+                <field name="destination_id" optional="show"/>
+                <field name="etd"/>
+                <field name="revenue_service" sum="Pendapatan Jasa"/>
+                <field name="cost_service" sum="Biaya Jasa"/>
+                <field name="margin" sum="Margin"/>
+                <field name="margin_pct" widget="percentage"/>
+                <field name="accrual_open" sum="Estimasi Belum Aktual"/>
+                <field name="accrual_share_pct" widget="percentage"/>
+                <field name="disbursement_billed" sum="Talangan" optional="hide"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_report_job_profit_pivot" model="ir.ui.view">
+        <field name="name">lgx.report.job.profit.pivot</field>
+        <field name="model">lgx.report.job.profit</field>
+        <field name="arch" type="xml">
+            <pivot string="Laba per Segmen">
+                <field name="segment" type="row"/>
+                <field name="etd" interval="month" type="col"/>
+                <field name="revenue_service" type="measure"/>
+                <field name="cost_service" type="measure"/>
+                <field name="margin" type="measure"/>
+                <field name="accrual_open" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+    <record id="view_lgx_report_job_profit_graph" model="ir.ui.view">
+        <field name="name">lgx.report.job.profit.graph</field>
+        <field name="model">lgx.report.job.profit</field>
+        <field name="arch" type="xml">
+            <graph string="Margin per Segmen" type="bar">
+                <field name="segment"/>
+                <field name="margin" type="measure"/>
+            </graph>
+        </field>
+    </record>
+    <record id="view_lgx_report_job_profit_search" model="ir.ui.view">
+        <field name="name">lgx.report.job.profit.search</field>
+        <field name="model">lgx.report.job.profit</field>
+        <field name="arch" type="xml">
+            <search string="Laba per Job">
+                <field name="job_name"/>
+                <field name="customer_id"/>
+                <field name="segment"/>
+                <filter name="f_open" string="Belum Tutup"
+                        domain="[('state','not in',('closed','cancelled'))]"/>
+                <filter name="f_thin" string="Margin di Bawah 10%" domain="[('margin_pct','&lt;',10)]"/>
+                <filter name="f_unreliable" string="Estimasi Belum Aktual &gt; 30%"
+                        domain="[('accrual_share_pct','&gt;',30)]"/>
+                <separator/>
+                <filter name="g_segment" string="Segmen" context="{'group_by':'segment'}"/>
+                <filter name="g_customer" string="Pelanggan" context="{'group_by':'customer_id'}"/>
+                <filter name="g_sales" string="Penjual" context="{'group_by':'salesperson_id'}"/>
+                <filter name="g_ou" string="Cabang" context="{'group_by':'operating_unit_id'}"/>
+                <filter name="g_route" string="Tujuan" context="{'group_by':'destination_id'}"/>
+                <filter name="g_month" string="ETD" context="{'group_by':'etd:month'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_report_job_profit" model="ir.actions.act_window">
+        <field name="name">Laba per Job &amp; Segmen</field>
+        <field name="res_model">lgx.report.job.profit</field>
+        <field name="view_mode">list,pivot,graph</field>
+        <field name="context">{'search_default_g_segment': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Porsi estimasi yang belum menjadi aktual ditampilkan berdampingan dengan margin.
+                Itu ukuran seberapa dipercaya angka margin bulan berjalan — margin tanpa angka itu
+                adalah setengah kalimat.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_lgx_report_cycle_pivot" model="ir.ui.view">
+        <field name="name">lgx.report.cycle.time.pivot</field>
+        <field name="model">lgx.report.cycle.time</field>
+        <field name="arch" type="xml">
+            <pivot string="Waktu Siklus">
+                <field name="milestone_code" type="row"/>
+                <field name="elapsed_days" type="measure"/>
+                <field name="delay_days" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+    <record id="view_lgx_report_cycle_list" model="ir.ui.view">
+        <field name="name">lgx.report.cycle.time.list</field>
+        <field name="model">lgx.report.cycle.time</field>
+        <field name="arch" type="xml">
+            <list string="Waktu Siklus" create="false">
+                <field name="job_id"/>
+                <field name="milestone_type_id"/>
+                <field name="planned_date"/>
+                <field name="actual_date"/>
+                <field name="delay_days"/>
+                <field name="elapsed_days"/>
+                <field name="customer_id" optional="show"/>
+                <field name="destination_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_report_cycle_time" model="ir.actions.act_window">
+        <field name="name">Waktu Siklus per Tahap</field>
+        <field name="res_model">lgx.report.cycle.time</field>
+        <field name="view_mode">pivot,list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Baca sebagai median dan persentil, bukan rata-rata. Distribusi waktu bongkar
+                pelabuhan berekor panjang, dan rata-rata pada distribusi berekor panjang
+                menyembunyikan justru kasus yang membuat pelanggan menelepon.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_lgx_report_provision_list" model="ir.ui.view">
+        <field name="name">lgx.report.provision.accuracy.list</field>
+        <field name="model">lgx.report.provision.accuracy</field>
+        <field name="arch" type="xml">
+            <list string="Akurasi Provisi" create="false">
+                <field name="job_id"/>
+                <field name="charge_code_id"/>
+                <field name="category"/>
+                <field name="nature"/>
+                <field name="partner_id"/>
+                <field name="amount_estimated" sum="Estimasi"/>
+                <field name="amount_actual" sum="Aktual"/>
+                <field name="amount_variance" sum="Selisih"/>
+                <field name="accuracy_pct" widget="percentage"/>
+                <field name="provision_age_days"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_report_provision_pivot" model="ir.ui.view">
+        <field name="name">lgx.report.provision.accuracy.pivot</field>
+        <field name="model">lgx.report.provision.accuracy</field>
+        <field name="arch" type="xml">
+            <pivot string="Akurasi Provisi per Kategori">
+                <field name="category" type="row"/>
+                <field name="amount_estimated" type="measure"/>
+                <field name="amount_actual" type="measure"/>
+                <field name="amount_variance" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+    <record id="action_lgx_report_provision" model="ir.actions.act_window">
+        <field name="name">Akurasi Provisi</field>
+        <field name="res_model">lgx.report.provision.accuracy</field>
+        <field name="view_mode">list,pivot</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Selisih provisi terhadap tagihan yang akhirnya datang, per kategori charge.
+                Akurasi biasanya berbeda tajam antar kategori: freight yang dikontrakkan hampir
+                selalu tepat, demurrage hampir selalu meleset.
+            </p>
+        </field>
+    </record>
+</odoo>

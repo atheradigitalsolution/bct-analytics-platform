@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_job_form_portal" model="ir.ui.view">
+        <field name="name">lgx.job.form.portal</field>
+        <field name="model">lgx.job</field>
+        <field name="inherit_id" ref="custom_lgx_job.view_lgx_job_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_share_tracking_link" type="object"
+                        string="Tautan Pelacakan" invisible="state == 'draft'"/>
+                <button name="action_revoke_track_token" type="object"
+                        string="Cabut Tautan" groups="custom_lgx_base.group_lgx_ff_manager"/>
+            </xpath>
+            <field name="customer_reference" position="after">
+                <field name="is_portal_booking" readonly="1" invisible="not is_portal_booking"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_lgx_document_form_portal" model="ir.ui.view">
+        <field name="name">lgx.document.form.portal</field>
+        <field name="model">lgx.document</field>
+        <field name="inherit_id" ref="custom_lgx_doc.view_lgx_document_form"/>
+        <field name="arch" type="xml">
+            <field name="is_customer_visible" position="after">
+                <field name="download_count" readonly="1"/>
+                <field name="last_downloaded_at" readonly="1"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_lgx_download_log_list" model="ir.ui.view">
+        <field name="name">lgx.document.download.log.list</field>
+        <field name="model">lgx.document.download.log</field>
+        <field name="arch" type="xml">
+            <list string="Riwayat Unduh Dokumen" create="false">
+                <field name="downloaded_at"/>
+                <field name="document_id"/>
+                <field name="job_id"/>
+                <field name="partner_id"/>
+                <field name="source"/>
+                <field name="remote_addr" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_download_log" model="ir.actions.act_window">
+        <field name="name">Riwayat Unduh Dokumen</field>
+        <field name="res_model">lgx.document.download.log</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Dicatat bukan untuk mengawasi pelanggan, melainkan karena pertanyaan
+                "apakah mereka sudah menerima B/L-nya" muncul setiap minggu — dan menjawabnya
+                dengan tebakan adalah cara dokumen dikirim ulang berkali-kali lewat surel.
+            </p>
+        </field>
+    </record>
+    <menuitem id="menu_lgx_download_log" name="Riwayat Unduh Dokumen"
+              parent="custom_lgx_base.menu_lgx_reporting"
+              action="action_lgx_download_log" sequence="70"/>
+</odoo>

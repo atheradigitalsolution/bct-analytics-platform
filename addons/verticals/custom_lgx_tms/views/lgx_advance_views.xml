@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_trip_advance_list" model="ir.ui.view">
+        <field name="name">lgx.trip.advance.list</field>
+        <field name="model">lgx.trip.advance</field>
+        <field name="arch" type="xml">
+            <list string="Uang Jalan" decoration-warning="state in ('approved','paid')"
+                  decoration-success="state == 'settled'">
+                <field name="name"/>
+                <field name="trip_id"/>
+                <field name="driver_id"/>
+                <field name="amount_limit"/>
+                <field name="amount_requested"/>
+                <field name="amount_approved"/>
+                <field name="amount_paid" sum="Dibayarkan"/>
+                <field name="expense_total" sum="Biaya"/>
+                <field name="balance" sum="Saldo"/>
+                <field name="balance_direction"/>
+                <field name="settlement_date"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_trip_advance_form" model="ir.ui.view">
+        <field name="name">lgx.trip.advance.form</field>
+        <field name="model">lgx.trip.advance</field>
+        <field name="arch" type="xml">
+            <form string="Uang Jalan">
+                <header>
+                    <button name="action_approve" type="object" string="Setujui"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_pay" type="object" string="Bayarkan"
+                            class="btn-primary" invisible="state != 'approved'"/>
+                    <button name="action_settle" type="object" string="Tutup Pertanggungjawaban"
+                            class="btn-primary" invisible="state != 'paid'"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('settled','cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,approved,paid,settled"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="alert alert-info" role="alert" invisible="amount_limit">
+                        Batas dari master rute belum ada — rute atau tarifnya belum terisi.
+                        Itu yang harus diperbaiki, bukan dilewati dengan mengetik angka bebas.
+                    </div>
+                    <group>
+                        <group string="Pihak">
+                            <field name="trip_id"/>
+                            <field name="driver_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Nilai">
+                            <field name="amount_limit" readonly="1"/>
+                            <field name="amount_requested"/>
+                            <field name="amount_approved"/>
+                            <field name="amount_paid"/>
+                            <field name="currency_id"/>
+                            <field name="paid_date"/>
+                            <field name="payment_method"/>
+                        </group>
+                    </group>
+                    <group string="Persetujuan" invisible="not approval_user_id and not approval_reason">
+                        <field name="approval_user_id" readonly="1"/>
+                        <field name="approval_reason"/>
+                    </group>
+                    <field name="expense_ids">
+                        <list editable="bottom">
+                            <field name="date"/>
+                            <field name="category"/>
+                            <field name="description"/>
+                            <field name="amount" sum="Total"/>
+                            <field name="needs_proof"/>
+                            <field name="proof_ids" widget="many2many_binary"/>
+                            <field name="trip_id" column_invisible="True"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                    <group class="oe_subtotal_footer">
+                        <field name="expense_total"/>
+                        <field name="balance" class="oe_subtotal_footer_separator"/>
+                        <field name="balance_direction"/>
+                        <field name="settlement_date"/>
+                    </group>
+                    <group><field name="note"/></group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_trip_advance" model="ir.actions.act_window">
+        <field name="name">Uang Jalan</field>
+        <field name="res_model">lgx.trip.advance</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_lgx_advance_open" model="ir.actions.act_window">
+        <field name="name">Uang Jalan Belum Dipertanggungjawabkan</field>
+        <field name="res_model">lgx.trip.advance</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state','in',('approved','paid'))]</field>
+        <field name="context">{'search_default_group_driver': 1}</field>
+    </record>
+</odoo>

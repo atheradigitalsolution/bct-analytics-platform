@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_milestone_list" model="ir.ui.view">
+        <field name="name">lgx.milestone.list</field>
+        <field name="model">lgx.milestone</field>
+        <field name="arch" type="xml">
+            <list string="Milestone" decoration-danger="is_exception" decoration-success="actual_date">
+                <field name="job_id"/>
+                <field name="milestone_type_id"/>
+                <field name="planned_date"/>
+                <field name="actual_date"/>
+                <field name="delay_days"/>
+                <field name="location_id" optional="show"/>
+                <field name="source"/>
+                <field name="is_customer_visible"/>
+                <field name="is_exception" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_milestone_search" model="ir.ui.view">
+        <field name="name">lgx.milestone.search</field>
+        <field name="model">lgx.milestone</field>
+        <field name="arch" type="xml">
+            <search string="Milestone">
+                <field name="job_id"/>
+                <field name="milestone_type_id"/>
+                <filter name="f_pending" string="Belum Tercapai" domain="[('actual_date','=',False)]"/>
+                <filter name="f_late" string="Terlambat" domain="[('delay_days','>',0)]"/>
+                <filter name="f_exception" string="Kejadian Pengecualian" domain="[('is_exception','=',True)]"/>
+                <separator/>
+                <filter name="g_job" string="Job" context="{'group_by':'job_id'}"/>
+                <filter name="g_type" string="Jenis" context="{'group_by':'milestone_type_id'}"/>
+                <filter name="g_source" string="Sumber" context="{'group_by':'source'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_milestone" model="ir.actions.act_window">
+        <field name="name">Milestone</field>
+        <field name="res_model">lgx.milestone</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

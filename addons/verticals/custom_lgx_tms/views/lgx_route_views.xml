@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_route_list" model="ir.ui.view">
+        <field name="name">lgx.route.list</field>
+        <field name="model">lgx.route</field>
+        <field name="arch" type="xml">
+            <list string="Rute">
+                <field name="code"/>
+                <field name="origin_location_id"/>
+                <field name="destination_location_id"/>
+                <field name="distance_km"/>
+                <field name="standard_duration_hours"/>
+                <field name="toll_estimate"/>
+                <field name="fuel_estimate"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_route_form" model="ir.ui.view">
+        <field name="name">lgx.route.form</field>
+        <field name="model">lgx.route</field>
+        <field name="arch" type="xml">
+            <form string="Rute">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="origin_location_id"/>
+                            <field name="destination_location_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="distance_km"/>
+                            <field name="standard_duration_hours"/>
+                            <field name="toll_estimate"/>
+                            <field name="fuel_estimate"/>
+                            <field name="currency_id"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <b>Uang jalan standar di tarif ini adalah batas yang dipakai dispatcher.</b>
+                        Batas yang diketik bebas per trip adalah kebocoran, bukan fleksibilitas —
+                        nilai di atas batas menuntut persetujuan dengan alasan tercatat.
+                    </div>
+                    <field name="tariff_ids">
+                        <list editable="bottom">
+                            <field name="vehicle_category_id"/>
+                            <field name="partner_id"/>
+                            <field name="pricing_basis"/>
+                            <field name="price"/>
+                            <field name="standard_advance"/>
+                            <field name="valid_from"/>
+                            <field name="valid_to"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                    <group><field name="note"/></group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_route" model="ir.actions.act_window">
+        <field name="name">Rute</field>
+        <field name="res_model">lgx.route</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

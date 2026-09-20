@@ -1,0 +1,12 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_document_staff,lgx.document/staff,model_lgx_document,custom_lgx_base.group_lgx_staff,1,1,1,0
+access_lgx_document_ff_manager,lgx.document/ff_manager,model_lgx_document,custom_lgx_base.group_lgx_ff_manager,1,1,1,1
+access_lgx_document_finance_manager,lgx.document/finance_manager,model_lgx_document,custom_lgx_base.group_lgx_finance_manager,1,1,1,1
+access_lgx_document_driver,lgx.document/driver,model_lgx_document,custom_lgx_base.group_lgx_driver,1,0,0,0
+access_lgx_document_mgmt,lgx.document/management,model_lgx_document,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_checklist_staff,lgx.document.checklist/staff,model_lgx_document_checklist,custom_lgx_base.group_lgx_staff,1,1,1,0
+access_lgx_checklist_ff_manager,lgx.document.checklist/ff_manager,model_lgx_document_checklist,custom_lgx_base.group_lgx_ff_manager,1,1,1,1
+access_lgx_checklist_mgmt,lgx.document.checklist/management,model_lgx_document_checklist,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_checklist_tpl_staff,lgx.document.checklist.template/staff,model_lgx_document_checklist_template,custom_lgx_base.group_lgx_staff,1,0,0,0
+access_lgx_checklist_tpl_manager,lgx.document.checklist.template/ff_manager,model_lgx_document_checklist_template,custom_lgx_base.group_lgx_ff_manager,1,1,1,1
+access_lgx_checklist_tpl_system,lgx.document.checklist.template/system,model_lgx_document_checklist_template,base.group_system,1,1,1,1

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_wms_count_program_list" model="ir.ui.view">
+        <field name="name">lgx.wms.count.program.list</field>
+        <field name="model">lgx.wms.count.program</field>
+        <field name="arch" type="xml">
+            <list string="Program Opname" editable="bottom">
+                <field name="name"/>
+                <field name="client_id"/>
+                <field name="abc_class"/>
+                <field name="frequency_days"/>
+                <field name="discrepancy_threshold_pct"/>
+                <field name="last_run_date"/>
+                <field name="next_run_date"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_wms_count_program_form" model="ir.ui.view">
+        <field name="name">lgx.wms.count.program.form</field>
+        <field name="model">lgx.wms.count.program</field>
+        <field name="arch" type="xml">
+            <form string="Program Opname">
+                <header>
+                    <button name="action_generate_tasks" type="object" string="Bangkitkan Tugas"
+                            class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="client_id"/>
+                            <field name="abc_class"/>
+                            <field name="frequency_days"/>
+                            <field name="discrepancy_threshold_pct"/>
+                        </group>
+                        <group>
+                            <field name="last_run_date" readonly="1"/>
+                            <field name="next_run_date" readonly="1"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="location_ids" widget="many2many_tags"/>
+                        <field name="product_ids" widget="many2many_tags"/>
+                    </group>
+                    <field name="task_ids" readonly="1">
+                        <list>
+                            <field name="scheduled_date"/>
+                            <field name="location_id"/>
+                            <field name="counted_date"/>
+                            <field name="discrepancy_count"/>
+                            <field name="max_discrepancy_pct"/>
+                            <field name="needs_recount"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_wms_count_program" model="ir.actions.act_window">
+        <field name="name">Program Stock Opname</field>
+        <field name="res_model">lgx.wms.count.program</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_lgx_wms_count_task_list" model="ir.ui.view">
+        <field name="name">lgx.wms.count.task.list</field>
+        <field name="model">lgx.wms.count.task</field>
+        <field name="arch" type="xml">
+            <list string="Tugas Hitung" decoration-warning="needs_recount">
+                <field name="scheduled_date"/>
+                <field name="client_id"/>
+                <field name="location_id"/>
+                <field name="counter_id"/>
+                <field name="counted_date"/>
+                <field name="discrepancy_count"/>
+                <field name="max_discrepancy_pct"/>
+                <field name="needs_recount"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_wms_count_task_form" model="ir.ui.view">
+        <field name="name">lgx.wms.count.task.form</field>
+        <field name="model">lgx.wms.count.task</field>
+        <field name="arch" type="xml">
+            <form string="Tugas Hitung">
+                <header>
+                    <button name="action_start_count" type="object" string="Mulai Hitung"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_submit" type="object" string="Kirim untuk Ditinjau"
+                            class="btn-primary" invisible="state != 'counting'"/>
+                    <button name="action_create_recount" type="object" string="Hitung Ulang"
+                            invisible="state != 'review' or not needs_recount"/>
+                    <button name="action_approve_adjustment" type="object" string="Setujui Penyesuaian"
+                            invisible="state != 'review'"
+                            groups="custom_lgx_base.group_lgx_wh_supervisor"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="not needs_recount">
+                        Selisih terbesar melewati ambang program. Hitung ulang dulu — penyesuaian
+                        yang diposting dari hitungan pertama adalah cara kesalahan hitung menjadi
+                        kesalahan stok.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="program_id"/>
+                            <field name="client_id"/>
+                            <field name="location_id"/>
+                            <field name="recount_of_id" invisible="not recount_of_id"/>
+                        </group>
+                        <group>
+                            <field name="scheduled_date"/>
+                            <field name="counted_date"/>
+                            <field name="counter_id"/>
+                            <field name="approved_by_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="line_ids">
+                        <list editable="bottom" decoration-warning="discrepancy_qty != 0">
+                            <field name="product_id"/>
+                            <field name="lot_id"/>
+                            <field name="owner_id"/>
+                            <field name="quantity_expected"/>
+                            <field name="quantity_counted"/>
+                            <field name="discrepancy_qty"/>
+                            <field name="discrepancy_pct"/>
+                            <field name="note"/>
+                        </list>
+                    </field>
+                    <group><field name="adjustment_reason"/></group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_wms_count_task" model="ir.actions.act_window">
+        <field name="name">Tugas Hitung Stok</field>
+        <field name="res_model">lgx.wms.count.task</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

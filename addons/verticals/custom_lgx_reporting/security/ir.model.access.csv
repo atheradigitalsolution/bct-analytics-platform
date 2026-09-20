@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_report_job_profit_mgmt,lgx.report.job.profit/management,model_lgx_report_job_profit,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_report_job_profit_finance,lgx.report.job.profit/finance,model_lgx_report_job_profit,custom_lgx_base.group_lgx_finance_billing,1,0,0,0
+access_lgx_report_job_profit_sales,lgx.report.job.profit/sales_manager,model_lgx_report_job_profit,custom_lgx_base.group_lgx_sales_manager,1,0,0,0
+access_lgx_report_cycle_mgmt,lgx.report.cycle.time/management,model_lgx_report_cycle_time,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_report_cycle_staff,lgx.report.cycle.time/staff,model_lgx_report_cycle_time,custom_lgx_base.group_lgx_staff,1,0,0,0
+access_lgx_report_provision_mgmt,lgx.report.provision.accuracy/management,model_lgx_report_provision_accuracy,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_report_provision_finance,lgx.report.provision.accuracy/finance,model_lgx_report_provision_accuracy,custom_lgx_base.group_lgx_finance_accountant,1,0,0,0

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lgx_duty_log" name="Log Jam Kerja" parent="custom_lgx_base.menu_lgx_operations"
+              action="action_lgx_duty_log" sequence="60"
+              groups="custom_lgx_base.group_lgx_trucking_dispatcher"/>
+    <menuitem id="menu_lgx_duty_violation" name="Pelanggaran Jam Kerja"
+              parent="custom_lgx_base.menu_lgx_reporting"
+              action="action_lgx_duty_violation" sequence="40"/>
+</odoo>

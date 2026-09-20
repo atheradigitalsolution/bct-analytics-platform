@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_trip_list" model="ir.ui.view">
+        <field name="name">lgx.trip.list</field>
+        <field name="model">lgx.trip</field>
+        <field name="arch" type="xml">
+            <list string="Trip" decoration-danger="odol_status == 'blocked'"
+                  decoration-warning="odol_status == 'warning' or pod_missing_count > 0"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="trip_type"/>
+                <field name="job_id" optional="show"/>
+                <field name="vehicle_id"/>
+                <field name="driver_id"/>
+                <field name="route_id" optional="show"/>
+                <field name="planned_start"/>
+                <field name="cargo_weight_kg"/>
+                <field name="odol_status" widget="badge"/>
+                <field name="pod_missing_count" string="POD kurang"/>
+                <field name="advance_state" optional="show"/>
+                <field name="distance_km" optional="hide"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_trip_form" model="ir.ui.view">
+        <field name="name">lgx.trip.form</field>
+        <field name="model">lgx.trip</field>
+        <field name="arch" type="xml">
+            <form string="Trip">
+                <header>
+                    <button name="action_assign" type="object" string="Tugaskan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_create_advance" type="object" string="Terbitkan Uang Jalan"
+                            invisible="state not in ('assigned','draft') or advance_id"/>
+                    <button name="action_dispatch" type="object" string="Berangkatkan"
+                            class="btn-primary" invisible="state != 'assigned'"/>
+                    <button name="action_in_transit" type="object" string="Dalam Perjalanan"
+                            invisible="state != 'dispatched'"/>
+                    <button name="action_deliver" type="object" string="Terkirim"
+                            class="btn-primary" invisible="state not in ('dispatched','in_transit')"/>
+                    <button name="action_settle" type="object" string="Tutup Pertanggungjawaban"
+                            invisible="state != 'delivered'"/>
+                    <button name="action_close" type="object" string="Tutup Trip"
+                            invisible="state != 'settled'"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('settled','closed','cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,assigned,dispatched,delivered,settled,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="alert alert-danger" role="alert" invisible="odol_status != 'blocked'">
+                        <b>Melebihi kapasitas legal.</b>
+                        <field name="odol_message" nolabel="1" readonly="1"/>
+                        Penegakan Zero ODOL sudah berlaku, jadi penugasan ditolak.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="odol_status != 'warning'">
+                        <b>Peringatan ODOL.</b>
+                        <field name="odol_message" nolabel="1" readonly="1"/>
+                        Selama masa peringatan, melanjutkan menuntut alasan tercatat di bawah.
+                    </div>
+                    <div class="alert alert-info" role="alert"
+                         invisible="odol_status != 'unknown' or not vehicle_id">
+                        <field name="odol_message" nolabel="1" readonly="1"/>
+                        Ini bukan "lolos" — muatan memang tidak dapat diperiksa terhadap JBI.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="pod_missing_count == 0">
+                        <field name="pod_missing_count" nolabel="1" readonly="1" class="oe_inline"/>
+                        stop bongkar belum punya POD. Trip tidak dapat dinyatakan terkirim —
+                        POD adalah satu-satunya dasar penagihan di trucking.
+                    </div>
+                    <group>
+                        <group string="Penugasan">
+                            <field name="trip_type"/>
+                            <field name="job_id"/>
+                            <field name="vehicle_id"/>
+                            <field name="trailer_id"/>
+                            <field name="driver_id"/>
+                            <field name="helper_ids" widget="many2many_tags"/>
+                            <field name="operating_unit_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Rute &amp; Jadwal">
+                            <field name="route_id"/>
+                            <field name="origin_location_id"/>
+                            <field name="destination_location_id"/>
+                            <field name="planned_start"/>
+                            <field name="planned_end"/>
+                            <field name="actual_start"/>
+                            <field name="actual_end"/>
+                            <field name="duration_hours" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Muatan">
+                        <group>
+                            <field name="container_no" invisible="trip_type != 'container_haulage'"/>
+                            <field name="container_type_id" invisible="trip_type != 'container_haulage'"/>
+                            <field name="commodity_id"/>
+                            <field name="cargo_weight_kg"/>
+                            <field name="cargo_volume_cbm"/>
+                            <field name="package_count"/>
+                        </group>
+                        <group>
+                            <field name="odol_status" readonly="1"/>
+                            <field name="odol_override_reason"
+                                   invisible="odol_status not in ('warning','blocked')"/>
+                            <field name="odometer_start"/>
+                            <field name="odometer_end"/>
+                            <field name="distance_km"/>
+                            <field name="laden_km"/>
+                            <field name="empty_km" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Stop">
+                            <field name="stop_ids">
+                                <list editable="bottom" decoration-success="has_pod"
+                                      decoration-warning="stop_type == 'dropoff' and not has_pod">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="stop_type"/>
+                                    <field name="partner_id"/>
+                                    <field name="location_id" optional="hide"/>
+                                    <field name="planned_arrival"/>
+                                    <field name="actual_arrival"/>
+                                    <field name="qty_planned"/>
+                                    <field name="qty_delivered"/>
+                                    <field name="qty_rejected"/>
+                                    <field name="rejection_reason" optional="show"/>
+                                    <field name="received_by_name"/>
+                                    <field name="received_at"/>
+                                    <field name="has_pod"/>
+                                    <field name="pod_source" optional="show"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <group>
+                                            <field name="stop_type"/>
+                                            <field name="partner_id"/>
+                                            <field name="location_id"/>
+                                            <field name="address"/>
+                                            <field name="planned_arrival"/>
+                                            <field name="actual_arrival"/>
+                                        </group>
+                                        <group>
+                                            <field name="qty_planned"/>
+                                            <field name="qty_delivered"/>
+                                            <field name="qty_rejected"/>
+                                            <field name="rejection_reason"
+                                                   required="qty_rejected &gt; 0"/>
+                                        </group>
+                                    </group>
+                                    <group string="Bukti Terima (POD)">
+                                        <group>
+                                            <field name="received_by_name"/>
+                                            <field name="received_at"/>
+                                            <field name="pod_source"/>
+                                            <field name="has_pod" readonly="1"/>
+                                        </group>
+                                        <group>
+                                            <field name="pod_signature" widget="image"/>
+                                        </group>
+                                    </group>
+                                    <field name="pod_photo_ids" widget="many2many_binary"/>
+                                    <group><field name="note"/></group>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Uang Jalan &amp; Biaya">
+                            <group>
+                                <field name="advance_id"/>
+                                <field name="advance_state"/>
+                            </group>
+                            <field name="expense_ids">
+                                <list editable="bottom">
+                                    <field name="date"/>
+                                    <field name="category"/>
+                                    <field name="description"/>
+                                    <field name="quantity"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="needs_proof"/>
+                                    <field name="proof_ids" widget="many2many_binary"/>
+                                    <field name="advance_id" optional="hide"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="expense_total"/>
+                                <field name="currency_id" invisible="1"/>
+                            </group>
+                        </page>
+                        <page string="Catatan"><field name="note" nolabel="1"/></page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_lgx_trip_search" model="ir.ui.view">
+        <field name="name">lgx.trip.search</field>
+        <field name="model">lgx.trip</field>
+        <field name="arch" type="xml">
+            <search string="Trip">
+                <field name="name"/>
+                <field name="vehicle_id"/>
+                <field name="driver_id"/>
+                <field name="job_id"/>
+                <field name="route_id"/>
+                <filter name="f_open" string="Berjalan"
+                        domain="[('state','in',('assigned','dispatched','in_transit'))]"/>
+                <filter name="f_pod_missing" string="POD Belum Lengkap" domain="[('pod_missing_count','&gt;',0)]"/>
+                <filter name="f_odol" string="Melebihi JBI" domain="[('odol_status','in',('warning','blocked'))]"/>
+                <filter name="f_advance_open" string="Uang Jalan Belum Tutup"
+                        domain="[('advance_state','in',('approved','paid'))]"/>
+                <separator/>
+                <filter name="g_driver" string="Pengemudi" context="{'group_by':'driver_id'}"/>
+                <filter name="g_vehicle" string="Kendaraan" context="{'group_by':'vehicle_id'}"/>
+                <filter name="g_route" string="Rute" context="{'group_by':'route_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by':'state'}"/>
+                <filter name="g_date" string="Rencana Berangkat" context="{'group_by':'planned_start:day'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_lgx_trip" model="ir.actions.act_window">
+        <field name="name">Trip</field>
+        <field name="res_model">lgx.trip</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_f_open': 1}</field>
+    </record>
+    <record id="action_lgx_trip_pod_missing" model="ir.actions.act_window">
+        <field name="name">POD Belum Lengkap</field>
+        <field name="res_model">lgx.trip</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('pod_missing_count','&gt;',0),('state','not in',('cancelled','closed'))]</field>
+    </record>
+
+    <record id="view_lgx_job_form_tms" model="ir.ui.view">
+        <field name="name">lgx.job.form.tms</field>
+        <field name="model">lgx.job</field>
+        <field name="inherit_id" ref="custom_lgx_job.view_lgx_job_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='milestones']" position="before">
+                <page string="Trip" name="trips">
+                    <field name="trip_ids" context="{'default_job_id': id}">
+                        <list>
+                            <field name="name"/>
+                            <field name="trip_type"/>
+                            <field name="vehicle_id"/>
+                            <field name="driver_id"/>
+                            <field name="planned_start"/>
+                            <field name="cargo_weight_kg"/>
+                            <field name="odol_status"/>
+                            <field name="pod_missing_count"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                    <group class="oe_subtotal_footer">
+                        <field name="trip_open_count"/>
+                        <field name="pod_missing_total"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

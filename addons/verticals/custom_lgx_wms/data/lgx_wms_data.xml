@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Kategori barang milik klien: valuasi MANUAL/PERIODIK, bukan real time.
+
+            Ini jawaban atas keputusan 2 di Fase 0. `owner_id` pada quant TIDAK
+            dengan sendirinya mengecualikan barang dari valuasi: dengan
+            stock_account dan valuasi otomatis, penerimaan tetap membentuk jurnal
+            tanpa memedulikan pemilik. Mekanisme yang benar-benar bekerja adalah
+            kategori produk non-valuasi, dan itulah yang dibuktikan tes LGX-E07.
+        -->
+        <record id="product_category_client_goods" model="product.category">
+            <field name="name">Barang Milik Klien (3PL)</field>
+            <field name="lgx_is_client_goods">1</field>
+            <field name="property_valuation">periodic</field>
+            <field name="property_cost_method">standard</field>
+        </record>
+
+        <record id="cron_lgx_count_tasks" model="ir.cron">
+            <field name="name">LGX: bangkitkan tugas stock opname siklus</field>
+            <field name="model_id" ref="model_lgx_wms_count_program"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_generate_count_tasks()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

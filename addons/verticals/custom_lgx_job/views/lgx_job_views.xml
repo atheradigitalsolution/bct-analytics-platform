@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_job_list" model="ir.ui.view">
+        <field name="name">lgx.job.list</field>
+        <field name="model">lgx.job</field>
+        <field name="arch" type="xml">
+            <list string="Job" decoration-muted="state == 'cancelled'"
+                  decoration-success="state == 'closed'"
+                  decoration-warning="state == 'closed_provisioned'">
+                <field name="name"/>
+                <field name="job_type"/>
+                <field name="customer_id"/>
+                <field name="origin_location_id" optional="show"/>
+                <field name="destination_location_id" optional="show"/>
+                <field name="etd" optional="show"/>
+                <field name="eta" optional="show"/>
+                <field name="operating_unit_id" optional="hide"/>
+                <field name="revenue_total" sum="Pendapatan Jasa"/>
+                <field name="cost_total" sum="Biaya Jasa"/>
+                <field name="margin" sum="Margin"/>
+                <field name="margin_pct" widget="percentage" optional="show"/>
+                <field name="cost_accrual_open" sum="Akrual Terbuka" optional="show"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'closed'"
+                       decoration-info="state in ('confirmed','in_progress')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_lgx_job_form" model="ir.ui.view">
+        <field name="name">lgx.job.form</field>
+        <field name="model">lgx.job</field>
+        <field name="arch" type="xml">
+            <form string="Job">
+                <header>
+                    <button name="action_confirm" type="object" string="Konfirmasi"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_start" type="object" string="Jalankan"
+                            class="btn-primary" invisible="state != 'confirmed'"/>
+                    <button name="action_complete" type="object" string="Selesai Operasi"
+                            class="btn-primary" invisible="state not in ('confirmed','in_progress')"/>
+                    <button name="action_close" type="object" string="Tutup Penuh"
+                            class="btn-primary" invisible="state not in ('completed','closed_provisioned')"/>
+                    <button name="action_cancel" type="object" string="Batalkan"
+                            invisible="state in ('closed','closed_provisioned','cancelled')"/>
+                    <button name="action_draft" type="object" string="Kembali ke Draf"
+                            invisible="state != 'cancelled'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,confirmed,in_progress,completed,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                        <h3><field name="description" placeholder="Keterangan singkat job"/></h3>
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not close_blocked_reason or state in ('draft','cancelled')">
+                        <b>Penghalang penutupan:</b>
+                        <field name="close_blocked_reason" nolabel="1" readonly="1"/>
+                    </div>
+                    <group>
+                        <group string="Komersial">
+                            <field name="job_type"/>
+                            <field name="transport_mode"/>
+                            <field name="direction"/>
+                            <field name="customer_id"/>
+                            <field name="customer_reference"/>
+                            <field name="salesperson_id"/>
+                            <field name="operator_id"/>
+                            <field name="operating_unit_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Rute &amp; Jadwal">
+                            <field name="origin_location_id"/>
+                            <field name="destination_location_id"/>
+                            <field name="incoterm_id"/>
+                            <label for="etd" string="ETD / ETA"/>
+                            <div class="o_row">
+                                <field name="etd"/> <span class="mx-2">→</span> <field name="eta"/>
+                            </div>
+                            <label for="atd" string="ATD / ATA"/>
+                            <div class="o_row">
+                                <field name="atd"/> <span class="mx-2">→</span> <field name="ata"/>
+                            </div>
+                            <field name="target_close_date"/>
+                            <field name="closed_date" invisible="not closed_date"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Charge" name="charges">
+                            <field name="charge_ids" context="{'default_job_id': id}">
+                                <list editable="bottom" decoration-muted="state == 'cancelled'">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="kind"/>
+                                    <field name="charge_code_id"/>
+                                    <field name="name"/>
+                                    <field name="nature"/>
+                                    <field name="is_freight_charge" optional="show"/>
+                                    <field name="partner_id"/>
+                                    <field name="quantity"/>
+                                    <field name="uom_id" optional="hide"/>
+                                    <field name="unit_price"/>
+                                    <field name="amount_estimated" sum="Estimasi"/>
+                                    <field name="is_actual_known" string="Akt?"/>
+                                    <field name="amount_actual" sum="Aktual"/>
+                                    <field name="amount_variance" sum="Varians" optional="show"/>
+                                    <field name="wht_type" optional="hide"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="revenue_total"/>
+                                <field name="cost_total"/>
+                                <field name="margin" class="oe_subtotal_footer_separator"/>
+                                <field name="margin_pct" widget="percentage"/>
+                                <field name="disbursement_billed"/>
+                                <field name="disbursement_incurred"/>
+                                <field name="disbursement_balance"/>
+                                <field name="invoice_value"/>
+                                <field name="cost_accrual_open"/>
+                                <field name="variance_total"/>
+                            </group>
+                        </page>
+                        <page string="Pihak" name="parties">
+                            <group>
+                                <group string="Pihak Angkut">
+                                    <field name="shipper_id"/>
+                                    <field name="consignee_id"/>
+                                    <field name="notify_party_id"/>
+                                </group>
+                                <group string="Agen">
+                                    <field name="is_nomination"/>
+                                    <field name="agent_id" invisible="not is_nomination"
+                                           required="is_nomination"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Milestone" name="milestones">
+                            <field name="milestone_ids">
+                                <list editable="bottom" decoration-danger="is_exception"
+                                      decoration-success="actual_date">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="milestone_type_id"/>
+                                    <field name="planned_date"/>
+                                    <field name="actual_date"/>
+                                    <field name="delay_days" optional="show"/>
+                                    <field name="location_id" optional="hide"/>
+                                    <field name="is_mandatory"/>
+                                    <field name="is_customer_visible"/>
+                                    <field name="source"/>
+                                    <field name="is_exception" column_invisible="True"/>
+                                    <field name="note" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Kurs" name="fx">
+                            <div class="alert alert-info" role="alert">
+                                Kurs pembukuan mengunci margin pada tanggal job. Kurs pajak adalah
+                                <b>Kurs Menteri Keuangan</b> yang berlaku pada tanggal faktur pajak
+                                atau tanggal PIB — keduanya sengaja dipisah, karena memakai satu
+                                kurs untuk keduanya membuat nilai rupiah di faktur pajak salah.
+                            </div>
+                            <group>
+                                <group>
+                                    <field name="currency_id"/>
+                                    <field name="fx_rate_book"/>
+                                    <field name="fx_rate_tax"/>
+                                </group>
+                                <group>
+                                    <field name="fx_rate_date"/>
+                                    <field name="fx_rate_source"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_lgx_job_search" model="ir.ui.view">
+        <field name="name">lgx.job.search</field>
+        <field name="model">lgx.job</field>
+        <field name="arch" type="xml">
+            <search string="Job">
+                <field name="name"/>
+                <field name="customer_id"/>
+                <field name="customer_reference"/>
+                <field name="origin_location_id"/>
+                <field name="destination_location_id"/>
+                <filter name="f_open" string="Berjalan" domain="[('state','in',('confirmed','in_progress'))]"/>
+                <filter name="f_completed" string="Selesai Operasi" domain="[('state','=','completed')]"/>
+                <filter name="f_provisioned" string="Tutup dengan Provisi" domain="[('state','=','closed_provisioned')]"/>
+                <separator/>
+                <filter name="f_mine" string="Milik Saya"
+                        domain="['|',('salesperson_id','=',uid),('operator_id','=',uid)]"/>
+                <filter name="f_accrual" string="Masih Ada Akrual Terbuka" domain="[('cost_accrual_open','>',0)]"/>
+                <separator/>
+                <filter name="g_type" string="Jenis Job" context="{'group_by':'job_type'}"/>
+                <filter name="g_customer" string="Pelanggan" context="{'group_by':'customer_id'}"/>
+                <filter name="g_state" string="Status" context="{'group_by':'state'}"/>
+                <filter name="g_ou" string="Cabang" context="{'group_by':'operating_unit_id'}"/>
+                <filter name="g_etd" string="ETD" context="{'group_by':'etd:month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_lgx_job" model="ir.actions.act_window">
+        <field name="name">Job</field>
+        <field name="res_model">lgx.job</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_f_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Job adalah tulang punggung komersial untuk ketiga segmen. Shipment, trip
+                dan operasi gudang menggantung di bawahnya.
+            </p>
+        </field>
+    </record>
+</odoo>

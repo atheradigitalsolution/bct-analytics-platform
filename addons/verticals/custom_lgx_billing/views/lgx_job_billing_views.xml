@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_job_form_billing" model="ir.ui.view">
+        <field name="name">lgx.job.form.billing</field>
+        <field name="model">lgx.job</field>
+        <field name="inherit_id" ref="custom_lgx_job.view_lgx_job_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_post_accrual" type="object" string="Posting Akrual"
+                        invisible="state not in ('confirmed','in_progress')"
+                        groups="custom_lgx_base.group_lgx_finance_billing"/>
+                <button name="action_open_invoice_wizard" type="object" string="Buat Faktur"
+                        class="btn-primary" invisible="state in ('draft','cancelled')"
+                        groups="custom_lgx_base.group_lgx_finance_billing"/>
+                <button name="action_create_vendor_bills" type="object" string="Buat Tagihan Vendor"
+                        invisible="state in ('draft','cancelled')"
+                        groups="custom_lgx_base.group_lgx_finance_billing"/>
+                <button name="action_close_with_provision" type="object" string="Tutup dengan Provisi"
+                        invisible="state != 'completed'"
+                        groups="custom_lgx_base.group_lgx_finance_manager"/>
+            </xpath>
+            <xpath expr="//sheet" position="before">
+                <div class="oe_button_box" name="lgx_billing_box">
+                    <button name="action_view_invoices" type="object" class="oe_stat_button"
+                            icon="fa-file-text-o" invisible="invoice_count == 0">
+                        <field name="invoice_count" widget="statinfo" string="Dokumen"/>
+                    </button>
+                </div>
+            </xpath>
+            <xpath expr="//group[@class='oe_subtotal_footer']" position="inside">
+                <field name="amount_invoiced"/>
+                <field name="amount_to_invoice"/>
+                <field name="accrual_posted"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_lgx_provision_open" model="ir.actions.act_window">
+        <field name="name">Provisi Berjalan</field>
+        <field name="res_model">lgx.job.charge</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state','=','provisioned')]</field>
+        <field name="context">{'search_default_g_code': 1}</field>
+    </record>
+    <record id="action_lgx_disbursement_balance" model="ir.actions.act_window">
+        <field name="name">Talangan Belum Tertagih</field>
+        <field name="res_model">lgx.job</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('disbursement_balance','!=',0),('state','in',('completed','closed_provisioned','closed'))]</field>
+    </record>
+    <record id="view_lgx_job_charge_list_provision" model="ir.ui.view">
+        <field name="name">lgx.job.charge.list.provision</field>
+        <field name="model">lgx.job.charge</field>
+        <field name="inherit_id" ref="custom_lgx_job.view_lgx_job_charge_list"/>
+        <field name="arch" type="xml">
+            <field name="state" position="before">
+                <field name="provision_date" optional="show"/>
+                <field name="provision_age_days" optional="show"/>
+            </field>
+        </field>
+    </record>
+</odoo>

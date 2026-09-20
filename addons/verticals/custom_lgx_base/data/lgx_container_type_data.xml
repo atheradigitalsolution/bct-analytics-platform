@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Angka muatan dan volume adalah nilai nominal ISO. Kapasitas legal
+             jalan raya Indonesia (JBI) jauh lebih membatasi daripada angka ini
+             untuk haulage darat — lihat validasi ODOL di custom_lgx_fleet. -->
+        <record id="ctype_20gp" model="lgx.container.type">
+            <field name="code">20GP</field><field name="name">20ft General Purpose</field>
+            <field name="size_ft">20</field><field name="teu">1.0</field>
+            <field name="max_payload_kg">28200</field><field name="tare_weight_kg">2300</field>
+            <field name="internal_volume_cbm">33.2</field><field name="sequence">10</field>
+        </record>
+        <record id="ctype_40gp" model="lgx.container.type">
+            <field name="code">40GP</field><field name="name">40ft General Purpose</field>
+            <field name="size_ft">40</field><field name="teu">2.0</field>
+            <field name="max_payload_kg">26680</field><field name="tare_weight_kg">3750</field>
+            <field name="internal_volume_cbm">67.7</field><field name="sequence">20</field>
+        </record>
+        <record id="ctype_40hc" model="lgx.container.type">
+            <field name="code">40HC</field><field name="name">40ft High Cube</field>
+            <field name="size_ft">40</field><field name="teu">2.0</field><field name="is_high_cube">1</field>
+            <field name="max_payload_kg">26460</field><field name="tare_weight_kg">3970</field>
+            <field name="internal_volume_cbm">76.3</field><field name="sequence">30</field>
+        </record>
+        <record id="ctype_45hc" model="lgx.container.type">
+            <field name="code">45HC</field><field name="name">45ft High Cube</field>
+            <field name="size_ft">45</field><field name="teu">2.25</field><field name="is_high_cube">1</field>
+            <field name="max_payload_kg">27700</field><field name="tare_weight_kg">4800</field>
+            <field name="internal_volume_cbm">86.0</field><field name="sequence">40</field>
+        </record>
+        <record id="ctype_20rf" model="lgx.container.type">
+            <field name="code">20RF</field><field name="name">20ft Reefer</field>
+            <field name="size_ft">20</field><field name="teu">1.0</field><field name="is_reefer">1</field>
+            <field name="max_payload_kg">27400</field><field name="tare_weight_kg">3000</field>
+            <field name="internal_volume_cbm">28.3</field><field name="sequence">50</field>
+        </record>
+        <record id="ctype_40rf" model="lgx.container.type">
+            <field name="code">40RF</field><field name="name">40ft Reefer High Cube</field>
+            <field name="size_ft">40</field><field name="teu">2.0</field>
+            <field name="is_reefer">1</field><field name="is_high_cube">1</field>
+            <field name="max_payload_kg">29520</field><field name="tare_weight_kg">4800</field>
+            <field name="internal_volume_cbm">67.3</field><field name="sequence">60</field>
+        </record>
+        <record id="ctype_20ot" model="lgx.container.type">
+            <field name="code">20OT</field><field name="name">20ft Open Top</field>
+            <field name="size_ft">20</field><field name="teu">1.0</field><field name="is_open_top">1</field>
+            <field name="max_payload_kg">28130</field><field name="tare_weight_kg">2370</field>
+            <field name="internal_volume_cbm">32.0</field><field name="sequence">70</field>
+        </record>
+        <record id="ctype_40ot" model="lgx.container.type">
+            <field name="code">40OT</field><field name="name">40ft Open Top</field>
+            <field name="size_ft">40</field><field name="teu">2.0</field><field name="is_open_top">1</field>
+            <field name="max_payload_kg">26680</field><field name="tare_weight_kg">3850</field>
+            <field name="internal_volume_cbm">65.5</field><field name="sequence">80</field>
+        </record>
+        <record id="ctype_20fr" model="lgx.container.type">
+            <field name="code">20FR</field><field name="name">20ft Flat Rack</field>
+            <field name="size_ft">20</field><field name="teu">1.0</field><field name="is_flat_rack">1</field>
+            <field name="max_payload_kg">31260</field><field name="tare_weight_kg">2740</field>
+            <field name="sequence">90</field>
+        </record>
+        <record id="ctype_40fr" model="lgx.container.type">
+            <field name="code">40FR</field><field name="name">40ft Flat Rack</field>
+            <field name="size_ft">40</field><field name="teu">2.0</field><field name="is_flat_rack">1</field>
+            <field name="max_payload_kg">39340</field><field name="tare_weight_kg">5700</field>
+            <field name="sequence">100</field>
+        </record>
+        <record id="ctype_20tk" model="lgx.container.type">
+            <field name="code">20TK</field><field name="name">20ft ISO Tank</field>
+            <field name="size_ft">20</field><field name="teu">1.0</field>
+            <field name="max_payload_kg">26000</field><field name="tare_weight_kg">4000</field>
+            <field name="internal_volume_cbm">24.0</field><field name="sequence">110</field>
+        </record>
+        <record id="ctype_lcl" model="lgx.container.type">
+            <field name="code">LCL</field><field name="name">LCL / Konsolidasi (tanpa kontainer sendiri)</field>
+            <field name="size_ft">0</field><field name="teu">0.0</field><field name="sequence">200</field>
+        </record>
+    </data>
+</odoo>

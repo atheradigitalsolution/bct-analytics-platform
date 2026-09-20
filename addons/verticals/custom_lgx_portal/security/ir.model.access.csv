@@ -1,0 +1,10 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lgx_download_log_staff,lgx.document.download.log/staff,model_lgx_document_download_log,custom_lgx_base.group_lgx_staff,1,0,0,0
+access_lgx_download_log_ff_manager,lgx.document.download.log/ff_manager,model_lgx_document_download_log,custom_lgx_base.group_lgx_ff_manager,1,1,1,1
+access_lgx_download_log_mgmt,lgx.document.download.log/management,model_lgx_document_download_log,custom_lgx_base.group_lgx_management_viewer,1,0,0,0
+access_lgx_job_portal,lgx.job/portal,model_lgx_job,base.group_portal,1,0,0,0
+access_lgx_milestone_portal,lgx.milestone/portal,custom_lgx_job.model_lgx_milestone,base.group_portal,1,0,0,0
+access_lgx_document_portal,lgx.document/portal,model_lgx_document,base.group_portal,1,0,0,0
+access_lgx_shipment_portal,lgx.shipment/portal,custom_lgx_ff.model_lgx_shipment,base.group_portal,1,0,0,0
+access_lgx_container_portal,lgx.container/portal,custom_lgx_ff.model_lgx_container,base.group_portal,1,0,0,0
+access_lgx_location_portal,lgx.location/portal,custom_lgx_base.model_lgx_location,base.group_portal,1,0,0,0

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Kategori kendaraan angkutan barang yang lazim di Indonesia.
+             Angka JBI tipikal adalah ANGKA PERENCANAAN, bukan pengganti JBI
+             pada STNK kendaraan masing-masing: validasi ODOL selalu memakai
+             JBI kendaraan, tidak pernah angka kategori. -->
+        <record id="vcat_cdd" model="lgx.vehicle.category">
+            <field name="code">CDD</field><field name="name">Colt Diesel Double</field>
+            <field name="axle_configuration">1.2</field>
+            <field name="typical_jbi_kg">8000</field><field name="typical_payload_kg">5000</field>
+            <field name="typical_volume_cbm">25</field><field name="sequence">20</field>
+        </record>
+        <record id="vcat_cde" model="lgx.vehicle.category">
+            <field name="code">CDE</field><field name="name">Colt Diesel Engkel</field>
+            <field name="axle_configuration">1.1</field>
+            <field name="typical_jbi_kg">6000</field><field name="typical_payload_kg">2500</field>
+            <field name="typical_volume_cbm">12</field><field name="sequence">10</field>
+        </record>
+        <record id="vcat_fuso" model="lgx.vehicle.category">
+            <field name="code">FUSO</field><field name="name">Fuso / Tronton 6x2</field>
+            <field name="axle_configuration">1.22</field>
+            <field name="typical_jbi_kg">16000</field><field name="typical_payload_kg">10000</field>
+            <field name="typical_volume_cbm">45</field><field name="sequence">30</field>
+        </record>
+        <record id="vcat_tronton" model="lgx.vehicle.category">
+            <field name="code">TRONTON</field><field name="name">Tronton 6x4</field>
+            <field name="axle_configuration">1.22</field>
+            <field name="typical_jbi_kg">24000</field><field name="typical_payload_kg">15000</field>
+            <field name="typical_volume_cbm">60</field><field name="sequence">40</field>
+        </record>
+        <record id="vcat_trailer20" model="lgx.vehicle.category">
+            <field name="code">TRL20</field><field name="name">Trailer 20 ft</field>
+            <field name="axle_configuration">1.2.22</field>
+            <field name="typical_jbi_kg">32000</field><field name="typical_payload_kg">20000</field>
+            <field name="can_carry_container">1</field><field name="container_size_ft">20</field>
+            <field name="sequence">50</field>
+        </record>
+        <record id="vcat_trailer40" model="lgx.vehicle.category">
+            <field name="code">TRL40</field><field name="name">Trailer 40 ft</field>
+            <field name="axle_configuration">1.2.222</field>
+            <field name="typical_jbi_kg">40000</field><field name="typical_payload_kg">26000</field>
+            <field name="can_carry_container">1</field><field name="container_size_ft">40</field>
+            <field name="sequence">60</field>
+        </record>
+        <record id="vcat_wingbox" model="lgx.vehicle.category">
+            <field name="code">WINGBOX</field><field name="name">Wing Box</field>
+            <field name="axle_configuration">1.22</field>
+            <field name="typical_jbi_kg">24000</field><field name="typical_payload_kg">12000</field>
+            <field name="typical_volume_cbm">55</field><field name="sequence">45</field>
+        </record>
+        <record id="cron_lgx_vehicle_documents" model="ir.cron">
+            <field name="name">LGX: peringatan masa berlaku dokumen kendaraan</field>
+            <field name="model_id" ref="fleet.model_fleet_vehicle"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_warn_vehicle_documents()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">weeks</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

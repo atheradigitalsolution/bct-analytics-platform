@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_lgx_customs_declaration" model="ir.sequence">
+            <field name="name">Deklarasi Pabean</field>
+            <field name="code">lgx.customs.declaration</field>
+            <field name="prefix">DEC/%(year)s/%(month)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="x_monthly_reset" eval="True"/>
+        </record>
+        <record id="seq_lgx_customs_guarantee" model="ir.sequence">
+            <field name="name">Jaminan Kepabeanan</field>
+            <field name="code">lgx.customs.guarantee</field>
+            <field name="prefix">JMN/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="use_date_range" eval="True"/>
+        </record>
+        <record id="cron_lgx_guarantee_flag" model="ir.cron">
+            <field name="name">LGX: status jaminan kepabeanan</field>
+            <field name="model_id" ref="model_lgx_customs_guarantee"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_flag_guarantees()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

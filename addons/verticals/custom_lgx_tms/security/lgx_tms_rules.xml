@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="rule_lgx_trip_company" model="ir.rule">
+            <field name="name">Trip: per perusahaan</field>
+            <field name="model_id" ref="model_lgx_trip"/>
+            <field name="domain_force">[('company_id','in',company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+        <!--
+            Pengemudi hanya melihat trip MILIKNYA SENDIRI.
+
+            Aturan ini ada karena akses pengemudi berjalan lewat perangkat yang
+            dibawa keluar kantor. Kalau perangkat itu hilang, yang ikut hilang
+            harus sebatas trip orang itu — bukan seluruh jadwal armada, alamat
+            seluruh pelanggan, dan nilai uang jalan semua orang.
+        -->
+        <record id="rule_lgx_trip_own_driver" model="ir.rule">
+            <field name="name">Trip: pengemudi hanya melihat miliknya</field>
+            <field name="model_id" ref="model_lgx_trip"/>
+            <field name="domain_force">[('driver_id.user_id','=',user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_lgx_base.group_lgx_driver'))]"/>
+        </record>
+        <record id="rule_lgx_trip_stop_own_driver" model="ir.rule">
+            <field name="name">Stop: pengemudi hanya melihat miliknya</field>
+            <field name="model_id" ref="model_lgx_trip_stop"/>
+            <field name="domain_force">[('trip_id.driver_id.user_id','=',user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_lgx_base.group_lgx_driver'))]"/>
+        </record>
+        <record id="rule_lgx_advance_own_driver" model="ir.rule">
+            <field name="name">Uang jalan: pengemudi hanya melihat miliknya</field>
+            <field name="model_id" ref="model_lgx_trip_advance"/>
+            <field name="domain_force">[('driver_id.user_id','=',user.id)]</field>
+            <field name="groups" eval="[(4, ref('custom_lgx_base.group_lgx_driver'))]"/>
+        </record>
+        <record id="rule_lgx_advance_company" model="ir.rule">
+            <field name="name">Uang jalan: per perusahaan</field>
+            <field name="model_id" ref="model_lgx_trip_advance"/>
+            <field name="domain_force">[('company_id','in',company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+        <record id="rule_lgx_route_company" model="ir.rule">
+            <field name="name">Rute: per perusahaan</field>
+            <field name="model_id" ref="model_lgx_route"/>
+            <field name="domain_force">[('company_id','in',company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+    </data>
+</odoo>

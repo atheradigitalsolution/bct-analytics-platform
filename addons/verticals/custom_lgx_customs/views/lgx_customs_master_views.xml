@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_hs_code_list" model="ir.ui.view">
+        <field name="name">lgx.hs.code.list</field>
+        <field name="model">lgx.hs.code</field>
+        <field name="arch" type="xml">
+            <list string="HS Code" editable="bottom" decoration-warning="lartas_flag">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="chapter" optional="hide"/>
+                <field name="bm_rate"/>
+                <field name="ppn_rate"/>
+                <field name="ppnbm_rate" optional="hide"/>
+                <field name="pph22_rate"/>
+                <field name="pph22_rate_no_api" optional="hide"/>
+                <field name="lartas_flag"/>
+                <field name="permit_note" optional="show"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_hs_code" model="ir.actions.act_window">
+        <field name="name">HS Code / BTKI</field>
+        <field name="res_model">lgx.hs.code</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_tutorial">
+                Daftar bawaan modul hanya contoh untuk demo. BTKI penuh (~11.000 pos) datang
+                lewat jalur master data dari sumber resmi — tanpa itu, deklarasi tidak dapat
+                diuji dengan data yang berarti.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_lgx_customs_expert_list" model="ir.ui.view">
+        <field name="name">lgx.customs.expert.list</field>
+        <field name="model">lgx.customs.expert</field>
+        <field name="arch" type="xml">
+            <list string="Ahli Kepabeanan" editable="bottom" decoration-danger="is_expired">
+                <field name="name"/>
+                <field name="certificate_no"/>
+                <field name="certificate_date"/>
+                <field name="certificate_expiry"/>
+                <field name="days_to_expiry"/>
+                <field name="ppjk_partner_id"/>
+                <field name="user_id" optional="hide"/>
+                <field name="is_expired" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_lgx_customs_expert" model="ir.actions.act_window">
+        <field name="name">Ahli Kepabeanan</field>
+        <field name="res_model">lgx.customs.expert</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_lgx_customs_guarantee_list" model="ir.ui.view">
+        <field name="name">lgx.customs.guarantee.list</field>
+        <field name="model">lgx.customs.guarantee</field>
+        <field name="arch" type="xml">
+            <list string="Jaminan" decoration-warning="state == 'releasable'"
+                  decoration-muted="state in ('released','expired')">
+                <field name="name"/>
+                <field name="guarantee_type"/>
+                <field name="purpose"/>
+                <field name="issuer_id"/>
+                <field name="reference"/>
+                <field name="amount" sum="Nilai"/>
+                <field name="valid_from"/>
+                <field name="valid_until"/>
+                <field name="released_date"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_lgx_customs_guarantee_form" model="ir.ui.view">
+        <field name="name">lgx.customs.guarantee.form</field>
+        <field name="model">lgx.customs.guarantee</field>
+        <field name="arch" type="xml">
+            <form string="Jaminan Kepabeanan">
+                <header>
+                    <button name="action_activate" type="object" string="Berlakukan"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_mark_releasable" type="object" string="Dapat Ditarik"
+                            invisible="state != 'active'"/>
+                    <button name="action_release" type="object" string="Tarik"
+                            class="btn-primary" invisible="state != 'releasable'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="guarantee_type"/>
+                            <field name="purpose"/>
+                            <field name="issuer_id"/>
+                            <field name="reference"/>
+                        </group>
+                        <group>
+                            <field name="amount"/>
+                            <field name="currency_id"/>
+                            <field name="valid_from"/>
+                            <field name="valid_until"/>
+                            <field name="released_date"/>
+                        </group>
+                    </group>
+                    <field name="declaration_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="doc_type"/>
+                            <field name="registration_number"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                    <group><field name="note"/></group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_lgx_customs_guarantee" model="ir.actions.act_window">
+        <field name="name">Jaminan Kepabeanan</field>
+        <field name="res_model">lgx.customs.guarantee</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_lgx_guarantee_releasable" model="ir.actions.act_window">
+        <field name="name">Jaminan Dapat Ditarik</field>
+        <field name="res_model">lgx.customs.guarantee</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state','=','releasable')]</field>
+    </record>
+</odoo>

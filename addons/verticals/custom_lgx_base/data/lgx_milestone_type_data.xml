@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Satu mesin milestone untuk tiga segmen. Yang membedakan forwarding
+            dari trucking bukan mekanismenya, melainkan daftar kodenya — jadi
+            daftar itu yang menjadi data.
+
+            offset_days mengisi TANGGAL RENCANA saat job lahir, dihitung dari
+            ETD. Itu yang membuat keterlambatan bisa dilihat sebagai selisih
+            terhadap rencana, bukan hanya sebagai "belum terjadi".
+        -->
+        <record id="ms_booking_received" model="lgx.milestone.type">
+            <field name="code">booking_received</field><field name="name">Booking diterima</field>
+            <field name="segment">common</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">10</field>
+        </record>
+        <record id="ms_booking_confirmed" model="lgx.milestone.type">
+            <field name="code">booking_confirmed</field><field name="name">Booking dikonfirmasi carrier</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">20</field>
+        </record>
+        <record id="ms_cargo_received" model="lgx.milestone.type">
+            <field name="code">cargo_received</field><field name="name">Barang diterima</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">30</field>
+        </record>
+        <record id="ms_stuffing_done" model="lgx.milestone.type">
+            <field name="code">stuffing_done</field><field name="name">Stuffing selesai</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">40</field>
+        </record>
+        <record id="ms_vgm_submitted" model="lgx.milestone.type">
+            <field name="code">vgm_submitted</field><field name="name">VGM dikirim</field>
+            <field name="segment">ff</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">0</field><field name="sequence">50</field>
+        </record>
+        <record id="ms_loaded_on_vessel" model="lgx.milestone.type">
+            <field name="code">loaded_on_vessel</field><field name="name">Dimuat ke kapal</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">60</field>
+        </record>
+        <record id="ms_vessel_departed" model="lgx.milestone.type">
+            <field name="code">vessel_departed</field><field name="name">Kapal berangkat</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">70</field>
+        </record>
+        <record id="ms_loaded_on_aircraft" model="lgx.milestone.type">
+            <field name="code">loaded_on_aircraft</field><field name="name">Dimuat ke pesawat</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">80</field>
+        </record>
+        <record id="ms_flight_departed" model="lgx.milestone.type">
+            <field name="code">flight_departed</field><field name="name">Pesawat berangkat</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">90</field>
+        </record>
+        <record id="ms_transhipped" model="lgx.milestone.type">
+            <field name="code">transhipped</field><field name="name">Alih kapal (transhipment)</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">100</field>
+        </record>
+        <record id="ms_vessel_arrived" model="lgx.milestone.type">
+            <field name="code">vessel_arrived</field><field name="name">Kapal tiba</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">110</field>
+        </record>
+        <record id="ms_flight_arrived" model="lgx.milestone.type">
+            <field name="code">flight_arrived</field><field name="name">Pesawat tiba</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">120</field>
+        </record>
+        <record id="ms_discharged" model="lgx.milestone.type">
+            <field name="code">discharged</field><field name="name">Dibongkar dari sarana angkut</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">130</field>
+        </record>
+        <record id="ms_customs_submitted" model="lgx.milestone.type">
+            <field name="code">customs_submitted</field><field name="name">Dokumen pabean diajukan</field>
+            <field name="segment">customs</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">140</field>
+        </record>
+        <record id="ms_customs_responded" model="lgx.milestone.type">
+            <field name="code">customs_responded</field><field name="name">Respons pabean diterima</field>
+            <field name="segment">customs</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">150</field>
+        </record>
+        <record id="ms_customs_red_lane" model="lgx.milestone.type">
+            <field name="code">customs_red_lane</field><field name="name">Ditetapkan jalur merah</field>
+            <field name="segment">customs</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">1</field><field name="sequence">160</field>
+        </record>
+        <record id="ms_customs_released" model="lgx.milestone.type">
+            <field name="code">customs_released</field><field name="name">Barang dikeluarkan pabean (SPPB)</field>
+            <field name="segment">customs</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">170</field>
+        </record>
+        <record id="ms_do_issued" model="lgx.milestone.type">
+            <field name="code">do_issued</field><field name="name">Delivery Order terbit</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">180</field>
+        </record>
+        <record id="ms_container_picked_up" model="lgx.milestone.type">
+            <field name="code">container_picked_up</field><field name="name">Kontainer keluar terminal</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">190</field>
+        </record>
+        <record id="ms_destuffing_done" model="lgx.milestone.type">
+            <field name="code">destuffing_done</field><field name="name">Destuffing selesai</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">200</field>
+        </record>
+        <record id="ms_delivered" model="lgx.milestone.type">
+            <field name="code">delivered</field><field name="name">Barang diserahkan ke penerima</field>
+            <field name="segment">common</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">210</field>
+        </record>
+        <record id="ms_container_returned" model="lgx.milestone.type">
+            <field name="code">container_returned</field><field name="name">Kontainer dikembalikan ke depo</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">220</field>
+        </record>
+        <record id="ms_rollover" model="lgx.milestone.type">
+            <field name="code">rollover</field><field name="name">Kontainer tertinggal (roll-over)</field>
+            <field name="segment">ff</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">1</field><field name="sequence">230</field>
+        </record>
+        <record id="ms_demurrage_started" model="lgx.milestone.type">
+            <field name="code">demurrage_started</field><field name="name">Masa bebas demurrage terlampaui</field>
+            <field name="segment">ff</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">1</field><field name="sequence">240</field>
+        </record>
+        <record id="ms_detention_started" model="lgx.milestone.type">
+            <field name="code">detention_started</field><field name="name">Masa bebas detensi terlampaui</field>
+            <field name="segment">ff</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">1</field><field name="sequence">250</field>
+        </record>
+        <record id="ms_trip_assigned" model="lgx.milestone.type">
+            <field name="code">trip_assigned</field><field name="name">Kendaraan dan pengemudi ditugaskan</field>
+            <field name="segment">tms</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">0</field><field name="sequence">260</field>
+        </record>
+        <record id="ms_advance_paid" model="lgx.milestone.type">
+            <field name="code">advance_paid</field><field name="name">Uang jalan dibayarkan</field>
+            <field name="segment">tms</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">0</field><field name="sequence">270</field>
+        </record>
+        <record id="ms_trip_dispatched" model="lgx.milestone.type">
+            <field name="code">trip_dispatched</field><field name="name">Kendaraan berangkat dari pool</field>
+            <field name="segment">tms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">280</field>
+        </record>
+        <record id="ms_arrived_pickup" model="lgx.milestone.type">
+            <field name="code">arrived_pickup</field><field name="name">Tiba di titik muat</field>
+            <field name="segment">tms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">290</field>
+        </record>
+        <record id="ms_loading_done" model="lgx.milestone.type">
+            <field name="code">loading_done</field><field name="name">Muat selesai</field>
+            <field name="segment">tms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">300</field>
+        </record>
+        <record id="ms_in_transit" model="lgx.milestone.type">
+            <field name="code">in_transit</field><field name="name">Dalam perjalanan</field>
+            <field name="segment">tms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">310</field>
+        </record>
+        <record id="ms_arrived_dropoff" model="lgx.milestone.type">
+            <field name="code">arrived_dropoff</field><field name="name">Tiba di titik bongkar</field>
+            <field name="segment">tms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">320</field>
+        </record>
+        <record id="ms_pod_captured" model="lgx.milestone.type">
+            <field name="code">pod_captured</field><field name="name">POD diterima</field>
+            <field name="segment">tms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">330</field>
+        </record>
+        <record id="ms_delivery_rejected" model="lgx.milestone.type">
+            <field name="code">delivery_rejected</field><field name="name">Pengiriman ditolak penerima</field>
+            <field name="segment">tms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">1</field><field name="sequence">340</field>
+        </record>
+        <record id="ms_trip_returned" model="lgx.milestone.type">
+            <field name="code">trip_returned</field><field name="name">Kendaraan kembali ke pool</field>
+            <field name="segment">tms</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">0</field><field name="sequence">350</field>
+        </record>
+        <record id="ms_advance_settled" model="lgx.milestone.type">
+            <field name="code">advance_settled</field><field name="name">Uang jalan dipertanggungjawabkan</field>
+            <field name="segment">tms</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">0</field><field name="sequence">360</field>
+        </record>
+        <record id="ms_goods_received_wh" model="lgx.milestone.type">
+            <field name="code">goods_received_wh</field><field name="name">Barang diterima di gudang</field>
+            <field name="segment">wms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">370</field>
+        </record>
+        <record id="ms_putaway_done" model="lgx.milestone.type">
+            <field name="code">putaway_done</field><field name="name">Penyimpanan (putaway) selesai</field>
+            <field name="segment">wms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">380</field>
+        </record>
+        <record id="ms_order_received" model="lgx.milestone.type">
+            <field name="code">order_received</field><field name="name">Order keluar diterima</field>
+            <field name="segment">wms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">390</field>
+        </record>
+        <record id="ms_picking_done" model="lgx.milestone.type">
+            <field name="code">picking_done</field><field name="name">Pengambilan (picking) selesai</field>
+            <field name="segment">wms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">400</field>
+        </record>
+        <record id="ms_packed" model="lgx.milestone.type">
+            <field name="code">packed</field><field name="name">Pengemasan selesai</field>
+            <field name="segment">wms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">410</field>
+        </record>
+        <record id="ms_dispatched_wh" model="lgx.milestone.type">
+            <field name="code">dispatched_wh</field><field name="name">Dikirim dari gudang</field>
+            <field name="segment">wms</field><field name="is_customer_visible">1</field>
+            <field name="is_exception">0</field><field name="sequence">420</field>
+        </record>
+        <record id="ms_stock_count_done" model="lgx.milestone.type">
+            <field name="code">stock_count_done</field><field name="name">Stock opname selesai</field>
+            <field name="segment">wms</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">0</field><field name="sequence">430</field>
+        </record>
+        <record id="ms_job_invoiced" model="lgx.milestone.type">
+            <field name="code">job_invoiced</field><field name="name">Difakturkan</field>
+            <field name="segment">common</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">0</field><field name="sequence">440</field>
+        </record>
+        <record id="ms_job_closed" model="lgx.milestone.type">
+            <field name="code">job_closed</field><field name="name">Job ditutup</field>
+            <field name="segment">common</field><field name="is_customer_visible">0</field>
+            <field name="is_exception">0</field><field name="sequence">450</field>
+        </record>
+        <record id="mst_ff_import_sea_booking_received" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_booking_received"/>
+            <field name="sequence">10</field><field name="offset_days">-21</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_sea_booking_confirmed" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_booking_confirmed"/>
+            <field name="sequence">20</field><field name="offset_days">-18</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_sea_cargo_received" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_cargo_received"/>
+            <field name="sequence">30</field><field name="offset_days">-14</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_sea_loaded_on_vessel" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_loaded_on_vessel"/>
+            <field name="sequence">40</field><field name="offset_days">-1</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_sea_vessel_departed" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_vessel_departed"/>
+            <field name="sequence">50</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_sea_vessel_arrived" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_vessel_arrived"/>
+            <field name="sequence">60</field><field name="offset_days">14</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_sea_discharged" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_discharged"/>
+            <field name="sequence">70</field><field name="offset_days">15</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_sea_customs_submitted" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_customs_submitted"/>
+            <field name="sequence">80</field><field name="offset_days">15</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_sea_customs_responded" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_customs_responded"/>
+            <field name="sequence">90</field><field name="offset_days">16</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_sea_customs_released" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_customs_released"/>
+            <field name="sequence">100</field><field name="offset_days">17</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_sea_do_issued" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_do_issued"/>
+            <field name="sequence">110</field><field name="offset_days">17</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_sea_container_picked_up" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_container_picked_up"/>
+            <field name="sequence">120</field><field name="offset_days">18</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_sea_delivered" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_delivered"/>
+            <field name="sequence">130</field><field name="offset_days">19</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_sea_container_returned" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_container_returned"/>
+            <field name="sequence">140</field><field name="offset_days">22</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_sea_job_closed" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">150</field><field name="offset_days">45</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_air_booking_received" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_booking_received"/>
+            <field name="sequence">10</field><field name="offset_days">-7</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_air_booking_confirmed" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_booking_confirmed"/>
+            <field name="sequence">20</field><field name="offset_days">-5</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_air_cargo_received" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_cargo_received"/>
+            <field name="sequence">30</field><field name="offset_days">-2</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_air_loaded_on_aircraft" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_loaded_on_aircraft"/>
+            <field name="sequence">40</field><field name="offset_days">-1</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_import_air_flight_departed" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_flight_departed"/>
+            <field name="sequence">50</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_air_flight_arrived" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_flight_arrived"/>
+            <field name="sequence">60</field><field name="offset_days">1</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_air_customs_submitted" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_customs_submitted"/>
+            <field name="sequence">70</field><field name="offset_days">1</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_air_customs_released" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_customs_released"/>
+            <field name="sequence">80</field><field name="offset_days">2</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_air_delivered" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_delivered"/>
+            <field name="sequence">90</field><field name="offset_days">3</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_import_air_job_closed" model="lgx.milestone.template">
+            <field name="job_type">ff_import</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">100</field><field name="offset_days">20</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_sea_booking_received" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_booking_received"/>
+            <field name="sequence">10</field><field name="offset_days">-21</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_sea_booking_confirmed" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_booking_confirmed"/>
+            <field name="sequence">20</field><field name="offset_days">-18</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_sea_cargo_received" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_cargo_received"/>
+            <field name="sequence">30</field><field name="offset_days">-5</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_sea_stuffing_done" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_stuffing_done"/>
+            <field name="sequence">40</field><field name="offset_days">-3</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_sea_vgm_submitted" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_vgm_submitted"/>
+            <field name="sequence">50</field><field name="offset_days">-2</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_sea_customs_submitted" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_customs_submitted"/>
+            <field name="sequence">60</field><field name="offset_days">-2</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_sea_customs_released" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_customs_released"/>
+            <field name="sequence">70</field><field name="offset_days">-1</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_sea_loaded_on_vessel" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_loaded_on_vessel"/>
+            <field name="sequence">80</field><field name="offset_days">-1</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_sea_vessel_departed" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_vessel_departed"/>
+            <field name="sequence">90</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_sea_vessel_arrived" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_vessel_arrived"/>
+            <field name="sequence">100</field><field name="offset_days">14</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_sea_job_closed" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">110</field><field name="offset_days">30</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_air_booking_received" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_booking_received"/>
+            <field name="sequence">10</field><field name="offset_days">-5</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_air_cargo_received" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_cargo_received"/>
+            <field name="sequence">20</field><field name="offset_days">-1</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_air_customs_submitted" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_customs_submitted"/>
+            <field name="sequence">30</field><field name="offset_days">-1</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_air_customs_released" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_customs_released"/>
+            <field name="sequence">40</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_air_loaded_on_aircraft" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_loaded_on_aircraft"/>
+            <field name="sequence">50</field><field name="offset_days">0</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_air_flight_departed" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_flight_departed"/>
+            <field name="sequence">60</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_export_air_flight_arrived" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_flight_arrived"/>
+            <field name="sequence">70</field><field name="offset_days">1</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_export_air_job_closed" model="lgx.milestone.template">
+            <field name="job_type">ff_export</field><field name="transport_mode">air</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">80</field><field name="offset_days">15</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_domestic_sea_booking_received" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_booking_received"/>
+            <field name="sequence">10</field><field name="offset_days">-10</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_domestic_sea_cargo_received" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_cargo_received"/>
+            <field name="sequence">20</field><field name="offset_days">-3</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_domestic_sea_loaded_on_vessel" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_loaded_on_vessel"/>
+            <field name="sequence">30</field><field name="offset_days">-1</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_ff_domestic_sea_vessel_departed" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_vessel_departed"/>
+            <field name="sequence">40</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_domestic_sea_vessel_arrived" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_vessel_arrived"/>
+            <field name="sequence">50</field><field name="offset_days">5</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_domestic_sea_discharged" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_discharged"/>
+            <field name="sequence">60</field><field name="offset_days">6</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_domestic_sea_delivered" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_delivered"/>
+            <field name="sequence">70</field><field name="offset_days">7</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_domestic_sea_container_returned" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_container_returned"/>
+            <field name="sequence">80</field><field name="offset_days">9</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_ff_domestic_sea_job_closed" model="lgx.milestone.template">
+            <field name="job_type">ff_domestic</field><field name="transport_mode">sea</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">90</field><field name="offset_days">25</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_customs_only_any_booking_received" model="lgx.milestone.template">
+            <field name="job_type">customs_only</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_booking_received"/>
+            <field name="sequence">10</field><field name="offset_days">-3</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_customs_only_any_customs_submitted" model="lgx.milestone.template">
+            <field name="job_type">customs_only</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_customs_submitted"/>
+            <field name="sequence">20</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_customs_only_any_customs_responded" model="lgx.milestone.template">
+            <field name="job_type">customs_only</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_customs_responded"/>
+            <field name="sequence">30</field><field name="offset_days">1</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_customs_only_any_customs_released" model="lgx.milestone.template">
+            <field name="job_type">customs_only</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_customs_released"/>
+            <field name="sequence">40</field><field name="offset_days">2</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_customs_only_any_job_closed" model="lgx.milestone.template">
+            <field name="job_type">customs_only</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">50</field><field name="offset_days">20</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_trucking_land_booking_received" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_booking_received"/>
+            <field name="sequence">10</field><field name="offset_days">-2</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_trucking_land_trip_assigned" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_trip_assigned"/>
+            <field name="sequence">20</field><field name="offset_days">-1</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_trucking_land_advance_paid" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_advance_paid"/>
+            <field name="sequence">30</field><field name="offset_days">0</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_trucking_land_trip_dispatched" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_trip_dispatched"/>
+            <field name="sequence">40</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_trucking_land_arrived_pickup" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_arrived_pickup"/>
+            <field name="sequence">50</field><field name="offset_days">0</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_trucking_land_loading_done" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_loading_done"/>
+            <field name="sequence">60</field><field name="offset_days">0</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_trucking_land_in_transit" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_in_transit"/>
+            <field name="sequence">70</field><field name="offset_days">0</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_trucking_land_arrived_dropoff" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_arrived_dropoff"/>
+            <field name="sequence">80</field><field name="offset_days">1</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_trucking_land_pod_captured" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_pod_captured"/>
+            <field name="sequence">90</field><field name="offset_days">1</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_trucking_land_trip_returned" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_trip_returned"/>
+            <field name="sequence">100</field><field name="offset_days">2</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_trucking_land_advance_settled" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_advance_settled"/>
+            <field name="sequence">110</field><field name="offset_days">3</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_trucking_land_job_closed" model="lgx.milestone.template">
+            <field name="job_type">trucking</field><field name="transport_mode">land</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">120</field><field name="offset_days">20</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_warehouse_any_goods_received_wh" model="lgx.milestone.template">
+            <field name="job_type">warehouse</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_goods_received_wh"/>
+            <field name="sequence">10</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_warehouse_any_putaway_done" model="lgx.milestone.template">
+            <field name="job_type">warehouse</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_putaway_done"/>
+            <field name="sequence">20</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_warehouse_any_order_received" model="lgx.milestone.template">
+            <field name="job_type">warehouse</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_order_received"/>
+            <field name="sequence">30</field><field name="offset_days">5</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_warehouse_any_picking_done" model="lgx.milestone.template">
+            <field name="job_type">warehouse</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_picking_done"/>
+            <field name="sequence">40</field><field name="offset_days">5</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_warehouse_any_packed" model="lgx.milestone.template">
+            <field name="job_type">warehouse</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_packed"/>
+            <field name="sequence">50</field><field name="offset_days">5</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_warehouse_any_dispatched_wh" model="lgx.milestone.template">
+            <field name="job_type">warehouse</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_dispatched_wh"/>
+            <field name="sequence">60</field><field name="offset_days">5</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_warehouse_any_job_invoiced" model="lgx.milestone.template">
+            <field name="job_type">warehouse</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_job_invoiced"/>
+            <field name="sequence">70</field><field name="offset_days">30</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_warehouse_any_job_closed" model="lgx.milestone.template">
+            <field name="job_type">warehouse</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">80</field><field name="offset_days">35</field>
+            <field name="is_mandatory">0</field>
+        </record>
+        <record id="mst_project_any_booking_received" model="lgx.milestone.template">
+            <field name="job_type">project</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_booking_received"/>
+            <field name="sequence">10</field><field name="offset_days">0</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_project_any_delivered" model="lgx.milestone.template">
+            <field name="job_type">project</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_delivered"/>
+            <field name="sequence">20</field><field name="offset_days">10</field>
+            <field name="is_mandatory">1</field>
+        </record>
+        <record id="mst_project_any_job_closed" model="lgx.milestone.template">
+            <field name="job_type">project</field><field name="transport_mode">any</field>
+            <field name="milestone_type_id" ref="ms_job_closed"/>
+            <field name="sequence">30</field><field name="offset_days">30</field>
+            <field name="is_mandatory">0</field>
+        </record>
+    </data>
+</odoo>
