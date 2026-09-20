@@ -218,6 +218,23 @@ class TestPublicBaseUrl(TransactionCase):
     def test_empty_is_refused(self):
         self._tolak("", "belum disetel")
 
+    def test_the_message_tells_you_to_freeze_it_too(self):
+        """Memperbaiki web.base.url tanpa freeze akan dibatalkan login berikutnya.
+
+        Odoo menimpanya dari header Host tiap login backend kecuali
+        `web.base.url.freeze` disetel — diverifikasi di sumber Odoo
+        (res_users.py, `if not ICP.get_param('web.base.url.freeze')`), bukan
+        diterima dari pihak ketiga.
+
+        Tanpa kalimat itu, operator memperbaiki lalu melihat perbaikannya hilang
+        tanpa tahu kenapa — dan perbaikan yang dibatalkan diam-diam lebih sulit
+        didiagnosis daripada yang tidak pernah dilakukan.
+        """
+        self.P.set_param("web.base.url", "http://athera_lgx.athera-digital.com")
+        with self.assertRaises(UserError) as ctx:
+            self.job.action_share_tracking_link()
+        self.assertIn("web.base.url.freeze", str(ctx.exception))
+
     def test_a_proper_public_url_is_accepted(self):
         """Kontrol positif: penjaga tidak boleh menolak alamat yang benar.
 

@@ -118,7 +118,12 @@ class LgxJob(models.Model):
                 "Odoo menyetelnya otomatis dari alamat yang dipakai saat login "
                 "pertama, dan di platform ini tenant baru sering pertama kali "
                 "disentuh lewat alias jaringan internal. Setel ke alamat publik "
-                "tenant ini di Pengaturan > Teknis > Parameter Sistem.",
+                "tenant ini di Pengaturan > Teknis > Parameter Sistem.\n\n"
+                "SETEL JUGA 'web.base.url.freeze' = True di tempat yang sama. "
+                "Tanpa itu Odoo menimpa kembali nilai yang baru Anda perbaiki "
+                "pada login backend berikutnya, dari Host apa pun yang kebetulan "
+                "datang — dan perbaikan yang dibatalkan diam-diam lebih sulit "
+                "didiagnosis daripada yang tidak pernah dilakukan.",
                 buruk, base or _("(kosong)"),
             ))
         return base.rstrip("/")
