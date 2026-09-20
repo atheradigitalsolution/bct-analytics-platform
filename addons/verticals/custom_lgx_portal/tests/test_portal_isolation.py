@@ -7,6 +7,8 @@ rule, dan record rule hanya benar-benar diuji kalau kueri berjalan sebagai
 pengguna yang dibatasi. Tes yang memanggil controller sebagai superuser akan
 hijau meski seluruh rule-nya salah.
 """
+from datetime import timedelta
+
 from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import TransactionCase, tagged
@@ -132,6 +134,77 @@ class TestPortalIsolation(TransactionCase):
             self.env["lgx.job"].lgx_resolve_track_token(self.job_b.id, token_a),
             "Token job A tidak boleh membuka job B.",
         )
+
+    def test_two_absences_do_not_cancel_each_other(self):
+        """Token kosong terhadap job yang BELUM PERNAH punya token harus ditolak.
+
+        Bentuk yang dilaporkan sesi SIMRS setelah menemukannya di penjaga token
+        mereka: `claims.get("stk") != credential_marker(holder)` — kalau KEDUANYA
+        None, `None != None` bernilai False dan keduanya lolos sekaligus.
+
+        Bukan penjaga yang longgar, bukan yang rakus: **cocok karena sama-sama
+        kosong**, tepat di jalur yang paling ingin ditutup. Dan ia hanya terlihat
+        dari menanyakan "apa yang terjadi kalau KEDUANYA tidak ada" — pertanyaan
+        yang tidak pernah muncul dari membaca ekspresinya.
+
+        Enam uji token yang sudah ada semuanya memakai token tidak-kosong
+        terhadap job yang PUNYA token. Matriks ketiadaannya tidak pernah
+        disentuh; kodenya kebetulan menjaga, dan tidak ada yang membuktikan
+        penjaganya bertahan.
+        """
+        Job = self.env["lgx.job"]
+        polos = Job.create({
+            "job_type": "ff_import", "transport_mode": "sea",
+            "customer_id": self.partner_a.id, "etd": "2026-09-01",
+        })
+        self.assertFalse(polos.lgx_track_token, "Prasyarat: job ini belum punya token.")
+
+        for kosong in ("", None, False):
+            self.assertFalse(
+                Job.lgx_resolve_track_token(polos.id, kosong),
+                "Token %r terhadap job tanpa token harus ditolak; dua ketiadaan "
+                "tidak boleh saling membatalkan." % (kosong,),
+            )
+
+        # DAN keadaan yang melewati penjaga KEDUA. Versi pertama uji ini hanya
+        # memakai job polos di atas, dan kontrol negatifnya LULUS — bentuk
+        # rentan `job.lgx_track_token != token` tetap tertolak, bukan oleh
+        # perbandingan tokennya melainkan oleh pemeriksaan masa berlaku di
+        # belakangnya. Ujinya menegaskan HASIL yang dijaga dua lapis, sambil
+        # docstring-nya mengklaim menangkap lapis pertama.
+        #
+        # Keadaan di bawah memisahkan keduanya: token kosong DENGAN masa
+        # berlaku yang masih hidup. Diukur pada bentuk rentan sebelum uji ini
+        # ditulis — token='' dan None tetap ditolak, tetapi False LOLOS, karena
+        # `False != False` bernilai False dan perbandingannya tidak menolak.
+        polos.sudo().write({
+            "lgx_track_token": False,
+            "lgx_track_token_expiry": fields.Datetime.now() + timedelta(hours=24),
+        })
+        for kosong in ("", None, False):
+            self.assertFalse(
+                Job.lgx_resolve_track_token(polos.id, kosong),
+                "Token %r lolos pada job tanpa token yang masa berlakunya masih "
+                "hidup — dua ketiadaan saling membatalkan." % (kosong,),
+            )
+
+    def test_absent_token_against_a_job_that_has_one(self):
+        """Satu ketiadaan saja juga ditolak — kontrol untuk uji di atasnya."""
+        Job = self.env["lgx.job"]
+        self.job_a.lgx_issue_track_token()
+        self.assertTrue(self.job_a.lgx_track_token, "Prasyarat: job ini punya token.")
+        for kosong in ("", None, False):
+            self.assertFalse(Job.lgx_resolve_track_token(self.job_a.id, kosong))
+
+    def test_real_token_against_a_job_that_never_had_one(self):
+        """Ketiadaan di sisi SIMPANAN, bukan di sisi masukan."""
+        Job = self.env["lgx.job"]
+        token_sah = self.job_a.lgx_issue_track_token()
+        polos = Job.create({
+            "job_type": "ff_import", "transport_mode": "sea",
+            "customer_id": self.partner_a.id, "etd": "2026-09-01",
+        })
+        self.assertFalse(Job.lgx_resolve_track_token(polos.id, token_sah))
 
     def test_reissue_returns_the_same_token_while_valid(self):
         """Menerbitkan ulang tidak boleh mematikan tautan yang sudah dikirim ke pelanggan."""
