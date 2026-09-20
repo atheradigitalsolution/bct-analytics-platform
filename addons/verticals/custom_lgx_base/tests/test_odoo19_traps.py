@@ -241,3 +241,41 @@ class TestOdoo19Traps(TransactionCase):
         self.assertFalse(temuan, (
             "Berkas tes yang tidak pernah dijalankan karena tidak diimpor:\n  %s\n"
             "Lihat %s." % ("\n  ".join(temuan), DOK)))
+
+    def test_no_test_methods_swallowed_by_a_nested_function(self):
+        """Metode tes yang tersarang di dalam fungsi lain tidak pernah dikoleksi.
+
+        Bentuk ketiga dari keluarga "tes yang tidak berjalan dan tidak ada yang
+        mengeluh", dilaporkan sesi SIMRS setelah empat tes kasir mereka lenyap:
+        satu fungsi tingkat-modul disisipkan di tengah badan kelas MENGAKHIRI
+        kelas itu, dan metode-metode sesudahnya menjadi isi fungsi tersebut.
+
+        Berkasnya ada. Berkasnya diimpor. Direktorinya tidak kosong. Python
+        tidak mengeluh, karena hasilnya sah secara sintaksis — sekadar bukan
+        yang dimaksud. Dua pemeriksaan sebelumnya di kelas ini melewatkannya
+        sepenuhnya.
+        """
+        import ast
+        temuan = []
+        for path in _berkas("test_*.py"):
+            try:
+                pohon = ast.parse(_baca(path))
+            except SyntaxError:
+                continue
+            for luar in ast.walk(pohon):
+                if not isinstance(luar, ast.FunctionDef):
+                    continue
+                for dalam in ast.walk(luar):
+                    if dalam is luar or not isinstance(dalam, ast.FunctionDef):
+                        continue
+                    if not dalam.name.startswith("test_"):
+                        continue
+                    argumen = [a.arg for a in dalam.args.args]
+                    if argumen and argumen[0] == "self":
+                        temuan.append(
+                            "%s:%s — %s() tersarang di dalam %s(), tidak akan dikoleksi"
+                            % (_ringkas(path), dalam.lineno, dalam.name, luar.name))
+        self.assertFalse(temuan, (
+            "Metode tes yang tersarang di dalam fungsi lain:\n  %s\n"
+            "Biasanya karena ada def tingkat-modul yang tanpa sengaja mengakhiri "
+            "badan kelas. Lihat %s." % ("\n  ".join(temuan), DOK)))

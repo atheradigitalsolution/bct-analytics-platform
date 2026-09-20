@@ -159,5 +159,20 @@ basis datanya:
 SELECT count(*) FROM ir_ui_view WHERE key='<modul>.<template>' AND arch_db::text LIKE '%<penanda>%';
 ```
 
+**Tiga bentuk "tes yang tidak berjalan dan tidak ada yang mengeluh".** Ketiganya
+ditemukan dalam satu hari, dan tiap bentuk lolos dari pemeriksaan yang menangkap
+bentuk sebelumnya:
+
+1. Direktori `tests/` tanpa `__init__.py` — tampak berisi, menjalankan nol.
+2. Berkas tes yang ada dan direktorinya TIDAK kosong, tetapi tidak diimpor di
+   `__init__.py`. Lolos dari pemeriksaan (1).
+3. Berkas yang ada DAN diimpor, tetapi metodenya tersarang: satu `def` tingkat
+   modul yang disisipkan di tengah badan kelas mengakhiri kelas itu, dan metode
+   sesudahnya menjadi isi fungsi tersebut. Python tidak mengeluh — hasilnya sah
+   secara sintaksis, sekadar bukan yang dimaksud. Lolos dari (1) dan (2).
+
+Ketiganya kini ditegakkan `tests/test_odoo19_traps.py`, kecuali bentuk (1) yang
+tidak dapat ditegakkan karena git tidak melacak direktori kosong.
+
 **Hook data demo hanya berjalan saat INSTALL.** Menyunting `hooks.py` tidak
 menyentuh database yang sudah terpasang; baris lama perlu dikoreksi lewat ORM.
