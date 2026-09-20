@@ -8,6 +8,44 @@
             dan belum dikonfirmasi ke sumber primer (Lampiran A). Menaruhnya di
             ir.config_parameter membuat koreksi menjadi satu baris konfigurasi,
             bukan rilis modul — dan itulah alasan strukturalnya, bukan kerapian.
+
+            ================================================================
+            AUDIT 2026-09-20: 15 dari 26 parameter benar-benar dibaca kode.
+            ================================================================
+
+            Sebelas sisanya tidak dibaca di mana pun, dan itu HARUS diketahui
+            sebelum ada yang mengubahnya lalu menunggu sistem berubah:
+
+              lgx.kir_validity_months          rujukan; tanggal KIR disalin dari
+                                               kartu, tidak pernah dihitung (A5)
+              lgx.vat_besaran_tertentu_rate    rujukan; nilai PPN datang dari
+                                               account.tax di sale_tax_ids (A1)
+              lgx.stamp_duty_amount            belum ada yang memakainya
+              lgx.stamp_duty_receipt_threshold belum ada yang memakainya
+              lgx.coretax_xml_batch_size       belum ada yang memakainya
+
+            Dan enam ini LEBIH BERBAHAYA daripada sekadar tidak terpakai,
+            karena ia DUPLIKAT dari state yang hidup:
+
+              lgx.pph23_rate            lgx.pph15_sea_rate
+              lgx.pph23_rate_no_npwp    lgx.pph15_air_rate
+              lgx.pph15_air_is_final    lgx.pph15_foreign_rate
+
+            Angka yang sesungguhnya dipakai ada di record `lgx.wht.rate`
+            (custom_lgx_tax_id/data/lgx_tax_data.xml), dicari lewat `lgx_find`
+            berdasarkan TANGGAL TRANSAKSI. Itu versi yang lebih baik: ia punya
+            masa berlaku, jadi faktur lama tetap dapat direkonstruksi dengan
+            tarif yang berlaku saat itu — sesuatu yang skalar di sini tidak
+            bisa lakukan.
+
+            Bahayanya konkret: mengubah lgx.pph23_rate menjadi 3.0 tidak
+            mengubah apa pun, dan orang yang mengubahnya akan percaya sistem
+            sudah memotong 3%. Dua sumber kebenaran untuk angka yang sama, dan
+            hanya satu yang menggerakkan perilaku.
+
+            Keenamnya DIPERTAHANKAN untuk sekarang karena §10 spesifikasi
+            memintanya, bukan karena ia berguna. Kalau boleh dihapus, hapus —
+            `lgx.wht.rate` sudah menggantikannya sepenuhnya.
         -->
 
         <!-- Zero ODOL. A12b SEBAGIAN TERTUTUP (diperiksa 2026-09-20).
