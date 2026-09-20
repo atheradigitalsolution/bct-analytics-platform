@@ -48,6 +48,43 @@
             yang tidak dipakai WAJIB dicatat, dan yang mulai dipakai wajib
             dicabut dari catatan.
 
+            ================================================================
+            MENGUBAH PARAMETER LEWAT `odoo shell` TIDAK TERLIHAT WORKER LAIN
+            ================================================================
+
+            `get_param` memakai `@ormcache('key', cache='stable')`, dan
+            `create`/`write`/`unlink` pada ir.config_parameter memanggil
+            `registry.clear_cache('stable')` — TETAPI itu membersihkan cache
+            PROSES ITU SENDIRI saja.
+
+            Yang memberi tahu worker lain adalah `registry.signal_changes()`,
+            dan ia hanya dipanggil dari:
+
+              service/model.py   dispatch RPC   (UI, JSON-RPC, /json/2)
+              ir_cron.py         runner cron
+
+            `odoo shell` bukan keduanya. Jadi parameter yang diubah dari shell
+            akan terlihat oleh shell itu sendiri dan oleh proses baru mana pun,
+            tetapi worker HTTP yang sedang melayani MEMEGANG NILAI LAMA sampai
+            restart.
+
+            Konsekuensinya konkret dan senyap: mengubah
+            lgx.odol_enforcement_date dari shell tidak mengubah apa yang
+            dilakukan dispatch hari itu. Tidak ada galat, dan pembacaan ulang
+            parameternya lewat shell yang sama akan menunjukkan nilai BARU —
+            jadi verifikasi yang paling wajar justru mengonfirmasi hal yang
+            salah.
+
+            Ubah lewat Pengaturan > Teknis > Parameter Sistem, atau restart
+            sesudahnya. Dan kalau harus dari shell, verifikasi dari sisi yang
+            MELAYANI, bukan dari shell yang mengubahnya.
+
+            Batas bukti: mekanisme di atas ditelusuri ke sumber Odoo 19 (jalur
+            signal_changes dan dekorator ormcache), BUKAN diukur pada worker
+            yang melayani — tidak ada rute yang menyurfacekan nilai parameter
+            dari worker panjang-umur di modul ini. Butir 10 berlaku pada
+            catatan ini sendiri.
+
             Tiga belas sisanya tidak dibaca di mana pun, dan itu HARUS diketahui
             sebelum ada yang mengubahnya lalu menunggu sistem berubah:
 
