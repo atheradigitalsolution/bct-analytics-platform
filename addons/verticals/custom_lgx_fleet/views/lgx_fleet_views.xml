@@ -94,10 +94,48 @@
         <field name="res_model">lgx.vehicle.category</field>
         <field name="view_mode">list,form</field>
     </record>
+    <!--
+        List SENDIRI, bukan list bawaan Odoo.
+
+        Tanpa view_id, action ini jatuh ke list fleet bawaan: License Plate,
+        Model, Category, Driver, Future Driver, Tags, Has Contract — tidak satu
+        pun kolom yang jadi ALASAN menu ini ada. Menunya bernama "Dokumen
+        Kendaraan Bermasalah" dan tidak menampilkan satu pun tanggal dokumen.
+
+        Ditemukan saat menyiapkan tangkapan layar, bukan dari uji: tidak ada uji
+        yang memeriksa KOLOM APA yang tampak, hanya bahwa datanya benar.
+    -->
+    <record id="view_fleet_vehicle_list_lgx" model="ir.ui.view">
+        <field name="name">fleet.vehicle.list.lgx</field>
+        <field name="model">fleet.vehicle</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <list string="Dokumen Kendaraan"
+                  decoration-danger="lgx_document_status == 'expired'"
+                  decoration-warning="lgx_document_status == 'warning'"
+                  create="false">
+                <field name="license_plate" string="Nomor Polisi"/>
+                <field name="model_id" string="Model"/>
+                <field name="lgx_document_status" string="Status" widget="badge"
+                       decoration-danger="lgx_document_status == 'expired'"
+                       decoration-warning="lgx_document_status == 'warning'"/>
+                <field name="lgx_document_issue" string="Dokumen Bermasalah"/>
+                <field name="lgx_kir_expiry_date" string="KIR"/>
+                <field name="lgx_stnk_expiry_date" string="STNK"/>
+                <field name="lgx_tax_expiry_date" string="Pajak"/>
+                <field name="lgx_kp_expiry_date" string="Kartu Pengawasan"/>
+                <field name="lgx_jbi_kg" string="JBI (kg)" optional="show"/>
+                <field name="lgx_dimension_status" string="Dimensi" widget="badge"
+                       optional="show"/>
+            </list>
+        </field>
+    </record>
+
     <record id="action_lgx_vehicle_documents" model="ir.actions.act_window">
         <field name="name">Dokumen Kendaraan Bermasalah</field>
         <field name="res_model">fleet.vehicle</field>
         <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_fleet_vehicle_list_lgx"/>
         <field name="domain">[('lgx_is_freight','=',True),('lgx_document_status','in',('warning','expired'))]</field>
     </record>
     <menuitem id="menu_lgx_vehicle_category" name="Kategori Kendaraan"

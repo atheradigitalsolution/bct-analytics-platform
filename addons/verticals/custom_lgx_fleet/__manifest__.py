@@ -46,6 +46,7 @@ dijadikan dasar memblokir.
     "depends": ["custom_lgx_base", "fleet"],
     "capability_tags": ["logistics", "fleet", "odol", "compliance", "indonesia"],
     "data": [
+        "security/lgx_fleet_group_implications.xml",
         "security/ir.model.access.csv",
         "data/lgx_fleet_data.xml",
         "views/lgx_fleet_views.xml",

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        BUKAN <record model="res.groups">. Grup LGX lahir di blok noupdate="1",
+        dan flag itu menempel pada baris ir.model.data milik grupnya — jadi
+        record dari modul mana pun yang mencoba menambah implied_ids akan
+        dilewati diam-diam pada setiap install dan update.
+
+        Dijalankan di blok TANPA noupdate supaya ia berjalan ulang tiap update:
+        hibah yang lahir di noupdate tidak akan pernah diperbaiki ketika
+        daftarnya bertambah.
+    -->
+    <data>
+        <function model="res.groups" name="_lgx_apply_fleet_group_implications"/>
+    </data>
+</odoo>
