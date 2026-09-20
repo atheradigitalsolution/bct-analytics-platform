@@ -89,10 +89,36 @@ docker exec odoo19-bct-postgres psql -U odoo -d athera_lgx -t -A \
 ```
 
 Nama di Postgres adalah `<tabel>_<atribut tanpa garis bawah awal>`: `_rates_sane`
-pada `lgx.hs.code` menjadi `lgx_hs_code_rates_sane`. Terakhir direkonsiliasi
-2026-09-20: **67 dideklarasikan, 67 ada, selisih 0.** Periksa per nama, bukan
-dengan mencoba menyimpan data jelek — uji perilaku menjawab "sesuatu menolak
-ini", yang bisa saja ACL atau kebetulan.
+pada `lgx.hs.code` menjadi `lgx_hs_code_rates_sane`.
+
+**Bandingkan NAMA, bukan JUMLAH.** Dua `count()` yang sama bukan bukti bahwa
+himpunannya sama: satu constraint hilang ditambah satu yatim dari model yang
+sudah dihapus menghasilkan selisih nol yang sepenuhnya salah — tepat pada hal
+yang diperiksa karena ia pernah gagal senyap.
+
+**Periksa DUA ARAH.** `comm -23` menemukan yang dideklarasikan tapi tidak ada;
+`comm -13` menemukan yang ada tapi tidak dideklarasikan. Yang kedua menangkap
+sisa dari model yang di-rename atau dihapus. Batasi daftar aktual ke tabel
+`lgx\_%` supaya arah kedua bermakna — tanpa itu seluruh constraint Odoo inti
+ikut terhitung sebagai yatim.
+
+**Beri rekonsiliasinya DUA kontrol positif**, karena ia punya dua sisi yang bisa
+rusak sendiri-sendiri:
+
+* A — sisipkan nama palsu ke daftar HARAPAN; ia harus dilaporkan hilang.
+  Menguji bahwa pembandingnya hidup.
+* B — buang satu nama NYATA dari daftar AKTUAL; ia harus dilaporkan hilang.
+  Menguji bahwa ia membaca daftar Postgres yang benar. **A saja akan lolos
+  meski daftar aktualnya diambil dari tempat yang salah.**
+
+Terakhir direkonsiliasi 2026-09-20 dengan kedua arah dan kedua kontrol:
+**67 dideklarasikan, 67 ada, nol hilang, nol yatim.** Enam puluh enam di antaranya
+pada tabel `lgx_*`; satu — `fleet_vehicle_jbi_not_above_jbb` — pada tabel warisan,
+dan constraint pada model yang di-`_inherit` memang tidak akan muncul di
+penyaringan `lgx_%`. Hitung terpisah, jangan dianggap hilang.
+
+Periksa per nama, bukan dengan mencoba menyimpan data jelek — uji perilaku
+menjawab "sesuatu menolak ini", yang bisa saja ACL atau kebetulan.
 
 **`browse(id)` atas id yang tidak ada bernilai TRUTHY.** Jadi `if not record`
 melewatkannya, dan yang meledak adalah pembacaan field jauh sesudahnya sebagai
