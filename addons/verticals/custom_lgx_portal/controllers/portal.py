@@ -188,11 +188,29 @@ class LgxCustomerPortal(CustomerPortal):
         Location = request.env["lgx.location"].sudo()
         if request.httprequest.method == "POST":
             partner = request.env.user.partner_id
+            origin = self._lgx_location_from(post.get("origin_id"))
+            destination = self._lgx_location_from(post.get("destination_id"))
+            invalid = []
+            if origin is None:
+                invalid.append(_("asal"))
+            if destination is None:
+                invalid.append(_("tujuan"))
+            if invalid:
+                # Formulir dikembalikan dengan isian pelanggan utuh. Menghapus
+                # yang sudah mereka ketik demi satu dropdown yang salah adalah
+                # cara tercepat membuat orang berhenti memakai portalnya.
+                return request.render("custom_lgx_portal.portal_booking_form", {
+                    "locations": Location.search([], order="country_id, code"),
+                    "page_name": "lgx_booking",
+                    "error": _("Simpul %s tidak dikenal. Pilih dari daftar yang tersedia.",
+                               " dan ".join(invalid)),
+                    "submitted": post,
+                })
             job = request.env["lgx.job"].lgx_create_portal_booking(partner, {
                 "job_type": post.get("job_type"),
                 "transport_mode": post.get("transport_mode"),
-                "origin_id": int(post["origin_id"]) if post.get("origin_id") else False,
-                "destination_id": int(post["destination_id"]) if post.get("destination_id") else False,
+                "origin_id": origin.id if origin else False,
+                "destination_id": destination.id if destination else False,
                 "etd": post.get("etd") or False,
                 "customer_reference": post.get("customer_reference"),
                 "note": post.get("note"),
@@ -204,3 +222,27 @@ class LgxCustomerPortal(CustomerPortal):
             "locations": Location.search([], order="country_id, code"),
             "page_name": "lgx_booking",
         })
+
+    def _lgx_location_from(self, raw):
+        """Simpul yang BENAR-BENAR ada; None bila nilainya tidak dapat dipakai.
+
+        Dua cara formulir ini bisa meledak, dan keduanya menjadi halaman galat
+        500 di hadapan pelanggan:
+
+        * ``int("abc")`` melempar ValueError. Nilai form datang dari HTTP, bukan
+          dari dropdown — siapa pun dapat mengirim apa saja.
+        * ``int("999999")`` BERHASIL, lalu id yang tidak ada itu ditulis ke
+          Many2one dan basis data yang menolaknya.
+
+        Kosong dikembalikan sebagai recordset kosong, bukan None: tidak mengisi
+        simpul adalah pengajuan yang sah, sedangkan mengisi dengan nilai ngawur
+        tidak.
+        """
+        empty = request.env["lgx.location"]
+        if not raw:
+            return empty
+        try:
+            location = empty.sudo().browse(int(raw)).exists()
+        except (ValueError, TypeError):
+            return None
+        return location or None

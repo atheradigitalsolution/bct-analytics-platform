@@ -221,6 +221,9 @@
                 Pengajuan ini menjadi permintaan yang menunggu konfirmasi tim operasi.
                 Anda menerima nomor referensi seketika.
             </p>
+            <div t-if="error" class="alert alert-danger" role="alert">
+                <t t-esc="error"/>
+            </div>
             <form method="post" action="/my/logistik/booking">
                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                 <div class="row g-3">
