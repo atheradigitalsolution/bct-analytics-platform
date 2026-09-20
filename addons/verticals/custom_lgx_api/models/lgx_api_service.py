@@ -228,23 +228,28 @@ class LgxApiService(models.AbstractModel):
             if rejection_reason:
                 values["rejection_reason"] = rejection_reason
         try:
-            stop.write(values)
-            for index, photo in enumerate(photos or []):
-                existing = self.env["ir.attachment"].search([
-                    ("res_model", "=", "lgx.trip.stop"),
-                    ("res_id", "=", stop.id),
-                    ("name", "=", "pod-%s-%s.jpg" % (stop.id, index)),
-                ], limit=1)
-                if existing:
-                    continue
-                attachment = self.env["ir.attachment"].create({
-                    "name": "pod-%s-%s.jpg" % (stop.id, index),
-                    "datas": photo,
-                    "res_model": "lgx.trip.stop",
-                    "res_id": stop.id,
-                    "mimetype": "image/jpeg",
-                })
-                stop.pod_photo_ids = [(4, attachment.id)]
+            # Savepoint, bukan sekadar try. Menjawab "ditolak" atas keadaan yang
+            # terlanjur separuh tersimpan adalah bentuk kebohongan yang paling
+            # mahal: perangkat pengemudi mengulang, stop sudah ber-POD, dan
+            # tidak ada log yang menunjukkan keduanya pernah bertentangan.
+            with self.env.cr.savepoint():
+                stop.write(values)
+                for index, photo in enumerate(photos or []):
+                    existing = self.env["ir.attachment"].search([
+                        ("res_model", "=", "lgx.trip.stop"),
+                        ("res_id", "=", stop.id),
+                        ("name", "=", "pod-%s-%s.jpg" % (stop.id, index)),
+                    ], limit=1)
+                    if existing:
+                        continue
+                    attachment = self.env["ir.attachment"].create({
+                        "name": "pod-%s-%s.jpg" % (stop.id, index),
+                        "datas": photo,
+                        "res_model": "lgx.trip.stop",
+                        "res_id": stop.id,
+                        "mimetype": "image/jpeg",
+                    })
+                    stop.pod_photo_ids = [(4, attachment.id)]
         except (AccessError, UserError, ValidationError) as error:
             return self._error("rejected", str(error))
         return self._ok({
@@ -268,10 +273,14 @@ class LgxApiService(models.AbstractModel):
         if not trip:
             return self._error("not_found", _("Trip tidak ditemukan."))
         try:
-            if odometer is not None:
-                field_name = "odometer_start" if action == "dispatch" else "odometer_end"
-                trip.write({field_name: float(odometer)})
-            getattr(trip, allowed[action])()
+            # Odometer dan perubahan status harus jatuh atau berdiri bersama.
+            # Tanpa savepoint, aksi yang ditolak aturan ODOL atau POD tetap
+            # meninggalkan odometer baru di trip yang statusnya tidak berubah.
+            with self.env.cr.savepoint():
+                if odometer is not None:
+                    field_name = "odometer_start" if action == "dispatch" else "odometer_end"
+                    trip.write({field_name: float(odometer)})
+                getattr(trip, allowed[action])()
         except (AccessError, UserError, ValidationError) as error:
             return self._error("rejected", str(error))
         return self._ok({"trip_id": trip.id, "state": trip.state})
@@ -314,23 +323,30 @@ class LgxApiService(models.AbstractModel):
         # pemindai adalah apa yang benar-benar ada di palet, bukan apa yang
         # dijanjikan dokumen — dan menumpuk di atas tebakan sistem menghasilkan
         # angka yang lolos validasi lalu meledak saat stok opname.
-        if hasattr(picking, "lgx_begin_scan"):
-            picking.lgx_begin_scan()
+        #
+        # PENOLAKAN ITU MENOLKAN kuantitas. Karena itu lgx_begin_scan ikut masuk
+        # savepoint di bawah, bukan berdiri di luarnya: kalau barisnya gagal
+        # dibuat, picking harus kembali persis seperti sebelum dipindai. Versi
+        # sebelumnya menolkan lebih dulu lalu menjawab "ditolak", dan operator
+        # gudang tidak punya cara mengetahui isian-otomatisnya sudah hilang.
         try:
-            line_values = {
-                "picking_id": picking.id,
-                "move_id": move.id,
-                "product_id": product.id,
-                "quantity": float(quantity),
-                "owner_id": owner.id,
-                "location_dest_id": move.location_dest_id.id,
-                "location_id": move.location_id.id,
-            }
-            if lot_name or parsed.get("lot"):
-                line_values["lot_name"] = lot_name or parsed.get("lot")
-            if parsed.get("expiry"):
-                line_values["expiration_date"] = parsed["expiry"]
-            self.env["stock.move.line"].create(line_values)
+            with self.env.cr.savepoint():
+                if hasattr(picking, "lgx_begin_scan"):
+                    picking.lgx_begin_scan()
+                line_values = {
+                    "picking_id": picking.id,
+                    "move_id": move.id,
+                    "product_id": product.id,
+                    "quantity": float(quantity),
+                    "owner_id": owner.id,
+                    "location_dest_id": move.location_dest_id.id,
+                    "location_id": move.location_id.id,
+                }
+                if lot_name or parsed.get("lot"):
+                    line_values["lot_name"] = lot_name or parsed.get("lot")
+                if parsed.get("expiry"):
+                    line_values["expiration_date"] = parsed["expiry"]
+                self.env["stock.move.line"].create(line_values)
         except (AccessError, UserError, ValidationError) as error:
             return self._error("rejected", str(error))
         return self._ok({
@@ -377,7 +393,8 @@ class LgxApiService(models.AbstractModel):
                     {"expected_location": expected.complete_name},
                 )
         try:
-            move_line.quantity = float(quantity)
+            with self.env.cr.savepoint():
+                move_line.quantity = float(quantity)
         except (AccessError, UserError, ValidationError) as error:
             return self._error("rejected", str(error))
         return self._ok({
