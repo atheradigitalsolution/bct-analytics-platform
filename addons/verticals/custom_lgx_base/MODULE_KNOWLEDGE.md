@@ -185,6 +185,24 @@ Butir 10 diterapkan pada daftar ini sendiri, dan jawabannya tidak nyaman:
 JEBAKAN ODOO di bagian bawah dokumen ini, bukan butir metode di atas. Jangan
 membaca kedekatan keduanya di berkas yang sama sebagai jaminan.
 
+> **Tabel ini sendiri ditulis sebelum diukur.** Saat baris "dua dari sepuluh"
+> pertama kali ditulis, pemetaan butir-ke-tes dilakukan di kepala, bukan
+> diverifikasi. Ia kebetulan benar — ketiga tes itu memang ada, memang berjalan
+> tiap suite, dan memang membandingkan himpunan nama dua arah; itu diukur
+> SESUDAHNYA terhadap log suite terakhir, dengan kontrol positif berupa nama tes
+> karangan yang melaporkan nol.
+>
+> Sesi sebelah menulis tabel yang sama untuk suite mereka dan salah: mereka
+> mengenali penegak yang saya laporkan sebagai milik mereka juga, padahal
+> rekonsiliasi mereka dijalankan manual dari shell. Nol, bukan dua.
+>
+> Dua draf pertama dari sebuah tabel tentang apa yang dijaga, keduanya ditulis
+> sebelum diukur, oleh dua orang yang sedang menulis tentang mengukur sebelum
+> menulis. Bedanya cuma keberuntungan tentang tes mana yang kebetulan sudah ada.
+> Insiden itu ditaruh di sini alih-alih dihapus, karena tabel kejujuran yang
+> draf pertamanya tidak jujur adalah satu-satunya contoh yang benar-benar
+> meyakinkan untuk apa yang sedang ia katakan.
+
 Sebagian dari delapan itu memang tidak dapat ditegakkan: tidak ada alat yang
 tahu bahwa nama database di sebuah probe dikarang (butir 4), atau bahwa sebuah
 laporan menyebut nilai untuk keadaan yang berubah cepat (butir 8). Keduanya
