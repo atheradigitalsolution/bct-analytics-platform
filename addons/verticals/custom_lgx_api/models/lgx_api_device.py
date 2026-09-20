@@ -102,9 +102,9 @@ class LgxApiDevice(models.Model):
         berbulan-bulan. Keduanya diperlukan, dan keduanya dapat dikonfigurasi.
         """
         params = self.env["ir.config_parameter"].sudo()
-        max_aktif = int(params.get_param("lgx.device_max_active", 5))
-        jam = int(params.get_param("lgx.device_issue_window_hours", 24))
-        max_terbit = int(params.get_param("lgx.device_issue_max_per_window", 10))
+        max_aktif = params.lgx_int("lgx.device_max_active", 5)
+        jam = params.lgx_int("lgx.device_issue_window_hours", 24)
+        max_terbit = params.lgx_int("lgx.device_issue_max_per_window", 10)
 
         aktif = self.sudo().search_count([
             ("user_id", "=", user.id), ("kind", "=", kind), ("state", "=", "active"),
@@ -161,8 +161,7 @@ class LgxApiDevice(models.Model):
         # Kunci yang tidak pernah mati akan hidup lebih lama daripada hubungan
         # kerjanya. `sudo()` di sini melewati BATAS durasi grup, bukan melewati
         # keharusan punya masa berlaku — tanggalnya tetap diisi.
-        days = int(self.env["ir.config_parameter"].sudo().get_param(
-            "lgx.device_key_days", 90))
+        days = self.env["ir.config_parameter"].sudo().lgx_int("lgx.device_key_days", 90)
         expiry = fields.Datetime.add(fields.Datetime.now(), days=days)
         raw = self.env["res.users.apikeys"].with_user(user).sudo()._generate(
             "rpc", "LGX %s — %s" % (kind, device_name), expiry)

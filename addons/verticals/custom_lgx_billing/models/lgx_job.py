@@ -497,7 +497,7 @@ class LgxJob(models.Model):
     @api.model
     def _cron_report_aged_provisions(self):
         """Provisi yang melewati umur ambang menjadi aktivitas, bukan hanya baris laporan."""
-        days = int(self.env["ir.config_parameter"].sudo().get_param("lgx.provision_age_days", 90))
+        days = self.env["ir.config_parameter"].sudo().lgx_int("lgx.provision_age_days", 90)
         cutoff = fields.Date.subtract(fields.Date.context_today(self), days=days)
         aged = self.env["lgx.job.charge"].search([
             ("state", "=", "provisioned"), ("provision_date", "<=", cutoff),

@@ -108,7 +108,7 @@ class FleetVehicle(models.Model):
         dipakai.
         """
         params = self.env["ir.config_parameter"].sudo()
-        warn_days = int(params.get_param("lgx.doc_expiry_warning_days", 30))
+        warn_days = params.lgx_int("lgx.doc_expiry_warning_days", 30)
         today = fields.Date.context_today(self)
         warn_before = fields.Date.add(today, days=warn_days)
         for vehicle in self:

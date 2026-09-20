@@ -40,7 +40,7 @@ class LgxCeisaClient(models.AbstractModel):
     # --- token -------------------------------------------------------------
     @api.model
     def _token_leeway(self):
-        return int(self.env["ir.config_parameter"].sudo().get_param("lgx.ceisa_token_leeway", 15))
+        return self.env["ir.config_parameter"].sudo().lgx_int("lgx.ceisa_token_leeway", 15)
 
     @api.model
     def _lgx_ceisa_token(self, company, force_refresh=False):

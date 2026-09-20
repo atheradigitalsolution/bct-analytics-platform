@@ -470,8 +470,7 @@ class LgxTripExpense(models.Model):
 
     @api.depends("amount")
     def _compute_needs_proof(self):
-        threshold = float(self.env["ir.config_parameter"].sudo().get_param(
-            "lgx.expense_proof_threshold", 100000))
+        threshold = self.env["ir.config_parameter"].sudo().lgx_float("lgx.expense_proof_threshold", 100000)
         for expense in self:
             expense.needs_proof = (expense.amount or 0.0) >= threshold
 

@@ -58,10 +58,10 @@ class LgxDriverDutyLog(models.Model):
     def _thresholds(self):
         params = self.env["ir.config_parameter"].sudo()
         return {
-            "continuous": int(params.get_param("lgx.duty_max_continuous_driving_minutes", 240)),
-            "rest": int(params.get_param("lgx.duty_required_rest_minutes", 30)),
-            "daily": int(params.get_param("lgx.duty_max_daily_working_minutes", 480)),
-            "absolute": int(params.get_param("lgx.duty_absolute_max_working_minutes", 720)),
+            "continuous": params.lgx_int("lgx.duty_max_continuous_driving_minutes", 240),
+            "rest": params.lgx_int("lgx.duty_required_rest_minutes", 30),
+            "daily": params.lgx_int("lgx.duty_max_daily_working_minutes", 480),
+            "absolute": params.lgx_int("lgx.duty_absolute_max_working_minutes", 720),
         }
 
     @api.depends("driving_minutes", "rest_minutes", "working_minutes",

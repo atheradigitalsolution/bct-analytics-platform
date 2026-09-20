@@ -126,8 +126,7 @@ class LgxWmsOccupancySnapshot(models.Model):
         pernah masuk proses penagihan dipertahankan apa pun umurnya, karena
         membuangnya berarti menghapus dasar tagihan yang belum terbit.
         """
-        months = int(self.env["ir.config_parameter"].sudo().get_param(
-            "lgx.occupancy_retention_months", 13))
+        months = self.env["ir.config_parameter"].sudo().lgx_int("lgx.occupancy_retention_months", 13)
         cutoff = fields.Date.subtract(fields.Date.context_today(self), months=months)
         stale = self.search([("date", "<", cutoff), ("billing_run_id", "!=", False)])
         count = len(stale)

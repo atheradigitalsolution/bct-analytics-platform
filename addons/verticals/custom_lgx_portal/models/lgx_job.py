@@ -50,8 +50,7 @@ class LgxJob(models.Model):
     # --- token pelacakan publik --------------------------------------------
     @api.model
     def _track_token_ttl_hours(self):
-        return int(self.env["ir.config_parameter"].sudo().get_param(
-            "lgx.track_link_ttl_hours", 72))
+        return self.env["ir.config_parameter"].sudo().lgx_int("lgx.track_link_ttl_hours", 72)
 
     def lgx_issue_track_token(self, force=False):
         """Terbitkan token pelacakan baru dengan masa berlaku.

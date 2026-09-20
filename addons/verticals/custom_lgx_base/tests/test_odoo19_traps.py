@@ -168,8 +168,15 @@ class TestOdoo19Traps(TransactionCase):
         sumber = [_baca(p) for p in _berkas("*.py")]
         dipakai = {
             k for k in dideklarasikan
-            if any(re.search(r'(get_param|set_param)\(\s*["\']%s["\']' % re.escape(k), s)
-                   for s in sumber)
+            # lgx_int/lgx_float ikut dihitung: refaktor 2026-09-20 mengganti
+            # int(get_param(...)) dengan pembaca yang tidak meledak pada nilai
+            # salah ketik, dan tanpa baris ini 18 parameter mendadak terbaca
+            # "tidak dipakai". Tes ini yang menangkapnya — pemeriksaan yang
+            # mengunci CARA memanggil, bukan FAKTA dipanggil, akan rusak tiap
+            # kali cara itu berubah.
+            if any(re.search(
+                r'(get_param|set_param|lgx_int|lgx_float)\(\s*["\']%s["\']'
+                % re.escape(k), s) for s in sumber)
         }
         mati = dideklarasikan - dipakai
         self.assertEqual(

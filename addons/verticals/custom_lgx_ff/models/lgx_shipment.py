@@ -172,8 +172,8 @@ class LgxShipment(models.Model):
         import math
         params = self.env["ir.config_parameter"].sudo()
         if self.transport_mode == "air":
-            divisor = float(params.get_param("lgx.volumetric_divisor_air", 6000.0)) or 6000.0
-            rounding = float(params.get_param("lgx.air_weight_rounding_kg", 0.5))
+            divisor = params.lgx_float("lgx.volumetric_divisor_air", 6000.0) or 6000.0
+            rounding = params.lgx_float("lgx.air_weight_rounding_kg", 0.5)
             volumetric = (self.volume_cm3 or (self.volume_cbm or 0.0) * 1_000_000.0) / divisor
             weight = max(self.gross_weight_kg or 0.0, volumetric)
             basis = "volume" if volumetric > (self.gross_weight_kg or 0.0) else "berat"

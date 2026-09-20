@@ -147,7 +147,7 @@ class LgxQuote(models.Model):
 
     # --- alur --------------------------------------------------------------
     def _min_margin_pct(self):
-        return float(self.env["ir.config_parameter"].sudo().get_param("lgx.min_margin_pct", 10.0))
+        return self.env["ir.config_parameter"].sudo().lgx_float("lgx.min_margin_pct", 10.0)
 
     def action_send(self):
         for quote in self:

@@ -114,8 +114,7 @@ class LgxTripAdvance(models.Model):
             if advance.state != "draft":
                 raise UserError(_("Hanya uang jalan draf yang dapat disetujui."))
             amount = advance.amount_approved or advance.amount_requested
-            tolerance = float(self.env["ir.config_parameter"].sudo().get_param(
-                "lgx.advance_tolerance_pct", 10.0))
+            tolerance = self.env["ir.config_parameter"].sudo().lgx_float("lgx.advance_tolerance_pct", 10.0)
             ceiling = (advance.amount_limit or 0.0) * (1.0 + tolerance / 100.0)
             if advance.amount_limit and amount > ceiling and not advance.approval_reason:
                 raise UserError(_(
