@@ -73,12 +73,62 @@ class LgxJob(models.Model):
         })
         return token
 
+    def _lgx_public_base_url(self):
+        """Alamat yang BENAR-BENAR dapat dibuka pelanggan, atau menolak.
+
+        `web.base.url` disetel Odoo secara otomatis dari header Host pada login
+        pertama. Di platform ini tenant baru pertama kali disentuh lewat ALIAS
+        JARINGAN INTERNAL, jadi nilainya membeku sebagai alamat yang hanya
+        resolve di dalam jaringan Docker — dan tautan pelacakan yang dibangun
+        di atasnya mati di tangan pelanggan tanpa satu galat pun di sisi kami.
+
+        Terukur 2026-09-20 di stack ini:
+
+            bct         https://bct.athera-digital.com
+            expomedia   https://expomedia.athera-digital.com
+            acme        http://localhost:8069        <- membeku dari laptop
+            athera_lgx  http://athera_lgx...         <- http, bukan https
+
+        Dua bentuk yang ditolak di sini, dan keduanya pernah benar-benar
+        terjadi di stack ini:
+
+        * localhost / 127.0.0.1 — tautan yang hanya bekerja di mesin yang
+          membuatnya;
+        * http:// — token pelacakan melintas tanpa enkripsi, dan pelanggan
+          yang membuka tautan itu di jaringan publik menyerahkan tokennya.
+
+        Menolak, bukan memperbaiki diam-diam. Menebak https untuk hostname yang
+        belum tentu punya sertifikat hanya memindahkan kegagalan ke tempat yang
+        lebih sulit dilihat — dan yang harus memutuskan alamat publik sebuah
+        tenant adalah orang yang memasangnya, bukan modul ini.
+        """
+        self.ensure_one()
+        base = (self.env["ir.config_parameter"].sudo().get_param("web.base.url") or "").strip()
+        buruk = None
+        if not base:
+            buruk = _("belum disetel sama sekali")
+        elif "localhost" in base or "127.0.0.1" in base:
+            buruk = _("menunjuk localhost, jadi ia hanya bekerja di mesin ini")
+        elif base.startswith("http://"):
+            buruk = _("memakai http, jadi token pelacakan melintas tanpa enkripsi")
+        if buruk:
+            raise UserError(_(
+                "Tautan pelacakan tidak dapat dibuat: parameter sistem "
+                "'web.base.url' %s.\n\nNilainya sekarang: %s\n\n"
+                "Odoo menyetelnya otomatis dari alamat yang dipakai saat login "
+                "pertama, dan di platform ini tenant baru sering pertama kali "
+                "disentuh lewat alias jaringan internal. Setel ke alamat publik "
+                "tenant ini di Pengaturan > Teknis > Parameter Sistem.",
+                buruk, base or _("(kosong)"),
+            ))
+        return base.rstrip("/")
+
     def action_share_tracking_link(self):
         """Tampilkan tautan pelacakan berikut masa berlakunya, apa adanya."""
         self.ensure_one()
         token = self.lgx_issue_track_token()
-        base = self.env["ir.config_parameter"].sudo().get_param("web.base.url")
-        url = "%s/lgx/lacak/%s/%s" % (base.rstrip("/"), self.id, token)
+        base = self._lgx_public_base_url()
+        url = "%s/lgx/lacak/%s/%s" % (base, self.id, token)
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",

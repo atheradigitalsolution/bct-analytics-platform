@@ -8,7 +8,7 @@ pengguna yang dibatasi. Tes yang memanggil controller sebagai superuser akan
 hijau meski seluruh rule-nya salah.
 """
 from odoo import fields
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -171,3 +171,62 @@ class TestPortalIsolation(TransactionCase):
             job.activity_ids,
             "Booking portal harus menempel pada seseorang sebagai aktivitas terjadwal.",
         )
+
+
+@tagged("post_install", "-at_install")
+class TestPublicBaseUrl(TransactionCase):
+    """Tautan pelacakan tidak boleh dibangun di atas alamat yang tidak dapat dibuka.
+
+    `web.base.url` disetel Odoo dari header Host pada login pertama. Di platform
+    ini tenant baru sering pertama kali disentuh lewat alias jaringan internal,
+    jadi nilainya membeku sebagai alamat yang hanya resolve di dalam jaringan —
+    dan tautannya mati di tangan pelanggan tanpa satu galat pun di sisi kami.
+
+    Terukur di stack ini saat uji ini ditulis: acme memakai http://localhost:8069,
+    athera_lgx memakai http:// sementara bct dan expomedia memakai https://.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.P = cls.env["ir.config_parameter"].sudo()
+        cls.asli = cls.P.get_param("web.base.url")
+        partner = cls.env["res.partner"].create({"name": "PT Uji Tautan"})
+        cls.job = cls.env["lgx.job"].create({
+            "job_type": "ff_import", "transport_mode": "sea",
+            "customer_id": partner.id, "etd": "2026-09-01",
+        })
+
+    def tearDown(self):
+        self.P.set_param("web.base.url", self.asli or "")
+        super().tearDown()
+
+    def _tolak(self, nilai, penanda):
+        self.P.set_param("web.base.url", nilai)
+        with self.assertRaises(UserError) as ctx:
+            self.job.action_share_tracking_link()
+        self.assertIn(penanda, str(ctx.exception).lower())
+
+    def test_localhost_is_refused(self):
+        """Tautan yang hanya bekerja di mesin yang membuatnya."""
+        self._tolak("http://localhost:8069", "localhost")
+
+    def test_plain_http_is_refused(self):
+        """Token pelacakan tidak boleh melintas tanpa enkripsi."""
+        self._tolak("http://athera_lgx.athera-digital.com", "http")
+
+    def test_empty_is_refused(self):
+        self._tolak("", "belum disetel")
+
+    def test_a_proper_public_url_is_accepted(self):
+        """Kontrol positif: penjaga tidak boleh menolak alamat yang benar.
+
+        Penjaga yang menolak segalanya lulus ketiga uji di atas dengan gemilang
+        dan mematikan fitur berbagi tautan sepenuhnya.
+        """
+        self.P.set_param("web.base.url", "https://athera_lgx.athera-digital.com/")
+        hasil = self.job.action_share_tracking_link()
+        self.assertEqual(hasil["type"], "ir.actions.client")
+        pesan = hasil["params"]["message"]
+        self.assertIn("https://athera_lgx.athera-digital.com/lgx/lacak/", pesan)
+        self.assertNotIn("//lgx/lacak", pesan, "Garis miring ganda: rstrip gagal.")
