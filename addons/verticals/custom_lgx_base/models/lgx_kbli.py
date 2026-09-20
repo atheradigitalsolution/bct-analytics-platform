@@ -6,10 +6,34 @@ paralel bersama KBLI 2020. Selama masa itu, dokumen perizinan yang sama bisa
 menyebut kode berbeda tergantung kapan ia terbit — jadi master ini menyimpan
 KEDUA versi beserta pemetaannya, bukan memilih salah satu.
 
-⚠ Konversi untuk pergudangan (52101) dan pelayaran (50131) belum dikonfirmasi ke
-OSS/BPS (butir A9 di Lampiran A). Baris yang belum terkonfirmasi ditandai
-`is_verified = False` dan TERLIHAT begitu di layar — bukan disembunyikan di
-komentar kode yang tidak dibaca siapa pun.
+A9 SEBAGIAN TERTUTUP (diperiksa 2026-09-20), dan bagian yang tertutup
+membenarkan bentuk model ini sementara bagian yang terbuka jadi lebih mendesak.
+
+TERTUTUP — bentuk konversinya. BPS menerbitkan Tabel Konversi KBLI 2020-2025
+(April 2026), dan konversinya TIDAK selalu satu-ke-satu: ada yang tetap, ada
+yang berubah, ada yang DIPECAH menjadi beberapa kode lebih spesifik, ada yang
+DIGABUNG dari beberapa kode lama. Itu persis alasan `counterpart_ids` berupa
+Many2many dan bukan Many2one — kalau ia Many2one, satu kode 2020 yang dipecah
+menjadi tiga kode 2025 memaksa seseorang memilih salah satu dan membuang dua.
+
+TERTUTUP — sumbernya. Tabel Konversi BPS, dan konversi otomatis di
+oss.go.id/kbli/konversi yang memakai tabel korespondensi yang sama.
+
+MASIH TERBUKA, dan ini yang harus diisi manusia: pemetaan konkret untuk
+pergudangan (52101) dan pelayaran (50131). Tidak diisi tebakan. Kode KBLI yang
+salah di dokumen perizinan bukan kesalahan kosmetik — ia menentukan tingkat
+risiko dan bentuk perizinan yang wajib dipenuhi.
+
+DAN SATU FAKTA YANG MENGUBAH ARTI `is_verified = False`: implementasi nasional
+KBLI 2025 di OSS dijadwalkan paling lambat 18 Juni 2026. Tanggal itu SUDAH
+LEWAT. Jadi baris 2020 yang belum terpetakan bukan lagi sekadar "belum
+dikonfirmasi" — ia berpotensi sudah tidak dipakai untuk perizinan baru, dan
+selisih antara keduanya kini menanggung risiko kepatuhan, bukan hanya
+ketidakrapian data.
+
+Baris yang belum terkonfirmasi ditandai `is_verified = False` dan TERLIHAT
+begitu di layar — bukan disembunyikan di komentar kode yang tidak dibaca siapa
+pun. Daftar bawaan sengaja kecil; muat lengkap lewat `lgx.kbli.lgx_import_csv`.
 """
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
