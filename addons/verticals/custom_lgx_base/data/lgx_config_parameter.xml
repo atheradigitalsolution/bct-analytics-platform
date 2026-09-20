@@ -93,7 +93,33 @@
             <field name="value">720</field>
         </record>
 
-        <!-- Pajak. Tarif efektif, bukan konstanta di kode (§11, LGX-F02). -->
+        <!-- Pajak. Tarif efektif, bukan konstanta di kode (§11, LGX-F02).
+
+             A1 dan A2 DITUTUP (diperiksa 2026-09-20), dan hasilnya melegakan
+             dengan cara yang tidak terduga: angkanya tidak berubah, tetapi
+             asal-usulnya berubah seluruhnya.
+
+             PMK 71/2022 menetapkan JPT yang tagihannya memuat biaya transportasi
+             sebagai JKP Tertentu, dulu 10% x 11% = 1,1%. PMK 11/2025 mengubah
+             rumusnya mengikuti kenaikan tarif umum ke 12%, menjadi
+             10% x 11/12 x 12% — yang tetap 1,1%. PMK 53/2025 (berlaku 1 Agustus
+             2025) mengubah PMK 11/2025 lagi dan MENEGASKAN pengali 11/12 itu.
+
+             Jadi rantainya PMK 71/2022 -> PMK 11/2025 -> PMK 53/2025, dan 1,1
+             di bawah ini bertahan melewati ketiganya. Siapa pun yang mengutip
+             "PMK 71/2022" sendirian untuk membenarkan angka ini mengutip aturan
+             yang sudah dua kali diubah.
+
+             CATATAN JUJUR tentang kedua parameter ini: tidak ada kode yang
+             membaca lgx.vat_besaran_tertentu_rate. Nilai PPN sesungguhnya
+             datang dari record account.tax yang menempel di sale_tax_ids kode
+             biaya. Parameter ini rujukan dan jejak keputusan, bukan sumber
+             perhitungan - dan menyebutnya sumber perhitungan akan membuat orang
+             mengubahnya lalu heran mengapa faktur tidak bergerak.
+
+             lgx.vat_default_without_freight SEBALIKNYA memang dibaca, di
+             custom_lgx_tax_id/models/account_move.py, dan ia yang menentukan
+             cabang saat tagihan JPT tidak memuat freight charge (butir A3). -->
         <record id="param_vat_besaran_tertentu_rate" model="ir.config_parameter">
             <field name="key">lgx.vat_besaran_tertentu_rate</field>
             <field name="value">1.1</field>
