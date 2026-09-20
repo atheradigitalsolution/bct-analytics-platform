@@ -126,6 +126,63 @@ class TestOdoo19Traps(TransactionCase):
                     hasil.add("%s_%s" % (tabel, c.group(1)))
         return hasil
 
+    # --- parameter yang diklaim ada -----------------------------------------
+    def test_unused_parameters_are_exactly_the_documented_ones(self):
+        """Parameter yang tidak dibaca kode HARUS tercatat, dan sebaliknya.
+
+        Dua arah, karena daftar ini rusak dari dua sisi: parameter baru yang
+        tidak dipakai dan tidak dicatat membuat daftarnya bohong, dan parameter
+        yang MULAI dipakai tetapi masih tercatat mati membuat orang berikutnya
+        percaya mengubahnya tidak berakibat apa-apa.
+
+        Audit ini pernah salah dengan dua cara sekaligus, dan keduanya bentuk
+        yang kami kejar sepanjang hari: ia memindai satu berkas lalu menyebut
+        dirinya "audit parameter" (nama lebih luas dari isinya), dan ia
+        menghitung PENYEBUTAN di komentar sebagai pemakaian.
+        """
+        TIDAK_DIPAKAI = {
+            # Duplikat dari lgx.wht.rate, yang justru menggerakkan perhitungan.
+            "lgx.pph23_rate", "lgx.pph23_rate_no_npwp", "lgx.pph15_sea_rate",
+            "lgx.pph15_air_rate", "lgx.pph15_foreign_rate", "lgx.pph15_air_is_final",
+            # Rujukan; nilai sesungguhnya dari account.tax dan dari kartu dokumen.
+            "lgx.vat_besaran_tertentu_rate", "lgx.kir_validity_months",
+            # Belum ada yang memakainya.
+            "lgx.stamp_duty_amount", "lgx.stamp_duty_receipt_threshold",
+            "lgx.coretax_xml_batch_size", "lgx.coretax_xml_max_bytes",
+            "lgx.coretax_sign_batch_size",
+        }
+        # DUA sumber, bukan satu. Parameter dapat lahir dari record data XML
+        # ATAU dari field res.config.settings dengan config_parameter=. Versi
+        # pertama pemeriksaan ini hanya membaca yang pertama dan melewatkan
+        # lgx.ceisa_token_leeway sepenuhnya — ketiga kalinya dalam satu hari
+        # sebuah audit bernama lebih luas daripada isinya.
+        dideklarasikan = set()
+        for path in _berkas("*.xml"):
+            dideklarasikan |= set(re.findall(
+                r'<field name="key">(lgx\.[a-z0-9_]+)</field>', _baca(path)))
+        for path in _berkas("*.py"):
+            dideklarasikan |= set(re.findall(
+                r'config_parameter\s*=\s*["\'](lgx\.[a-z0-9_]+)["\']', _baca(path)))
+        self.assertTrue(dideklarasikan, "Tidak satu pun parameter ditemukan — "
+                                        "pemindainya sendiri yang rusak.")
+        sumber = [_baca(p) for p in _berkas("*.py")]
+        dipakai = {
+            k for k in dideklarasikan
+            if any(re.search(r'(get_param|set_param)\(\s*["\']%s["\']' % re.escape(k), s)
+                   for s in sumber)
+        }
+        mati = dideklarasikan - dipakai
+        self.assertEqual(
+            sorted(mati - TIDAK_DIPAKAI), [],
+            "Parameter ini tidak dibaca kode mana pun dan tidak tercatat. "
+            "Pakai, hapus, atau tambahkan ke TIDAK_DIPAKAI dengan alasannya. "
+            "Lihat %s." % DOK)
+        self.assertEqual(
+            sorted(TIDAK_DIPAKAI - mati), [],
+            "Parameter ini tercatat tidak dipakai tetapi SEKARANG dibaca kode. "
+            "Cabut dari TIDAK_DIPAKAI — catatan yang basi membuat orang "
+            "berikutnya percaya mengubahnya tidak berakibat apa-apa.")
+
     # --- field & API yang dihapus -------------------------------------------
     def test_no_removed_field_names(self):
         """Field yang dihapus Odoo 19, yang galatnya terbaca seperti salah fixture."""

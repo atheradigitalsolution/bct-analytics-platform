@@ -10,15 +10,43 @@
             bukan rilis modul — dan itulah alasan strukturalnya, bukan kerapian.
 
             ================================================================
-            AUDIT 2026-09-20: 18 dari 31 parameter benar-benar dibaca kode.
+            AUDIT 2026-09-20: 22 dari 35 parameter benar-benar dibaca kode.
             ================================================================
 
+            TIGA PULUH LIMA, bukan tiga puluh satu, dan angka itu turun tiga
+            kali sebelum benar. Berkas ini memegang 31. Tiga lagi hidup sebagai
+            record data di modulnya masing-masing:
+
+              lgx.device_key_days                custom_lgx_api
+              lgx.track_link_ttl_hours           custom_lgx_portal
+              lgx.block_dispatch_on_expired_kir  custom_lgx_tms
+
+            Dan satu lagi tidak punya record data sama sekali — ia hanya ada
+            sebagai field res.config.settings dengan config_parameter=:
+
+              lgx.ceisa_token_leeway             custom_lgx_ceisa
+
+            Parameter dapat lahir dari DUA tempat, dan audit yang hanya membaca
+            satu di antaranya tetap menyebut dirinya audit parameter.
+
+            Versi pertama audit ini hanya memindai berkas ini sendiri lalu
+            menyebut hasilnya "audit parameter" — sebuah nama yang mencakup
+            lebih luas daripada isinya, bentuk yang sama dengan odol_status yang
+            kami temukan hari itu juga. Yang menemukannya bukan pembacaan ulang,
+            melainkan satu parameter yang muncul di basis data tanpa ada di
+            hitungan.
+
             Dihitung dari PEMAKAIAN, bukan penyebutan: hanya `get_param(` atau
-            `set_param(` dengan kuncinya di berkas .py. Metode pertama saya
-            memakai grep polos dan melaporkan 19 — satu di antaranya hanya
-            DISEBUT di komentar A13 pada berkas data lain. Audit yang menghitung
+            `set_param(` dengan kuncinya di berkas .py. Metode sebelumnya
+            memakai grep polos dan melaporkan satu parameter sebagai terpakai
+            padahal ia hanya DISEBUT di komentar A13. Audit yang menghitung
             komentar sebagai pemakaian akan menyusut sendiri tiap kali seseorang
             menulis dokumentasi yang benar.
+
+            Angka ini tidak lagi dijaga tangan: `custom_lgx_base/tests/
+            test_odoo19_traps.py` menegakkannya dua arah, jadi parameter baru
+            yang tidak dipakai WAJIB dicatat, dan yang mulai dipakai wajib
+            dicabut dari catatan.
 
             Tiga belas sisanya tidak dibaca di mana pun, dan itu HARUS diketahui
             sebelum ada yang mengubahnya lalu menunggu sistem berubah:
