@@ -8,6 +8,26 @@ yang berlaku pada tanggal pendaftarannya.
 `lartas_flag` menandai larangan dan pembatasan. Ia tidak memblokir apa pun
 sendiri — ia memunculkan daftar izin yang dibutuhkan, karena yang menghalangi
 pengiriman bukan HS code-nya melainkan izin yang belum ada.
+
+A25 DITUTUP (diperiksa 2026-09-20) — sumber dan ukurannya.
+
+BTKI 2022 ditetapkan PMK 26/PMK.010/2022, berlaku 1 April 2022, memuat
+99 bab dan **11.552 pos tarif** 8 digit (BTKI 2017: 10.841). Sumber resmi
+untuk penelusuran: portal INSW (insw.go.id), Inatrade (Kemendag), dan
+beacukai.go.id/btki.html. INSW yang paling lengkap untuk keperluan kami —
+ia menyertakan bea masuk, PPh impor, lartas, dan fasilitas FTA sekaligus.
+
+MODUL INI MEMUAT DELAPAN. Bukan 11.552, dan angka itu disebut supaya selisih
+1.444 kali lipatnya tidak pernah disalahpahami sebagai "hampir lengkap".
+Kedelapannya contoh untuk demo dan uji; muat sisanya lewat `lgx_import_csv`
+dari unduhan INSW.
+
+Yang membuat kekosongan ini AMAN adalah bentuk modelnya, bukan niat baik:
+deklarasi menunjuk `hs_code_id` sebagai Many2one wajib, jadi pos tarif yang
+belum dimuat tidak dapat dipilih dan tidak dapat diam-diam dianggap nol. Yang
+tidak ada TERLIHAT tidak ada. Kalau tarif suatu saat jatuh ke bawaan nol
+ketika HS code tidak ditemukan, sifat aman itu hilang dan seluruh perhitungan
+bea menjadi nol yang tampak wajar.
 """
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
