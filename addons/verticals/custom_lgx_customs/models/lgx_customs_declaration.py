@@ -14,6 +14,7 @@ pemeriksaan.
 """
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import float_compare
 
 DOC_TYPES = [
     ("bc20_pib", "BC 2.0 — PIB"),
@@ -70,6 +71,21 @@ class LgxCustomsDeclaration(models.Model):
     fx_rate_tax = fields.Float(
         "Kurs KMK", digits=(16, 6), default=1.0, required=True,
         help="Kurs Menteri Keuangan yang berlaku pada tanggal PIB. BUKAN kurs pembukuan.",
+    )
+    fx_rate_kmk_status = fields.Selection(
+        [("ok", "Cocok dengan KMK"), ("unknown", "KMK belum tercatat"),
+         ("mismatch", "Berbeda dari KMK")],
+        string="Status Kurs KMK", compute="_compute_fx_rate_kmk", store=True,
+    )
+    fx_rate_kmk_message = fields.Char(
+        "Keterangan Kurs KMK", compute="_compute_fx_rate_kmk", store=True)
+    fx_rate_kmk_id = fields.Many2one(
+        "lgx.kmk.rate", "KMK Acuan", compute="_compute_fx_rate_kmk", store=True)
+    fx_rate_override_reason = fields.Char(
+        "Alasan Kurs Berbeda dari KMK",
+        help="Wajib bila kurs yang dipakai berbeda dari KMK yang berlaku. "
+             "Selisih kurs mengalikan SELURUH pungutan, jadi ia tidak boleh "
+             "lewat tanpa jejak.",
     )
 
     line_ids = fields.One2many("lgx.customs.declaration.line", "declaration_id", "Baris Barang")
@@ -178,6 +194,52 @@ class LgxCustomsDeclaration(models.Model):
                 ))
 
     # --- alur --------------------------------------------------------------
+    @api.depends("fx_rate_tax", "currency_id", "registration_date", "company_id")
+    def _compute_fx_rate_kmk(self):
+        """Bandingkan kurs yang diketik dengan KMK yang berlaku pada tanggalnya.
+
+        Butir A26: kurs KMK ditetapkan mingguan, berlaku Rabu 00.00 sampai
+        Selasa. Yang diperiksa adalah kurs pada TANGGAL PENDAFTARAN, bukan hari
+        ini — deklarasi yang dibuka kembali tiga minggu kemudian harus tetap
+        menunjukkan kurs yang dipakai saat itu.
+
+        `unknown` bukan `ok`. Selama tabel KMK belum diisi, setiap deklarasi
+        menyatakan dirinya tidak dapat diverifikasi — dan itu memang keadaannya.
+        Melaporkannya "cocok" karena tidak ada pembanding adalah cara tabel itu
+        tidak pernah diisi.
+        """
+        Kmk = self.env["lgx.kmk.rate"]
+        for declaration in self:
+            on_date = declaration.registration_date or fields.Date.context_today(declaration)
+            kmk = Kmk.lgx_find(declaration.currency_id, on_date, declaration.company_id)
+            declaration.fx_rate_kmk_id = kmk
+            if declaration.currency_id == declaration.company_currency_id:
+                declaration.fx_rate_kmk_status = "ok"
+                declaration.fx_rate_kmk_message = _("Mata uang sama dengan mata uang perusahaan.")
+                continue
+            if not kmk:
+                declaration.fx_rate_kmk_status = "unknown"
+                declaration.fx_rate_kmk_message = _(
+                    "Belum ada kurs KMK tercatat untuk %s pada %s, jadi kurs yang "
+                    "dipakai tidak dapat diverifikasi. Sumber resmi: "
+                    "fiskal.kemenkeu.go.id, ditetapkan mingguan (Rabu-Selasa).",
+                    declaration.currency_id.name, on_date,
+                )
+                continue
+            if float_compare(declaration.fx_rate_tax, kmk.rate, precision_digits=6) == 0:
+                declaration.fx_rate_kmk_status = "ok"
+                declaration.fx_rate_kmk_message = _(
+                    "Cocok dengan %s.", kmk.kmk_number)
+                continue
+            declaration.fx_rate_kmk_status = "mismatch"
+            declaration.fx_rate_kmk_message = _(
+                "Kurs yang dipakai %s berbeda dari KMK %s yang menetapkan %s untuk "
+                "periode %s sampai %s. Seluruh pungutan berskala linear terhadap "
+                "angka ini.",
+                declaration.fx_rate_tax, kmk.kmk_number, kmk.rate,
+                kmk.valid_from, kmk.valid_to,
+            )
+
     def action_submit(self):
         for declaration in self:
             if declaration.state != "draft":
@@ -196,6 +258,15 @@ class LgxCustomsDeclaration(models.Model):
                     "Deklarasi tidak dapat diajukan dengan ahli yang sertifikatnya mati.",
                     expert.name, expert.certificate_expiry,
                 ))
+            if declaration.fx_rate_kmk_status == "mismatch" and not declaration.fx_rate_override_reason:
+                raise UserError(_(
+                    "%s\n\nIsi 'Alasan Kurs Berbeda dari KMK' bila ini memang "
+                    "disengaja. Kurs yang salah tidak membuat satu angka pun "
+                    "terlihat ganjil — semuanya ikut bergerak, konsisten dan salah.",
+                    declaration.fx_rate_kmk_message,
+                ))
+            if declaration.fx_rate_kmk_status == "unknown":
+                declaration.message_post(body=declaration.fx_rate_kmk_message)
             lartas_lines = declaration.line_ids.filtered(lambda l: l.hs_code_id.lartas_flag)
             if lartas_lines:
                 declaration.message_post(body=_(

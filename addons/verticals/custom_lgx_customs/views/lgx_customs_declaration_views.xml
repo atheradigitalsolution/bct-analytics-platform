@@ -81,6 +81,14 @@
                         <group>
                             <field name="currency_id"/>
                             <field name="fx_rate_tax"/>
+                            <field name="fx_rate_kmk_status" widget="badge" readonly="1"/>
+                            <field name="fx_rate_kmk_id" readonly="1"
+                                   invisible="not fx_rate_kmk_id"/>
+                            <field name="fx_rate_kmk_message" readonly="1"
+                                   invisible="fx_rate_kmk_status == 'ok'"/>
+                            <field name="fx_rate_override_reason"
+                                   invisible="fx_rate_kmk_status != 'mismatch'"
+                                   required="fx_rate_kmk_status == 'mismatch'"/>
                         </group>
                         <group>
                             <div class="text-muted">

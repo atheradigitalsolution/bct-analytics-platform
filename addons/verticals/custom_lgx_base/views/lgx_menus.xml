@@ -29,6 +29,8 @@
               action="action_lgx_customs_office" sequence="20"/>
     <menuitem id="menu_lgx_charge_code" name="Kode Charge" parent="menu_lgx_config_commercial"
               action="action_lgx_charge_code" sequence="10"/>
+    <menuitem id="menu_lgx_kmk_rate" name="Kurs KMK (NDPBM)" parent="menu_lgx_config_commercial"
+              action="action_lgx_kmk_rate" sequence="20"/>
     <menuitem id="menu_lgx_container_type" name="Tipe Kontainer" parent="menu_lgx_config_reference"
               action="action_lgx_container_type" sequence="10"/>
     <menuitem id="menu_lgx_commodity" name="Komoditas" parent="menu_lgx_config_reference"

@@ -33,3 +33,7 @@ access_lgx_integration_message_system,lgx.integration.message/system,model_lgx_i
 access_lgx_kbli_staff,lgx.kbli/staff,model_lgx_kbli,custom_lgx_base.group_lgx_staff,1,0,0,0
 access_lgx_kbli_finance_manager,lgx.kbli/finance_manager,model_lgx_kbli,custom_lgx_base.group_lgx_finance_manager,1,1,1,1
 access_lgx_kbli_system,lgx.kbli/system,model_lgx_kbli,base.group_system,1,1,1,1
+access_lgx_kmk_rate_staff,lgx.kmk.rate/staff,model_lgx_kmk_rate,custom_lgx_base.group_lgx_staff,1,0,0,0
+access_lgx_kmk_rate_customs_manager,lgx.kmk.rate/customs_manager,model_lgx_kmk_rate,custom_lgx_base.group_lgx_customs_manager,1,1,1,1
+access_lgx_kmk_rate_finance_manager,lgx.kmk.rate/finance_manager,model_lgx_kmk_rate,custom_lgx_base.group_lgx_finance_manager,1,1,1,1
+access_lgx_kmk_rate_system,lgx.kmk.rate/system,model_lgx_kmk_rate,base.group_system,1,1,1,1

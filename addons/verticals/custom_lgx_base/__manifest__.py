@@ -68,6 +68,7 @@ disimpan.
         "views/lgx_integration_views.xml",
         "views/res_partner_views.xml",
         "views/operating_unit_views.xml",
+        "views/lgx_kmk_rate_views.xml",
         "views/lgx_menus.xml",
     ],
     "installable": True,

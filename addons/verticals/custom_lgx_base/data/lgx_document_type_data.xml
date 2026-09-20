@@ -57,8 +57,31 @@
             <field name="code">CI</field><field name="name">Commercial Invoice</field>
             <field name="category">commercial</field><field name="is_customer_visible">1</field>
             <field name="sequence">100</field>
-            <!-- ⚠ A13: apakah faktur komersial biasa objek bea meterai belum
-                 dikonfirmasi ke konsultan pajak. Default: tidak. -->
+            <!-- A13 DITUTUP (diperiksa 2026-09-20): faktur komersial BUKAN objek
+                 bea meterai, dan default "tidak" di atas benar.
+
+                 UU 10/2020 mengenakan bea meterai pada dokumen bernilai di atas
+                 Rp5.000.000 yang MENYEBUTKAN PENERIMAAN UANG, atau yang berisi
+                 pengakuan bahwa utang sebagian atau seluruhnya telah dilunasi.
+                 Faktur tidak melakukan keduanya: ia MENAGIH pembayaran, bukan
+                 mengakui sudah menerimanya. Kuitansi yang melakukan itu — dan
+                 kuitansi memang ditandai di bawah.
+
+                 Pembedaan itu satu arah waktu, dan itulah seluruh perkaranya:
+                 menagih menghadap ke depan, mengakui menghadap ke belakang.
+                 Dua lembar yang menyebut angka yang sama persis diperlakukan
+                 berbeda karena kalimat yang membungkusnya.
+
+                 Surat perjanjian (kontrak) terkena tanpa memandang nilai — itu
+                 jenis dokumen yang berbeda lagi, dan doctype_kontrak sudah
+                 ditandai.
+
+                 CATATAN: `requires_stamp_duty` adalah boolean per JENIS dokumen,
+                 sedangkan ambang Rp5.000.000 berlaku per LEMBAR. Parameter
+                 lgx.stamp_duty_receipt_threshold memegang angkanya, tetapi
+                 belum ada kode yang membacanya — kuitansi di bawah Rp5 juta
+                 karena itu masih tampak "perlu meterai". Lihat audit parameter
+                 di lgx_config_parameter.xml. -->
         </record>
         <record id="doctype_coo" model="lgx.document.type">
             <field name="code">COO</field><field name="name">Certificate of Origin</field>

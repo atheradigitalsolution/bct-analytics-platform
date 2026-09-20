@@ -8,3 +8,4 @@ from . import lgx_milestone_type
 from . import lgx_integration_message
 from . import res_partner
 from . import operating_unit
+from . import lgx_kmk_rate

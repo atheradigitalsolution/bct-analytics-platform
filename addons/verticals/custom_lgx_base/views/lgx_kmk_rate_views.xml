@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lgx_kmk_rate_list" model="ir.ui.view">
+        <field name="name">lgx.kmk.rate.list</field>
+        <field name="model">lgx.kmk.rate</field>
+        <field name="arch" type="xml">
+            <list string="Kurs KMK" editable="bottom">
+                <field name="kmk_number"/>
+                <field name="currency_id"/>
+                <field name="rate"/>
+                <field name="valid_from"/>
+                <field name="valid_to"/>
+                <field name="company_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_lgx_kmk_rate_form" model="ir.ui.view">
+        <field name="name">lgx.kmk.rate.form</field>
+        <field name="model">lgx.kmk.rate</field>
+        <field name="arch" type="xml">
+            <form string="Kurs KMK">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Kurs NDPBM ditetapkan mingguan lewat Keputusan Menteri Keuangan
+                        dan berlaku Rabu pukul 00.00 WIB sampai Selasa berikutnya.
+                        Sumber resmi: fiskal.kemenkeu.go.id. Penarikan otomatis belum
+                        dibangun — isi manual setiap minggu.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="kmk_number"/>
+                            <field name="currency_id"/>
+                            <field name="rate"/>
+                        </group>
+                        <group>
+                            <field name="valid_from"/>
+                            <field name="valid_to"/>
+                            <field name="company_id"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_lgx_kmk_rate" model="ir.actions.act_window">
+        <field name="name">Kurs KMK (NDPBM)</field>
+        <field name="res_model">lgx.kmk.rate</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Belum ada kurs KMK tercatat.</p>
+            <p>
+                Selama tabel ini kosong, setiap deklarasi pabean menyatakan kursnya
+                "belum dapat diverifikasi" — dan itu memang keadaannya. Kurs KMK adalah
+                pengali setiap pungutan impor; satu nol yang kelebihan mengalikan
+                seluruhnya sepuluh kali tanpa membuat satu angka pun terlihat ganjil.
+            </p>
+        </field>
+    </record>
+</odoo>
