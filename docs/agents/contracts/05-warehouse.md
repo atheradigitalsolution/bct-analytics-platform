@@ -392,7 +392,7 @@ mart_name, tenant_id, sla_seconds, on_breach, last_refreshed_at, age_seconds, is
 
 **`warehouse.access_audit` design note, because the brief asks for one.** The module it was to
 mirror, `custom_pdp_audit`, **does not exist** — the five addons are `custom_demo_seed`,
-`custom_operating_unit`, `custom_pdp_core`, `custom_pdp_masking`, `custom_ppob`. So it is designed
+`custom_operating_unit`, `custom_pdp`, `custom_pdp_masking`, `custom_ppob`. So it is designed
 here, in three layers, because no single one of them is sufficient:
 
 1. `ALTER ROLE warehouse_rls SET log_statement='all'` — applied by the server, so a client cannot

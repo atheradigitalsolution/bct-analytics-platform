@@ -29,8 +29,8 @@ Odoo as a registry, once in the warehouse as a policy table the loader executes.
 
 **Where it lives**
 
-- `addons/custom_pdp_core/models/pdp_field_classification.py` and its seed
-  `addons/custom_pdp_core/data/pdp.field.classification.csv` — the registry inside Odoo, one row per
+- `addons/compliance/custom_pdp/models/pdp_field_classification.py` and its seed
+  `addons/compliance/custom_pdp/data/pdp.field.classification.csv` — the registry inside Odoo, one row per
   physical column.
 - `warehouse.column_policy` — the same taxonomy as data the loader reads at startup. Currently
   **698 rows**: 19 `public`, 628 `internal`, 27 `personal`, 19 `sensitive`, 5 `secret`.

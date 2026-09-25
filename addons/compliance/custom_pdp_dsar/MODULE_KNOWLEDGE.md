@@ -47,7 +47,7 @@ It is the operator-facing fulfilment surface for subject rights. Every state tra
 - Controller: `POST /dsar/request` (type=jsonrpc, auth=public, csrf=False).
 
 ## Integration Points
-- **Depends on:** `custom_core`, `custom_pdp_taxonomy`, `custom_pdp_audit`, `custom_ai_bridge`.
+- **Depends on:** `custom_core`, `custom_pdp`, `custom_pdp_audit`, `custom_ai_bridge`.
 - **Inherits from:** `pdp.audited.mixin`, `mail.thread`.
 - **Extended by:** none declared; vertical modules typically just rely on tagging their PII fields so they show up in the gather/anonymize sweep.
 - **External calls:** `custom.ai._chat` (optional, swallowed on failure).

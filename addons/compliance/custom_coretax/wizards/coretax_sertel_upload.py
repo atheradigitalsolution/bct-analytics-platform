@@ -108,7 +108,7 @@ class CoretaxSertelUploadWizard(models.TransientModel):
             INSERT INTO pdp.audit_log
                 (actor_user_id, actor_login, tenant_db, model_name, res_id,
                  action, field_changes, classification, reason)
-            VALUES (%s, %s, %s, %s, %s, 'sertel_access', %s::jsonb, 'sensitive_pii', %s)
+            VALUES (%s, %s, %s, %s, %s, 'sertel_access', %s::jsonb, 'sensitive', %s)
             """,
             (
                 self.env.uid,

@@ -14,7 +14,7 @@ at GATE 2. The seams between components are frozen in `docs/agents/contracts/01.
 ```
       ┌──────────────────────────────────────────────────────────────────────────────┐
       │  odoo19-bct-odoo            Odoo 19 CE, 5 custom addons                       │
-      │    custom_pdp_core        the classification registry (698 columns)           │
+      │    custom_pdp        the classification registry (698 columns)           │
       │    custom_pdp_masking     the HMAC spec + in-UI and export masking            │
       │    custom_operating_unit  OU record rules, fail-closed                        │
       │    custom_ppob            the PPOB domain                                     │

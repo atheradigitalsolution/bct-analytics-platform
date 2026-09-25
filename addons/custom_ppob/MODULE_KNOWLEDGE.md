@@ -121,7 +121,7 @@ module does not keep target history.
 
 ## 5. PDP
 
-Classified in `custom_pdp_core`'s seed (the registry keys by model-name string, so it classifies
+Classified in `custom_pdp`'s seed (the registry keys by model-name string, so it classifies
 this model without depending on this module):
 
 | column | class | at load |
@@ -160,9 +160,9 @@ Only a manager may press **Reverse**, and the button carries a confirmation — 
 
 ## 7. Dependencies
 
-`base, product, custom_pdp_core, custom_pdp_masking, custom_operating_unit`.
+`base, product, custom_pdp, custom_pdp_masking, custom_operating_unit`.
 
 `custom_operating_unit` is a hard dependency: `models/ppob_transaction.py` imports
 `operating_unit_field` from it so that the sixth occurrence of `operating_unit_id` cannot drift
 from the other five. Install order is therefore
-`custom_pdp_core → custom_pdp_masking → custom_operating_unit → custom_ppob`.
+`custom_pdp → custom_pdp_masking → custom_operating_unit → custom_ppob`.

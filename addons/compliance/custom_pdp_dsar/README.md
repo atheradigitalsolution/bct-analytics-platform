@@ -32,7 +32,7 @@ verifies identity, and produces a deliverable archive.
 
 ## Dependencies
 
-- `custom_core`, `custom_pdp_taxonomy`, `custom_pdp_audit`, `custom_ai_bridge`
+- `custom_core`, `custom_pdp`, `custom_pdp_audit`, `custom_ai_bridge`
   (AI assistance for identity verification & data classification of
   free-text fields).
 

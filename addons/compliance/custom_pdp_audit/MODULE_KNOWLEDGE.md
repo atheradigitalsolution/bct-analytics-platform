@@ -46,7 +46,7 @@ The Odoo-side model `pdp.audit.log` (note the dot) is a read-only `_auto=False` 
 - `pre_init_hook(env)` (in `hooks.py`) — boots the `pdp` schema from `data/02-pdp-schema.sql`.
 
 ## Integration Points
-- **Depends on:** `custom_core`, `custom_pdp_taxonomy`.
+- **Depends on:** `custom_core`, `custom_pdp`.
 - **Inherits from:** `res.partner`, `res.users` (adds the mixin).
 - **Extended by:** `custom_pdp_consent`, `custom_pdp_dsar`, `custom_pdp_retention`, `custom_pdp_masking`, `custom_coretax`, `custom_coretax_bupot`, `custom_pph_witholding`, `custom_rental`, and many more — anywhere `pdp.audited.mixin` is mixed in.
 - **External calls:** Postgres-only (raw SQL into `pdp.audit_log`); no network.

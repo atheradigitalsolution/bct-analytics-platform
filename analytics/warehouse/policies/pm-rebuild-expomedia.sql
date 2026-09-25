@@ -69,7 +69,7 @@ WHERE NOT EXISTS (SELECT 1 FROM pdp_field_classification WHERE model_name='sale.
 
 -- 3) Ruling user 2026-09-11 (onboarding expomedia): field identitas orang = sensitive
 --    (HMAC di warehouse), tanggal lahir (DATE, tak bisa HMAC) = secret (drop).
---    Lebih ketat dari seed custom_pdp_core (internal). Hanya expomedia yang punya
+--    Lebih ketat dari seed custom_pdp (internal). Hanya expomedia yang punya
 --    kolom-kolom ini secara fisik, jadi dampak ekstraksi terbatas ke tenant itu.
 UPDATE pdp_field_classification SET pdp_class='sensitive', drop_to_null=false,
   notes=COALESCE(notes,'')||' [ruling user 2026-09-11: sensitive/HMAC utk warehouse]'

@@ -95,15 +95,16 @@ TIER_ORDER = [
 # duplicating it here made this file, whose whole job is to stop the catalogue
 # republishing those names, one more place carrying them. Hence the import.
 #
-# custom_pdp_core is excluded for the reason migrate-client-renames.py gives: that
-# entry resolves a name COLLISION at import time, not a de-branding. Both modules
-# exist in this tree today, and honouring it would merge two unrelated catalogue
-# rows into one.
+# Since the 2026-09 PDP merge the repo-side rename custom_pdp_core -> custom_pdp
+# IS the catalogue reality (both old modules merged into compliance/custom_pdp),
+# so the entry is honoured here to carry the judgement columns over. The
+# DATABASE-side exclusion still lives in migrate-client-renames.py: the DB merge
+# is done by scripts/migrate-pdp-module-merge.py, never by replaying the map.
 _spec = importlib.util.spec_from_file_location(
     "import_platform_addons", REPO / "scripts" / "import-platform-addons.py")
 _imp = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_imp)
-IMPORT_ONLY_RENAMES = {"custom_pdp_core"}
+IMPORT_ONLY_RENAMES: set[str] = set()
 RENAMES = {k: v for k, v in _imp.RENAMES.items() if k not in IMPORT_ONLY_RENAMES}
 
 MEASURED = {

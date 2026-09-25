@@ -8,7 +8,7 @@
     "category": "Custom Platform/Compliance/PDP",
     "version": "19.0.0.2.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "custom_pdp_taxonomy", "custom_pdp_audit"],
+    "depends": ["custom_core", "custom_pdp", "custom_pdp_audit"],
     "capability_tags": ["pdp", "compliance", "audit-trail", "retention"],
     "data": [
         "views/generated_search_views.xml",

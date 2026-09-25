@@ -142,7 +142,7 @@ nothing**, so a fresh clone could not start them.
   names, field names, XML IDs and Python class names. 20 models, 5 fields, 7 module
   directories and 655 XML IDs moved. Three rule shapes were needed: letter
   boundaries (so `claim` is not a sighting and `we aim to` survives), CamelCase
-  matched on the following capital (`LevisCategReclass`), and UPPERCASE identifiers
+  matched on the following capital (`ClientCategReclass`), and UPPERCASE identifiers
   matched on the trailing underscore (`AIM_COMPANY`, which the prose rule turned
   into `the tenant_COMPANY` — a SyntaxError Odoo only reported at import).
 - **`scripts/migrate-client-renames.py`** — renames modules, models, tables,
@@ -179,7 +179,7 @@ nothing**, so a fresh clone could not start them.
 
 ### Known gaps
 
-- `custom_arka_aim_seed` and `custom_storefront_api` are present but not installed;
+- `custom_<client-c>_seed` and `custom_storefront_api` are present but not installed;
   ADR 0002 §6 records why. The second is the more interesting: an addon that turns a
   stored field into a computed one silently breaks logical replication of that
   column.

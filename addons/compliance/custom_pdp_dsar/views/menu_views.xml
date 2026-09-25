@@ -2,8 +2,8 @@
 <odoo>
     <menuitem id="menu_pdp_dsar"
               name="DSAR Requests"
-              parent="custom_pdp_taxonomy.menu_pdp_root"
+              parent="custom_pdp.menu_pdp_root"
               action="action_pdp_dsar_request"
               sequence="30"
-              groups="group_dsar_handler,custom_pdp_taxonomy.group_dpo"/>
+              groups="group_dsar_handler,custom_pdp.group_dpo"/>
 </odoo>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Single PDP menu tree for the merged module. -->
+    <menuitem id="menu_pdp_root"
+              name="PDP Compliance"
+              sequence="20"
+              groups="custom_core.group_custom_user"/>
+
+    <menuitem id="menu_pdp_config"
+              name="Configuration"
+              parent="menu_pdp_root"
+              sequence="90"
+              groups="group_dpo,group_pdp_officer"/>
+
+    <menuitem id="menu_pdp_field_classification"
+              name="Field Classification"
+              parent="menu_pdp_config"
+              action="action_pdp_field_classification"
+              sequence="5"
+              groups="group_pdp_officer"/>
+
+    <menuitem id="menu_pdp_classification"
+              name="Classifications"
+              parent="menu_pdp_config"
+              action="action_pdp_classification"
+              sequence="10"/>
+
+    <menuitem id="menu_pdp_tag_fields_wizard"
+              name="Tag PII Fields"
+              parent="menu_pdp_config"
+              action="action_pdp_tag_fields_wizard"
+              sequence="20"/>
+</odoo>

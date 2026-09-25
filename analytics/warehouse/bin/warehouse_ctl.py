@@ -127,7 +127,7 @@ CLASS_TO_TRANSFORM: dict[str, str] = {
 # announced loudly on every run, so it can never quietly become the DWH agent
 # inventing a classification — which contract 01 forbids.
 #
-# Remove an entry the moment custom_pdp_core's CSV agrees; the script says so
+# Remove an entry the moment custom_pdp's CSV agrees; the script says so
 # when that happens.
 # ---------------------------------------------------------------------------
 CONTRACT_01_OVERRIDES: dict[tuple[str, str], tuple[str, bool, str]] = {
@@ -137,7 +137,7 @@ CONTRACT_01_OVERRIDES: dict[tuple[str, str], tuple[str, bool, str]] = {
     # needed once and will be needed again: on 2026-08-31 contract 01 was
     # amended (Lead ruling 064d3c2) to reclassify res.partner.barcode from
     # `personal` to `sensitive` + drop_to_null, and for a short window the
-    # ruling existed in the contract while custom_pdp_core's committed seed
+    # ruling existed in the contract while custom_pdp's committed seed
     # still said `personal`. Platform-Addons has since regenerated the seed and
     # the registry agrees, so the override was removed rather than left to rot.
     #
@@ -281,7 +281,7 @@ def source_columns(odoo, table: str) -> list[dict]:
 
 
 def classification_map(odoo) -> dict[tuple[str, str], dict]:
-    """The active rows of custom_pdp_core's registry, keyed by (model, field).
+    """The active rows of custom_pdp's registry, keyed by (model, field).
 
     Read straight from the table rather than through JSON-RPC. The registry's
     MODULE_KNOWLEDGE documents a JSON-RPC surface for the loader; DWH is
@@ -307,7 +307,7 @@ def classification_map(odoo) -> dict[tuple[str, str], dict]:
         if current["pdp_class"] == klass and bool(current["drop_to_null"]) == drop_to_null:
             print(
                 f"  NOTE  contract-01 override for {model}.{field} is NO LONGER NEEDED - "
-                f"custom_pdp_core's seed already agrees. Remove it from CONTRACT_01_OVERRIDES."
+                f"custom_pdp's seed already agrees. Remove it from CONTRACT_01_OVERRIDES."
             )
             continue
         print(
@@ -317,7 +317,7 @@ def classification_map(odoo) -> dict[tuple[str, str], dict]:
         )
         print(f"            {why}")
         print(
-            "            The addon seed (addons/custom_pdp_core/data/pdp.field.classification.csv) "
+            "            The addon seed (addons/compliance/custom_pdp/data/pdp.field.classification.csv) "
             "has NOT caught up. Platform-Addons must regenerate it."
         )
         out[(model, field)] = {
@@ -400,7 +400,7 @@ def cmd_sync_policy(args) -> int:
             print(f"  - {u}", file=sys.stderr)
         print(
             "\nContract 01: unclassified is a hard failure, never a silent default to "
-            "`public`. Add the rows to custom_pdp_core's seed and reinstall the module.",
+            "`public`. Add the rows to custom_pdp's seed and reinstall the module.",
             file=sys.stderr,
         )
         return 2
@@ -1393,7 +1393,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("sync-policy", help="Materialise warehouse.column_policy from custom_pdp_core")
+    sub.add_parser("sync-policy", help="Materialise warehouse.column_policy from custom_pdp")
 
     p = sub.add_parser(
         "import-policy",

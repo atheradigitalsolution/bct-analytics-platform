@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        NOT noupdate: <function/> in a noupdate file only runs at first install,
+        and these must run on every -u.
+        1. Seed default PII tags on common res.partner fields.
+        2. Backfill pdp_class on (noupdate) dictionary rows, then project the
+           canonical registry (pdp.field.classification) onto the
+           x_pdp_classification_id tags. All idempotent raw SQL.
+    -->
+    <function model="pdp.classification" name="_seed_partner_pii_fields"/>
+    <function model="pdp.classification" name="_pdp_post_sync"/>
+</odoo>

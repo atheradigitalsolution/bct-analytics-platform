@@ -33,7 +33,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # Representative paths. They do not need to exist - these test the patterns.
 MUST_SHIP = [
-    "addons/custom_pdp_core/data/pdp.field.classification.csv",
+    "addons/compliance/custom_pdp/data/pdp.field.classification.csv",
     "addons/any_module/data/anything.xml",
     "analytics/dbt/data/seed.csv",
     "analytics/dbt/models/marts/build/model.sql",

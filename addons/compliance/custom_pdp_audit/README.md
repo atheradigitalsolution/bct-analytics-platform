@@ -35,7 +35,7 @@ the postgres init scripts). Aborts install if they don't.
 
 ## Dependencies
 
-- `custom_core`, `custom_pdp_taxonomy`
+- `custom_core`, `custom_pdp`
 
 ## Install
 

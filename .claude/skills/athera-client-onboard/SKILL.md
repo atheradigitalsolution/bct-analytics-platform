@@ -179,4 +179,4 @@ yang tidak terlihat dari onboarding bct/ndi:
 - Keputusan kepatuhan 2026-09-11: kolom identitas orang (NIK, paspor, KITAS, NPWP, NITKU,
   TIN, PTKP, tempat lahir, NPWP penandatangan) = **sensitive** (HMAC) di policy expomedia,
   `x_custom_birth_date` (DATE, tak bisa HMAC) = **secret** (drop). Lebih ketat dari seed
-  `custom_pdp_core` yang menulis `internal` — jangan diturunkan tanpa keputusan user.
+  `custom_pdp` yang menulis `internal` — jangan diturunkan tanpa keputusan user.

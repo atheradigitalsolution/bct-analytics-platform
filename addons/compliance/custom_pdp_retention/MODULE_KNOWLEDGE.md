@@ -47,7 +47,7 @@ Implements **data retention policies** for UU 27/2022. Operators define one `pdp
 - `pdp.retention.policy._eligible_domain()` / `_count_eligible()` — helpers for previews and cron.
 
 ## Integration Points
-- **Depends on:** `custom_core`, `custom_pdp_taxonomy`, `custom_pdp_audit`.
+- **Depends on:** `custom_core`, `custom_pdp`, `custom_pdp_audit`.
 - **Inherits from:** `pdp.audited.mixin`.
 - **Extended by:** none declared.
 - **External calls:** none.

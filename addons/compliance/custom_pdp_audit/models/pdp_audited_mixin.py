@@ -36,7 +36,7 @@ class PdpAuditedMixin(models.AbstractModel):
         if not codes:
             return None
         # Prefer most-sensitive code if available
-        priority = ("sensitive_pii", "health", "financial", "pii", "confidential", "internal", "public")
+        priority = ("secret", "sensitive", "child", "financial", "pii", "anonymized", "internal", "public")
         for p in priority:
             if p in codes:
                 return p

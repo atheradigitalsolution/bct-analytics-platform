@@ -18,7 +18,7 @@ persentase.
 Kolomnya diumumkan di sini dan bukan di ``custom_ndi_master`` karena ia melayani
 lapisan produksi, bukan lapisan master produk; ketika ``custom_ndi_mrp_formula``
 dibangun, definisi ini pindah ke sana beserta migrasinya. Ketiganya sudah
-diklasifikasi ``internal`` di ``custom_pdp_core``.
+diklasifikasi ``internal`` di ``custom_pdp``.
 """
 
 from odoo import fields, models

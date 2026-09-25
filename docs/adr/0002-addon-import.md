@@ -72,7 +72,7 @@ the following constraints.
 
 6. **Two imported modules are present but not installed here.** Both are recorded
    with their reason in `docs/module-catalog.md` section 12:
-   - `custom_arka_aim_seed` — its own manifest restricts it to one tenant database,
+   - `custom_<client-c>_seed` — its own manifest restricts it to one tenant database,
      and its post-init hook changes the company currency, which cannot succeed on a
      database that already has journal entries.
    - `custom_storefront_api` — it redefines `res.partner.phone`, `street`, `street2`

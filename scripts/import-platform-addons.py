@@ -45,172 +45,46 @@ SKIP = {
 }
 
 # ADR 0002 sections 3 and 4 -- renamed on the way in.
-RENAMES = {
-    # Collision with this repo's own module. The two are complementary: theirs is a
-    # taxonomy of classification codes, ours is the per-column CDC policy.
-    "custom_pdp_core": "custom_pdp_taxonomy",
-    # Customer identity must not enter the tree.
-    "l10n_erajaya": "l10n_id_coa_10d",
-    "custom_arka_aim_numbering": "custom_doc_numbering",
-    "custom_arka_fx_header": "custom_account_fx_header",
-    "custom_levis_sales_dashboard": "custom_retail_sales_dashboard",
+#
+# The client-identifying maps (module renames, content substitutions, dedupe
+# specs) are NOT in this repo: keeping the old client names here would make the
+# scrubber itself the last file still carrying them. They live in the untracked
+# scripts/client-renames.local.json (git-excluded; the master copy is kept
+# outside the repo). Without that file the import cannot de-brand upstream
+# code, so `--apply` refuses to run; the read-only consumers
+# (refresh_module_catalog.py, migrate-client-renames.py) degrade gracefully to
+# the generic entries below.
+_LOCAL_RENAMES = Path(__file__).with_name("client-renames.local.json")
+
+#: Non-client renames that belong to the repo itself.
+RENAMES: dict[str, str] = {
+    # Collision with this repo's own module. Upstream's custom_pdp_core is a
+    # taxonomy of classification codes; since 2026-09 it is MERGED (together with
+    # this repo's per-column registry) into compliance/custom_pdp. A re-import of
+    # the upstream module would overwrite the merged module - review manually
+    # instead of replaying this rename blindly.
+    "custom_pdp_core": "custom_pdp",
+    # Too generic a name for what it contains.
     "custom_ops_reports": "custom_asset_ops_reports",
-    "custom_ppob_eraspace_bridge": "custom_ppob_pos_bridge",
-    # The second pass, after the first import showed the client names were not
-    # only in prose: they were in model names, field names and XML IDs, which is
-    # a database rename rather than a text substitution. See
-    # scripts/migrate-client-renames.py.
-    "custom_levis_localization": "custom_retail_localization",
-    "custom_levis_categ_approval": "custom_retail_categ_approval",
-    "custom_levis_asset_accounts": "custom_retail_asset_accounts",
-    "custom_arka_aim_asset_register": "custom_asset_register_seed",
-    "custom_arka_aim_opening_balance": "custom_opening_balance_seed",
-    "custom_arka_aim_seed": "custom_tenant_coa_seed",
-    "custom_arka_show_date": "custom_sale_show_date",
 }
 
 # Applied to the CONTENTS and PATHS of every imported module (ADR 0002 section 4).
-# Order matters: the specific rules must run before the bare token, or `erajaya.com`
-# becomes `id_coa_10d.com` and `ERAJAYA_ASSET_GROUP_SEED` keeps half its name.
-#
-# The seed brands in custom_project_portfolio are a customer's brand list sitting in
-# an otherwise generic module, so they are renamed to the retail segments they stand
-# for. Four test files resolve those XML IDs; the same table rewrites them, which is
-# why the ids are listed here rather than hand-edited in the data file.
+# Order matters: the specific client rules (from the local file) must run before
+# the generic cleanup below - substituting a client name for a common noun can
+# leave "the the"; collapsing duplicates afterwards is simpler than making every
+# substitution agree with the article and noun around it.
 CONTENT_SUBS: list[tuple[str, str]] = [
-    # Mail hosts and repositories.
-    (r"mail\.erajaya\.com", "mail.example.invalid"),
-    (r"[\w.]*@erajaya\.com", "retail.data@example.invalid"),
-    (r"\berajaya\.com\b", "example.invalid"),
-    (r"erajaya-platform", "example-org"),
-    # Legal entities.
-    (r"Erajaya\s+Swasembada", 'Example Group'),
-    (r"Erajaya\s+Group", 'Example Group'),
-    (r"PT\.?\s+Erajaya\s+\w+", 'the group parent company'),
-    # Prose. Almost every surviving mention is about the chart of accounts, so a
-    # blanket "the group" would read as "the the group chart"; name the chart instead.
-    (r"Erajaya\s+Chart\s+of\s+Accounts", '10-Digit Chart of Accounts'),
-    (r"an\s+Erajaya[-\s]chart", 'a 10-digit chart'),
-    (r"the\s+Erajaya[-\s]chart", 'the 10-digit chart'),
-    (r"Erajaya[-\s]chart", '10-digit chart'),
-    (r"the\s+Erajaya\s+cost", 'the 10-digit chart cost'),
-    (r"Erajaya\s+cost", '10-digit chart cost'),
-    (r"the\s+Erajaya\s+revaluation", 'the 10-digit chart revaluation'),
-    (r"Erajaya\s+revaluation", '10-digit chart revaluation'),
-    (r"Erajaya\s+asset\s+group", '10-digit chart asset group'),
-    (r"Erajaya\s+localization", '10-digit chart localization'),
-    (r"Erajaya\s+10-digit", '10-digit'),
-    (r"any\s+new\s+Erajaya\s+company", 'any new company'),
-    (r"EFN\s*\(Erajaya\s*F&amp;B\)", 'F&amp;B'),
-    (r"Erajaya[-\s]brand", 'brand'),
-    (r"Erajaya\s+Product\s+Owner", 'Product Owner'),
-    (r"Erajaya[-\s]style", 'intra-group'),
-    (r"Erajaya\s+group\s+pattern", 'intra-group pattern'),
-    (r"\"name\": \"Erajaya\"", '"name": "Indonesia 10-Digit"'),
-    # This comment named two customers and described the legal_entity fields the
-    # rule above removes, so it goes with them.
+    # Brand seed comments are replaced with a generic explanation.
     (r"<!-- Brand seed\.[\s\S]*?-->",
      "<!-- Brand seed: generic retail segments, not one customer's brand list.\n"
      "             `legal_entity` is left unset; each tenant fills in its own. -->"),
-    (r"ERAJAYA_", ''),
-    (r"\bErajaya\b", 'the group'),
-    (r"(?<![A-Za-z])erajaya(?![A-Za-z])", "id_coa_10d"),
-    # ---- The other customer names ------------------------------------------
-    # Ordered longest-first. These land in model names (`levis.cogs.run`), field
-    # names (`eraspace_txn_id`) and XML IDs, so the same table drives both the
-    # source rewrite and scripts/migrate-client-renames.py, which moves an
-    # existing database to match.
-    #
-    # `aim` is only ever rewritten next to `arka` or as an identifier segment.
-    # A bare lowercase `aim` is left alone: it is an ordinary English word and a
-    # blind rule would rewrite "we aim to" in someone's docstring.
-    # CamelCase class names. The letter-bounded rules below cannot see these:
-    # `LevisCategReclass` has a letter straight after the name, so the lookahead
-    # that protects ordinary prose also blocks the class. Match on the following
-    # capital instead, which is what makes it CamelCase in the first place.
-    # `aimarka` is the two names fused, and it only ever appears in tenant
-    # database names (erp_dev_aimarka, uat_aimarka, rnd_aimarka).
-    (r"(?i)aimarka", "tenant"),
-    (r"ERAFONE", "MOBILE"),
-    (r"ArkaAim", "Tenant"),
-    (r"ARKAAIM", "TENANT"),
-    (r"VasPmo(?=[A-Z])", "Pmo"),
-    (r"Vaspmo(?=[A-Z])", "Pmo"),
-    (r"Levis(?=[A-Z])", "Retail"),
-    (r"Eraspace(?=[A-Z])", "Pos"),
-    (r"Erafone(?=[A-Z])", "Mobile"),
-    # UPPERCASE identifier forms come first. `AIM_COMPANY` is a Python constant,
-    # and the prose rule below turns it into `the tenant_COMPANY`, which is a
-    # SyntaxError. An underscore is not a letter, so the letter-boundary lookahead
-    # does not protect it -- the identifier context has to be matched explicitly.
-    (r"(?<![A-Za-z])ARKA_", "TENANT_"),
-    (r"_ARKA(?![A-Za-z])", "_TENANT"),
-    (r"(?<![A-Za-z])AIM_", "TENANT_"),
-    (r"_AIM(?![A-Za-z])", "_TENANT"),
-    (r"(?<![A-Za-z])LEVIS_", "RETAIL_"),
-    (r"_LEVIS(?![A-Za-z])", "_RETAIL"),
-    (r"(?<![A-Za-z])ERASPACE_", "POS_"),
-    (r"_ERASPACE(?![A-Za-z])", "_POS"),
-    (r"(?<![A-Za-z])VASPMO_", "PMO_"),
-    (r"_VASPMO(?![A-Za-z])", "_PMO"),
-    (r"ARKA[-\s]AIM", "the tenant"),
-    (r"arka[-_]aim", "tenant"),
-    (r"arkaaim", "tenant"),
-    (r"(?<![A-Za-z])ARKA(?![A-Za-z])", "the tenant"),
-    (r"(?<![A-Za-z])arka(?![A-Za-z])", "tenant"),
-    (r"(?<![A-Za-z])AIM(?![A-Za-z])", "the tenant"),
-    (r"(?<![A-Za-z])_aim(?![A-Za-z])", "_tenant"),
-    (r"Levi's", "the apparel brand"),
-    (r"(?<![A-Za-z])LEVIS(?![A-Za-z])", "RETAIL"),
-    (r"(?<![A-Za-z])Levis(?![A-Za-z])", "Retail"),
-    (r"(?<![A-Za-z])levis(?![A-Za-z])", "retail"),
-    (r"(?<![A-Za-z])ERASPACE(?![A-Za-z])", "POS"),
-    (r"(?<![A-Za-z])Eraspace(?![A-Za-z])", "POS"),
-    (r"(?<![A-Za-z])eraspace(?![A-Za-z])", "pos"),
-    (r"(?<![A-Za-z])Erafone(?![A-Za-z])", "Mobile Retail"),
-    (r"(?<![A-Za-z])erafone(?![A-Za-z])", "mobile"),
-    (r"(?<![A-Za-z])VasPmo(?![A-Za-z])", "Pmo"),
-    (r"(?<![A-Za-z])VASPMO(?![A-Za-z])", "PMO"),
-    (r"(?<![A-Za-z])vaspmo(?![A-Za-z])", "pmo"),
-    # Test-fixture hygiene. These are HMAC secrets and a login used only inside
-    # tests/, but scripts/scan-secrets.py cannot tell a fixture from a leaked
-    # credential by looking at the assignment, and it is right not to try. Making
-    # the values self-describing keeps the scanner strict instead of teaching it
-    # to skip test files, where a real credential could later be pasted.
+    # Upstream test secrets are replaced with obviously-fake ones.
     (r'"s3cr3t-very-long-key"', '"dummy-hmac-key-for-tests"'),
     (r'"test-secret-please-change"', '"dummy-webhook-secret"'),
-    (r'"eraspace-secret"', '"dummy-pos-bridge-secret"'),
     (r'"va-test-secret-BCA"', '"dummy-va-callback-secret"'),
-    # Written to match the value AFTER the CamelCase rules above have run: they
-    # turn VasPmoTest into PmoTest first. Matching the original here would look
-    # right and never fire.
+    # Written to match the value AFTER the client CamelCase rules have run.
     (r'"PmoTest!2026"', '"dummy-portal-password"'),
-    # Brand-vertical seed: customer brands -> the retail segment each one is.
-    (r"vertical_levis", "vertical_apparel"),
-    (r"vertical_gtw", "vertical_womenswear"),
-    (r"vertical_eraspace", "vertical_electronics"),
-    (r"vertical_arkaaim", "vertical_aerial"),
-    (r"vertical_erafone", "vertical_mobile"),
-    (r"vertical_urban", "vertical_lifestyle"),
-    (r"vertical_jds", "vertical_warehouse"),
-    (r"<field name=\"name\">Levi's</field>", '<field name="name">Apparel Retail</field>'),
-    (r"<field name=\"name\">Gentlewoman</field>", '<field name="name">Womenswear</field>'),
-    (r"<field name=\"name\">Eraspace</field>", '<field name="name">Electronics Retail</field>'),
-    (r"<field name=\"name\">ARKA AIM</field>", '<field name="name">Aerial Services</field>'),
-    (r"<field name=\"name\">Erafone</field>", '<field name="name">Mobile Retail</field>'),
-    (r"<field name=\"name\">Urban Republic</field>", '<field name="name">Lifestyle Retail</field>'),
-    (r"<field name=\"name\">JDS — Warehouse</field>", '<field name="name">Warehouse &amp; Distribution</field>'),
-    (r"<field name=\"code\">LEVIS</field>", '<field name="code">APPAREL</field>'),
-    (r"<field name=\"code\">GTW</field>", '<field name="code">WOMENSWEAR</field>'),
-    (r"<field name=\"code\">ERASPACE</field>", '<field name="code">ELECTRONICS</field>'),
-    (r"<field name=\"code\">ARKAAIM</field>", '<field name="code">AERIAL</field>'),
-    (r"<field name=\"code\">ERAFONE</field>", '<field name="code">MOBILE</field>'),
-    (r"<field name=\"code\">URBAN</field>", '<field name="code">LIFESTYLE</field>'),
-    (r"<field name=\"code\">JDS</field>", '<field name="code">WAREHOUSE</field>'),
-    # Prose cleanup, LAST. Substituting a client name for a common noun leaves
-    # "the ARKA-AIM tenant" reading "the the tenant tenant". Collapsing the
-    # duplicates afterwards is simpler, and far less brittle, than trying to make
-    # every substitution above agree with the article and noun around it.
+    # Prose cleanup, LAST.
     (r"\bthe the\b", "the"),
     (r"\bThe the\b", "The"),
     (r"\btenant tenant\b", "tenant"),
@@ -220,25 +94,19 @@ CONTENT_SUBS: list[tuple[str, str]] = [
     (r"[ \t]*<field name=\"legal_entity\">[^<]*</field>\n", ""),
 ]
 
-# Duplicate payloads removed on import (ADR 0002 section 3, catalogue P0 findings).
-# Each entry drops data files that another module already provides and adds the
-# dependency that provides them, so the data exists exactly once.
-DEDUPE: dict[str, dict] = {
-    "custom_arka_aim_seed": {
-        "reason": (
-            "its 548-account chart and 40 taxes duplicate l10n_id_coa_10d: 534 codes "
-            "are byte-identical and the other 14 are the bank/cash accounts Odoo "
-            "creates from the code prefixes. The tax file is a strict subset too "
-            "(40 of 78). Only the fiscal positions and the post-init wiring are its own."
-        ),
-        "drop_data": [
-            "data/account.account.csv",
-            "data/account.tax.csv",
-            "data/account.tax.group.csv",
-        ],
-        "add_depends": ["l10n_id_coa_10d"],
-    },
-}
+# Duplicate payloads removed on import (ADR 0002 section 3, catalogue P0
+# findings). Keyed by UPSTREAM module name; client-specific, so it lives in the
+# local file too.
+DEDUPE: dict[str, dict] = {}
+
+if _LOCAL_RENAMES.exists():
+    import json as _json
+    _local = _json.loads(_LOCAL_RENAMES.read_text(encoding="utf-8"))
+    RENAMES.update(_local.get("renames", {}))
+    # Client substitutions run BEFORE the generic cleanup entries above.
+    CONTENT_SUBS = [tuple(x) for x in _local.get("content_subs", [])] + CONTENT_SUBS
+    DEDUPE.update(_local.get("dedupe", {}))
+HAVE_CLIENT_RENAMES = _LOCAL_RENAMES.exists()
 
 
 def apply_dedupe(dest: Path, name: str) -> list[str]:
@@ -320,7 +188,7 @@ def import_module(src: Path, name: str, tier: str, apply: bool) -> tuple[Path, i
     dest = DEST / tier / new_name
     # The scrub runs on every module. Customer identity turned up in modules that
     # are otherwise generic -- a mail host in custom_retail_import, a legal entity in
-    # custom_project_portfolio's brand seed, an ERAJAYA_ constant in a _tenants
+    # custom_project_portfolio's brand seed, a client-prefixed constant in a _tenants
     # module -- so restricting it to renamed modules left the name in the tree.
 
     if not apply:
@@ -435,6 +303,12 @@ def main(argv=None) -> int:
     members = wave_members(args.wave, catalog)
 
     print(f"Wave {args.wave} -- {WAVES[args.wave][0]} (layers {WAVES[args.wave][1].start}..{min(WAVES[args.wave][1].stop - 1, 9)})")
+    if args.apply and not HAVE_CLIENT_RENAMES:
+        sys.exit(
+            "scripts/client-renames.local.json is missing: without the client "
+            "rename map the import cannot de-brand upstream code. Restore it "
+            "from the copy kept outside the repo before using --apply."
+        )
     print("APPLYING" if args.apply else "DRY RUN (pass --apply to write)")
     print()
 
@@ -468,7 +342,7 @@ def main(argv=None) -> int:
     if cdc_cols:
         print(f"\nThis wave adds {cdc_cols} columns to replicated tables. The CDC loader "
               f"will hard-fail\nuntil they are classified:")
-        print("  python addons/custom_pdp_core/tools/generate_classification_seed.py")
+        print("  python addons/compliance/custom_pdp/tools/generate_classification_seed.py")
         print("  make up-analytics")
     return 0
 

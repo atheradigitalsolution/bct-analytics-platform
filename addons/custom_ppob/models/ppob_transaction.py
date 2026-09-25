@@ -103,7 +103,7 @@ class PpobTransaction(models.Model):
     customer_ref = fields.Char(
         string="Customer Reference",
         index=True,
-        help="Subscriber, meter or policy number. Classified `sensitive` in custom_pdp_core: "
+        help="Subscriber, meter or policy number. Classified `sensitive` in custom_pdp: "
         "hashed before it reaches the warehouse, masked in the UI for non-viewers.",
     )
     customer_name = fields.Char(

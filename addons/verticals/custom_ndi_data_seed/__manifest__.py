@@ -49,7 +49,7 @@ baris penjualan dipotong terhadap ``free_qty`` di lokasi asalnya.
         "custom_ndi_master",
         "custom_ndi_pricing",
         "custom_operating_unit",
-        "custom_pdp_core",
+        "custom_pdp",
         "mrp",
         "purchase_stock",
         "sale_management",

@@ -17,7 +17,7 @@ What the warehouse depends on:
 * ``state`` moves only along the five legal transitions - dbt asserts ``accepted_values`` on it.
 * ``sla_seconds`` is a stored compute, so it is a real Postgres column that logical decoding sees.
 * ``operating_unit_id`` is stored and indexed, exactly as on the four stock models.
-* ``customer_ref`` is classified ``sensitive`` in ``custom_pdp_core``, hashed before it reaches the
+* ``customer_ref`` is classified ``sensitive`` in ``custom_pdp``, hashed before it reaches the
   warehouse, and masked in the Odoo UI for users outside PDP / Data Viewer.
 """,
     "version": "19.0.1.0.0",
@@ -28,7 +28,7 @@ What the warehouse depends on:
     "depends": [
         "base",
         "product",
-        "custom_pdp_core",
+        "custom_pdp",
         "custom_pdp_masking",
         "custom_operating_unit",
     ],

@@ -27,7 +27,7 @@ to `pdp.audit_log`.
 
 ## Dependencies
 
-- `custom_core`, `custom_pdp_taxonomy`, `custom_pdp_audit`, `portal`
+- `custom_core`, `custom_pdp`, `custom_pdp_audit`, `portal`
 
 ## Install
 

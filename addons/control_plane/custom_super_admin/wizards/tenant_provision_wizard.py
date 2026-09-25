@@ -175,7 +175,7 @@ class TenantProvisionWizard(models.TransientModel):
             "custom_core",
             "custom_currency_nbsp",
             "custom_ai_bridge",
-            "custom_pdp_taxonomy",
+            "custom_pdp",
             "custom_pdp_audit",
             "custom_pdp_consent",
             "custom_pdp_dsar",

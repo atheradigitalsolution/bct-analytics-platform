@@ -91,7 +91,7 @@ Score: commits ≥ 10 → 2 · has tests → 2 · LOC ≥ 1500 → 1.
 
 | Tier | Count | Reading |
 |---|--:|---|
-| **A — production-proven** | 23 | `custom_accounting_reports` (50 commits, 15.9k LOC), `custom_retail_import` (58 commits), `custom_levis_localization` (40) |
+| **A — production-proven** | 23 | `custom_accounting_reports` (50 commits, 15.9k LOC), `custom_retail_import` (58 commits), `custom_<client-a>_localization` (40) |
 | **B — functional** | 70 | Works; thin test coverage |
 | **C — scaffold/beta** | 61 | **45 of the 101 `ee_gap` modules have no tests at all**; many untouched since May–June 2026 |
 
@@ -99,7 +99,7 @@ The full A list: `custom_accounting_asset`, `custom_accounting_full`,
 `custom_accounting_reports`, `custom_adapter_framework`, `custom_approval_engine`,
 `custom_barcode`, `custom_bast`, `custom_brd_analyzer`, `custom_core`,
 `custom_coretax`, `custom_coretax_bupot`, `custom_expenses`, `custom_hht_bridge`,
-`custom_levis_localization`, `custom_pdp_masking`, `custom_rental`,
+`custom_<client-a>_localization`, `custom_pdp_masking`, `custom_rental`,
 `custom_repairs`, `custom_retail_import`, `custom_studio_lite`, `custom_tax_id`,
 `custom_whatsapp`, `custom_wms_putaway`, `custom_wms_to_engine`.
 
@@ -108,7 +108,7 @@ The full A list: `custom_accounting_asset`, `custom_accounting_full`,
 A client name in a docstring is prose. A client name **inside `data/`** is a
 coupling: it ships that customer's records to every tenant that installs the
 module. Only data-file hits count, and only on letter boundaries — substring
-matching turns "claim" into an ARKA-AIM sighting.
+matching turns "claim" into an <client-c> sighting.
 
 ### Disposition — ADOPT 78 · DEFER 52 · ADAPT 18 · DROP 4 · CONFLICT 2
 
@@ -197,7 +197,7 @@ duplication is **semantic**: the same domain modelled twice under different name
 |---|---|---|
 | P0 | **Two parallel PPh withholding engines, with no dependency between them.** `custom_pph_witholding` (626 lines — computes a number, writes a log row) vs `custom_tax_id` (1,613 lines — posts and unwinds real GL entries, with a Hutang Pajak account constraint). Same PPh-type enumeration. | Keep `custom_tax_id`; retire `custom_pph_witholding`. Two live consumers: `custom_pdp_masking`, `custom_ppob_commission`. |
 | P0 | **Two e-Faktur exports covering the same 7 document types.** `custom_coretax` emits XML against `urn:djp:coretax:v1`, a placeholder namespace with no bundled XSD — `custom_coretax_export`'s own manifest says so. | Retire the XML wizard; keep `custom_coretax` for `custom.coretax.config`, the adapter base and NSFP fields. **And compare both against core `l10n_id_efaktur_coretax` — see §7.** |
-| P0 | **The same 10-digit chart of accounts shipped twice.** `_tenants/custom_arka_aim_seed/data/account.account.csv` (548 codes) vs `l10n_erajaya` (534) — **534 identical**. | Keep the chart template; drop the tenant CSV payload. |
+| P0 | **The same 10-digit chart of accounts shipped twice.** `_tenants/custom_<client-c>_seed/data/account.account.csv` (548 codes) vs `l10n_<client-b>` (534) — **534 identical**. | Keep the chart template; drop the tenant CSV payload. |
 | P1 | Bukti Potong modelled **three times**: `custom.coretax.bukti.potong`, `custom.bupot.unifikasi(+line)`, `account.move.withholding.line`. The export wizard reads only the third. | Consolidate onto one. |
 | P1 | `l10n_id_psak_custom` is `auto_install: True` **and** hard-depended by `custom_accounting_full` → every accounting tenant is forced onto the PSAK chart. | Make the dependency soft. |
 | P2 | Bank-statement auto-matching written twice: `custom.reconcile.rule` vs `_get_auto_match_candidate()`, in modules that do not depend on each other. | Merge the automatic path; keep the manual wizard. |
@@ -277,7 +277,7 @@ Search, Filter or Group By in the UI.
 |---|--:|
 | `custom_accounting_full` | 15 |
 | `custom_finance_portal` | 13 |
-| `custom_levis_localization` | 10 |
+| `custom_<client-a>_localization` | 10 |
 | `custom_quality_full` · `custom_esb_connector` · `custom_barcode` | 8 each |
 | `custom_studio_lite` · `custom_approval_engine` | 7 each |
 | `custom_retail_import` | 6 |
@@ -298,18 +298,18 @@ has **no addon test gate at all**: `--test-enable` never runs on a runner.
 data may be customer-specific; the engine is not."* Separate the engine from the
 seed, then rename.
 
-`l10n_erajaya` is the largest case — **648 occurrences of the client name in data
+`l10n_<client-b>` is the largest case — **648 occurrences of the client name in data
 files**, and the client name is embedded in the chart-template key itself.
 
 | Now | Proposed | Note |
 |---|---|---|
-| `ee_gap/l10n_erajaya` | `l10n_id_coa_10d` | Also: template code `"erajaya"` → `"id_coa_10d"`; `template_erajaya.py` → `template_id_coa_10d.py`; 4 CSVs `*-erajaya.csv`; ~534 XML IDs `erajaya_<code>`; tax-group IDs `erajaya_tg_*` |
-| `_tenants/custom_arka_aim_numbering` | `ee_gap/custom_doc_numbering` | Per-company numbering engine with monthly reset; SQ/SO/PO/INV/DO/BAST patterns become data |
-| `_tenants/custom_arka_fx_header` | `ee_gap/custom_account_fx_header` | Already generic (`depends: account`) — move tier and rename |
-| `_tenants/custom_levis_sales_dashboard` | `ee_gap/custom_retail_sales_dashboard` | Store targets and dashboard; data arrives via `custom_retail_import` |
+| `ee_gap/l10n_<client-b>` | `l10n_id_coa_10d` | Also: template code `"<client-b>"` → `"id_coa_10d"`; `template_<client-b>.py` → `template_id_coa_10d.py`; 4 CSVs `*-<client-b>.csv`; ~534 XML IDs `<client-b>_<code>`; tax-group IDs `<client-b>_tg_*` |
+| `_tenants/custom_<client-c>_numbering` | `ee_gap/custom_doc_numbering` | Per-company numbering engine with monthly reset; SQ/SO/PO/INV/DO/BAST patterns become data |
+| `_tenants/custom_<client-c>_fx_header` | `ee_gap/custom_account_fx_header` | Already generic (`depends: account`) — move tier and rename |
+| `_tenants/custom_<client-a>_sales_dashboard` | `ee_gap/custom_retail_sales_dashboard` | Store targets and dashboard; data arrives via `custom_retail_import` |
 | `ee_gap/custom_ops_reports` | `ee_gap/custom_asset_ops_reports` | Reports are generic; only the prose assumes a drone fleet |
-| `custom_project_portfolio` / `_cr` / `_notify` / `_api` | unchanged | Code is generic; strip `data/vaspmo_vertical_data.xml`, which hardcodes LEVIS/ERASPACE/ARKAAIM records |
-| `custom_ppob_eraspace_bridge` | `custom_ppob_pos_bridge` | 41 client references in data |
+| `custom_project_portfolio` / `_cr` / `_notify` / `_api` | unchanged | Code is generic; strip `data/<client-pmo>_vertical_data.xml`, which hardcodes <CLIENT-A>/<CLIENT-B-POS>/<CLIENT-C> records |
+| `custom_ppob_<client-b-pos>_bridge` | `custom_ppob_pos_bridge` | 41 client references in data |
 
 ⚠️ The chart-template code is stored in `res.company.chart_template`. Renaming it is
 a data migration for any database that already applied it. In a fresh database it is
@@ -385,7 +385,7 @@ deliberately not in the install set:
 
 | Module | Why it is not installed |
 |---|---|
-| `custom_arka_aim_seed` | Its own manifest says "INSTALL ONLY ON THE erp_dev_aimarka TENANT DB". Its `post_init_hook` changes the company currency, which fails on any database that already has journal entries. It stays in `_tenants/` where a tenant deployment can install it. |
+| `custom_<client-c>_seed` | Its own manifest says "INSTALL ONLY ON THE erp_dev_<client-c> TENANT DB". Its `post_init_hook` changes the company currency, which fails on any database that already has journal entries. It stays in `_tenants/` where a tenant deployment can install it. |
 | `custom_storefront_api` | It redefines `res.partner.phone`, `street`, `street2` and `zip` as **non-stored** computed fields backed by encrypted columns. Its own docstring calls this a trade-off and notes the fields stop being searchable. Here it also silently empties four columns the CDC pipeline replicates, so the warehouse received NULL for every partner's phone and address. This deployment already protects that data — the policy classifies all four as `personal`, so they are HMAC-digested during load and never land as plaintext. The module has zero dependents. |
 
 The second one is worth generalising: **an addon that changes a field from stored
@@ -415,19 +415,19 @@ than undoing it.
 
 | Was | Is | Scale |
 |---|---|---|
-| `erajaya` | the chart it names (`10-digit chart`, `l10n_id_coa_10d`) | 725 occurrences |
-| `levis` | `retail` | 129 files; 12 models, 1 field on `account.move` |
-| `eraspace` | `pos` | 44 files; 6 models, 2 fields |
-| `vaspmo` | `pmo` | 45 files; 2 models |
-| `arka` / `aim` / `arkaaim` | `tenant` | 90 files; 7 module directories |
-| `erafone` | `mobile` | brand-seed record |
+| `<client-b>` | the chart it names (`10-digit chart`, `l10n_id_coa_10d`) | 725 occurrences |
+| `<client-a>` | `retail` | 129 files; 12 models, 1 field on `account.move` |
+| `<client-b-pos>` | `pos` | 44 files; 6 models, 2 fields |
+| `<client-pmo>` | `pmo` | 45 files; 2 models |
+| `<client-c>` (3 token variants) | `tenant` | 90 files; 7 module directories |
+| `<client-b-mobile>` | `mobile` | brand-seed record |
 
 Three rules were needed, not one, and each was found by something breaking:
 
-- **Letter boundaries**, so `claim` is not an ARKA-AIM sighting and `we aim to`
-  survives. A bare `` is not enough: `erajaya_2104300001` is one word to ``,
+- **Letter boundaries**, so `claim` is not an <client-c> sighting and `we aim to`
+  survives. A bare `` is not enough: `<client-b>_2104300001` is one word to ``,
   and that XML-ID prefix is exactly the coupling worth removing.
-- **CamelCase**, matched on the following capital. `LevisCategReclass` has a letter
+- **CamelCase**, matched on the following capital. `ClientCategReclass` has a letter
   straight after the name, so the boundary rule that protects prose also blocks the
   class name.
 - **UPPERCASE identifiers** (`AIM_COMPANY`), matched on the trailing underscore.
@@ -460,7 +460,7 @@ Four things it had to learn:
 |---|---|
 | `custom_pdp_core → custom_pdp_taxonomy` must NOT be replayed | That rename resolves a name *collision* at import time. In the database `custom_pdp_core` is this repo's own module and is already correct; replaying it renames it onto the taxonomy module and Postgres rejects it on the unique index. Import-time renames and de-branding renames are now separate sets. |
 | `ir_act_server.model_name` does not exist in Odoo 19 | The reference-column list is written against a schema, so it is filtered against `information_schema` rather than trusted. A wrong entry is skipped, not fatal. |
-| Many2many join tables | They are named `<model_a>_<model_b>_rel`, so a model's table name is a *prefix*, not the whole name. Renaming only exact matches left `levis_categ_reclass_product_template_rel` behind, and Odoo would have created a second, empty join table beside it. |
+| Many2many join tables | They are named `<model_a>_<model_b>_rel`, so a model's table name is a *prefix*, not the whole name. Renaming only exact matches left `<client-a>_categ_reclass_product_template_rel` behind, and Odoo would have created a second, empty join table beside it. |
 | Ordering between passes | The model pass rewrites part of a field's XML ID, which then no longer matches what the XML-ID pass collected. Because every statement is guarded, a second run converges — which is what idempotency is for. |
 
 ### Landing-zone orphans

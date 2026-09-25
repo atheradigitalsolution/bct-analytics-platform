@@ -194,6 +194,6 @@ Odoo 19 removed `res.groups.category_id`; both groups hang off the `res.groups.p
 dependency for one column; it is accepted because the brief names `pos.order` as a target and
 because POS is a real revenue channel in the metric contract.
 
-No dependency on `custom_pdp_core`: the classification rows for `operating.unit` and for the four
-injected `operating_unit_id` columns are seeded by `custom_pdp_core` itself, which keys its registry
+No dependency on `custom_pdp`: the classification rows for `operating.unit` and for the four
+injected `operating_unit_id` columns are seeded by `custom_pdp` itself, which keys its registry
 by model-name string precisely so it needs no dependency on the modules it classifies.

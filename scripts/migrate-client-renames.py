@@ -6,9 +6,9 @@ The import pipeline (scripts/import-platform-addons.py) strips customer names fr
 the source tree. For a fresh database that is the whole job. For a database that is
 already installed it is only half: the customer names are also in
 
-  * ir_module_module.name          (custom_levis_localization)
-  * ir_model.model + the table     (levis.cogs.run -> levis_cogs_run)
-  * ir_model_fields.name + column  (account_move.levis_categ_reclass_id)
+  * ir_module_module.name          (custom_<client>_localization)
+  * ir_model.model + the table     (client.cogs.run -> client_cogs_run)
+  * ir_model_fields.name + column  (account_move.client_categ_reclass_id)
   * ir_model_data.name             (644 XML IDs)
 
 and Odoo renames none of those on upgrade. It would instead treat every renamed
@@ -56,12 +56,13 @@ scrub = _imp._scrub_client
 # RENAMES in the import script serves two different purposes, and only one of them
 # may be replayed against a database.
 #
-#   custom_pdp_core -> custom_pdp_taxonomy resolves a NAME COLLISION at import
-#   time: the platform's module and this repo's own module share a directory name
-#   and are unrelated. In the database, `custom_pdp_core` IS this repo's module and
-#   is already correct. Replaying that rename tries to rename it onto the taxonomy
-#   module that is also installed, and Postgres rejects it on the unique index --
-#   correctly, and loudly, which is how this distinction was found.
+#   custom_pdp_core -> custom_pdp resolves a NAME COLLISION at import time:
+#   the upstream module and this repo's own module shared a directory name and
+#   were unrelated. Since 2026-09 both this repo's custom_pdp_core and the
+#   imported custom_pdp_taxonomy are MERGED into compliance/custom_pdp; the
+#   database-side rename for that merge is done by
+#   scripts/migrate-pdp-module-merge.py (with xmlid-collision handling this
+#   plain rename lacks), never by replaying this map.
 #
 # Only the de-branding renames describe a database that is out of date.
 IMPORT_ONLY_RENAMES = {"custom_pdp_core"}
@@ -186,7 +187,7 @@ def build_sql(state: dict) -> list[str]:
 END $$;""")
         # Many2many join tables are named <model_a>_<model_b>_rel, so the model's
         # table name is a PREFIX of them, not the whole name. Renaming only the
-        # exact match leaves levis_categ_reclass_product_template_rel behind, and
+        # exact match leaves client_categ_reclass_product_template_rel behind, and
         # Odoo would then create a second, empty join table beside it.
         out.append(f"""DO $$
 DECLARE r record;
@@ -267,8 +268,8 @@ END $$;""")
 def check() -> int:
     left = []
     # Modules are judged by the rename map, not the token rules: the token rules
-    # would call custom_arka_aim_seed "custom_tenant_seed" while the import names
-    # it custom_tenant_coa_seed. Everything else is judged by the token rules.
+    # would guess a slightly different name for a client-seed module than the import
+    # map actually assigned. Everything else is judged by the token rules.
     left += [("module", v) for v in
              (r[0] for r in psql("SELECT name FROM ir_module_module;")) if v in RENAMES]
     for label, rows in (

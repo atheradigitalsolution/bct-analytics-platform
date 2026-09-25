@@ -5,7 +5,7 @@
 -- Asserted against warehouse.column_policy rather than against a hand-written
 -- list of column names: the test therefore covers whatever the policy currently
 -- says is personal, and cannot drift away from it. A new personal column added
--- to custom_pdp_core is covered the moment sync-policy runs.
+-- to custom_pdp is covered the moment sync-policy runs.
 --
 -- The shape being asserted is the pinned HMAC output from
 -- custom_pdp_masking/MODULE_KNOWLEDGE.md §2 item 7: exactly 64 lowercase hex

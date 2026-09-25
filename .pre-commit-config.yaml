@@ -105,10 +105,12 @@ repos:
           # ------------------------------------------------------------------
           # IMPORTED-ADDON DEBT, 2026-09-01. NARROWED 2026-09-04.
           #
-          # It used to say `addons/**`, which also covered the five modules THIS
-          # project wrote and owns - custom_pdp_core, custom_pdp_masking,
-          # custom_operating_unit, custom_ppob, custom_demo_seed, all of which sit
-          # directly under addons/ while every imported module sits one level
+          # It used to say `addons/**`, which also covered the modules THIS
+          # project wrote and owns - custom_operating_unit, custom_ppob,
+          # custom_demo_seed (directly under addons/) and custom_pdp +
+          # custom_pdp_masking (owned, but living under addons/compliance/ since
+          # the 2026-09 PDP merge; the tier ignores cover them and cost nothing:
+          # measured 0 findings) - while every imported module sits one level
           # deeper under addons/<tier>/. Five rules were therefore dead on our own
           # code for a debt none of it carries. Measured before narrowing: ruff
           # with the five ignores REMOVED reports 0 findings across those five
@@ -161,8 +163,8 @@ repos:
           # `invalid value 'addons/{_vendor' ... Expected <FilePattern>:<RuleCode>`.
           # Verified against ruff 0.16.5, the pinned rev above. The tiers are
           # spelled out rather than globbed by depth because `addons/*/*/**` also
-          # matches addons/custom_pdp_core/models/*.py, which is the code this
-          # narrowing exists to protect.
+          # matches the root-level owned modules' models/*.py, which is the code
+          # this narrowing exists to protect.
           - --per-file-ignores=addons/_vendor/**:B023
           - --per-file-ignores=addons/core/**:B023
           - --per-file-ignores=addons/control_plane/**:B023

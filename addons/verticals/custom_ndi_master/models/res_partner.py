@@ -14,7 +14,7 @@ pelanggan" (pasal 24) karena itu mustahil lewat tag. Selection skalar hidup di
 kolom ``res_partner`` sendiri dan ikut terreplikasi apa adanya.
 
 **K-3 — wilayah tidak boleh menumpang ``city``.** ``res_partner.city``
-diklasifikasi ``personal`` di ``custom_pdp_core`` dan karena itu di-hash HMAC saat
+diklasifikasi ``personal`` di ``custom_pdp`` dan karena itu di-hash HMAC saat
 load ke warehouse. Digest-nya konsisten (join tetap hidup) tetapi tidak terbaca
 manusia, jadi dashboard wilayah hanya akan menampilkan hash. Dimensi wilayah butuh
 kolom sendiri yang berkelas ``internal``.

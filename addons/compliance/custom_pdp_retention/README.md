@@ -29,7 +29,7 @@ policy × model × records-eligible × last-run × next-run.
 
 ## Dependencies
 
-- `custom_core`, `custom_pdp_taxonomy`, `custom_pdp_audit`
+- `custom_core`, `custom_pdp`, `custom_pdp_audit`
 
 ## Install
 

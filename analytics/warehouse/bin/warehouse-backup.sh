@@ -23,13 +23,13 @@
 #                anyway - SCD2 history is NOT reproducible from raw once the
 #                landing zone has been trimmed, because a snapshot records what
 #                the world looked like when it ran.
-#   warehouse.*  BACKED UP. column_policy is re-derivable from custom_pdp_core,
+#   warehouse.*  BACKED UP. column_policy is re-derivable from custom_pdp,
 #                but pipeline_state is not: losing it means the CDC consumer
 #                does not know where it stopped.
 #
 # NO FILESTORE HALF. tenant-backup.sh insists on both halves because an Odoo
 # database without its filestore restores to broken attachments. The warehouse
-# has no filestore: `ir_attachment` is never replicated (custom_pdp_core §7 -
+# has no filestore: `ir_attachment` is never replicated (custom_pdp §7 -
 # an attachment can be anything at all, a scanned KTP included, and there is no
 # classification that would make it safe). So one file is a COMPLETE backup
 # here, and that is a property of the design rather than an omission.

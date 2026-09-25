@@ -45,7 +45,7 @@ Provides a customer-facing portal (`/my/consents`) so data subjects can view and
 - Portal: `/my/consents` (GET, auth=user), `/my/consents/<int:consent_id>/withdraw` (POST, csrf=True).
 
 ## Integration Points
-- **Depends on:** `custom_core`, `custom_pdp_taxonomy`, `custom_pdp_audit`, `portal`.
+- **Depends on:** `custom_core`, `custom_pdp`, `custom_pdp_audit`, `portal`.
 - **Inherits from:** `pdp.audited.mixin` (on `pdp.consent`), `portal.CustomerPortal` (controller).
 - **Extended by:** none declared; vertical modules call `check_consent` rather than subclassing.
 - **External calls:** none.

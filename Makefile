@@ -209,8 +209,8 @@ init-db: ## Create and initialise the default Odoo database (idempotent)
 	@bash scripts/init-db.sh $(if $(MODULES),--modules $(MODULES),)
 
 .PHONY: install-modules
-install-modules: ## Install/upgrade modules: make install-modules MODULES=custom_pdp_core
-	@test -n "$(MODULES)" || { echo "MODULES is required, e.g. MODULES=custom_pdp_core,custom_ppob"; exit 1; }
+install-modules: ## Install/upgrade modules: make install-modules MODULES=custom_pdp
+	@test -n "$(MODULES)" || { echo "MODULES is required, e.g. MODULES=custom_pdp,custom_ppob"; exit 1; }
 	@bash scripts/init-db.sh --modules "$(MODULES)" --force
 
 .PHONY: set-dev-passwords

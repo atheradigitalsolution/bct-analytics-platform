@@ -33,7 +33,7 @@ None of that makes it safe to install in production. Do not add it to the produc
     "depends": [
         "custom_ppob",
         "custom_operating_unit",
-        "custom_pdp_core",
+        "custom_pdp",
         "custom_pdp_masking",
         "sale_management",
         "sale_stock",

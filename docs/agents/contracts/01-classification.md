@@ -1,6 +1,6 @@
 # Frozen contract 1 — PDP field classification (Security → DWH)
 
-Status: **FROZEN at GATE 0.** Producer: `addons/custom_pdp_core`. Consumers: `custom_pdp_masking`,
+Status: **FROZEN at GATE 0.** Producer: `addons/custom_pdp`. Consumers: `custom_pdp_masking`,
 the CDC loader, dbt. Changing a class or its masking means re-briefing every consumer.
 
 Legal basis: UU 27/2022 (PDP). Art. 4(2) = *data pribadi umum*, Art. 4(3) = *data pribadi spesifik*.
@@ -33,7 +33,7 @@ Per-tenant salt lives in SOPS (`WAREHOUSE_MASK_SALT_<TENANT>`), never in a file,
 
 ## Declaration surface
 
-`custom_pdp_core` exposes model `pdp.field.classification` with columns
+`custom_pdp` exposes model `pdp.field.classification` with columns
 `(model_name, field_name, pdp_class, legal_basis, notes)` and a JSON-RPC-reachable read method.
 The CDC loader reads this table at startup and refuses to start if a column it is about to extract
 carries **no** classification. Unclassified is a hard failure, never a silent default to `public`.
@@ -200,7 +200,7 @@ ruling is IN FORCE. Limb 2 is pending Data Warehouse.**
 ## Process rule — an amendment is not in force until it reaches its producer
 
 This ruling was written into this document while
-`addons/custom_pdp_core/data/pdp.field.classification.csv:453` and the live
+`addons/compliance/custom_pdp/data/pdp.field.classification.csv:453` and the live
 `pdp_field_classification` table still said `personal` / `drop_to_null=f`. The CDC loader reads the
 **table**, not this prose, so for a period the amendment had no effect while appearing settled.
 

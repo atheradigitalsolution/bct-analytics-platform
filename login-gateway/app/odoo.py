@@ -97,7 +97,7 @@ GROUP_SUPER_ADMIN = "custom_super_admin.group_super_admin"
 #: Odoo groups -> contract 02 roles. Unmapped users get the least-privileged role, never none:
 #: a session with no role at all would be indistinguishable from a bug in the mapping.
 ROLE_MAP = (
-    ("custom_pdp_core.group_pdp_officer", "analytics.admin"),
+    ("custom_pdp.group_pdp_officer", "analytics.admin"),
     ("custom_operating_unit.group_operating_unit_manager", "analytics.analyst"),
     ("base.group_erp_manager", "analytics.admin"),
 )

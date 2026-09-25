@@ -213,7 +213,7 @@ class Policy:
             raise UnclassifiedColumn(
                 "warehouse.column_policy has no row for %s: %s. "
                 "Unclassified is a hard failure (contract 05); it is never defaulted to 'public'. "
-                "Add the classification in custom_pdp_core and re-seed the policy."
+                "Add the classification in custom_pdp and re-seed the policy."
                 % (table, ", ".join("%s.%s" % (table, c) for c in sorted(missing)))
             )
         columns = {}

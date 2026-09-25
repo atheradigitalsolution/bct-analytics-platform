@@ -31,7 +31,7 @@ SET ROLE :wh_user;
 -- This table IS the seam. Master prompt §3.2 assigns PDP masking to the DWH
 -- agent but requires it applied during load, and the loader is Backend's
 -- code; two agents must never write one file. So the instruction set is a
--- table rather than a call. DWH populates it from custom_pdp_core's registry;
+-- table rather than a call. DWH populates it from custom_pdp's registry;
 -- Backend executes exactly what it says and invents nothing.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS warehouse.column_policy (
@@ -62,7 +62,7 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'column_policy_masknull_ck') THEN
     -- mask_null only means anything for `sensitive`; mirrors the CHECK
-    -- custom_pdp_core puts on drop_to_null so the two cannot drift.
+    -- custom_pdp puts on drop_to_null so the two cannot drift.
     ALTER TABLE warehouse.column_policy ADD CONSTRAINT column_policy_masknull_ck
       CHECK (mask_null IS NOT TRUE OR pdp_class = 'sensitive');
   END IF;
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS warehouse.mart_sla (
 --
 -- THE HONEST DESIGN NOTE, because the brief asks for one: the mirrored module
 -- is custom_pdp_audit, and it DOES NOT EXIST. The five addons in this repo are
--- custom_demo_seed, custom_operating_unit, custom_pdp_core, custom_pdp_masking
+-- custom_demo_seed, custom_operating_unit, custom_pdp, custom_pdp_masking
 -- and custom_ppob. So this is designed here rather than mirrored, and it is
 -- built from three layers because no single one of them is sufficient:
 --

@@ -166,5 +166,5 @@ class TestNdiDataSeed(TransactionCase):
             self.assertTrue(
                 Classification.search_count(
                     [("model_name", "=", model_name), ("field_name", "=", field_name)]),
-                "%s.%s belum diklasifikasi di custom_pdp_core" % (model_name, field_name),
+                "%s.%s belum diklasifikasi di custom_pdp" % (model_name, field_name),
             )
