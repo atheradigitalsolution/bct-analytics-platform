@@ -100,7 +100,7 @@ class PpobWallet(models.Model):
                     vals["account_id"] = klass.default_wallet_account_id.id
             if not vals.get("journal_id"):
                 journal = self.env.ref(
-                    "custom_ppob_wallet.journal_ppob_wallet",
+                    "custom_ppob_core.journal_ppob_wallet",
                     raise_if_not_found=False,
                 )
                 if journal:

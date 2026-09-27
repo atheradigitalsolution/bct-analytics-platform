@@ -35,7 +35,7 @@ use EVShop.
     "depends": [
         "custom_ppob_provider",
         "custom_ppob_sale",
-        "custom_ppob_wallet",
+        "custom_ppob_core",
     ],
     "external_dependencies": {
         "python": ["oracledb"],

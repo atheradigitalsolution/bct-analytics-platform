@@ -1,4 +1,4 @@
-# Review Konsolidasi Modul Odoo — 2026-09-25
+# Review Konsolidasi Modul Odoo — 2026-09-25 (dieksekusi s.d. 2026-09-27)
 
 Hasil review 218 modul custom lintas tier (`core`, `compliance`, `control_plane`,
 `operations`, `verticals`, `_tenants`, `ee_gap`, root) untuk tiga pertanyaan:
@@ -30,15 +30,16 @@ Prinsip yang dipakai:
 |---|---|---|
 | `custom_pdp_core` | 7 DB | **SELESAI** — dilebur ke modul baru `compliance/custom_pdp` (lihat §2) |
 | `custom_pdp_masking` | 7 DB | **SELESAI** — pindah ke `compliance/`, depends → `custom_pdp` |
-| `custom_operating_unit` | 7 DB | → `core/` (dipakai lintas vertical: lgx, ndi, ppob, demo) |
-| `custom_ppob` | 6 DB | → `verticals/` (lihat catatan duplikasi §3.1) |
-| `custom_demo_seed` | 1 DB (bct_fixture) | → `operations/` (perkakas demo internal) |
+| `custom_operating_unit` | 7 DB | **SELESAI** — pindah ke `core/` |
+| `custom_ppob` | 6 DB | **SELESAI** — pindah ke `verticals/` (lihat catatan duplikasi §3.1) |
+| `custom_demo_seed` | 1 DB (bct_fixture) | **SELESAI** — pindah ke `operations/` |
 
-Tiga pemindahan yang belum dieksekusi bernilai risiko **nol** terhadap database
-(pindah folder saja), tapi menyentuh referensi path di repo (pre-commit ignores,
-`30-metadata.sql` comment, dsb.) — pola yang sama dengan pemindahan PDP hari ini.
+Root `addons/` kini **tidak lagi memuat modul tanpa tier**. Pemindahan folder
+tidak mengubah nama teknis (risiko DB nol; diverifikasi dengan `-u` ketiganya di
+`bct_fixture`), dan referensi path di repo ikut diperbarui (pre-commit ignores,
+contract 02).
 
-## 2. Duplikasi PDP — DIEKSEKUSI hari ini
+## 2. Duplikasi PDP — SELESAI
 
 `custom_pdp_core` (registry per-kolom `pdp.field.classification`, kontrak 01
 beku, dibaca warehouse via SQL) dan `custom_pdp_taxonomy` (kamus semantik
@@ -53,12 +54,11 @@ Diselesaikan dengan **redevelop menjadi satu modul `compliance/custom_pdp`**:
   (`_pdp_post_sync`, idempoten, jalan tiap `-u`); wizard tag write-through ke
   registry.
 - Migrasi DB tanpa uninstall (gaya OpenUpgrade `merge_modules`):
-  `scripts/migrate-pdp-module-merge.py`. 9/9 DB sudah dimigrasi; upgrade Odoo
-  selesai di 7 DB, **menunggu persetujuan operator: `expomedia` (produksi) dan
-  `acme`**.
+  `scripts/migrate-pdp-module-merge.py`. **9/9 DB selesai** (termasuk `expomedia`
+  produksi dan `acme`), semua di v19.0.2.0.0.
 - Hasil terverifikasi: registry seragam 1.159 baris di semua DB (athera_lgx &
   athera_admin yang tadinya tanpa registry kini lengkap), proyeksi terisi
-  (650–843 tag/DB), 0 konflik roll-up, 0 xmlid yatim, 106 test Odoo lulus,
+  (650–857 tag/DB), 0 konflik roll-up, 0 xmlid yatim, 106 test Odoo lulus,
   `warehouse_ctl verify` + `sync-policy` hijau (894 kolom terklasifikasi, 0
   bocor `secret`).
 - Bug laten ikut terjawab: kode klasifikasi `sensitive_pii`/`health`/
@@ -74,8 +74,8 @@ Diselesaikan dengan **redevelop menjadi satu modul `compliance/custom_pdp`**:
   `operating_unit_id`) — tabelnya tidak boleh diganggu.
 - Pack `verticals/custom_ppob_*` (12 modul) TIDAK terpasang di DB mana pun,
   dengan domain tumpang tindih (provider≈biller, sla, sale).
-- Rekomendasi: root `custom_ppob` pindah folder ke `verticals/` (aman), lalu
-  konsolidasi jangka panjang mengikuti pola PDP — pack menjadi satu-satunya
+- Root `custom_ppob` sudah dipindah ke `verticals/` (aman, SELESAI); konsolidasi
+  jangka panjang mengikuti pola PDP — pack menjadi satu-satunya
   implementasi, `ppob.transaction` tetap kanonik untuk warehouse. Kerjakan
   SEBELUM pack dipasang tenant pertama; sesudah itu biayanya naik kelas.
 
@@ -91,7 +91,7 @@ regresi angka. **Jangan merge kasual.**
 
 ## 4. Verdict penggabungan per keluarga
 
-### 4.1 Kandidat MERGE yang layak (tidak terpasang di DB mana pun → tanpa migrasi)
+### 4.1 MERGE — DIEKSEKUSI 2026-09-27 (tak satu pun terpasang di DB → tanpa migrasi)
 
 | Merge | Ke | Alasan |
 |---|---|---|
@@ -102,9 +102,22 @@ regresi angka. **Jangan merge kasual.**
 | `custom_ppob_commission` (632) | `custom_ppob_sale` | dep pph+bupot = compliance universal ID |
 | **G1 ledger EE-gap**: `custom_account_batch_payment` + `custom_account_deferred` + `custom_account_reconcile` + `custom_payment_admin_fee` | modul baru `custom_account_ee_features` | keempatnya depends **hanya `account`**, maturity B — kandidat merge terbersih di repo |
 
-Catatan eksekusi: modul ee_gap = repo terpisah; merge = hapus folder satelit +
-salin kode ke induk + naikkan versi induk; karena tak terpasang di mana pun,
-tidak ada migrasi DB.
+**Hasil eksekusi**: 11 modul satelit terserap ke 6 induk (satu induk baru,
+`ee_gap/custom_account_ee_features`), katalog turun 218 → 208 baris. Berkas
+bernama sama di-rename saat pindah (mis. `models/ppob_transaction.py` →
+`models/ppob_transaction_commission.py`), ACL digabung, manifest `depends`/`data`
+disatukan, dan prefix xmlid/param milik satelit diarahkan ke induk. Dependen
+ikut diarahkan: `custom_ppob_{oracle_bridge,pos_bridge,va}` → `custom_ppob_core`,
+`custom_finance_portal_sap` → `custom_finance_portal`, `custom_project_api` →
+`custom_project_portfolio`.
+
+Verifikasi: seluruh modul induk di-install bersih di DB uji dan test suite-nya
+jalan — `custom_account_ee_features` 26, `custom_project_portfolio` 47,
+`custom_rental` 24, `custom_ppob_sale` 15, `custom_finance_portal` 8. Lima
+kegagalan di `custom_rental` (`test_loan_unit_flow`, `test_rental_lifecycle`)
+**pra-eksisting**: baseline pra-merge gagal 7 test yang sama — jebakan Odoo 19
+`stock.move.name`, bukan akibat konsolidasi. Perbaikannya bukan bagian pekerjaan
+ini; dicatat sebagai utang terpisah.
 
 ### 4.2 KEEP SPLIT (pemisahan yang benar)
 
@@ -158,11 +171,12 @@ generic yang bisa dijual ulang.
 
 ## 6. Urutan eksekusi yang disarankan (setelah review ini disetujui)
 
-1. **Selesaikan PDP**: upgrade `expomedia` + `acme` (perintah sudah disiapkan,
-   butuh persetujuan operator).
-2. **Pindah tier 3 modul root** (operating_unit → core, ppob → verticals,
-   demo_seed → operations) — nol risiko DB, satu commit.
-3. **Merge tak-terpasang** (§4.1) — per keluarga, satu PR per merge, commit
-   ee_gap terpisah.
-4. **Konsolidasi PPOB root-vs-pack** (§3.1) — sebelum pack dipasang tenant.
+1. ~~Selesaikan PDP~~ — **SELESAI**: 9/9 DB @ v19.0.2.0.0.
+2. ~~Pindah tier 3 modul root~~ — **SELESAI**.
+3. ~~Merge tak-terpasang (§4.1)~~ — **SELESAI**: 11 satelit → 6 induk.
+4. **Konsolidasi PPOB root-vs-pack** (§3.1) — sebelum pack dipasang tenant
+   pertama. BELUM dikerjakan: menyentuh `ppob.transaction` yang dibaca warehouse.
 5. **Konsolidasi withholding** (§3.2) — fase sendiri, dengan regresi angka pajak.
+   BELUM dikerjakan: keduanya terpasang di produksi.
+6. **Utang terpisah**: 7 test `custom_rental` gagal karena jebakan Odoo 19
+   `stock.move.name` (pra-eksisting, ditemukan saat verifikasi merge).

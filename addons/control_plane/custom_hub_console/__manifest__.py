@@ -26,7 +26,7 @@ tenant containing only ``custom_core`` + ``custom_super_admin`` +
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/Hub",
-    "version": "19.0.0.2.0",
+    "version": "19.0.0.3.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",

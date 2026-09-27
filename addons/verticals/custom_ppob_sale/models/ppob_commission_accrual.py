@@ -63,7 +63,7 @@ class PpobCommissionAccrual(models.Model):
             raise UserError(
                 _("Commission accrual accounts not mapped - check the PPOB account mapping (commission_* roles).")
             )
-        journal = self.env.ref("custom_ppob_wallet.journal_ppob_sale", raise_if_not_found=False)
+        journal = self.env.ref("custom_ppob_core.journal_ppob_sale", raise_if_not_found=False)
         if not journal:
             raise UserError(_("PPOB Sale journal not found."))
         ref = f"Commission {self.name} ({self.transaction_id.name})"

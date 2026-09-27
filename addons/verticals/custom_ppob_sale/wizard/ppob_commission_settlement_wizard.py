@@ -100,7 +100,7 @@ class PpobCommissionSettlementWizard(models.TransientModel):
     def _create_mitra_payout(self, partner, accruals, total):
         """Us->mitra: create a payout JE that settles CommPayable-Mitra,
         withholds PPh 23 (via the platform engine), and nets to bank/wallet."""
-        journal = self.env.ref("custom_ppob_wallet.journal_ppob_sale", raise_if_not_found=False)
+        journal = self.env.ref("custom_ppob_core.journal_ppob_sale", raise_if_not_found=False)
         if not journal:
             raise UserError(_("PPOB Sale journal not found."))
         comm_payable = self._acc("commission_payable_mitra")

@@ -31,8 +31,9 @@ transactions by calling the provider adapter's ``status()`` before refunding
     "version": "19.0.1.0.0",
     "license": "LGPL-3",
     "depends": [
-        "custom_ppob_wallet",
         "custom_ppob_provider",
+        "custom_pph_witholding",
+        "custom_coretax_bupot",
     ],
     "data": [
         "views/generated_search_views.xml",
@@ -43,6 +44,11 @@ transactions by calling the provider adapter's ``status()`` before refunding
         "views/ppob_wallet_move_views.xml",
         "views/ppob_provider_bucket_move_views.xml",
         "views/menu_views.xml",
+        "views/ppob_commission_generated_search_views.xml",
+        "wizard/ppob_commission_settlement_wizard_views.xml",
+        "views/ppob_commission_rule_views.xml",
+        "views/ppob_commission_accrual_views.xml",
+        "views/ppob_commission_menu_views.xml",
     ],
     "post_init_hook": "post_init_hook",
     "application": False,

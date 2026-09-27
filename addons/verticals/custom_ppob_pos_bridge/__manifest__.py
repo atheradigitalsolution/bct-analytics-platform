@@ -44,7 +44,7 @@ call billers, hold mitra balance, or execute purchases -- see
     "license": "LGPL-3",
     "depends": [
         "custom_ppob_sale",
-        "custom_ppob_wallet",
+        "custom_ppob_core",
         "custom_ppob_va",
         "custom_ppob_provider",
         "custom_core",

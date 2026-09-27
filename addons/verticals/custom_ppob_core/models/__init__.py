@@ -4,3 +4,5 @@ from . import ppob_product_class
 from . import ppob_product
 from . import ppob_price_tier
 from . import res_partner
+from . import ppob_wallet_move
+from . import ppob_wallet

@@ -4,7 +4,7 @@
     <record id="view_ppob_wallet_move_list_sale" model="ir.ui.view">
         <field name="name">custom.ppob.wallet.move.list.sale</field>
         <field name="model">custom.ppob.wallet.move</field>
-        <field name="inherit_id" ref="custom_ppob_wallet.view_ppob_wallet_move_list"/>
+        <field name="inherit_id" ref="custom_ppob_core.view_ppob_wallet_move_list"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='ref']" position="after">
                 <field name="ppob_transaction_id" optional="show"/>

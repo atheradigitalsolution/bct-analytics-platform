@@ -71,7 +71,7 @@ requested tenant and the timestamp. Proven by test (§6: "Cross-tenant access re
 **This corrects a defect in the contract as originally frozen, found by the Backend agent.**
 
 The contract said an empty `allowed_ou` meant *all OUs in the tenant*. The producer says the
-opposite — `addons/custom_operating_unit/models/res_users.py:21-22`:
+opposite — `addons/core/custom_operating_unit/models/res_users.py:21-22`:
 
 > "Empty means the user sees only documents that carry no Operating Unit — the rules fail closed,
 > not open."

@@ -28,7 +28,7 @@ Optional per-VA output tax splits each top-up into DPP (wallet credit) + PPN
     "version": "19.0.1.0.0",
     "license": "LGPL-3",
     "depends": [
-        "custom_ppob_wallet",
+        "custom_ppob_core",
         "custom_core",
         "custom_accounting_full",
     ],

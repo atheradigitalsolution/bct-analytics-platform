@@ -101,17 +101,16 @@ repos:
           # The demo seeder needs reproducible pseudo-randomness from a caller-supplied
           # seed, which is the opposite of a cryptographic requirement. Scoped to that
           # module: S311 stays live for any future token or salt generation.
-          - --per-file-ignores=addons/custom_demo_seed/**:S311
+          - --per-file-ignores=addons/operations/custom_demo_seed/**:S311
           # ------------------------------------------------------------------
           # IMPORTED-ADDON DEBT, 2026-09-01. NARROWED 2026-09-04.
           #
           # It used to say `addons/**`, which also covered the modules THIS
-          # project wrote and owns - custom_operating_unit, custom_ppob,
-          # custom_demo_seed (directly under addons/) and custom_pdp +
-          # custom_pdp_masking (owned, but living under addons/compliance/ since
-          # the 2026-09 PDP merge; the tier ignores cover them and cost nothing:
-          # measured 0 findings) - while every imported module sits one level
-          # deeper under addons/<tier>/. Five rules were therefore dead on our own
+          # project wrote and owns. Since 2026-09 they all live under a tier
+          # (custom_pdp + custom_pdp_masking in compliance/, custom_operating_unit
+          # in core/, custom_ppob in verticals/, custom_demo_seed in operations/),
+          # so the tier ignores cover them too - accepted, and it costs nothing:
+          # measured 0 findings across all of them. Five rules were therefore dead on our own
           # code for a debt none of it carries. Measured before narrowing: ruff
           # with the five ignores REMOVED reports 0 findings across those five
           # modules, so this costs nothing and buys back the coverage.
@@ -162,9 +161,8 @@ repos:
           # brace alternation `addons/{a,b}/**:B023` parses - the latter fails with
           # `invalid value 'addons/{_vendor' ... Expected <FilePattern>:<RuleCode>`.
           # Verified against ruff 0.16.5, the pinned rev above. The tiers are
-          # spelled out rather than globbed by depth because `addons/*/*/**` also
-          # matches the root-level owned modules' models/*.py, which is the code
-          # this narrowing exists to protect.
+          # spelled out per tier so a new tier is a deliberate one-line decision
+          # rather than a glob silently widening.
           - --per-file-ignores=addons/_vendor/**:B023
           - --per-file-ignores=addons/core/**:B023
           - --per-file-ignores=addons/control_plane/**:B023
