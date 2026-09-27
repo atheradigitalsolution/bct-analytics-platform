@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        PPh withholding rate matrix, Indonesian statutory rates.
+
+        noupdate="1" on purpose: a tenant may amend a rate (a tax-treaty rate
+        for PPh 26, a construction qualification that differs), and an upgrade
+        must not silently overwrite that. New rates ship as new records with a
+        later effective_date_from; _find_active() picks the most recent one
+        that covers the date, so a rate change is additive, never destructive.
+
+        without_npwp_rate follows the statute, NOT a blanket doubling:
+          * PPh 23  -> 100% higher without NPWP (UU PPh Pasal 23 ayat (1a))
+          * PPh 22  -> 100% higher without NPWP (UU PPh Pasal 22 ayat (3))
+          * PPh 21  -> 20% higher without NPWP  (UU PPh Pasal 21 ayat (5a))
+          * PPh 4(2) -> FINAL; no NPWP surcharge exists, so both columns match
+          * PPh 15  -> final regime; no NPWP surcharge
+          * PPh 26  -> 20% statutory; a lower tax-treaty rate needs a DGT form
+                       and is a per-partner decision, not a default
+        Rates are percentages of the gross amount (engine multiplies by /100).
+    -->
+
+    <!-- ================================================================
+         PPh Pasal 23 - UU PPh Pasal 23 ayat (1); PMK 141/PMK.03/2015
+         ================================================================ -->
+    <record id="rate_pph23_general" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">general</field>
+        <field name="with_npwp_rate">2.0</field>
+        <field name="without_npwp_rate">4.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf c angka 2 jo. PMK 141/PMK.03/2015 — imbalan jasa lain, 2% dari jumlah bruto tidak termasuk PPN. Tanpa NPWP: 100% lebih tinggi (Pasal 23 ayat (1a)).</field>
+    </record>
+
+    <record id="rate_pph23_sewa" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">sewa</field>
+        <field name="with_npwp_rate">2.0</field>
+        <field name="without_npwp_rate">4.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf c angka 1 — sewa dan penghasilan lain sehubungan dengan penggunaan harta, 2%. TIDAK berlaku untuk sewa tanah/bangunan, yang final di PPh 4(2).</field>
+    </record>
+
+    <record id="rate_pph23_jasa_teknik" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">jasa_teknik</field>
+        <field name="with_npwp_rate">2.0</field>
+        <field name="without_npwp_rate">4.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf c angka 2 — jasa teknik, 2% dari jumlah bruto.</field>
+    </record>
+
+    <record id="rate_pph23_manajemen" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">manajemen</field>
+        <field name="with_npwp_rate">2.0</field>
+        <field name="without_npwp_rate">4.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf c angka 2 — jasa manajemen, 2% dari jumlah bruto.</field>
+    </record>
+
+    <record id="rate_pph23_konsultan" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">konsultan</field>
+        <field name="with_npwp_rate">2.0</field>
+        <field name="without_npwp_rate">4.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf c angka 2 — jasa konsultan, 2% dari jumlah bruto.</field>
+    </record>
+
+    <record id="rate_pph23_dividen" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">dividen</field>
+        <field name="with_npwp_rate">15.0</field>
+        <field name="without_npwp_rate">30.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf a angka 1 — dividen kepada Wajib Pajak badan dalam negeri, 15%. Dividen ke WP orang pribadi dalam negeri bersifat final di PPh 4(2).</field>
+    </record>
+
+    <record id="rate_pph23_bunga" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">bunga</field>
+        <field name="with_npwp_rate">15.0</field>
+        <field name="without_npwp_rate">30.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf a angka 2 — bunga termasuk premium, diskonto, dan imbalan jaminan pengembalian utang, 15%. Bunga deposito/tabungan bank bersifat final di PPh 4(2).</field>
+    </record>
+
+    <record id="rate_pph23_royalti" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">royalti</field>
+        <field name="with_npwp_rate">15.0</field>
+        <field name="without_npwp_rate">30.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf a angka 3 — royalti, 15% dari jumlah bruto.</field>
+    </record>
+
+    <record id="rate_pph23_hadiah" model="custom.witholding.rate">
+        <field name="pph_type">23</field>
+        <field name="service_category">hadiah</field>
+        <field name="with_npwp_rate">15.0</field>
+        <field name="without_npwp_rate">30.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 23 ayat (1) huruf a angka 4 — hadiah, penghargaan, bonus dan sejenisnya selain yang telah dipotong PPh 21, 15%.</field>
+    </record>
+
+    <!-- ================================================================
+         PPh Pasal 4 ayat (2) - final. No NPWP surcharge exists.
+         ================================================================ -->
+    <record id="rate_pph4_2_general" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">general</field>
+        <field name="with_npwp_rate">10.0</field>
+        <field name="without_npwp_rate">10.0</field>
+        <field name="effective_date_from">2002-05-01</field>
+        <field name="legal_basis">PP 34/2017 — sewa tanah dan/atau bangunan, 10% final dari jumlah bruto nilai persewaan. Dipakai sebagai default PPh 4(2) karena itu kasus tersering; kategori lain punya recordnya sendiri.</field>
+    </record>
+
+    <record id="rate_pph4_2_sewa_tanah_bangunan" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">sewa_tanah_bangunan</field>
+        <field name="with_npwp_rate">10.0</field>
+        <field name="without_npwp_rate">10.0</field>
+        <field name="effective_date_from">2002-05-01</field>
+        <field name="legal_basis">PP 34/2017 jo. PP 5/2002 — persewaan tanah dan/atau bangunan, 10% final. Bersifat final sehingga tidak ada tarif punitif tanpa NPWP.</field>
+    </record>
+
+    <record id="rate_pph4_2_konstruksi_pelaksana_kecil" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">konstruksi_pelaksana_kecil</field>
+        <field name="with_npwp_rate">1.75</field>
+        <field name="without_npwp_rate">1.75</field>
+        <field name="effective_date_from">2022-02-21</field>
+        <field name="legal_basis">PP 9/2022 — jasa pelaksanaan konstruksi oleh penyedia dengan sertifikat badan usaha kualifikasi kecil atau sertifikat kompetensi kerja untuk usaha orang perseorangan, 1,75% final.</field>
+    </record>
+
+    <record id="rate_pph4_2_konstruksi_pelaksana_menengah_besar" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">konstruksi_pelaksana_menengah_besar</field>
+        <field name="with_npwp_rate">2.65</field>
+        <field name="without_npwp_rate">2.65</field>
+        <field name="effective_date_from">2022-02-21</field>
+        <field name="legal_basis">PP 9/2022 — jasa pelaksanaan konstruksi oleh penyedia dengan sertifikat badan usaha kualifikasi menengah atau besar, 2,65% final.</field>
+    </record>
+
+    <record id="rate_pph4_2_konstruksi_pelaksana_tanpa_sertifikat" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">konstruksi_pelaksana_tanpa_sertifikat</field>
+        <field name="with_npwp_rate">4.0</field>
+        <field name="without_npwp_rate">4.0</field>
+        <field name="effective_date_from">2022-02-21</field>
+        <field name="legal_basis">PP 9/2022 — jasa pelaksanaan konstruksi oleh penyedia yang tidak memiliki sertifikat badan usaha atau sertifikat kompetensi kerja, 4% final.</field>
+    </record>
+
+    <record id="rate_pph4_2_konstruksi_perencana_pengawas" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">konstruksi_perencana_pengawas</field>
+        <field name="with_npwp_rate">3.5</field>
+        <field name="without_npwp_rate">3.5</field>
+        <field name="effective_date_from">2022-02-21</field>
+        <field name="legal_basis">PP 9/2022 — jasa konsultansi konstruksi oleh penyedia bersertifikat, 3,5% final. Tanpa sertifikat: 6% (record terpisah).</field>
+    </record>
+
+    <record id="rate_pph4_2_konstruksi_perencana_tanpa_sertifikat" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">konstruksi_perencana_tanpa_sertifikat</field>
+        <field name="with_npwp_rate">6.0</field>
+        <field name="without_npwp_rate">6.0</field>
+        <field name="effective_date_from">2022-02-21</field>
+        <field name="legal_basis">PP 9/2022 — jasa konsultansi konstruksi oleh penyedia yang tidak memiliki sertifikat, 6% final.</field>
+    </record>
+
+    <record id="rate_pph4_2_bunga_deposito" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">bunga_deposito</field>
+        <field name="with_npwp_rate">20.0</field>
+        <field name="without_npwp_rate">20.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">PP 131/2000 jo. PP 123/2015 — bunga deposito dan tabungan serta diskonto Sertifikat Bank Indonesia, 20% final.</field>
+    </record>
+
+    <record id="rate_pph4_2_dividen_orang_pribadi" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">dividen_orang_pribadi</field>
+        <field name="with_npwp_rate">10.0</field>
+        <field name="without_npwp_rate">10.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 17 ayat (2c) jo. PP 19/2009 — dividen yang diterima Wajib Pajak orang pribadi dalam negeri, 10% final. Sejak UU HPP, dividen yang diinvestasikan kembali di Indonesia dapat dikecualikan — pengecualian itu keputusan per-transaksi, bukan tarif.</field>
+    </record>
+
+    <record id="rate_pph4_2_pengalihan_tanah_bangunan" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">pengalihan_tanah_bangunan</field>
+        <field name="with_npwp_rate">2.5</field>
+        <field name="without_npwp_rate">2.5</field>
+        <field name="effective_date_from">2016-09-08</field>
+        <field name="legal_basis">PP 34/2016 — pengalihan hak atas tanah dan/atau bangunan, 2,5% final dari jumlah bruto nilai pengalihan (1% untuk rumah sederhana/rumah susun sederhana oleh pengembang).</field>
+    </record>
+
+    <record id="rate_pph4_2_hadiah_undian" model="custom.witholding.rate">
+        <field name="pph_type">4_2</field>
+        <field name="service_category">hadiah_undian</field>
+        <field name="with_npwp_rate">25.0</field>
+        <field name="without_npwp_rate">25.0</field>
+        <field name="effective_date_from">2000-01-01</field>
+        <field name="legal_basis">PP 132/2000 — hadiah undian, 25% final dari jumlah bruto nilai hadiah.</field>
+    </record>
+
+    <!-- ================================================================
+         PPh Pasal 15 - deemed profit regimes, final.
+         ================================================================ -->
+    <record id="rate_pph15_pelayaran_dalam_negeri" model="custom.witholding.rate">
+        <field name="pph_type">15</field>
+        <field name="service_category">pelayaran_dalam_negeri</field>
+        <field name="with_npwp_rate">1.2</field>
+        <field name="without_npwp_rate">1.2</field>
+        <field name="effective_date_from">1996-01-01</field>
+        <field name="legal_basis">KMK 416/KMK.04/1996 — perusahaan pelayaran dalam negeri, 1,2% final dari peredaran bruto.</field>
+    </record>
+
+    <record id="rate_pph15_penerbangan_dalam_negeri" model="custom.witholding.rate">
+        <field name="pph_type">15</field>
+        <field name="service_category">penerbangan_dalam_negeri</field>
+        <field name="with_npwp_rate">1.8</field>
+        <field name="without_npwp_rate">1.8</field>
+        <field name="effective_date_from">1996-01-01</field>
+        <field name="legal_basis">KMK 475/KMK.04/1996 — perusahaan penerbangan dalam negeri atas charter, 1,8% dari peredaran bruto (kredit pajak, tidak final bagi penerima).</field>
+    </record>
+
+    <record id="rate_pph15_pelayaran_penerbangan_luar_negeri" model="custom.witholding.rate">
+        <field name="pph_type">15</field>
+        <field name="service_category">pelayaran_penerbangan_luar_negeri</field>
+        <field name="with_npwp_rate">2.64</field>
+        <field name="without_npwp_rate">2.64</field>
+        <field name="effective_date_from">1996-01-01</field>
+        <field name="legal_basis">KMK 417/KMK.04/1996 — perusahaan pelayaran dan/atau penerbangan luar negeri, 2,64% final dari peredaran bruto.</field>
+    </record>
+
+    <!-- ================================================================
+         PPh Pasal 22 - 100% higher without NPWP (UU PPh Pasal 22 ayat (3)).
+         ================================================================ -->
+    <record id="rate_pph22_general" model="custom.witholding.rate">
+        <field name="pph_type">22</field>
+        <field name="service_category">general</field>
+        <field name="with_npwp_rate">1.5</field>
+        <field name="without_npwp_rate">3.0</field>
+        <field name="effective_date_from">2015-08-07</field>
+        <field name="legal_basis">PMK 34/PMK.010/2017 — pembelian barang oleh badan tertentu, 1,5% dari harga pembelian tidak termasuk PPN. Tanpa NPWP: 100% lebih tinggi (Pasal 22 ayat (3)).</field>
+    </record>
+
+    <!-- ================================================================
+         PPh Pasal 26 - non-resident. Treaty rates are per-partner, not
+         a default: they need a DGT form on file.
+         ================================================================ -->
+    <record id="rate_pph26_general" model="custom.witholding.rate">
+        <field name="pph_type">26</field>
+        <field name="service_category">general</field>
+        <field name="with_npwp_rate">20.0</field>
+        <field name="without_npwp_rate">20.0</field>
+        <field name="effective_date_from">2009-01-01</field>
+        <field name="legal_basis">UU PPh Pasal 26 ayat (1) — penghasilan yang dibayarkan kepada Wajib Pajak luar negeri, 20% dari jumlah bruto. Tarif P3B yang lebih rendah hanya berlaku bila Surat Keterangan Domisili (DGT) tersedia — itu keputusan per-mitra, bukan tarif default.</field>
+    </record>
+
+    <!-- ================================================================
+         PPh Pasal 21 - 20% higher without NPWP (Pasal 21 ayat (5a)).
+         The progressive employee schedule lives in custom_hr_payroll_id;
+         this record covers the flat non-employee case.
+         ================================================================ -->
+    <record id="rate_pph21_bukan_pegawai" model="custom.witholding.rate">
+        <field name="pph_type">21</field>
+        <field name="service_category">bukan_pegawai</field>
+        <field name="with_npwp_rate">2.5</field>
+        <field name="without_npwp_rate">3.0</field>
+        <field name="effective_date_from">2024-01-01</field>
+        <field name="legal_basis">PP 58/2023 jo. PMK 168/2023 — bukan pegawai berkesinambungan, tarif efektif bulanan atas 50% penghasilan bruto; 2,5% dipakai sebagai default praktis untuk lapisan terendah. Tanpa NPWP: 20% lebih tinggi (UU PPh Pasal 21 ayat (5a)), bukan 100%. Kasus pegawai tetap dihitung progresif di custom_hr_payroll_id, bukan dari matriks ini.</field>
+    </record>
+
+</odoo>

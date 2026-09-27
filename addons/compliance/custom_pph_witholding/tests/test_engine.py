@@ -55,10 +55,16 @@ class TestWitholdingEngine(TransactionCase):
         self.assertEqual(result["withheld"], 400_000)
 
     def test_03_missing_rate_yields_zero_withheld(self):
+        # PPh 26 is seeded now (data/witholding_rate_data.xml), so the "no rule"
+        # case has to be made rather than assumed: archive every rate of the
+        # type and the engine must refuse to invent one.
+        self.env["custom.witholding.rate"].search([("pph_type", "=", "26")]).write(
+            {"active": False}
+        )
         result = self.Engine.compute(
             partner=self.partner_npwp,
             amount=5_000_000.0,
-            pph_type="26",  # no rule seeded
+            pph_type="26",
             date=date(2026, 5, 19),
         )
         self.assertEqual(result["withheld"], 0)
