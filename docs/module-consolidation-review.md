@@ -67,17 +67,47 @@ Diselesaikan dengan **redevelop menjadi satu modul `compliance/custom_pdp`**:
 
 ## 3. Duplikasi lain yang DITEMUKAN (belum dieksekusi)
 
-### 3.1 PPOB: root vs pack
+### 3.1 PPOB: root vs pack — DIEKSEKUSI 2026-09-27
 
 - Root `custom_ppob` (`ppob.biller`, `ppob.transaction`) TERPASANG di 6 DB dan
   menjadi sumber CDC/dbt (assert pada `state`, `sla_seconds`,
   `operating_unit_id`) — tabelnya tidak boleh diganggu.
 - Pack `verticals/custom_ppob_*` (12 modul) TIDAK terpasang di DB mana pun,
   dengan domain tumpang tindih (provider≈biller, sla, sale).
-- Root `custom_ppob` sudah dipindah ke `verticals/` (aman, SELESAI); konsolidasi
-  jangka panjang mengikuti pola PDP — pack menjadi satu-satunya
-  implementasi, `ppob.transaction` tetap kanonik untuk warehouse. Kerjakan
-  SEBELUM pack dipasang tenant pertama; sesudah itu biayanya naik kelas.
+
+**Hasil eksekusi.** Pack kini satu-satunya implementasi dan tabel transaksi
+kedua sudah hilang: model `custom.ppob.transaction` dihapus, `custom_ppob_sale`
+meng-`_inherit` `ppob.transaction` dan menempelkan mesin dispatch di atasnya
+(100 rujukan di 10 modul diarahkan ulang). Kontrak warehouse utuh:
+
+- `state` tetap 5 nilai beku dengan guard transisinya; mesin menulis
+  `engine_state` (7 nilai) dan jembatan menapaki jalur legal (`_ledger_path`,
+  BFS atas `PPOB_TRANSITIONS`) — bridge POS/Oracle yang mencerminkan transaksi
+  sudah-final pun tidak perlu melonggarkan guard.
+- Uang dipetakan sesuai semantik ledger: `cost_price`→`amount` (pass-through),
+  `margin`→`admin_fee` **dan** `commission` (memenuhi `commission ≤ admin_fee`);
+  revenue tetap `commission`, bukan `amount`.
+- `product_id` tetap `product.product` (join dim_product); katalog mesin jadi
+  `ppob_product_id`. `biller_id` (wajib, di-assert dbt) diresolusi dari kelas
+  produk, dengan biller catch-all agar mesin tak pernah gagal mengisinya.
+- 45 kolom mesin diklasifikasi PDP (`msisdn` sensitive seperti `customer_ref`;
+  `raw_response`/`error_message`/`serial_token` sensitive + drop-to-null;
+  `pps_callback_url` **secret** sehingga tak pernah ikut di-extract).
+- Baris ledger non-mesin tetap sah: syarat mesin ditegakkan lewat constraint
+  pada baris ber-`idempotency_key`, bukan NOT NULL tabel — memasang pack di
+  tenant yang sudah punya baris ledger karena itu tidak gagal.
+
+Verifikasi: 158 test keluarga PPOB hijau; `warehouse_ctl verify` hijau (894
+kolom terklasifikasi, nol `secret` bocor); 6 DB tenant TIDAK tersentuh (tabel
+tetap 25 kolom — kolom mesin hanya muncul di DB yang memasang pack), jadi tidak
+ada rollout produksi yang diperlukan.
+
+**Sengaja TIDAK dilakukan:** modul `custom_ppob` tidak dihapus. Meleburnya ke
+`custom_ppob_core` akan memaksa 6 tenant (termasuk rumah sakit) memasang
+`custom_ppob_core`, yang `post_init_hook`-nya **membuat 10+ akun GL PPOB di
+bagan akun mereka**. Duplikasi yang jadi masalah — dua model dan dua tabel
+transaksi — sudah hilang; sisanya modul tipis pembawa kontrak warehouse yang
+memang di-provision ke setiap tenant.
 
 ### 3.2 Withholding pajak: `custom_tax_id` vs `custom_pph_witholding`
 
@@ -174,9 +204,12 @@ generic yang bisa dijual ulang.
 1. ~~Selesaikan PDP~~ — **SELESAI**: 9/9 DB @ v19.0.2.0.0.
 2. ~~Pindah tier 3 modul root~~ — **SELESAI**.
 3. ~~Merge tak-terpasang (§4.1)~~ — **SELESAI**: 11 satelit → 6 induk.
-4. **Konsolidasi PPOB root-vs-pack** (§3.1) — sebelum pack dipasang tenant
-   pertama. BELUM dikerjakan: menyentuh `ppob.transaction` yang dibaca warehouse.
+4. ~~Konsolidasi PPOB root-vs-pack (§3.1)~~ — **SELESAI**: satu model transaksi,
+   kontrak warehouse utuh, tanpa rollout produksi.
 5. **Konsolidasi withholding** (§3.2) — fase sendiri, dengan regresi angka pajak.
    BELUM dikerjakan: keduanya terpasang di produksi.
-6. **Utang terpisah**: 7 test `custom_rental` gagal karena jebakan Odoo 19
-   `stock.move.name` (pra-eksisting, ditemukan saat verifikasi merge).
+6. ~~Utang test `custom_rental`~~ — **SELESAI**: `stock.move.name` tidak ada di
+   Odoo 19; label baris picking adalah `description_picking`. 24/24 lulus.
+7. **Ditemukan & ditutup sambil jalan**: `product.template.is_medicine` dan
+   `account.move.hms_bill_id` belum terklasifikasi PDP — celah nyata di tenant
+   HMS yang akan membuat CDC menolak start. Sudah diklasifikasi.

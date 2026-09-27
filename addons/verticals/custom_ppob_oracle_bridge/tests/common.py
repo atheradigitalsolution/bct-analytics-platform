@@ -223,15 +223,15 @@ class OracleBridgeCommon(TransactionCase):
         )
 
     def _make_transaction(self, idempotency_key="TXN-001", state="pending"):
-        return self.env["custom.ppob.transaction"].create(
+        return self.env["ppob.transaction"].create(
             {
                 "mitra_id": self.partner.id,
-                "product_id": self.product.id,
+                "ppob_product_id": self.product.id,
                 "provider_id": self.provider.id,
                 "idempotency_key": idempotency_key,
                 "msisdn": "08123456789",
                 "sell_price": 10000.0,
                 "cost_price": 9500.0,
-                "state": state,
+                "engine_state": state,
             }
         )

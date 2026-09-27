@@ -166,3 +166,33 @@ Only a manager may press **Reverse**, and the button carries a confirmation — 
 `operating_unit_field` from it so that the sixth occurrence of `operating_unit_id` cannot drift
 from the other five. Install order is therefore
 `custom_pdp → custom_pdp_masking → custom_operating_unit → custom_ppob`.
+
+
+---
+
+## 2026-09-27: one transaction model, two vocabularies
+
+The PPOB pack no longer keeps a second transaction table. `custom.ppob.transaction`
+is gone; `custom_ppob_sale` now `_inherit`s **this** model and adds the dispatch
+engine onto it (idempotency, provider routing, wallet and bucket subledgers,
+PMK-63 margin VAT). Consequences worth knowing before editing either side:
+
+- **`state` is still the five frozen states** and still guarded by
+  `_assert_transition` in `write()`. That guard is what dbt's
+  `accepted_values` test and the whole 60-second mart rely on, so the engine
+  does not write it directly: it writes `engine_state` (7 values: pending,
+  inquiry_ok, in_progress, success, failed, timeout, refunded) and the bridge
+  in `custom_ppob_sale` walks the ledger along the legal path
+  (`_ledger_path`, breadth-first over `PPOB_TRANSITIONS`).
+- **Money mapping**: engine `cost_price` -> `amount` (pass-through),
+  engine `margin` -> `admin_fee` **and** `commission` (equal, which satisfies
+  `commission <= admin_fee`). `total_amount` stays computed. Revenue is
+  `commission`, never `amount`.
+- **`product_id` is still a `product.product`** so PPOB joins dim_product. The
+  engine's catalogue entry is `ppob_product_id` (`custom.ppob.product`).
+- **`msisdn` duplicates `customer_ref`** and is classified `sensitive` for the
+  same reason - it is the subscriber identifier. Adding an engine column means
+  adding its classification row, or the CDC loader refuses to start.
+- Rows the engine did not create (demo seed, direct entries) stay legal: the
+  engine's own requirements are enforced by `_check_engine_row_is_complete`
+  on rows carrying an `idempotency_key`, not as table-wide NOT NULL.

@@ -13,25 +13,25 @@ class SaleOrder(models.Model):
         "invoice uses a summary journal excluded from the TB.",
     )
     x_custom_ppob_rollup_date = fields.Date(string="Rollup Date", index=True)
-    x_custom_ppob_transaction_ids = fields.One2many(
-        "custom.ppob.transaction",
+    x_ppob_transaction_ids = fields.One2many(
+        "ppob.transaction",
         "x_custom_ppob_rollup_so_id",
         string="Rolled-up Transactions",
     )
-    x_custom_ppob_transaction_count = fields.Integer(
-        compute="_compute_x_custom_ppob_transaction_count",
+    x_ppob_transaction_count = fields.Integer(
+        compute="_compute_x_ppob_transaction_count",
     )
 
-    def _compute_x_custom_ppob_transaction_count(self):
+    def _compute_x_ppob_transaction_count(self):
         for so in self:
-            so.x_custom_ppob_transaction_count = len(so.x_custom_ppob_transaction_ids)
+            so.x_ppob_transaction_count = len(so.x_ppob_transaction_ids)
 
     def action_open_rolled_up(self):
         self.ensure_one()
         return {
             "type": "ir.actions.act_window",
             "name": "Rolled-up Transactions",
-            "res_model": "custom.ppob.transaction",
+            "res_model": "ppob.transaction",
             "view_mode": "list,form",
             "domain": [("x_custom_ppob_rollup_so_id", "=", self.id)],
         }

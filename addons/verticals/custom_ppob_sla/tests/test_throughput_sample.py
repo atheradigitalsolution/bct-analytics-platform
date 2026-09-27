@@ -84,13 +84,13 @@ class TestPpobThroughputSample(TransactionCase):
         )
 
     def _dispatch(self, count=1):
-        Txn = self.env["custom.ppob.transaction"]
+        Txn = self.env["ppob.transaction"]
         txns = Txn.browse()
         for i in range(count):
             txn = Txn.create(
                 {
                     "mitra_id": self.mitra.id,
-                    "product_id": self.product.id,
+                    "ppob_product_id": self.product.id,
                     "msisdn": f"0812000{i:04d}",
                     "sell_price": 5000.0,
                     "cost_price": 4900.0,
@@ -112,7 +112,7 @@ class TestPpobThroughputSample(TransactionCase):
         """Without this field there is nothing to measure an SLA against --
         and it must be written for every adapter, mock included."""
         txn = self._dispatch(1)
-        self.assertEqual(txn.state, "success")
+        self.assertEqual(txn.engine_state, "success")
         self.assertIsNotNone(txn.provider_latency_ms)
         self.assertGreaterEqual(txn.provider_latency_ms, 0)
 
@@ -120,13 +120,13 @@ class TestPpobThroughputSample(TransactionCase):
         """A provider that fails slowly is exactly the sample the SLA needs."""
         self.provider.mock_outcome = "fail"
         txn = self._dispatch(1)
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         self.assertGreaterEqual(txn.provider_latency_ms, 0)
 
     def test_retry_clone_resets_latency(self):
         txn = self._dispatch(1)
         action = txn.action_retry()
-        clone = self.env["custom.ppob.transaction"].browse(action["res_id"])
+        clone = self.env["ppob.transaction"].browse(action["res_id"])
         self.assertEqual(clone.provider_latency_ms, 0)
         self.assertFalse(clone.dispatched_at)
 
@@ -154,11 +154,11 @@ class TestPpobThroughputSample(TransactionCase):
     def test_sample_separates_success_from_failure(self):
         self._dispatch(2)
         self.provider.mock_outcome = "fail"
-        Txn = self.env["custom.ppob.transaction"]
+        Txn = self.env["ppob.transaction"]
         txn = Txn.create(
             {
                 "mitra_id": self.mitra.id,
-                "product_id": self.product.id,
+                "ppob_product_id": self.product.id,
                 "msisdn": "081299999",
                 "sell_price": 5000.0,
                 "cost_price": 4900.0,

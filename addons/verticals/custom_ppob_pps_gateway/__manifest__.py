@@ -9,7 +9,7 @@ Custom PPOB Suite - PPS Gateway (Revamp II: Odoo as switcher)
 Revamp II makes Odoo REPLACE the vendor PPS/EVShop switcher. POS POS keeps
 its existing integration and simply re-points its base URL to Odoo: this module
 exposes the SAME PPS H2H API surface as a drop-in and maps every request onto
-the native ``custom.ppob.transaction`` engine + wallet ("deposit") + provider
+the native ``ppob.transaction`` engine + wallet ("deposit") + provider
 adapter registry. Odoo fulfils to real billers itself (its own adapters); the
 vendor PPS is NOT called downstream.
 

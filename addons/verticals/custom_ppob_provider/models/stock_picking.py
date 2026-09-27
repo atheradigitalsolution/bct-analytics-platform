@@ -9,8 +9,8 @@ When a bucket has ``inventory_product_id`` configured, two flows fire:
 2. **Mitra dispatch** -- when a transaction debits the bucket for a sale, an
    outgoing picking is created and validated to release the same stock units.
 
-Note vs. ERA source: the ``x_custom_ppob_transaction_id`` back-reference is
-declared by custom_ppob_sale (which owns ``custom.ppob.transaction``), not here,
+Note vs. ERA source: the ``x_ppob_transaction_id`` back-reference is
+declared by custom_ppob_sale (which owns ``ppob.transaction``), not here,
 so this provider module stays independently installable. ``_stock_picking_outgoing``
 sets that link only when the column exists.
 """
@@ -144,8 +144,8 @@ class PpobProviderBucket(models.Model):
         }
         # Link to the originating transaction only when custom_ppob_sale has
         # declared the column (keeps provider independently installable).
-        if transaction and "x_custom_ppob_transaction_id" in self.env["stock.picking"]._fields:
-            vals["x_custom_ppob_transaction_id"] = transaction.id
+        if transaction and "x_ppob_transaction_id" in self.env["stock.picking"]._fields:
+            vals["x_ppob_transaction_id"] = transaction.id
         picking = self.env["stock.picking"].create(vals)
         picking.action_confirm()
         picking.action_assign()

@@ -39,7 +39,7 @@ def resolve(code):
 
 
 def state_to_status(state):
-    """Map a custom.ppob.transaction state to a PPS Status code."""
+    """Map a ppob.transaction state to a PPS Status code."""
     if state == "success":
         return "0"
     if state in ("failed", "timeout", "refunded"):

@@ -81,7 +81,7 @@ class TestOracleBridgeAdapter(OracleBridgeCommon):
         with self._patch_connection():
             txn = self._make_transaction("TXN-DISPATCH-OK")
             txn.action_dispatch()
-        self.assertEqual(txn.state, "in_progress")
+        self.assertEqual(txn.engine_state, "in_progress")
         self.assertTrue(txn.oracle_msg016t_id)
         self.assertFalse(txn.wallet_move_id, "No wallet move should be created in oracle_bridge mode")
 
@@ -90,7 +90,7 @@ class TestOracleBridgeAdapter(OracleBridgeCommon):
         with self._patch_connection():
             txn = self._make_transaction("TXN-DISPATCH-FAIL")
             txn.action_dispatch()
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         self.assertEqual(txn.error_code, "oracle_business_error")
         self.assertFalse(txn.wallet_refund_move_id)
 

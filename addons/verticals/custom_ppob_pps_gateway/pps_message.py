@@ -10,7 +10,7 @@ from .pps_errors import PPS_ERRORS, NATIVE_TO_PPS
 
 
 def _amount(txn):
-    return int(round(txn.sell_price or txn.product_id.denom or 0.0))
+    return int(round(txn.sell_price or txn.ppob_product_id.denom or 0.0))
 
 
 def sale_message(txn):
@@ -18,7 +18,7 @@ def sale_message(txn):
     if txn.state == "success":
         ref = txn.serial_token or txn.provider_ref or ""
         return ("Pengisian %(prod)s sebesar %(amt)s ke nomor %(mdn)s berhasil dengan no ref <%(ref)s>") % {
-            "prod": txn.product_id.name or txn.product_id.code or "produk",
+            "prod": txn.ppob_product_id.name or txn.ppob_product_id.code or "produk",
             "amt": _amount(txn),
             "mdn": txn.msisdn or "",
             "ref": ref,
@@ -27,7 +27,7 @@ def sale_message(txn):
         key = NATIVE_TO_PPS.get(txn.error_code or "", "ADAPTER_FAIL")
         base = PPS_ERRORS.get(key, PPS_ERRORS["ADAPTER_FAIL"])[1]
         return ("Pengisian %(prod)s sebesar %(amt)s ke nomor %(mdn)s GAGAL. %(msg)s") % {
-            "prod": txn.product_id.name or txn.product_id.code or "produk",
+            "prod": txn.ppob_product_id.name or txn.ppob_product_id.code or "produk",
             "amt": _amount(txn),
             "mdn": txn.msisdn or "",
             "msg": txn.error_message or base,

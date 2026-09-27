@@ -69,7 +69,7 @@ class PosTxn(models.Model):
     product_id = fields.Many2one("custom.ppob.product", string="Product", index=True)
     provider_id = fields.Many2one("custom.ppob.provider", string="Biller")
     transaction_id = fields.Many2one(
-        "custom.ppob.transaction",
+        "ppob.transaction",
         string="Mirror Transaction",
         copy=False,
     )
@@ -497,11 +497,11 @@ class PosTxn(models.Model):
         )
 
     def _ensure_mirror_transaction(self, mitra, product, state):
-        """Get-or-create the mirror custom.ppob.transaction for this join."""
+        """Get-or-create the mirror ppob.transaction for this join."""
         self.ensure_one()
         if self.transaction_id:
             return self.transaction_id
-        Txn = self.env["custom.ppob.transaction"]
+        Txn = self.env["ppob.transaction"]
         existing = Txn.search(
             [
                 ("mitra_id", "=", mitra.id),
@@ -515,12 +515,12 @@ class PosTxn(models.Model):
         txn = Txn.create(
             {
                 "mitra_id": mitra.id,
-                "product_id": product.id,
+                "ppob_product_id": product.id,
                 "msisdn": self.customer_no or "-",
                 "idempotency_key": self.pos_trx_ref,
                 "sell_price": self.sell_price,
                 "cost_price": self.cost_price or product.cost_price_default or 0.0,
-                "state": state,
+                "engine_state": state,
                 "pos_txn_id": self.id,
                 "provider_id": self.provider_id.id if self.provider_id else False,
                 "completed_at": fields.Datetime.now(),

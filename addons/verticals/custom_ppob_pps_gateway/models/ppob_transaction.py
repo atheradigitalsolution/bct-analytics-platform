@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Extend custom.ppob.transaction with PPS-gateway state: the ServerIDTrx, the
+"""Extend ppob.transaction with PPS-gateway state: the ServerIDTrx, the
 game dynamic-field payload, and the async outbound-callback lifecycle.
 
 Callbacks are decoupled from _mark_success/_mark_failed (which run inside the
@@ -27,7 +27,7 @@ _CALLBACK_TIMEOUT_S = 10
 
 
 class PpobTransaction(models.Model):
-    _inherit = "custom.ppob.transaction"
+    _inherit = "ppob.transaction"
 
     pps_serveridtrx = fields.Char(
         string="PPS ServerIDTrx",
@@ -91,7 +91,7 @@ class PpobTransaction(models.Model):
         txns = self.search(
             [
                 ("pps_callback_state", "=", "pending"),
-                ("state", "in", ("success", "failed", "timeout", "refunded")),
+                ("engine_state", "in", ("success", "failed", "timeout", "refunded")),
             ],
             limit=batch_size,
         )
@@ -113,7 +113,7 @@ class PpobTransaction(models.Model):
             "serveridtrx": self.pps_serveridtrx or "",
             "clientnotrx": self.idempotency_key or "",
             "status": status,
-            "produk": self.pps_produk or (self.product_id.code or ""),
+            "produk": self.pps_produk or (self.ppob_product_id.code or ""),
             "mdn": self.msisdn or "",
             "sn": self.serial_token or "",
             "message": sale_message(self),

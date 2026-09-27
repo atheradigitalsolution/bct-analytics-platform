@@ -230,7 +230,7 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         A postpaid product left without it is sold down the prepaid path, which
         Digiflazz rejects rather than mis-sells -- noisy, but not dangerous.
         """
-        return bool(transaction.product_id.inquiry_required)
+        return bool(transaction.ppob_product_id.inquiry_required)
 
     def _ref_id(self, transaction):
         """Return the transaction's stable ref_id, assigning it on first use.
@@ -272,7 +272,7 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         if not self._is_postpaid(transaction):
             raise NotImplementedError(
                 "Digiflazz has no prepaid inquiry endpoint. Product %s is marked "
-                "inquiry_required but is not a postpaid product." % transaction.product_id.code
+                "inquiry_required but is not a postpaid product." % transaction.ppob_product_id.code
             )
         status_code, data = self._post(PATH_TRANSACTION, self._transaction_payload(transaction, CMD_INQUIRY_POSTPAID))
         return self._result_from(status_code, data)
@@ -341,7 +341,7 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         return result
 
     def _find_transaction(self, provider_ref):
-        Txn = self.provider.env["custom.ppob.transaction"]
+        Txn = self.provider.env["ppob.transaction"]
         txn = Txn.search([("digiflazz_ref_id", "=", provider_ref)], limit=1)
         if txn:
             return txn

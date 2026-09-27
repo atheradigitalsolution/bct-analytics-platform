@@ -38,10 +38,10 @@ class PpobManualSaleWizard(models.TransientModel):
 
     def action_create_and_dispatch(self):
         self.ensure_one()
-        txn = self.env["custom.ppob.transaction"].create(
+        txn = self.env["ppob.transaction"].create(
             {
                 "mitra_id": self.mitra_id.id,
-                "product_id": self.product_id.id,
+                "ppob_product_id": self.product_id.id,
                 "msisdn": self.msisdn,
                 "provider_id": self.provider_id.id if self.provider_id else False,
                 "sell_price": self.sell_price,
@@ -52,7 +52,7 @@ class PpobManualSaleWizard(models.TransientModel):
         txn.action_dispatch()
         return {
             "type": "ir.actions.act_window",
-            "res_model": "custom.ppob.transaction",
+            "res_model": "ppob.transaction",
             "res_id": txn.id,
             "view_mode": "form",
         }

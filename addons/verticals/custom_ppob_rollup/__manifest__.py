@@ -6,7 +6,7 @@
     "description": """
 Custom PPOB Suite - Daily Rollup
 ================================
-Hybrid architecture: real-time ``custom.ppob.transaction`` rows post their own
+Hybrid architecture: real-time ``ppob.transaction`` rows post their own
 per-transaction sub-ledger + GL entries during the day. This module rolls the
 successful ones up nightly into one ``sale.order`` + summary ``account.move``
 (``out_invoice``) per mitra per day, grouped by product.

@@ -30,7 +30,7 @@ class OracleIngestSkipped(models.Model):
     replayed = fields.Boolean(default=False, index=True)
     replayed_at = fields.Datetime(readonly=True)
     transaction_id = fields.Many2one(
-        comodel_name="custom.ppob.transaction",
+        comodel_name="ppob.transaction",
         string="Resulting Transaction",
         readonly=True,
     )
@@ -45,7 +45,7 @@ class OracleIngestSkipped(models.Model):
         now resolves. Idempotent -- already-replayed records are no-ops."""
         Map = self.env["custom.ppob.oracle.member.map"]
         SkuMap = self.env["custom.ppob.provider.sku.map"]
-        Txn = self.env["custom.ppob.transaction"]
+        Txn = self.env["ppob.transaction"]
         conn = self.env["custom.ppob.oracle.connection"]._get_active()
 
         replayed_count = 0
@@ -74,7 +74,7 @@ class OracleIngestSkipped(models.Model):
             txn = Txn.create(
                 {
                     "mitra_id": member_map.partner_id.id,
-                    "product_id": sku_map.product_id.id,
+                    "ppob_product_id": sku_map.product_id.id,
                     "provider_id": sku_map.provider_id.id,
                     "idempotency_key": trx_no or f"MSG016T-{msg016t_id}",
                     "provider_ref": str(msg016t_id),
@@ -83,7 +83,7 @@ class OracleIngestSkipped(models.Model):
                     "msisdn": msisdn or "",
                     "sell_price": sales_price or 0.0,
                     "cost_price": sales_price or 0.0,
-                    "state": odoo_state,
+                    "engine_state": odoo_state,
                 }
             )
             rec.write(

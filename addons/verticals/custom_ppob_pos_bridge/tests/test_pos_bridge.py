@@ -125,7 +125,7 @@ class TestPosBridge(TransactionCase):
         # Mirror container transaction feeds the daily rollup faktur.
         txn = join.transaction_id
         self.assertTrue(txn)
-        self.assertEqual(txn.state, "success")
+        self.assertEqual(txn.engine_state, "success")
         self.assertEqual(txn.pos_txn_id, join)
         self.assertAlmostEqual(txn.sell_price, 5000.0, places=2)
 

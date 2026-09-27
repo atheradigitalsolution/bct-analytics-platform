@@ -10,7 +10,7 @@ class PpsCallbackLog(models.Model):
     _order = "create_date desc, id desc"
 
     transaction_id = fields.Many2one(
-        comodel_name="custom.ppob.transaction",
+        comodel_name="ppob.transaction",
         string="Transaction",
         required=True,
         ondelete="cascade",

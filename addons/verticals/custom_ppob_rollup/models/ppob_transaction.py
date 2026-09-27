@@ -3,7 +3,7 @@ from odoo import fields, models
 
 
 class PpobTransaction(models.Model):
-    _inherit = "custom.ppob.transaction"
+    _inherit = "ppob.transaction"
 
     x_custom_ppob_rollup_so_id = fields.Many2one(
         comodel_name="sale.order",

@@ -6,7 +6,7 @@ class PpobWalletMove(models.Model):
     _inherit = "custom.ppob.wallet.move"
 
     ppob_transaction_id = fields.Many2one(
-        comodel_name="custom.ppob.transaction",
+        comodel_name="ppob.transaction",
         string="PPOB Transaction",
         ondelete="set null",
         index=True,

@@ -3,7 +3,7 @@ from odoo import fields, models
 
 
 class PpobTransaction(models.Model):
-    _inherit = "custom.ppob.transaction"
+    _inherit = "ppob.transaction"
 
     commission_accrual_ids = fields.One2many(
         "custom.ppob.commission.accrual",

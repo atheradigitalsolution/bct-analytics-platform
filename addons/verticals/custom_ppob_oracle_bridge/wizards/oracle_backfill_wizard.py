@@ -62,7 +62,7 @@ class OracleBackfillWizard(models.TransientModel):
             self.result_summary = f"Query failed: {exc}"
             return self._reload_form()
 
-        Txn = self.env["custom.ppob.transaction"]
+        Txn = self.env["ppob.transaction"]
         Map = self.env["custom.ppob.oracle.member.map"]
         SkuMap = self.env["custom.ppob.provider.sku.map"]
         Skipped = self.env["custom.ppob.oracle.ingest.skipped"]
@@ -120,7 +120,7 @@ class OracleBackfillWizard(models.TransientModel):
                 Txn.create(
                     {
                         "mitra_id": member_map.partner_id.id,
-                        "product_id": sku_map.product_id.id,
+                        "ppob_product_id": sku_map.product_id.id,
                         "provider_id": sku_map.provider_id.id,
                         "provider_sku": sku_map.provider_sku,
                         "idempotency_key": idem_key,
@@ -130,7 +130,7 @@ class OracleBackfillWizard(models.TransientModel):
                         "msisdn": msisdn or "",
                         "sell_price": float(sales_price or 0),
                         "cost_price": float(sku_map.buy_price or sales_price or 0),
-                        "state": odoo_state,
+                        "engine_state": odoo_state,
                     }
                 )
 

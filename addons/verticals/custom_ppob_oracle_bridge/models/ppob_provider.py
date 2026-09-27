@@ -27,12 +27,12 @@ class PpobProvider(models.Model):
 
     @api.constrains("bridge_mode")
     def _check_bridge_mode_no_pending(self):
-        Txn = self.env["custom.ppob.transaction"]
+        Txn = self.env["ppob.transaction"]
         for rec in self:
             pending = Txn.search_count(
                 [
                     ("provider_id", "=", rec.id),
-                    ("state", "in", ("pending", "inquiry_ok", "in_progress")),
+                    ("engine_state", "in", ("pending", "inquiry_ok", "in_progress")),
                 ]
             )
             if pending:

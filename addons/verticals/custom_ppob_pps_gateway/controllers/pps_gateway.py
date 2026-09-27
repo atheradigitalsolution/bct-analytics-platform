@@ -4,7 +4,7 @@
 Seven routes mimic the vendor PPS contract so POS POS re-points its base
 URL to Odoo unchanged. Each request is MD5-verified (isolated in
 ``pps_signature``), resolved to a mitra credential, then mapped onto the native
-``custom.ppob.transaction`` engine / wallet / provider adapter.
+``ppob.transaction`` engine / wallet / provider adapter.
 
 Auth model note: the PPS contract has no nonce and (mostly) no timestamp, so the
 compensating controls are the per-mitra MD5 secret + IP allowlist; money
@@ -175,7 +175,7 @@ class PpsGatewayController(http.Controller):
         if not notrx or not params.get("produk") or not params.get("mdn"):
             return self._sell_err("BAD_FORMAT", notrx)
 
-        Txn = request.env["custom.ppob.transaction"].sudo()
+        Txn = request.env["ppob.transaction"].sudo()
         existing = Txn.search([("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
         if existing:
             return self._sell_ok(existing)  # idempotent: original result
@@ -219,7 +219,7 @@ class PpsGatewayController(http.Controller):
         if err:
             return self._sell_err(err, notrx)
         txn = (
-            request.env["custom.ppob.transaction"]
+            request.env["ppob.transaction"]
             .sudo()
             .search([("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
         )
@@ -387,7 +387,7 @@ class PpsGatewayController(http.Controller):
         if not notrx or not params.get("product"):
             return self._sell_err("BAD_FORMAT", notrx)
 
-        Txn = request.env["custom.ppob.transaction"].sudo()
+        Txn = request.env["ppob.transaction"].sudo()
         existing = Txn.search([("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
         if existing:
             return self._sell_ok(existing)

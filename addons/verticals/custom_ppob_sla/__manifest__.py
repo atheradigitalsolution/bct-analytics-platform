@@ -47,7 +47,7 @@ arrives, import history to ``source=oracle`` and recalibrate the targets.
 
 Measurement caveat
 ------------------
-``peak_tps`` and latency are sampled from ``custom.ppob.transaction`` via raw
+``peak_tps`` and latency are sampled from ``ppob.transaction`` via raw
 SQL, which is flushed (``env.flush_all()``) before reading so that transactions
 posted earlier in the same cursor are not missed. Latency comes from
 ``provider_latency_ms`` (adapter RTT, added by ``custom_ppob_sale``) and is

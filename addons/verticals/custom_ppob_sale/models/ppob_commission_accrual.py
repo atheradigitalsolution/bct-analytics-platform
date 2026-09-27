@@ -13,7 +13,7 @@ class PpobCommissionAccrual(models.Model):
         copy=False,
         default=lambda self: self.env["ir.sequence"].next_by_code("custom.ppob.commission.accrual") or "/",
     )
-    transaction_id = fields.Many2one("custom.ppob.transaction", required=True, ondelete="cascade", index=True)
+    transaction_id = fields.Many2one("ppob.transaction", required=True, ondelete="cascade", index=True)
     rule_id = fields.Many2one("custom.ppob.commission.rule", required=True, ondelete="restrict")
     scope = fields.Selection(related="rule_id.scope", store=True)
     partner_id = fields.Many2one("res.partner", required=True)

@@ -42,7 +42,7 @@ class OracleBridgeAdapter(PPOBProviderAdapter):
         return self.provider.env["custom.ppob.provider.sku.map"].search(
             [
                 ("provider_id", "=", self.provider.id),
-                ("product_id", "=", transaction.product_id.id),
+                ("product_id", "=", transaction.ppob_product_id.id),
             ],
             limit=1,
         )
@@ -84,7 +84,7 @@ class OracleBridgeAdapter(PPOBProviderAdapter):
                 error_message=(
                     "Produk %s belum dimap ke KODE_VOUCHER Oracle. Set field oracle_kode_voucher di SKU Map."
                 )
-                % (transaction.product_id.code or transaction.product_id.display_name),
+                % (transaction.ppob_product_id.code or transaction.ppob_product_id.display_name),
             )
 
         connection = self._connection()
@@ -99,7 +99,7 @@ class OracleBridgeAdapter(PPOBProviderAdapter):
             "trxNumber": transaction.idempotency_key,
             "addr": connection.sp_default_ip or "",
             "GoogleserialNumber": "",
-            "Nominal": int(transaction.product_id.denom or 0),
+            "Nominal": int(transaction.ppob_product_id.denom or 0),
         }
         out_specs = {
             "trxId": oracledb.NUMBER,

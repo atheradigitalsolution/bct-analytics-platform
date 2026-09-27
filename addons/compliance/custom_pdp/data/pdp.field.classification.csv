@@ -39,6 +39,8 @@ pdp_account_move__create_date,account.move,create_date,internal,Not personal dat
 pdp_account_move__create_uid,account.move,create_uid,internal,Not personal data - business record,,False
 pdp_account_move__currency_id,account.move,currency_id,internal,Not personal data - business record,,False
 pdp_account_move__custom_match_result_id,account.move,custom_match_result_id,internal,Not personal data - business record,,False
+pdp_account_move__custom_match_result_id,account.move,custom_match_result_id,internal,Not personal data - business record,,False
+pdp_account_move__custom_match_status,account.move,custom_match_status,internal,Not personal data - business record,,False
 pdp_account_move__custom_match_status,account.move,custom_match_status,internal,Not personal data - business record,,False
 pdp_account_move__custom_recurring_template_id,account.move,custom_recurring_template_id,internal,Not personal data - business record,,False
 pdp_account_move__date,account.move,date,internal,Not personal data - business record,,False
@@ -46,6 +48,7 @@ pdp_account_move__deferred_entry_type,account.move,deferred_entry_type,internal,
 pdp_account_move__deferred_origin_move_id,account.move,deferred_origin_move_id,internal,Not personal data - business record,,False
 pdp_account_move__delivery_date,account.move,delivery_date,internal,Not personal data - business record,,False
 pdp_account_move__fiscal_position_id,account.move,fiscal_position_id,internal,Not personal data - business record,,False
+pdp_account_move__hms_bill_id,account.move,hms_bill_id,internal,Not personal data - business record,"FK to the hospital bill that produced this journal entry. An id, not a diagnosis.",False
 pdp_account_move__id,account.move,id,internal,Not personal data - business record,,False
 pdp_account_move__inalterable_hash,account.move,inalterable_hash,secret,UU 27/2022 Art. 35 - kewajiban pelindungan; credential material,Credential or key material; never named in the extraction SELECT list.,False
 pdp_account_move__incoterm_location,account.move,incoterm_location,internal,Not personal data - business record,,False
@@ -62,13 +65,13 @@ pdp_account_move__invoice_user_id,account.move,invoice_user_id,internal,Not pers
 pdp_account_move__is_manually_modified,account.move,is_manually_modified,internal,Not personal data - business record,,False
 pdp_account_move__is_move_sent,account.move,is_move_sent,internal,Not personal data - business record,,False
 pdp_account_move__journal_id,account.move,journal_id,internal,Not personal data - business record,,False
-pdp_account_move__l10n_id_coretax_add_info_07,account.move,l10n_id_coretax_add_info_07,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
-pdp_account_move__l10n_id_coretax_add_info_08,account.move,l10n_id_coretax_add_info_08,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
-pdp_account_move__l10n_id_coretax_custom_doc,account.move,l10n_id_coretax_custom_doc,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
-pdp_account_move__l10n_id_coretax_custom_doc_month_year,account.move,l10n_id_coretax_custom_doc_month_year,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
-pdp_account_move__l10n_id_coretax_document,account.move,l10n_id_coretax_document,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
-pdp_account_move__l10n_id_coretax_facility_info_07,account.move,l10n_id_coretax_facility_info_07,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
-pdp_account_move__l10n_id_coretax_facility_info_08,account.move,l10n_id_coretax_facility_info_08,internal,Not personal data - business record,"Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.",False
+pdp_account_move__l10n_id_coretax_add_info_07,account.move,l10n_id_coretax_add_info_07,internal,Not personal data - business record,Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.,False
+pdp_account_move__l10n_id_coretax_add_info_08,account.move,l10n_id_coretax_add_info_08,internal,Not personal data - business record,Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.,False
+pdp_account_move__l10n_id_coretax_custom_doc,account.move,l10n_id_coretax_custom_doc,internal,Not personal data - business record,Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.,False
+pdp_account_move__l10n_id_coretax_custom_doc_month_year,account.move,l10n_id_coretax_custom_doc_month_year,internal,Not personal data - business record,Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.,False
+pdp_account_move__l10n_id_coretax_document,account.move,l10n_id_coretax_document,internal,Not personal data - business record,Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.,False
+pdp_account_move__l10n_id_coretax_facility_info_07,account.move,l10n_id_coretax_facility_info_07,internal,Not personal data - business record,Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.,False
+pdp_account_move__l10n_id_coretax_facility_info_08,account.move,l10n_id_coretax_facility_info_08,internal,Not personal data - business record,Metadata e-Faktur Coretax pada dokumen bisnis. Preseden: x_custom_coretax_* pada model yang sama.,False
 pdp_account_move__l10n_id_kode_transaksi,account.move,l10n_id_kode_transaksi,internal,Not personal data - business record,"Kode transaksi faktur pajak (01-09). Kode dokumen, bukan atribut orang.",False
 pdp_account_move__l10n_ou_analytic_id,account.move,l10n_ou_analytic_id,internal,Not personal data - business record,,False
 pdp_account_move__l10n_purchase_type,account.move,l10n_purchase_type,internal,Not personal data - business record,,False
@@ -112,7 +115,10 @@ pdp_account_move__write_uid,account.move,write_uid,internal,Not personal data - 
 pdp_account_move__x_custom_approval_request_id,account.move,x_custom_approval_request_id,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_approval_state,account.move,x_custom_approval_state,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_coretax_kode_status,account.move,x_custom_coretax_kode_status,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_coretax_kode_status,account.move,x_custom_coretax_kode_status,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_coretax_replaced_by_id,account.move,x_custom_coretax_replaced_by_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_coretax_replaced_by_id,account.move,x_custom_coretax_replaced_by_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_coretax_replacement_of_id,account.move,x_custom_coretax_replacement_of_id,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_coretax_replacement_of_id,account.move,x_custom_coretax_replacement_of_id,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_coretax_response_attach_id,account.move,x_custom_coretax_response_attach_id,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_coretax_status,account.move,x_custom_coretax_status,internal,Not personal data - business record,,False
@@ -121,7 +127,10 @@ pdp_account_move__x_custom_coretax_submission_uuid,account.move,x_custom_coretax
 pdp_account_move__x_custom_has_bukti_potong,account.move,x_custom_has_bukti_potong,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_has_faktur_pajak,account.move,x_custom_has_faktur_pajak,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_ic_mirror_id,account.move,x_custom_ic_mirror_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_ic_mirror_id,account.move,x_custom_ic_mirror_id,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_ic_rule_id,account.move,x_custom_ic_rule_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_ic_rule_id,account.move,x_custom_ic_rule_id,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_ic_source_id,account.move,x_custom_ic_source_id,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_ic_source_id,account.move,x_custom_ic_source_id,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_no_bukti_potong,account.move,x_custom_no_bukti_potong,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_nsfp,account.move,x_custom_nsfp,internal,Not personal data - business record,,False
@@ -136,6 +145,8 @@ pdp_account_move__x_custom_subscription_id,account.move,x_custom_subscription_id
 pdp_account_move__x_custom_tanggal_bukti_potong,account.move,x_custom_tanggal_bukti_potong,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_tanggal_faktur_pajak,account.move,x_custom_tanggal_faktur_pajak,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_total_withheld,account.move,x_custom_total_withheld,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_total_withheld,account.move,x_custom_total_withheld,internal,Not personal data - business record,,False
+pdp_account_move__x_custom_withholding_move_id,account.move,x_custom_withholding_move_id,internal,Not personal data - business record,,False
 pdp_account_move__x_custom_withholding_move_id,account.move,x_custom_withholding_move_id,internal,Not personal data - business record,,False
 pdp_account_move_line__account_id,account.move.line,account_id,internal,Not personal data - business record,,False
 pdp_account_move_line__amount_currency,account.move.line,amount_currency,internal,Not personal data - business record,,False
@@ -163,6 +174,7 @@ pdp_account_move_line__discount_amount_currency,account.move.line,discount_amoun
 pdp_account_move_line__discount_balance,account.move.line,discount_balance,internal,Not personal data - business record,,False
 pdp_account_move_line__discount_date,account.move.line,discount_date,internal,Not personal data - business record,,False
 pdp_account_move_line__display_type,account.move.line,display_type,internal,Not personal data - business record,,False
+pdp_account_move_line__expense_id,account.move.line,expense_id,internal,Not personal data - business record,,False
 pdp_account_move_line__expense_id,account.move.line,expense_id,internal,Not personal data - business record,,False
 pdp_account_move_line__extra_tax_data,account.move.line,extra_tax_data,internal,Not personal data - business record,,False
 pdp_account_move_line__full_reconcile_id,account.move.line,full_reconcile_id,internal,Not personal data - business record,,False
@@ -203,6 +215,8 @@ pdp_account_move_line__vehicle_id,account.move.line,vehicle_id,internal,Not pers
 pdp_account_move_line__write_date,account.move.line,write_date,internal,Not personal data - business record,,False
 pdp_account_move_line__write_uid,account.move.line,write_uid,internal,Not personal data - business record,,False
 pdp_account_move_line__x_custom_tax_label,account.move.line,x_custom_tax_label,internal,Not personal data - business record,,False
+pdp_account_move_line__x_custom_tax_label,account.move.line,x_custom_tax_label,internal,Not personal data - business record,,False
+pdp_account_move_line__x_custom_withholding_category_id,account.move.line,x_custom_withholding_category_id,internal,Not personal data - business record,,False
 pdp_account_move_line__x_custom_withholding_category_id,account.move.line,x_custom_withholding_category_id,internal,Not personal data - business record,,False
 pdp_mrp_bom__ndi_batch_standar_kg,mrp.bom,ndi_batch_standar_kg,internal,Not personal data - business record,NDI pasal 7: jejak formulasi berbasis persen di balik product_qty per batch.,False
 pdp_mrp_bom__ndi_formula_note,mrp.bom,ndi_formula_note,internal,Not personal data - business record,NDI pasal 7: jejak formulasi berbasis persen di balik product_qty per batch.,False
@@ -340,29 +354,74 @@ pdp_ppob_biller__write_date,ppob.biller,write_date,internal,Not personal data - 
 pdp_ppob_biller__write_uid,ppob.biller,write_uid,internal,Not personal data - business record,,False
 pdp_ppob_transaction__admin_fee,ppob.transaction,admin_fee,internal,Not personal data - business record,,False
 pdp_ppob_transaction__amount,ppob.transaction,amount,internal,Not personal data - business record,,False
+pdp_ppob_transaction__attempt_no,ppob.transaction,attempt_no,internal,Not personal data - business record,,False
 pdp_ppob_transaction__biller_id,ppob.transaction,biller_id,internal,Not personal data - business record,,False
 pdp_ppob_transaction__biller_reference,ppob.transaction,biller_reference,internal,Not personal data - business record,,False
+pdp_ppob_transaction__bucket_id,ppob.transaction,bucket_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__bucket_move_id,ppob.transaction,bucket_move_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__bucket_refund_move_id,ppob.transaction,bucket_refund_move_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__class_id,ppob.transaction,class_id,internal,Not personal data - business record,,False
 pdp_ppob_transaction__commission,ppob.transaction,commission,internal,Not personal data - business record,,False
 pdp_ppob_transaction__company_id,ppob.transaction,company_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__completed_at,ppob.transaction,completed_at,internal,Not personal data - business record,,False
+pdp_ppob_transaction__cost_price,ppob.transaction,cost_price,internal,Not personal data - business record,,False
 pdp_ppob_transaction__create_date,ppob.transaction,create_date,internal,Not personal data - business record,,False
 pdp_ppob_transaction__create_uid,ppob.transaction,create_uid,internal,Not personal data - business record,,False
 pdp_ppob_transaction__currency_id,ppob.transaction,currency_id,internal,Not personal data - business record,,False
 pdp_ppob_transaction__customer_name,ppob.transaction,customer_name,personal,UU 27/2022 Art. 4(2) - data pribadi umum,Direct identifier of a natural person; hashed at load so joins survive.,False
 pdp_ppob_transaction__customer_ref,ppob.transaction,customer_ref,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"Subscriber / meter number. Identifies a household and, joined to amount over time, its consumption pattern. Hashed at load - the digest still supports repeat-customer counts.",False
+pdp_ppob_transaction__digiflazz_ref_id,ppob.transaction,digiflazz_ref_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__dispatched_at,ppob.transaction,dispatched_at,internal,Not personal data - business record,,False
+pdp_ppob_transaction__dpp_amount,ppob.transaction,dpp_amount,internal,Not personal data - business record,,False
+pdp_ppob_transaction__dynamic_field,ppob.transaction,dynamic_field,internal,Not personal data - business record,,False
+pdp_ppob_transaction__engine_state,ppob.transaction,engine_state,internal,Not personal data - business record,,False
+pdp_ppob_transaction__error_code,ppob.transaction,error_code,internal,Not personal data - business record,"Provider error code, a fixed vocabulary - unlike error_message, which is free text.",False
+pdp_ppob_transaction__error_message,ppob.transaction,error_message,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,Free text from the provider; may echo subscriber details. Dropped to NULL at load.,True
 pdp_ppob_transaction__failure_reason,ppob.transaction,failure_reason,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,Free text from the biller; may echo subscriber details. Dropped to NULL at load.,True
 pdp_ppob_transaction__id,ppob.transaction,id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__idempotency_key,ppob.transaction,idempotency_key,internal,Not personal data - business record,,False
+pdp_ppob_transaction__inbound_source,ppob.transaction,inbound_source,internal,Not personal data - business record,,False
+pdp_ppob_transaction__inquiry_amount,ppob.transaction,inquiry_amount,internal,Not personal data - business record,,False
+pdp_ppob_transaction__inquiry_reference,ppob.transaction,inquiry_reference,internal,Not personal data - business record,,False
+pdp_ppob_transaction__margin,ppob.transaction,margin,internal,Not personal data - business record,,False
+pdp_ppob_transaction__mitra_id,ppob.transaction,mitra_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__move_id,ppob.transaction,move_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__msisdn,ppob.transaction,msisdn,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"Phone number, meter ID or account number the transaction targets - the same subscriber identifier as customer_ref, which this engine copies it into. Hashed at load so repeat-customer counts survive.",False
 pdp_ppob_transaction__name,ppob.transaction,name,internal,Not personal data - business record,,False
 pdp_ppob_transaction__operating_unit_id,ppob.transaction,operating_unit_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__oracle_msg016t_id,ppob.transaction,oracle_msg016t_id,internal,Not personal data - business record,,False
 pdp_ppob_transaction__partner_id,ppob.transaction,partner_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__pos_txn_id,ppob.transaction,pos_txn_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__ppn_amount,ppob.transaction,ppn_amount,internal,Not personal data - business record,,False
+pdp_ppob_transaction__ppob_product_id,ppob.transaction,ppob_product_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__pps_callback_attempts,ppob.transaction,pps_callback_attempts,internal,Not personal data - business record,,False
+pdp_ppob_transaction__pps_callback_state,ppob.transaction,pps_callback_state,internal,Not personal data - business record,,False
+pdp_ppob_transaction__pps_callback_url,ppob.transaction,pps_callback_url,secret,Credential material,Per-transaction callback URL; the path can carry a shared token. Never extracted.,False
+pdp_ppob_transaction__pps_last_callback_at,ppob.transaction,pps_last_callback_at,internal,Not personal data - business record,,False
+pdp_ppob_transaction__pps_produk,ppob.transaction,pps_produk,internal,Not personal data - business record,,False
+pdp_ppob_transaction__pps_serveridtrx,ppob.transaction,pps_serveridtrx,internal,Not personal data - business record,,False
 pdp_ppob_transaction__product_id,ppob.transaction,product_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__provider_id,ppob.transaction,provider_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__provider_latency_ms,ppob.transaction,provider_latency_ms,internal,Not personal data - business record,,False
+pdp_ppob_transaction__provider_ref,ppob.transaction,provider_ref,internal,Not personal data - business record,,False
+pdp_ppob_transaction__provider_sku,ppob.transaction,provider_sku,internal,Not personal data - business record,,False
+pdp_ppob_transaction__raw_response,ppob.transaction,raw_response,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,Verbatim provider payload. Free text: it echoes the subscriber identifier and whatever else the provider returns. Dropped to NULL at load.,True
 pdp_ppob_transaction__requested_at,ppob.transaction,requested_at,internal,Not personal data - business record,,False
+pdp_ppob_transaction__reverse_move_id,ppob.transaction,reverse_move_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__sell_price,ppob.transaction,sell_price,internal,Not personal data - business record,,False
+pdp_ppob_transaction__serial_token,ppob.transaction,serial_token,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,PLN token or similar serialised response - a bearer value worth money and useless for analysis. Dropped to NULL at load.,True
 pdp_ppob_transaction__settled_at,ppob.transaction,settled_at,internal,Not personal data - business record,,False
 pdp_ppob_transaction__sla_breached,ppob.transaction,sla_breached,internal,Not personal data - business record,,False
 pdp_ppob_transaction__sla_seconds,ppob.transaction,sla_seconds,internal,Not personal data - business record,,False
 pdp_ppob_transaction__state,ppob.transaction,state,internal,Not personal data - business record,,False
 pdp_ppob_transaction__total_amount,ppob.transaction,total_amount,internal,Not personal data - business record,,False
+pdp_ppob_transaction__vat_mode,ppob.transaction,vat_mode,internal,Not personal data - business record,,False
+pdp_ppob_transaction__wallet_id,ppob.transaction,wallet_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__wallet_move_id,ppob.transaction,wallet_move_id,internal,Not personal data - business record,,False
+pdp_ppob_transaction__wallet_refund_move_id,ppob.transaction,wallet_refund_move_id,internal,Not personal data - business record,,False
 pdp_ppob_transaction__write_date,ppob.transaction,write_date,internal,Not personal data - business record,,False
 pdp_ppob_transaction__write_uid,ppob.transaction,write_uid,internal,Not personal data - business record,,False
+pdp_ppob_transaction__x_custom_ppob_rollup_so_id,ppob.transaction,x_custom_ppob_rollup_so_id,internal,Not personal data - business record,,False
 pdp_product_pricelist__ndi_hj_level,product.pricelist,ndi_hj_level,internal,Not personal data - business record,"NDI pasal 13/22: nomor tingkat harga pricelist, kunci ir.rule kasir dan sumbu laporan.",False
 pdp_product_product__abc_class,product.product,abc_class,internal,Not personal data - business record,,False
 pdp_product_product__active,product.product,active,internal,Not personal data - business record,,False
@@ -409,6 +468,7 @@ pdp_product_template__available_threshold,product.template,available_threshold,i
 pdp_product_template__base_unit_count,product.template,base_unit_count,internal,Not personal data - business record,,False
 pdp_product_template__base_unit_id,product.template,base_unit_id,internal,Not personal data - business record,,False
 pdp_product_template__can_be_expensed,product.template,can_be_expensed,internal,Not personal data - business record,,False
+pdp_product_template__can_be_expensed,product.template,can_be_expensed,internal,Not personal data - business record,,False
 pdp_product_template__can_image_1024_be_zoomed,product.template,can_image_1024_be_zoomed,internal,Not personal data - business record,,False
 pdp_product_template__categ_id,product.template,categ_id,internal,Not personal data - business record,,False
 pdp_product_template__color,product.template,color,internal,Not personal data - business record,,False
@@ -432,12 +492,13 @@ pdp_product_template__hs_code,product.template,hs_code,internal,Not personal dat
 pdp_product_template__id,product.template,id,internal,Not personal data - business record,,False
 pdp_product_template__invoice_policy,product.template,invoice_policy,internal,Not personal data - business record,,False
 pdp_product_template__is_favorite,product.template,is_favorite,internal,Not personal data - business record,,False
+pdp_product_template__is_medicine,product.template,is_medicine,internal,Not personal data - business record,"Flags a product as a medicine. A product attribute, not a patient's; the patient link lives on the dispensing record, not here.",False
 pdp_product_template__is_published,product.template,is_published,internal,Not personal data - business record,,False
 pdp_product_template__is_rentable,product.template,is_rentable,internal,Not personal data - business record,,False
 pdp_product_template__is_rental_asset,product.template,is_rental_asset,internal,Not personal data - business record,,False
 pdp_product_template__is_seo_optimized,product.template,is_seo_optimized,internal,Not personal data - business record,,False
 pdp_product_template__is_storable,product.template,is_storable,internal,Not personal data - business record,,False
-pdp_product_template__l10n_id_product_code,product.template,l10n_id_product_code,internal,Not personal data - business record,"Kode klasifikasi barang/jasa untuk e-Faktur. Atribut produk.",False
+pdp_product_template__l10n_id_product_code,product.template,l10n_id_product_code,internal,Not personal data - business record,Kode klasifikasi barang/jasa untuk e-Faktur. Atribut produk.,False
 pdp_product_template__list_price,product.template,list_price,public,Not personal data - published to counterparties,,False
 pdp_product_template__lot_sequence_id,product.template,lot_sequence_id,internal,Not personal data - business record,,False
 pdp_product_template__lot_valuated,product.template,lot_valuated,internal,Not personal data - business record,,False
@@ -514,6 +575,7 @@ pdp_product_template__service_to_purchase,product.template,service_to_purchase,i
 pdp_product_template__service_tracking,product.template,service_tracking,internal,Not personal data - business record,,False
 pdp_product_template__service_type,product.template,service_type,internal,Not personal data - business record,,False
 pdp_product_template__service_upsell_threshold,product.template,service_upsell_threshold,internal,Not personal data - business record,,False
+pdp_product_template__service_upsell_threshold,product.template,service_upsell_threshold,internal,Not personal data - business record,,False
 pdp_product_template__show_availability,product.template,show_availability,internal,Not personal data - business record,,False
 pdp_product_template__task_template_id,product.template,task_template_id,internal,Not personal data - business record,,False
 pdp_product_template__to_weight,product.template,to_weight,internal,Not personal data - business record,,False
@@ -548,6 +610,7 @@ pdp_product_template__wms_units_per_package,product.template,wms_units_per_packa
 pdp_product_template__wms_volume_ccm,product.template,wms_volume_ccm,internal,Not personal data - business record,,False
 pdp_product_template__write_date,product.template,write_date,internal,Not personal data - business record,,False
 pdp_product_template__write_uid,product.template,write_uid,internal,Not personal data - business record,,False
+pdp_product_template__x_custom_withholding_category_id,product.template,x_custom_withholding_category_id,internal,Not personal data - business record,,False
 pdp_product_template__x_custom_withholding_category_id,product.template,x_custom_withholding_category_id,internal,Not personal data - business record,,False
 pdp_res_company__absence_management,res.company,absence_management,internal,Not personal data - business record,,False
 pdp_res_company__account_cash_basis_base_account_id,res.company,account_cash_basis_base_account_id,internal,Not personal data - business record,,False
@@ -780,9 +843,9 @@ pdp_res_partner__is_pickup_location,res.partner,is_pickup_location,internal,Not 
 pdp_res_partner__is_published,res.partner,is_published,internal,Not personal data - business record,,False
 pdp_res_partner__is_seo_optimized,res.partner,is_seo_optimized,internal,Not personal data - business record,,False
 pdp_res_partner__l10n_id_buyer_document_number,res.partner,l10n_id_buyer_document_number,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"Nomor dokumen identitas pembeli (paspor/identitas lain) untuk e-Faktur. Sejajar res.partner.vat: di-hash saat load, tidak di-NULL-kan supaya join lintas dokumen tetap hidup.",False
-pdp_res_partner__l10n_id_buyer_document_type,res.partner,l10n_id_buyer_document_type,internal,Not personal data - business record,"Jenis dokumen identitas (domain enum sangat kecil). Sengaja BUKAN personal: HMAC atas enum tiga nilai bukan masking - ia terbalik dalam tiga percobaan - sekaligus mematikan nilai analitiknya.",False
-pdp_res_partner__l10n_id_kode_transaksi,res.partner,l10n_id_kode_transaksi,internal,Not personal data - business record,"Kode transaksi faktur pajak default pelanggan. Atribut komersial.",False
-pdp_res_partner__l10n_id_nik,res.partner,l10n_id_nik,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"NIK. Preseden langsung: res.partner.vat (NPWP/NIK) sudah sensitive dan di-hash saat load.",False
+pdp_res_partner__l10n_id_buyer_document_type,res.partner,l10n_id_buyer_document_type,internal,Not personal data - business record,Jenis dokumen identitas (domain enum sangat kecil). Sengaja BUKAN personal: HMAC atas enum tiga nilai bukan masking - ia terbalik dalam tiga percobaan - sekaligus mematikan nilai analitiknya.,False
+pdp_res_partner__l10n_id_kode_transaksi,res.partner,l10n_id_kode_transaksi,internal,Not personal data - business record,Kode transaksi faktur pajak default pelanggan. Atribut komersial.,False
+pdp_res_partner__l10n_id_nik,res.partner,l10n_id_nik,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,NIK. Preseden langsung: res.partner.vat (NPWP/NIK) sudah sensitive dan di-hash saat load.,False
 pdp_res_partner__l10n_id_pkp,res.partner,l10n_id_pkp,internal,Not personal data - business record,"Status Pengusaha Kena Pajak. Status badan usaha, boolean.",False
 pdp_res_partner__l10n_id_tku,res.partner,l10n_id_tku,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,"Nomor Identitas Tempat Kegiatan Usaha, bagian dari identitas NPWP16 lawan transaksi. Diperlakukan sejajar res.partner.vat.",False
 pdp_res_partner__lang,res.partner,lang,internal,Not personal data - business record,,False
@@ -918,6 +981,7 @@ pdp_sale_order__currency_rate,sale.order,currency_rate,internal,Not personal dat
 pdp_sale_order__custom_affiliate_code,sale.order,custom_affiliate_code,internal,Not personal data - business record,,False
 pdp_sale_order__custom_affiliate_id,sale.order,custom_affiliate_id,internal,Not personal data - business record,,False
 pdp_sale_order__custom_credit_check_log_id,sale.order,custom_credit_check_log_id,internal,Not personal data - business record,,False
+pdp_sale_order__custom_credit_check_log_id,sale.order,custom_credit_check_log_id,internal,Not personal data - business record,,False
 pdp_sale_order__customizable_pdf_form_fields,sale.order,customizable_pdf_form_fields,internal,Not personal data - business record,,False
 pdp_sale_order__date_order,sale.order,date_order,internal,Not personal data - business record,,False
 pdp_sale_order__delivery_message,sale.order,delivery_message,internal,Not personal data - business record,,False
@@ -934,6 +998,7 @@ pdp_sale_order__medium_id,sale.order,medium_id,internal,Not personal data - busi
 pdp_sale_order__name,sale.order,name,internal,Not personal data - business record,,False
 pdp_sale_order__note,sale.order,note,sensitive,UU 27/2022 Art. 4(3) - data pribadi spesifik,Free text - may contain any category of personal data; dropped to NULL at load.,True
 pdp_sale_order__operating_unit_id,sale.order,operating_unit_id,internal,Not personal data - business record,,False
+pdp_sale_order__opportunity_id,sale.order,opportunity_id,internal,Not personal data - business record,,False
 pdp_sale_order__origin,sale.order,origin,internal,Not personal data - business record,,False
 pdp_sale_order__partner_id,sale.order,partner_id,internal,Not personal data - business record,,False
 pdp_sale_order__partner_invoice_id,sale.order,partner_invoice_id,internal,Not personal data - business record,,False
@@ -991,6 +1056,7 @@ pdp_sale_order_line__discount,sale.order.line,discount,internal,Not personal dat
 pdp_sale_order_line__display_type,sale.order.line,display_type,internal,Not personal data - business record,,False
 pdp_sale_order_line__extra_tax_data,sale.order.line,extra_tax_data,internal,Not personal data - business record,,False
 pdp_sale_order_line__has_displayed_warning_upsell,sale.order.line,has_displayed_warning_upsell,internal,Not personal data - business record,,False
+pdp_sale_order_line__has_displayed_warning_upsell,sale.order.line,has_displayed_warning_upsell,internal,Not personal data - business record,,False
 pdp_sale_order_line__id,sale.order.line,id,internal,Not personal data - business record,,False
 pdp_sale_order_line__invoice_status,sale.order.line,invoice_status,internal,Not personal data - business record,,False
 pdp_sale_order_line__is_delivery,sale.order.line,is_delivery,internal,Not personal data - business record,,False
@@ -1020,6 +1086,7 @@ pdp_sale_order_line__qty_delivered,sale.order.line,qty_delivered,internal,Not pe
 pdp_sale_order_line__qty_delivered_method,sale.order.line,qty_delivered_method,internal,Not personal data - business record,,False
 pdp_sale_order_line__qty_invoiced,sale.order.line,qty_invoiced,internal,Not personal data - business record,,False
 pdp_sale_order_line__qty_to_invoice,sale.order.line,qty_to_invoice,internal,Not personal data - business record,,False
+pdp_sale_order_line__remaining_hours,sale.order.line,remaining_hours,internal,Not personal data - business record,,False
 pdp_sale_order_line__remaining_hours,sale.order.line,remaining_hours,internal,Not personal data - business record,,False
 pdp_sale_order_line__salesman_id,sale.order.line,salesman_id,internal,Not personal data - business record,,False
 pdp_sale_order_line__sequence,sale.order.line,sequence,internal,Not personal data - business record,,False
@@ -1157,23 +1224,3 @@ pdp_stock_picking__x_custom_ppob_dp_invoice_id,stock.picking,x_custom_ppob_dp_in
 pdp_stock_picking__x_custom_ppob_transaction_id,stock.picking,x_custom_ppob_transaction_id,internal,Not personal data - business record,,False
 pdp_uom_uom__ndi_is_packaging,uom.uom,ndi_is_packaging,internal,Not personal data - business record,"NDI pasal 5: peran dan kedalaman satuan pada pohon UoM. Atribut kemasan, bukan data orang.",False
 pdp_uom_uom__ndi_tier,uom.uom,ndi_tier,internal,Not personal data - business record,"NDI pasal 5: peran dan kedalaman satuan pada pohon UoM. Atribut kemasan, bukan data orang.",False
-pdp_product_template__can_be_expensed,product.template,can_be_expensed,internal,Not personal data - business record,,False
-pdp_product_template__service_upsell_threshold,product.template,service_upsell_threshold,internal,Not personal data - business record,,False
-pdp_product_template__x_custom_withholding_category_id,product.template,x_custom_withholding_category_id,internal,Not personal data - business record,,False
-pdp_sale_order__custom_credit_check_log_id,sale.order,custom_credit_check_log_id,internal,Not personal data - business record,,False
-pdp_sale_order__opportunity_id,sale.order,opportunity_id,internal,Not personal data - business record,,False
-pdp_sale_order_line__has_displayed_warning_upsell,sale.order.line,has_displayed_warning_upsell,internal,Not personal data - business record,,False
-pdp_sale_order_line__remaining_hours,sale.order.line,remaining_hours,internal,Not personal data - business record,,False
-pdp_account_move__custom_match_result_id,account.move,custom_match_result_id,internal,Not personal data - business record,,False
-pdp_account_move__custom_match_status,account.move,custom_match_status,internal,Not personal data - business record,,False
-pdp_account_move__x_custom_coretax_kode_status,account.move,x_custom_coretax_kode_status,internal,Not personal data - business record,,False
-pdp_account_move__x_custom_coretax_replaced_by_id,account.move,x_custom_coretax_replaced_by_id,internal,Not personal data - business record,,False
-pdp_account_move__x_custom_coretax_replacement_of_id,account.move,x_custom_coretax_replacement_of_id,internal,Not personal data - business record,,False
-pdp_account_move__x_custom_ic_mirror_id,account.move,x_custom_ic_mirror_id,internal,Not personal data - business record,,False
-pdp_account_move__x_custom_ic_rule_id,account.move,x_custom_ic_rule_id,internal,Not personal data - business record,,False
-pdp_account_move__x_custom_ic_source_id,account.move,x_custom_ic_source_id,internal,Not personal data - business record,,False
-pdp_account_move__x_custom_total_withheld,account.move,x_custom_total_withheld,internal,Not personal data - business record,,False
-pdp_account_move__x_custom_withholding_move_id,account.move,x_custom_withholding_move_id,internal,Not personal data - business record,,False
-pdp_account_move_line__expense_id,account.move.line,expense_id,internal,Not personal data - business record,,False
-pdp_account_move_line__x_custom_tax_label,account.move.line,x_custom_tax_label,internal,Not personal data - business record,,False
-pdp_account_move_line__x_custom_withholding_category_id,account.move.line,x_custom_withholding_category_id,internal,Not personal data - business record,,False

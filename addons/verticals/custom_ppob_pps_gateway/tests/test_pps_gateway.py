@@ -271,7 +271,7 @@ class TestPpsGateway(HttpCase):
         p["signature"] = _md5(_md5(self.password) + p["user"] + p["product"] + notrx)
         r = self._post_json("/pps/direct-topup", p).json()
         self.assertEqual(r["Status"], "0", r)
-        txn = self.env["custom.ppob.transaction"].search(
+        txn = self.env["ppob.transaction"].search(
             [("mitra_id", "=", self.mitra.id), ("idempotency_key", "=", notrx)], limit=1
         )
         self.assertEqual(txn.dynamic_field, {"userid": "9630001"})
@@ -286,11 +286,11 @@ class TestPpsGateway(HttpCase):
         p = {"user": "ERAUSER", "produk": self.product.code, "mdn": "0812", "notrx": notrx}
         p["signature"] = _md5(p["mdn"] + p["produk"] + notrx + _md5(self.password))
         self._post_form("/pps/sell", p)
-        txn = self.env["custom.ppob.transaction"].search(
+        txn = self.env["ppob.transaction"].search(
             [("mitra_id", "=", self.mitra.id), ("idempotency_key", "=", notrx)], limit=1
         )
         self.assertEqual(txn.pps_callback_state, "pending")
-        self.env["custom.ppob.transaction"]._cron_pps_dispatch_callbacks()
+        self.env["ppob.transaction"]._cron_pps_dispatch_callbacks()
         txn.invalidate_recordset()
         self.assertEqual(txn.pps_callback_state, "sent")
         log = self.env["custom.ppob.pps.callback.log"].search([("transaction_id", "=", txn.id)])

@@ -2,8 +2,8 @@
 <odoo>
 
     <record id="view_ppob_transaction_form_digiflazz" model="ir.ui.view">
-        <field name="name">custom.ppob.transaction.form.digiflazz</field>
-        <field name="model">custom.ppob.transaction</field>
+        <field name="name">ppob.transaction.form.digiflazz</field>
+        <field name="model">ppob.transaction</field>
         <field name="inherit_id" ref="custom_ppob_sale.view_ppob_transaction_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='idempotency_key']" position="after">

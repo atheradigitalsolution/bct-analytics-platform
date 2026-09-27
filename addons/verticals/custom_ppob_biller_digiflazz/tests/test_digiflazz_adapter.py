@@ -144,10 +144,10 @@ class TestDigiflazzAdapter(TransactionCase):
     # ------------------------------------------------------------------
 
     def _make_txn(self, product=None, key="DF-1"):
-        return self.env["custom.ppob.transaction"].create(
+        return self.env["ppob.transaction"].create(
             {
                 "mitra_id": self.mitra.id,
-                "product_id": (product or self.product).id,
+                "ppob_product_id": (product or self.product).id,
                 "msisdn": "087800001233",
                 "sell_price": 5000.0,
                 "cost_price": 4900.0,
@@ -357,9 +357,9 @@ class TestDigiflazzAdapter(TransactionCase):
                 }
             }
         )
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         action = txn.action_retry()
-        clone = self.env["custom.ppob.transaction"].browse(action["res_id"])
+        clone = self.env["ppob.transaction"].browse(action["res_id"])
         self.assertFalse(clone.digiflazz_ref_id)
         self.assertNotEqual(clone.name, txn.name)
 
@@ -379,7 +379,7 @@ class TestDigiflazzAdapter(TransactionCase):
                 }
             }
         )
-        self.assertEqual(txn.state, "success")
+        self.assertEqual(txn.engine_state, "success")
         self.assertEqual(txn.serial_token, "TOKEN-1")
         self.assertTrue(txn.wallet_move_id)
         self.assertFalse(txn.wallet_refund_move_id)
@@ -396,7 +396,7 @@ class TestDigiflazzAdapter(TransactionCase):
                 }
             }
         )
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         self.assertTrue(txn.wallet_refund_move_id, "a confirmed failure must refund")
         self.assertEqual(txn.error_message, "produk gangguan")
 
@@ -414,7 +414,7 @@ class TestDigiflazzAdapter(TransactionCase):
                 }
             }
         )
-        self.assertEqual(txn.state, "in_progress")
+        self.assertEqual(txn.engine_state, "in_progress")
         self.assertFalse(txn.wallet_refund_move_id, "pending must NEVER refund")
         self.assertFalse(txn.completed_at)
 
@@ -432,12 +432,12 @@ class TestDigiflazzAdapter(TransactionCase):
                 }
             }
         )
-        self.assertEqual(txn.state, "in_progress")
+        self.assertEqual(txn.engine_state, "in_progress")
         self.assertFalse(txn.wallet_refund_move_id)
 
     def test_http_error_refunds(self):
         txn, _ = self._dispatch_with_reply({"message": "bad gateway"}, status_code=502)
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         self.assertEqual(txn.error_code, "HTTP502")
         self.assertTrue(txn.wallet_refund_move_id)
 
@@ -451,7 +451,7 @@ class TestDigiflazzAdapter(TransactionCase):
             side_effect=_requests.RequestException("boom"),
         ):
             txn._dispatch_one()
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         self.assertTrue(txn.wallet_refund_move_id)
 
     # ------------------------------------------------------------------
@@ -577,7 +577,7 @@ class TestDigiflazzAdapter(TransactionCase):
                 }
             }
         )
-        self.assertEqual(txn.state, "in_progress")
+        self.assertEqual(txn.engine_state, "in_progress")
         txn.dispatched_at = fields.Datetime.now() - timedelta(minutes=30)
         patcher, _captured = self._reply(
             {
@@ -590,8 +590,8 @@ class TestDigiflazzAdapter(TransactionCase):
             }
         )
         with patcher:
-            self.env["custom.ppob.transaction"]._cron_reap_stale_inprogress()
-        self.assertEqual(txn.state, "in_progress", "still-pending must survive the reaper")
+            self.env["ppob.transaction"]._cron_reap_stale_inprogress()
+        self.assertEqual(txn.engine_state, "in_progress", "still-pending must survive the reaper")
         self.assertFalse(txn.wallet_refund_move_id)
 
     def test_reaper_settles_a_transaction_that_completed_late(self):
@@ -618,8 +618,8 @@ class TestDigiflazzAdapter(TransactionCase):
             }
         )
         with patcher:
-            self.env["custom.ppob.transaction"]._cron_reap_stale_inprogress()
-        self.assertEqual(txn.state, "success")
+            self.env["ppob.transaction"]._cron_reap_stale_inprogress()
+        self.assertEqual(txn.engine_state, "success")
         self.assertEqual(txn.serial_token, "SN-LATE")
         self.assertFalse(txn.wallet_refund_move_id)
 
@@ -647,8 +647,8 @@ class TestDigiflazzAdapter(TransactionCase):
             }
         )
         with patcher:
-            self.env["custom.ppob.transaction"]._cron_reap_stale_inprogress()
-        self.assertEqual(txn.state, "timeout")
+            self.env["ppob.transaction"]._cron_reap_stale_inprogress()
+        self.assertEqual(txn.engine_state, "timeout")
         self.assertTrue(txn.wallet_refund_move_id, "a confirmed late failure must refund")
 
     # ------------------------------------------------------------------
@@ -690,7 +690,7 @@ class TestDigiflazzAdapter(TransactionCase):
         self.provider.digiflazz_username = False
         txn = self._make_txn(key="DF-NOCRED")
         txn._dispatch_one()
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         self.assertEqual(txn.error_code, "ADAPTER_EXC")
         self.assertTrue(txn.wallet_refund_move_id)
 

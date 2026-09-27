@@ -57,7 +57,7 @@ class PpobCommissionRule(models.Model):
             return False
         if self.class_id and self.class_id.id != transaction.class_id.id:
             return False
-        if self.product_id and self.product_id.id != transaction.product_id.id:
+        if self.product_id and self.product_id.id != transaction.ppob_product_id.id:
             return False
         if self.partner_id:
             if self.scope == "provider_to_us" and self.partner_id != transaction.provider_id.partner_id:

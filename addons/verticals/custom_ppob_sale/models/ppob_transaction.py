@@ -5,7 +5,8 @@ import time
 from datetime import timedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.addons.custom_ppob.models.ppob_transaction import PPOB_TRANSITIONS
+from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -14,21 +15,23 @@ PPN_RATE = 0.11
 
 
 class PpobTransaction(models.Model):
-    _name = "custom.ppob.transaction"
-    _description = "PPOB Transaction"
-    _order = "create_date desc, id desc"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    """The dispatch engine, layered onto the frozen ledger.
 
-    name = fields.Char(
-        required=True,
-        copy=False,
-        default=lambda self: self.env["ir.sequence"].next_by_code("custom.ppob.transaction") or "/",
-        tracking=True,
-    )
+    ``ppob.transaction`` is contract 05's table: the warehouse reads it, dbt
+    asserts its five states and its biller relationship. This module adds the
+    engine that fills it -- idempotency, provider dispatch, wallet and bucket
+    subledgers, PMK-63 margin VAT -- rather than keeping a second transaction
+    table beside it. ``engine_state`` carries the fine-grained lifecycle;
+    ``state`` stays the five-value contract column, written through the
+    ledger's own transition guard.
+    """
+
+    _name = "ppob.transaction"
+    _inherit = ["ppob.transaction", "mail.thread", "mail.activity.mixin"]
+
     mitra_id = fields.Many2one(
         comodel_name="res.partner",
         string="Mitra",
-        required=True,
         domain=[("x_custom_ppob_is_mitra", "=", True)],
         tracking=True,
     )
@@ -39,19 +42,20 @@ class PpobTransaction(models.Model):
         store=True,
         readonly=True,
     )
-    product_id = fields.Many2one(
+    ppob_product_id = fields.Many2one(
         comodel_name="custom.ppob.product",
-        string="Product",
-        required=True,
+        string="PPOB Product",
+        help="The catalogue entry the engine dispatches. The ledger's own "
+        "product_id stays a product.product so PPOB joins dim_product like "
+        "every other revenue line.",
     )
     class_id = fields.Many2one(
-        related="product_id.class_id",
+        related="ppob_product_id.class_id",
         store=True,
         readonly=True,
     )
     msisdn = fields.Char(
         string="MSISDN / Target",
-        required=True,
         help="Phone number, meter ID, account number.",
     )
     provider_id = fields.Many2one(
@@ -60,8 +64,8 @@ class PpobTransaction(models.Model):
         help="Resolved at dispatch from the SKU map when empty.",
     )
     provider_sku = fields.Char()
-    sell_price = fields.Monetary(currency_field="currency_id", required=True)
-    cost_price = fields.Monetary(currency_field="currency_id", required=True)
+    sell_price = fields.Monetary(currency_field="currency_id")
+    cost_price = fields.Monetary(currency_field="currency_id")
     margin = fields.Monetary(
         currency_field="currency_id",
         compute="_compute_margin",
@@ -87,7 +91,7 @@ class PpobTransaction(models.Model):
         compute="_compute_tax",
         store=True,
     )
-    state = fields.Selection(
+    engine_state = fields.Selection(
         selection=[
             ("pending", "Pending"),
             ("inquiry_ok", "Inquiry OK"),
@@ -101,8 +105,10 @@ class PpobTransaction(models.Model):
         required=True,
         tracking=True,
         index=True,
+        help="The dispatch lifecycle. Finer-grained than the ledger's five "
+        "contract states, which it drives through LEDGER_STATE.",
     )
-    idempotency_key = fields.Char(required=True, index=True, copy=False)
+    idempotency_key = fields.Char(index=True, copy=False)
     attempt_no = fields.Integer(default=1)
     provider_ref = fields.Char(copy=False, tracking=True)
     serial_token = fields.Char(help="For PLN token or similar serialised responses.")
@@ -135,16 +141,18 @@ class PpobTransaction(models.Model):
     )
     error_code = fields.Char(copy=False, tracking=True)
     error_message = fields.Char(copy=False, tracking=True)
-    currency_id = fields.Many2one(
-        comodel_name="res.currency",
-        default=lambda self: self.env.company.currency_id,
-        required=True,
-    )
-    company_id = fields.Many2one(
-        comodel_name="res.company",
-        default=lambda self: self.env.company,
-        required=True,
-    )
+    # currency_id and company_id come from the ledger, defined identically there.
+
+    #: engine lifecycle -> the five frozen ledger states (contract 05 / dbt).
+    LEDGER_STATE = {
+        "pending": "pending",
+        "inquiry_ok": "pending",
+        "in_progress": "pending",
+        "success": "success",
+        "failed": "failed",
+        "timeout": "failed",
+        "refunded": "reversed",
+    }
 
     _mitra_idempotency_uniq = models.Constraint(
         "unique(mitra_id, idempotency_key)",
@@ -196,18 +204,205 @@ class PpobTransaction(models.Model):
     # Defaults
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _is_engine_vals(vals):
+        """Is this row the dispatch engine's, or a plain ledger row?
+
+        The ledger also carries rows this engine never created -- the demo
+        seed, direct ledger entries -- and those must not acquire an
+        idempotency key, a derived biller or engine-shaped money.
+        """
+        return any(
+            vals.get(key) for key in ("mitra_id", "ppob_product_id", "msisdn", "sell_price")
+        )
+
     @api.model_create_multi
     def create(self, vals_list):
+        engine_rows = []
         for vals in vals_list:
+            if not self._is_engine_vals(vals):
+                continue
+            engine_rows.append(vals)
             if not vals.get("idempotency_key"):
                 vals["idempotency_key"] = (
-                    self.env["ir.sequence"].next_by_code("custom.ppob.transaction")
+                    self.env["ir.sequence"].next_by_code("ppob.transaction")
                     or self.env.cr.mogrify("%s", (fields.Datetime.now(),)).decode()
                 )
             if not vals.get("cost_price"):
-                product = self.env["custom.ppob.product"].browse(vals.get("product_id"))
+                product = self.env["custom.ppob.product"].browse(vals.get("ppob_product_id"))
                 vals["cost_price"] = product.cost_price_default if product else 0.0
-        return super().create(vals_list)
+            self._fill_ledger_vals(vals)
+        records = super().create(vals_list)
+        if engine_rows:
+            engine = records.filtered("idempotency_key")
+            engine._sync_ledger_money()
+            engine._sync_ledger_state()
+        return records
+
+    @api.constrains("idempotency_key", "mitra_id", "ppob_product_id", "msisdn")
+    def _check_engine_row_is_complete(self):
+        """A row the engine owns must carry what the engine needs.
+
+        These are NOT table-wide NOT NULL columns on purpose: ppob.transaction
+        is the ledger, and it also holds rows this engine never created -- the
+        demo seed, the POS bridge, the Oracle backfill. Requiring them at the
+        column level would make installing this module fail on any tenant that
+        already has ledger rows.
+        """
+        for txn in self:
+            if not txn.idempotency_key:
+                continue
+            missing = [
+                label
+                for label, value in (
+                    ("Mitra", txn.mitra_id),
+                    ("PPOB Product", txn.ppob_product_id),
+                    ("MSISDN / Target", txn.msisdn),
+                )
+                if not value
+            ]
+            if missing:
+                raise ValidationError(
+                    _("Engine transaction %(name)s is missing: %(fields)s.")
+                    % {"name": txn.name, "fields": ", ".join(missing)}
+                )
+
+    # ------------------------------------------------------------------
+    # The ledger bridge
+    #
+    # ppob.transaction is contract 05's table and dbt asserts its shape: five
+    # states, a not-null biller_id related to ppob_biller, a unique name. The
+    # engine's own vocabulary (mitra, sell price, msisdn, provider) is richer,
+    # so rather than keep a second transaction table beside the ledger, it
+    # fills the contract columns from its own as it goes.
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _fill_ledger_vals(self, vals):
+        """Derive the contract columns from the engine's vocabulary."""
+        if vals.get("mitra_id") and not vals.get("partner_id"):
+            vals["partner_id"] = vals["mitra_id"]
+        if vals.get("msisdn") and not vals.get("customer_ref"):
+            # Classified `sensitive` on the ledger, so it is hashed on the way
+            # to the warehouse and masked in the UI. msisdn carries exactly the
+            # same subscriber identifier and must not bypass that.
+            vals["customer_ref"] = vals["msisdn"]
+        if not vals.get("biller_id"):
+            product = self.env["custom.ppob.product"].browse(vals.get("ppob_product_id"))
+            biller = product._resolve_ledger_biller() if product else False
+            # biller_id is NOT NULL on the ledger and dbt asserts the
+            # relationship, so the engine must never leave it unresolved --
+            # a product without a class still gets the catch-all biller.
+            vals["biller_id"] = (biller or self._default_ledger_biller()).id
+        # Money, in the ledger's vocabulary: `amount` is the pass-through to
+        # the biller (our cost), `admin_fee` is what the mitra pays on top, and
+        # `commission` is the revenue taken out of that fee -- which for PPOB
+        # is the whole margin (mart_revenue_daily reads commission, never
+        # amount). total_amount is computed as amount + admin_fee, so it comes
+        # out equal to sell_price without being written.
+        if vals.get("sell_price") is not None and "amount" not in vals:
+            sell = vals.get("sell_price") or 0.0
+            cost = vals.get("cost_price") or 0.0
+            margin = max(sell - cost, 0.0)
+            vals["amount"] = cost
+            vals["admin_fee"] = margin
+            vals["commission"] = margin
+        return vals
+
+    @api.model
+    def _default_ledger_biller(self):
+        """The catch-all biller, created once, for rows no class maps."""
+        Biller = self.env["ppob.biller"].sudo()
+        biller = Biller.search(
+            [("code", "=", "OTHER"), ("company_id", "in", [False, self.env.company.id])],
+            limit=1,
+        )
+        return biller or Biller.create(
+            {
+                "name": "Other / Unmapped",
+                "code": "OTHER",
+                "category": "other",
+                "company_id": self.env.company.id,
+            }
+        )
+
+    def _sync_ledger_state(self):
+        """Walk the ledger to the state the engine lifecycle implies.
+
+        Every hop goes through write(), because the ledger refuses illegal
+        transitions there and that guard is exactly what lets the warehouse
+        trust the column. The engine does not always pass through every hop
+        itself -- the POS and Oracle bridges mirror transactions that are
+        already settled upstream -- so the walk takes the legal path
+        (draft -> pending -> success -> reversed) rather than jumping, which
+        would either be refused or, worse, need the guard relaxed.
+        """
+        for txn in self:
+            target = self.LEDGER_STATE.get(txn.engine_state)
+            if not target:
+                continue
+            for hop in self._ledger_path(txn.state, target):
+                super(PpobTransaction, txn).write({"state": hop})
+        return True
+
+    @api.model
+    def _ledger_path(self, current, target):
+        """Return the hops from `current` to `target`, or [] when already there.
+
+        Breadth-first over the ledger's own transition table, so the path can
+        never diverge from the guard it has to satisfy.
+        """
+        if current == target:
+            return []
+        seen = {current}
+        queue = [(current, [])]
+        while queue:
+            node, path = queue.pop(0)
+            for nxt in sorted(PPOB_TRANSITIONS.get(node, ())):
+                if nxt in seen:
+                    continue
+                if nxt == target:
+                    return path + [nxt]
+                seen.add(nxt)
+                queue.append((nxt, path + [nxt]))
+        raise UserError(
+            _("No legal PPOB state path from %(current)s to %(target)s.")
+            % {"current": current, "target": target}
+        )
+
+    def _sync_ledger_money(self):
+        """Mirror the engine's prices onto the contract columns.
+
+        `amount` is the pass-through cost and explicitly NOT revenue; the
+        revenue of a PPOB row is `commission` (mart_revenue_daily reads it that
+        way), which is the engine's margin, charged as `admin_fee`. The ledger
+        freezes these figures once a transaction is terminal, so this stops
+        there rather than fighting it.
+        """
+        for txn in self:
+            if txn.state in ("success", "failed", "reversed"):
+                continue
+            margin = max((txn.sell_price or 0.0) - (txn.cost_price or 0.0), 0.0)
+            values = {}
+            if txn.amount != txn.cost_price:
+                values["amount"] = txn.cost_price
+            if txn.admin_fee != margin:
+                values["admin_fee"] = margin
+            if txn.commission != margin:
+                values["commission"] = margin
+            if values:
+                super(PpobTransaction, txn).write(values)
+        return True
+
+    def write(self, vals):
+        res = super().write(vals)
+        if {"sell_price", "cost_price", "margin"} & set(vals):
+            self._sync_ledger_money()
+        if "engine_state" in vals:
+            # Money first: once the ledger state is terminal the figures freeze.
+            self._sync_ledger_money()
+            self._sync_ledger_state()
+        return res
 
     # ------------------------------------------------------------------
     # Routing & validation
@@ -220,7 +415,7 @@ class PpobTransaction(models.Model):
             sku = self.env["custom.ppob.provider.sku.map"].search(
                 [
                     ("provider_id", "=", self.provider_id.id),
-                    ("product_id", "=", self.product_id.id),
+                    ("product_id", "=", self.ppob_product_id.id),
                     ("active", "=", True),
                 ],
                 limit=1,
@@ -228,18 +423,21 @@ class PpobTransaction(models.Model):
             if sku:
                 return self.provider_id, sku
             raise UserError(
-                _("No SKU map for provider %s and product %s.") % (self.provider_id.code, self.product_id.code)
+                _("No SKU map for provider %s and product %s.")
+                % (self.provider_id.code, self.ppob_product_id.code)
             )
         candidates = self.env["custom.ppob.provider.sku.map"].search(
             [
-                ("product_id", "=", self.product_id.id),
+                ("product_id", "=", self.ppob_product_id.id),
                 ("active", "=", True),
                 ("provider_id.status", "=", "active"),
             ],
             order="priority asc, id asc",
         )
         if not candidates:
-            raise UserError(_("No active provider route for product %s.") % self.product_id.code)
+            raise UserError(
+                _("No active provider route for product %s.") % self.ppob_product_id.code
+            )
         chosen = candidates[0]
         return chosen.provider_id, chosen
 
@@ -253,13 +451,13 @@ class PpobTransaction(models.Model):
             return
         today = fields.Date.context_today(self)
         month_start = today.replace(day=1)
-        Txn = self.env["custom.ppob.transaction"]
+        Txn = self.env["ppob.transaction"]
         if daily_cap:
             daily = sum(
                 Txn.search(
                     [
                         ("mitra_id", "=", mitra.id),
-                        ("state", "in", ["success", "in_progress"]),
+                        ("engine_state", "in", ["success", "in_progress"]),
                         ("dispatched_at", ">=", fields.Datetime.to_datetime(today)),
                     ]
                 ).mapped("sell_price")
@@ -271,7 +469,7 @@ class PpobTransaction(models.Model):
                 Txn.search(
                     [
                         ("mitra_id", "=", mitra.id),
-                        ("state", "in", ["success", "in_progress"]),
+                        ("engine_state", "in", ["success", "in_progress"]),
                         ("dispatched_at", ">=", fields.Datetime.to_datetime(month_start)),
                     ]
                 ).mapped("sell_price")
@@ -291,7 +489,7 @@ class PpobTransaction(models.Model):
         side (DP-100% is provider/purchase-side only).
         """
         self.ensure_one()
-        return self.product_id._get_revenue_account()
+        return self.ppob_product_id._get_revenue_account()
 
     def _get_ppn_account(self):
         """Resolve the Output VAT (PPN Keluaran) account by role mapping,
@@ -329,8 +527,11 @@ class PpobTransaction(models.Model):
 
     def _dispatch_one(self):
         self.ensure_one()
-        if self.state not in ("pending", "inquiry_ok"):
-            raise UserError(_("Transaction %s is already %s; cannot dispatch.") % (self.name, self.state))
+        if self.engine_state not in ("pending", "inquiry_ok"):
+            raise UserError(
+                _("Transaction %s is already %s; cannot dispatch.")
+                % (self.name, self.engine_state)
+            )
         self._check_caps()
 
         provider, sku_line = self._resolve_provider()
@@ -347,7 +548,7 @@ class PpobTransaction(models.Model):
                     "provider %s / product %s has buy_price=0 and the transaction "
                     "was created without a default cost."
                 )
-                % (self.name, provider.code, self.product_id.code)
+                % (self.name, provider.code, self.ppob_product_id.code)
             )
         self.write(
             {
@@ -374,12 +575,12 @@ class PpobTransaction(models.Model):
 
         # 2. Debit provider bucket (prepaid only).
         if provider.settlement_mode == "prepaid_deposit":
-            bucket = provider._resolve_bucket_for(self.product_id)
+            bucket = provider._resolve_bucket_for(self.ppob_product_id)
             self.bucket_id = bucket.id
             bucket_move = bucket._atomic_debit(
                 amount=self.cost_price,
                 reason=f"Sale {self.name}",
-                counterpart_account=self.product_id._get_cogs_account(),
+                counterpart_account=self.ppob_product_id._get_cogs_account(),
                 move_type="usage",
                 ppob_transaction_id=self.id,
             )
@@ -400,7 +601,7 @@ class PpobTransaction(models.Model):
         # recognised at the daily rollup faktur, not per transaction.
         self.write(
             {
-                "state": "in_progress",
+                "engine_state": "in_progress",
                 "dispatched_at": fields.Datetime.now(),
             }
         )
@@ -414,7 +615,7 @@ class PpobTransaction(models.Model):
         adapter = provider._get_adapter()
         t0 = time.monotonic()
         try:
-            if self.product_id.inquiry_required and self.state == "pending":
+            if self.ppob_product_id.inquiry_required and self.engine_state == "pending":
                 result = adapter.inquiry(self)
             else:
                 result = adapter.pay(self)
@@ -454,7 +655,7 @@ class PpobTransaction(models.Model):
         self.ensure_one()
         self.write(
             {
-                "state": "success",
+                "engine_state": "success",
                 "provider_ref": provider_ref,
                 "serial_token": serial_token,
                 "completed_at": fields.Datetime.now(),
@@ -474,7 +675,7 @@ class PpobTransaction(models.Model):
             }
         )
         self._refund_subledgers()
-        self.state = "failed"
+        self.engine_state = "failed"
         return False
 
     def _refund_subledgers(self):
@@ -502,7 +703,7 @@ class PpobTransaction(models.Model):
                 dpp_amount=self.cost_price,
                 tax_amount=0.0,
                 reason=f"Refund {self.name}",
-                counterpart_account=self.product_id._get_cogs_account(),
+                counterpart_account=self.ppob_product_id._get_cogs_account(),
                 move_type="refund",
                 ppob_transaction_id=self.id,
             )
@@ -511,18 +712,18 @@ class PpobTransaction(models.Model):
     def action_confirm_inquiry(self):
         """After a successful inquiry, transition pending -> inquiry_ok."""
         for txn in self:
-            if txn.state != "pending":
+            if txn.engine_state != "pending":
                 continue
-            txn.state = "inquiry_ok"
+            txn.engine_state = "inquiry_ok"
         return True
 
     def action_mark_refunded(self):
         """Manual refund action for ops, after confirming with provider."""
         for txn in self:
-            if txn.state not in ("failed", "timeout"):
+            if txn.engine_state not in ("failed", "timeout"):
                 raise UserError(_("Only failed/timeout transactions can be manually refunded."))
             txn._refund_subledgers()
-            txn.state = "refunded"
+            txn.engine_state = "refunded"
         return True
 
     def action_retry(self):
@@ -532,7 +733,7 @@ class PpobTransaction(models.Model):
             {
                 "idempotency_key": f"{self.idempotency_key}/R{self.attempt_no + 1}",
                 "attempt_no": self.attempt_no + 1,
-                "state": "pending",
+                "engine_state": "pending",
                 "provider_ref": False,
                 "serial_token": False,
                 "raw_response": False,
@@ -551,7 +752,7 @@ class PpobTransaction(models.Model):
         )
         return {
             "type": "ir.actions.act_window",
-            "res_model": "custom.ppob.transaction",
+            "res_model": "ppob.transaction",
             "res_id": clone.id,
             "view_mode": "form",
         }
@@ -576,11 +777,11 @@ class PpobTransaction(models.Model):
         coarse_cutoff = now - timedelta(minutes=1)
         candidates = self.search(
             [
-                ("state", "=", "in_progress"),
+                ("engine_state", "=", "in_progress"),
                 ("dispatched_at", "<", coarse_cutoff),
             ]
         )
-        stale = self.env["custom.ppob.transaction"]
+        stale = self.env["ppob.transaction"]
         for txn in candidates:
             if stale_minutes is not None:
                 threshold = max(int(stale_minutes), 1)
@@ -635,4 +836,4 @@ class PpobTransaction(models.Model):
                     }
                 )
                 txn._refund_subledgers()
-                txn.state = "timeout"
+                txn.engine_state = "timeout"

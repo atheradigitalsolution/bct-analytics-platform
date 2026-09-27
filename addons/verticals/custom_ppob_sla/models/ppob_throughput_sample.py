@@ -3,7 +3,7 @@
 
 One table holds BOTH sides of the parallel run: ``source=oracle`` rows imported
 from the legacy MSG016T history, and ``source=odoo`` rows sampled from
-``custom.ppob.transaction`` by the hourly cron. Parity checking during WS-8 is
+``ppob.transaction`` by the hourly cron. Parity checking during WS-8 is
 then a pivot over one model rather than a bespoke comparison harness.
 
 Sampling is raw SQL for read_group's sake -- per-second peak and p95 percentile
@@ -40,7 +40,7 @@ class PpobThroughputSample(models.Model):
         readonly=True,
         help="Which system produced this traffic. 'oracle' rows are imported "
         "from the legacy MSG016T history to establish the D4 baseline; "
-        "'odoo' rows are sampled from custom.ppob.transaction.",
+        "'odoo' rows are sampled from ppob.transaction.",
     )
     provider_id = fields.Many2one(
         comodel_name="custom.ppob.provider",
@@ -218,7 +218,7 @@ class PpobThroughputSample(models.Model):
 
     @api.model
     def _sample_hour(self, bucket_start):
-        """Sample one complete hour of custom.ppob.transaction into rows.
+        """Sample one complete hour of ppob.transaction into rows.
 
         Buckets on ``dispatched_at``: a transaction only loads the provider once
         dispatched, and pending rows never touched one. Transactions still
@@ -239,7 +239,7 @@ class PpobThroughputSample(models.Model):
                 SELECT provider_id, class_id, company_id, state, sell_price,
                        provider_latency_ms,
                        date_trunc('second', dispatched_at) AS sec
-                  FROM custom_ppob_transaction
+                  FROM ppob_transaction
                  WHERE dispatched_at >= %(start)s
                    AND dispatched_at <  %(end)s
             ),

@@ -113,10 +113,10 @@ class TestPpobSale(TransactionCase):
         return provider
 
     def _make_txn(self, provider=None, sell=5000.0, key=None):
-        return self.env["custom.ppob.transaction"].create(
+        return self.env["ppob.transaction"].create(
             {
                 "mitra_id": self.mitra.id,
-                "product_id": self.product.id,
+                "ppob_product_id": self.product.id,
                 "msisdn": "081200000000",
                 "provider_id": provider.id if provider else False,
                 "sell_price": sell,
@@ -136,7 +136,7 @@ class TestPpobSale(TransactionCase):
         txn = self._make_txn(provider, key="K-OK")
         txn.action_dispatch()
 
-        self.assertEqual(txn.state, "success")
+        self.assertEqual(txn.engine_state, "success")
         self.assertTrue(txn.provider_ref)
         self.assertAlmostEqual(self.wallet.balance, wallet_before - 5000.0, places=2)
         self.assertAlmostEqual(provider.bucket_ids.balance, bucket_before - 4900.0, places=2)
@@ -167,7 +167,7 @@ class TestPpobSale(TransactionCase):
         txn = self._make_txn(provider, key="K-FAIL")
         txn.action_dispatch()
 
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         # Wallet + bucket restored to pre-dispatch balances (net zero).
         self.assertAlmostEqual(self.wallet.balance, wallet_before, places=2)
         self.assertAlmostEqual(provider.bucket_ids.balance, bucket_before, places=2)
@@ -228,10 +228,10 @@ class TestPpobSale(TransactionCase):
                 "denom": sell,
             }
         )
-        return self.env["custom.ppob.transaction"].create(
+        return self.env["ppob.transaction"].create(
             {
                 "mitra_id": self.mitra.id,
-                "product_id": product.id,
+                "ppob_product_id": product.id,
                 "msisdn": "08120000",
                 "sell_price": sell,
                 "cost_price": cost,
@@ -267,10 +267,10 @@ class TestPpobSale(TransactionCase):
         provider = self._make_provider("SALE_RETRY", mock_outcome="fail")
         txn = self._make_txn(provider, key="K-RETRY")
         txn.action_dispatch()
-        self.assertEqual(txn.state, "failed")
+        self.assertEqual(txn.engine_state, "failed")
         action = txn.action_retry()
-        clone = self.env["custom.ppob.transaction"].browse(action["res_id"])
-        self.assertEqual(clone.state, "pending")
+        clone = self.env["ppob.transaction"].browse(action["res_id"])
+        self.assertEqual(clone.engine_state, "pending")
         self.assertEqual(clone.attempt_no, txn.attempt_no + 1)
         self.assertIn("/R", clone.idempotency_key)
 
@@ -282,16 +282,23 @@ class TestPpobSale(TransactionCase):
         provider = self._make_provider("SALE_REAP_OK")
         txn = self._make_txn(provider, key="K-REAP-OK")
         txn.action_dispatch()
-        # Force it back to in_progress + old dispatch time to look stale.
-        txn.write({"state": "in_progress"})
-        self.env.flush_all()  # persist state before the reaper's search
+        # Rewind to a stale in-progress dispatch. Raw SQL on purpose: the
+        # ledger legitimately refuses success -> pending, and the subject here
+        # is the reaper, not the state machine that guards it.
+        self.env.flush_all()
         self.env.cr.execute(
-            "UPDATE custom_ppob_transaction SET dispatched_at = now() - interval '1 hour' WHERE id = %s",
+            "UPDATE ppob_transaction SET engine_state = 'in_progress', "
+            "state = 'pending' WHERE id = %s",
+            (txn.id,),
+        )
+        txn.invalidate_recordset(["engine_state", "state"])
+        self.env.cr.execute(
+            "UPDATE ppob_transaction SET dispatched_at = now() - interval '1 hour' WHERE id = %s",
             (txn.id,),
         )
         txn.invalidate_recordset(["dispatched_at"])
-        self.env["custom.ppob.transaction"]._cron_reap_stale_inprogress()
-        self.assertEqual(txn.state, "success")  # mock status() confirms success
+        self.env["ppob.transaction"]._cron_reap_stale_inprogress()
+        self.assertEqual(txn.engine_state, "success")  # mock status() confirms success
 
     def test_reaper_status_fail_refunds_and_timeouts(self):
         provider = self._make_provider("SALE_REAP_FAIL", adapter="ppob_test_statusfail")
@@ -299,16 +306,23 @@ class TestPpobSale(TransactionCase):
         bucket_before = provider.bucket_ids.balance
         txn = self._make_txn(provider, key="K-REAP-FAIL")
         txn.action_dispatch()  # pay ok -> in_progress -> success (pay ok=True) ...
-        # pay() ok=True marks success; force in_progress to test the reaper path.
-        txn.write({"state": "in_progress", "wallet_refund_move_id": False, "bucket_refund_move_id": False})
-        self.env.flush_all()  # persist state before the reaper's search
+        # pay() ok=True marks success; rewind to in_progress to exercise the
+        # reaper. Raw SQL for the state, same reason as above.
+        txn.write({"wallet_refund_move_id": False, "bucket_refund_move_id": False})
+        self.env.flush_all()
         self.env.cr.execute(
-            "UPDATE custom_ppob_transaction SET dispatched_at = now() - interval '1 hour' WHERE id = %s",
+            "UPDATE ppob_transaction SET engine_state = 'in_progress', "
+            "state = 'pending' WHERE id = %s",
+            (txn.id,),
+        )
+        txn.invalidate_recordset(["engine_state", "state"])
+        self.env.cr.execute(
+            "UPDATE ppob_transaction SET dispatched_at = now() - interval '1 hour' WHERE id = %s",
             (txn.id,),
         )
         txn.invalidate_recordset(["dispatched_at"])
-        self.env["custom.ppob.transaction"]._cron_reap_stale_inprogress()
-        self.assertEqual(txn.state, "timeout")
+        self.env["ppob.transaction"]._cron_reap_stale_inprogress()
+        self.assertEqual(txn.engine_state, "timeout")
         # Status confirmed failure -> subledgers refunded.
         self.assertAlmostEqual(self.wallet.balance, wallet_before, places=2)
         self.assertAlmostEqual(provider.bucket_ids.balance, bucket_before, places=2)

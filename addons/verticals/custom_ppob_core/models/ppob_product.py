@@ -60,6 +60,49 @@ class PpobProduct(models.Model):
         "PPOB product code must be unique.",
     )
 
+    #: product class code -> ppob.biller category. The ledger's category is a
+    #: required Selection and dbt joins dim_biller on it, so an unmapped class
+    #: lands in `other` rather than blocking a dispatch.
+    LEDGER_BILLER_CATEGORY = {
+        "TELKO": "telco",
+        "PLN": "electricity",
+        "PDAM": "water",
+        "INTERNET": "internet",
+        "BPJS": "insurance",
+        "MULTIFINANCE": "multifinance",
+        "PAJAK": "tax",
+    }
+
+    def _resolve_ledger_biller(self):
+        """Return (creating if needed) the ppob.biller this product bills through.
+
+        ``ppob.transaction.biller_id`` is required and dbt asserts the
+        relationship to stg_ppob_biller, so every engine transaction needs one.
+        The engine routes by provider and SKU, not by biller, so the biller is
+        derived from the product class -- one biller per class, which is the
+        grain dim_biller is meant to have.
+        """
+        self.ensure_one()
+        klass = self.class_id
+        if not klass:
+            return self.env["ppob.biller"]
+        Biller = self.env["ppob.biller"].sudo()
+        code = (klass.code or "OTHER").upper()
+        biller = Biller.search(
+            [("code", "=", code), ("company_id", "in", [False, self.env.company.id])],
+            limit=1,
+        )
+        if biller:
+            return biller
+        return Biller.create(
+            {
+                "name": klass.name or code,
+                "code": code,
+                "category": self.LEDGER_BILLER_CATEGORY.get(code, "other"),
+                "company_id": self.env.company.id,
+            }
+        )
+
     def _get_revenue_account(self):
         self.ensure_one()
         return self.revenue_account_id or self.class_id.default_revenue_account_id

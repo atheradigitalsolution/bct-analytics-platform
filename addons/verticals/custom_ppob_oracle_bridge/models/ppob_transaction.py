@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Extend custom.ppob.transaction for Oracle Bridge mode.
+"""Extend ppob.transaction for Oracle Bridge mode.
 
 Adds oracle_msg016t_id + inbound_source, overrides _dispatch_one to short-circuit
 oracle_bridge providers (skipping native wallet/bucket debit -- Oracle owns
@@ -27,7 +27,7 @@ _logger = logging.getLogger(__name__)
 
 
 class PpobTransaction(models.Model):
-    _inherit = "custom.ppob.transaction"
+    _inherit = "ppob.transaction"
 
     oracle_msg016t_id = fields.Integer(
         string="Oracle MSG016T ID",
@@ -88,7 +88,7 @@ class PpobTransaction(models.Model):
                 msg016t_id = 0
             self.write(
                 {
-                    "state": "in_progress",
+                    "engine_state": "in_progress",
                     "provider_ref": result.provider_ref,
                     "oracle_msg016t_id": msg016t_id,
                 }
@@ -98,7 +98,7 @@ class PpobTransaction(models.Model):
         # Failure on dispatch -- no Odoo-side debit happened, so no refund.
         self.write(
             {
-                "state": "failed",
+                "engine_state": "failed",
                 "error_code": result.error_code or "ORACLE_FAIL",
                 "error_message": result.error_message or "Oracle SP returned error",
                 "completed_at": fields.Datetime.now(),
@@ -118,7 +118,7 @@ class PpobTransaction(models.Model):
             return
         txns = self.search(
             [
-                ("state", "=", "in_progress"),
+                ("engine_state", "=", "in_progress"),
                 ("provider_id.bridge_mode", "=", "oracle_bridge"),
                 ("oracle_msg016t_id", "!=", 0),
                 ("oracle_msg016t_id", "!=", False),
@@ -302,7 +302,7 @@ class PpobTransaction(models.Model):
         odoo_state = ORACLE_STATUS_MAP.get(status, "in_progress")
         vals = {
             "mitra_id": member_map.partner_id.id,
-            "product_id": sku_map.product_id.id,
+            "ppob_product_id": sku_map.product_id.id,
             "provider_id": sku_map.provider_id.id,
             "provider_sku": sku_map.provider_sku,
             "idempotency_key": idem_key,
@@ -312,7 +312,7 @@ class PpobTransaction(models.Model):
             "msisdn": msisdn or "",
             "sell_price": float(sales_price or 0),
             "cost_price": float(sku_map.buy_price or sales_price or 0),
-            "state": odoo_state,
+            "engine_state": odoo_state,
         }
         if odoo_state in ("success", "failed"):
             vals["completed_at"] = fields.Datetime.now()

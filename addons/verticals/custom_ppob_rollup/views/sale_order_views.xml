@@ -10,7 +10,7 @@
                 <group string="PPOB Rollup" invisible="not x_custom_ppob_is_rollup">
                     <field name="x_custom_ppob_is_rollup" readonly="1"/>
                     <field name="x_custom_ppob_rollup_date" readonly="1"/>
-                    <field name="x_custom_ppob_transaction_count" readonly="1"/>
+                    <field name="x_ppob_transaction_count" readonly="1"/>
                     <button name="action_open_rolled_up" type="object"
                             string="View Rolled-up Transactions"
                             icon="fa-list"/>

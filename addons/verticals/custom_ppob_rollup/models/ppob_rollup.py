@@ -26,12 +26,12 @@ class PpobRollup(models.AbstractModel):
         if isinstance(rollup_date, str):
             rollup_date = fields.Date.from_string(rollup_date)
 
-        Txn = self.env["custom.ppob.transaction"]
+        Txn = self.env["ppob.transaction"]
         day_start = datetime.combine(rollup_date, time(0, 0, 0))
         day_end = datetime.combine(rollup_date + timedelta(days=1), time(0, 0, 0))
         pending = Txn.search(
             [
-                ("state", "=", "success"),
+                ("engine_state", "=", "success"),
                 ("x_custom_ppob_rollup_so_id", "=", False),
                 ("completed_at", ">=", day_start),
                 ("completed_at", "<", day_end),
@@ -41,7 +41,7 @@ class PpobRollup(models.AbstractModel):
             _logger.info("PPOB rollup %s: nothing to do", rollup_date)
             return 0
 
-        grouped = defaultdict(lambda: self.env["custom.ppob.transaction"])
+        grouped = defaultdict(lambda: self.env["ppob.transaction"])
         for t in pending:
             grouped[t.mitra_id.id] |= t
 
@@ -57,14 +57,14 @@ class PpobRollup(models.AbstractModel):
         return created
 
     def _create_rollup_so(self, mitra, txns, rollup_date):
-        """Build one sale.order grouping txns by (product_id, sell_price)."""
+        """Build one sale.order grouping txns by (ppob_product_id, sell_price)."""
         SaleOrder = self.env["sale.order"]
         lines_by_key = defaultdict(lambda: {"qty": 0.0, "price": 0.0, "product": None})
         for t in txns:
-            key = (t.product_id.id, t.sell_price)
+            key = (t.ppob_product_id.id, t.sell_price)
             lines_by_key[key]["qty"] += 1
             lines_by_key[key]["price"] = t.sell_price
-            lines_by_key[key]["product"] = t.product_id
+            lines_by_key[key]["product"] = t.ppob_product_id
         order_line = []
         for (_pid, _price), agg in lines_by_key.items():
             odoo_product = self._ensure_odoo_product(agg["product"])

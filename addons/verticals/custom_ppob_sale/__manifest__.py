@@ -6,7 +6,7 @@
     "description": """
 Custom PPOB Suite - Sale / Transaction
 ======================================
-Transactional core for the PPOB vertical. Holds ``custom.ppob.transaction`` with
+Transactional core for the PPOB vertical. Holds ``ppob.transaction`` with
 a state machine:
 
     pending -> inquiry_ok -> in_progress -> success / failed / timeout / refunded
@@ -31,6 +31,7 @@ transactions by calling the provider adapter's ``status()`` before refunding
     "version": "19.0.1.0.0",
     "license": "LGPL-3",
     "depends": [
+        "custom_ppob",
         "custom_ppob_provider",
         "custom_pph_witholding",
         "custom_coretax_bupot",

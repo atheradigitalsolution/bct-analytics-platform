@@ -2,8 +2,8 @@
 <odoo>
 
     <record id="view_ppob_transaction_form_oracle" model="ir.ui.view">
-        <field name="name">custom.ppob.transaction.form.oracle</field>
-        <field name="model">custom.ppob.transaction</field>
+        <field name="name">ppob.transaction.form.oracle</field>
+        <field name="model">ppob.transaction</field>
         <field name="inherit_id" ref="custom_ppob_sale.view_ppob_transaction_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='provider_ref']" position="after">
@@ -14,8 +14,8 @@
     </record>
 
     <record id="view_ppob_transaction_list_oracle" model="ir.ui.view">
-        <field name="name">custom.ppob.transaction.list.oracle</field>
-        <field name="model">custom.ppob.transaction</field>
+        <field name="name">ppob.transaction.list.oracle</field>
+        <field name="model">ppob.transaction</field>
         <field name="inherit_id" ref="custom_ppob_sale.view_ppob_transaction_list"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='state']" position="after">
@@ -27,8 +27,8 @@
     </record>
 
     <record id="view_ppob_transaction_search_oracle" model="ir.ui.view">
-        <field name="name">custom.ppob.transaction.search.oracle</field>
-        <field name="model">custom.ppob.transaction</field>
+        <field name="name">ppob.transaction.search.oracle</field>
+        <field name="model">ppob.transaction</field>
         <field name="inherit_id" ref="custom_ppob_sale.view_ppob_transaction_search"/>
         <field name="arch" type="xml">
             <xpath expr="//search" position="inside">

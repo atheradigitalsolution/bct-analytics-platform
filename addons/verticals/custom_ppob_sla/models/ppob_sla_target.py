@@ -128,7 +128,7 @@ class PpobSlaTarget(models.Model):
         string="p95 Latency (ms)",
         default=3000,
         required=True,
-        help="95th-percentile adapter round-trip budget. Measured against custom.ppob.transaction.provider_latency_ms.",
+        help="95th-percentile adapter round-trip budget. Measured against ppob.transaction.provider_latency_ms.",
     )
     timeout_s_target = fields.Integer(
         string="Adapter Timeout (s)",
