@@ -1,6 +1,8 @@
 # Rencana Konsolidasi Mesin Withholding PPh — analisis 2026-09-27
 
-Status: **ANALISIS + RENCANA. Belum dieksekusi.** Dibuat atas permintaan review
+Status: **Langkah 1–3 & 5a DIEKSEKUSI 2026-09-27** (lihat §7). Sisanya —
+memensiunkan model withholding `custom_tax_id` dan memperbaiki salah eja —
+masih rencana. Dibuat atas permintaan review
 konsolidasi modul (`docs/module-consolidation-review.md` §3.2).
 
 ## 1. Apa yang duplikat
@@ -105,3 +107,63 @@ keputusan konsolidasi: selama registri kosong, kepatuhan PPh di expomedia
 bergantung pada proses manual yang tidak terlihat di sistem. Konsolidasi
 strukturnya (langkah 3–6) bisa menyusul tanpa tekanan waktu, karena tidak ada
 data yang bertambah rusak selama dua mesin itu dorman.
+
+
+---
+
+## 7. Yang sudah dieksekusi 2026-09-27
+
+**Langkah 1 — registri tarif diisi (commit 9f8b64d).** 26 tarif statutori PPh
+23 / 4(2) / 15 / 22 / 26 / 21-bukan-pegawai, masing-masing mengutip dasar
+hukumnya di `legal_basis`. Kolom tanpa-NPWP mengikuti undang-undang, bukan
+pengganda seragam: PPh 23 & 22 naik 100%, PPh 21 naik 20%, rezim final (4(2),
+15) tidak punya tarif punitif sama sekali. Record `noupdate` agar amandemen
+tenant selamat dari upgrade; perubahan tarif berikutnya dikirim sebagai record
+baru dengan `effective_date_from` lebih akhir.
+
+**Langkah 2 — harness regresi (commit yang sama).** 25 kasus bruto→potongan
+terkunci ke regulasinya, plus asersi struktural: rezim final tanpa surcharge,
+surcharge PPh 23 tepat dua kali lipat, PPh 21 tepat 20%, kategori tak terseed
+jatuh ke `general` (bukan memotong nol), tarif bertanggal depan tidak berlaku,
+dan setiap tarif wajib mengutip regulasi. Termasuk satu asersi bahwa registri
+TIDAK kosong — kegagalan yang memulai semua ini, dan yang tak bisa ditangkap
+uji per-tarif karena nol memang hasil registri kosong.
+
+**Langkah 3 — satu otoritas tarif.** `tax.withholding.rule` (lapisan dokumen:
+kode objek, akun GL, pencocokan vendor/produk) kini mengambil `tarif` dan
+`tarif_no_npwp` dari `custom.witholding.rate` lewat `rate_id`, alih-alih
+menyimpan salinan angka yang bisa melenceng diam-diam. Rule tanpa `rate_id`
+tetap memakai angka yang diketik — jalan keluar untuk tarif yang diperintahkan
+dan tidak ada di matriks. Tersegel 5 test baru.
+
+**Langkah 5a — inversi tier & dependensi palsu dibereskan.** Hook PPh 21 di
+`hr.payslip` dipindah dari `compliance/custom_pph_witholding` ke
+`ee_gap/custom_hr_payroll_id` yang memang memiliki payroll. Sebelumnya hook itu
+duduk di modul compliance di balik penjaga `get_modules()` yang tidak pernah
+bekerja — manifest-nya tetap mendeklarasikan `custom_hr_payroll_id` sebagai
+dependensi keras, sehingga **setiap tenant yang hanya butuh tarif PPh dipaksa
+memasang HR payroll**, dan modul compliance bergantung pada modul ee_gap.
+Sekarang arahnya benar: payroll butuh mesin withholding, bukan sebaliknya.
+Ditemukan juga bahwa hook itu **tidak punya pemanggil** — PPh 21 tidak pernah
+otomatis dipotong dari payslip; itu dicatat di docstring-nya, bukan ditutupi.
+
+Verifikasi: 177 test lulus (custom_tax_id 58, custom_hr_payroll_id 56,
+custom_accounting_reports 40, custom_pph_witholding 18, custom_petty_cash 5);
+tarif terpasang dan terbukti menghitung di expomedia, athera_lgx, acme_l10n.
+Satu test laporan PPh yang **sudah gagal sebelum perubahan ini** ikut
+diperbaiki: fixture-nya tidak pernah mengisi `x_custom_withholding_move_id`,
+padahal laporan sengaja membuang baris yang PPh-nya belum masuk GL.
+
+## 8. Temuan operasional yang perlu tindakan manusia
+
+- **Nol partner di expomedia punya NPWP terisi.** Karena mesin sekarang benar
+  -benar menghitung, setiap potongan akan memakai tarif punitif (dobel untuk
+  PPh 23). Benar secara regulasi bila mitra memang tak ber-NPWP; biasanya
+  NPWP-nya ada dan hanya belum dicatat di Odoo. Isi `res.partner.vat` sebelum
+  withholding dipakai untuk dokumen nyata.
+- **PPh 21 dari payslip tidak pernah otomatis berjalan** — hook-nya ada, tapi
+  tidak ada yang memanggilnya. Kalau PPh 21 karyawan diharapkan terpotong
+  otomatis, itu pekerjaan tersendiri.
+- Kategori kode objek (`tax.withholding.category`) dan rule dokumen masih
+  kosong: seed-nya placeholder. Tarif sudah ada; pemetaan ke kode objek Coretax
+  belum. Itu langkah berikutnya bila bukti potong hendak diterbitkan.

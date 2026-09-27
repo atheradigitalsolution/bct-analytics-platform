@@ -36,7 +36,6 @@ Triggers
         "custom_pdp_audit",
         "custom_coretax",
         "custom_coretax_bupot",
-        "custom_hr_payroll_id",
         "account",
         "mail",
     ],

@@ -5,13 +5,8 @@ from . import witholding_application
 from . import account_move
 from . import account_payment
 
-# hr.payslip override is Enterprise-only (depends on hr_payroll). Importing it
-# unconditionally crashes on Community because _inherit on a missing model
-# raises TypeError at registry load. Only import when hr_payroll is present.
-try:
-    import odoo.modules.module
-
-    if "hr_payroll" in odoo.modules.module.get_modules():
-        from . import hr_payslip  # noqa: F401
-except Exception:
-    pass
+# The PPh 21 payslip hook moved to ee_gap/custom_hr_payroll_id, which owns
+# hr.payslip. It used to live here behind a get_modules() guard that never
+# actually worked: the manifest declared custom_hr_payroll_id as a hard
+# dependency anyway, so every tenant that wanted a PPh rate had to install
+# payroll. That also inverted the tier (compliance depending on ee_gap).
