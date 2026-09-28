@@ -9,6 +9,9 @@
                 <t t-foreach="rx.line_ids.filtered(lambda l: l.state != 'cancelled' and not l.parent_line_id)" t-as="line">
                     <div class="page" style="font-family: Arial, sans-serif; font-size: 7pt;">
                         <div style="font-weight: bold; font-size: 6pt; border-bottom: 0.2mm solid #000;">
+                            <img t-if="settings.hospital_logo"
+                                 t-att-src="image_data_uri(settings.hospital_logo)"
+                                 style="max-height: 4mm; max-width: 10mm; vertical-align: middle; margin-right: 1mm;"/>
                             <span t-esc="settings.hospital_name"/>
                         </div>
                         <div style="margin-top: 1mm;">

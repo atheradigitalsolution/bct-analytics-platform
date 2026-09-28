@@ -45,6 +45,10 @@
                 <t t-set="settings" t-value="enc.env['hms.settings'].get_settings()"/>
                 <t t-call="web.external_layout">
                     <div class="page">
+                        <div t-if="settings.hospital_logo" style="text-align: center;">
+                            <img t-att-src="image_data_uri(settings.hospital_logo)"
+                                 style="max-height: 16mm; max-width: 60mm;"/>
+                        </div>
                         <h3 style="text-align: center; margin-bottom: 0;">LEMBAR REGISTRASI PASIEN</h3>
                         <p style="text-align: center; margin-top: 0;">
                             <span t-esc="settings.hospital_name"/>
