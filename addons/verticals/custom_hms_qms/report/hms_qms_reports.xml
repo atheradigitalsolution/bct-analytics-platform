@@ -28,6 +28,13 @@
             <t t-foreach="docs" t-as="ticket">
                 <t t-set="settings" t-value="ticket.env['hms.settings'].get_settings()"/>
                 <div class="page" style="font-family: Arial, sans-serif; text-align: center;">
+                    <!-- Logo RS. `hospital_logo` sebelumnya bisa diunggah di form pengaturan
+                     tanpa satu baris kode pun membacanya. t-if menjaga kop tetap
+                     rapi ketika RS belum mengunggah apa pun: tanpa itu QWeb menulis
+                     src kosong dan pencetak menghasilkan ikon gambar rusak. -->
+                    <img t-if="settings.hospital_logo"
+                         t-att-src="image_data_uri(settings.hospital_logo)"
+                         style="max-height: 12mm; max-width: 40mm; margin-bottom: 1mm;"/>
                     <div style="font-size: 10pt; font-weight: bold;">
                         <span t-esc="settings.hospital_name"/>
                     </div>

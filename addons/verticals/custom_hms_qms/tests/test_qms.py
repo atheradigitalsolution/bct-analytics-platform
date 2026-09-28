@@ -282,3 +282,143 @@ class TestKioskAndDisplay(QmsCase):
         old = display.token
         display.action_regenerate_token()
         self.assertNotEqual(display.token, old)
+
+
+@tagged("post_install", "-at_install", "hms")
+class TestRecallInterval(QmsCase):
+    """`max_call_count` is one number for a rule that has two dimensions.
+
+    Three taps in five seconds — impatient clerk, sticky button, a double tap
+    on a touch screen — marked a patient standing at the desk as absent.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.settings = self.env["hms.settings"].get_settings()
+        self.settings.write({"max_call_count": 3})
+
+    def _rewind_last_call(self, ticket, seconds):
+        """Move the counted-call stamp into the past without sleeping."""
+        ticket.sudo().write({
+            "last_call_at": fields.Datetime.subtract(
+                fields.Datetime.now(), seconds=seconds
+            ),
+        })
+
+    def test_rapid_recalls_do_not_count_toward_no_show(self):
+        self.settings.write({"recall_min_interval_seconds": 30})
+        self.counter.action_open()
+        self._issue()
+        ticket = self.counter.action_call_next()
+        self.assertEqual(ticket.call_count, 1)
+        ticket.action_recall()
+        ticket.action_recall()
+        ticket.action_recall()
+        self.assertEqual(
+            ticket.state, "called",
+            "Panggilan beruntun dalam jeda minimum tidak boleh menandai tidak hadir.",
+        )
+        self.assertEqual(
+            ticket.call_count, 1,
+            "Pencacah panggilan tidak boleh melaju untuk panggilan yang terlalu cepat.",
+        )
+
+    def test_spaced_recalls_still_reach_no_show(self):
+        """KONTROL POSITIF: penjaga jeda tidak boleh mematikan no-show."""
+        self.settings.write({"recall_min_interval_seconds": 30})
+        self.counter.action_open()
+        self._issue()
+        ticket = self.counter.action_call_next()
+        self._rewind_last_call(ticket, 60)
+        ticket.action_recall()
+        self.assertEqual(ticket.call_count, 2)
+        self.assertEqual(ticket.state, "called")
+        self._rewind_last_call(ticket, 60)
+        ticket.action_recall()
+        self.assertEqual(ticket.call_count, 3)
+        self.assertEqual(ticket.state, "no_show")
+
+    def test_default_interval_keeps_todays_behaviour(self):
+        """Bawaan 0 = tanpa jeda minimum, perilaku persis seperti sebelumnya."""
+        self.assertEqual(
+            self.env["hms.settings"].default_get(
+                ["recall_min_interval_seconds"]
+            ).get("recall_min_interval_seconds", 0), 0,
+            "Nilai bawaan harus 0 supaya tidak mengubah perilaku RS yang sudah jalan.",
+        )
+        self.settings.write({"recall_min_interval_seconds": 0})
+        self.counter.action_open()
+        self._issue()
+        ticket = self.counter.action_call_next()
+        ticket.action_recall()
+        ticket.action_recall()
+        self.assertEqual(ticket.state, "no_show")
+        self.assertEqual(ticket.call_count, 3)
+
+    def test_an_uncounted_recall_is_still_announced(self):
+        """Pasien tuli/lansia butuh dipanggil lagi; hanya pencacahnya yang diam."""
+        self.settings.write({"recall_min_interval_seconds": 30})
+        self.counter.action_open()
+        self._issue()
+        ticket = self.counter.action_call_next()
+        before = len(ticket.log_ids)
+        ticket.action_recall()
+        self.assertEqual(
+            len(ticket.log_ids), before + 1,
+            "Panggilan ulang harus tetap tercatat walau tidak dihitung.",
+        )
+        self.assertEqual(ticket.call_count, 1)
+
+    def test_recall_through_the_counter_is_guarded_too(self):
+        self.settings.write({"recall_min_interval_seconds": 30})
+        self.counter.action_open()
+        self._issue()
+        ticket = self.counter.action_call_next()
+        self.counter.action_recall()
+        self.counter.action_recall()
+        self.counter.action_recall()
+        self.assertEqual(ticket.state, "called")
+        self.assertEqual(ticket.call_count, 1)
+
+    def test_restore_clears_the_call_stamp(self):
+        self.settings.write({"recall_min_interval_seconds": 30})
+        self.counter.action_open()
+        self._issue()
+        ticket = self.counter.action_call_next()
+        ticket.action_no_show()
+        ticket.action_restore()
+        self.assertEqual(ticket.call_count, 0)
+        self.assertFalse(
+            ticket.last_call_at,
+            "Tiket yang dipulihkan harus mulai dari nol, bukan mewarisi jeda lama.",
+        )
+
+
+@tagged("post_install", "-at_install", "hms")
+class TestTicketPrintHeader(QmsCase):
+    """`hospital_logo` dulu bisa diunggah tetapi tidak pernah dibaca kode."""
+
+    def _render_ticket(self, ticket):
+        return self.env["ir.qweb"]._render(
+            "custom_hms_qms.report_qms_ticket_document", {"docs": ticket}
+        )
+
+    def test_logo_appears_on_the_printed_ticket(self):
+        settings = self.env["hms.settings"].get_settings()
+        # 1x1 PNG, cukup untuk membuktikan field-nya dibaca.
+        settings.write({"hospital_logo": (
+            b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
+            b"z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        )})
+        html = str(self._render_ticket(self._issue()))
+        self.assertIn("data:image/png;base64,", html,
+                      "Logo RS yang diunggah harus muncul di kop struk antrian.")
+
+    def test_header_stays_clean_without_a_logo(self):
+        settings = self.env["hms.settings"].get_settings()
+        settings.write({"hospital_logo": False})
+        html = str(self._render_ticket(self._issue()))
+        self.assertIn(settings.hospital_name, html)
+        self.assertNotIn("data:image", html,
+                         "Tanpa logo, kop tidak boleh menghasilkan gambar rusak.")
+        self.assertNotIn('src=""', html)

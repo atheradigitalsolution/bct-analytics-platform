@@ -87,6 +87,13 @@ class HmsQmsTicket(models.Model):
     serving_at = fields.Datetime("Mulai Dilayani", readonly=True)
     finished_at = fields.Datetime("Selesai", readonly=True)
     call_count = fields.Integer("Jumlah Panggilan", default=0, readonly=True)
+    last_call_at = fields.Datetime(
+        "Panggilan Terhitung Terakhir", readonly=True,
+        help="Stempel panggilan terakhir yang MENAIKKAN call_count. Sengaja "
+             "terpisah dari called_at: called_at ikut menghitung wait_seconds, "
+             "jadi memperbaruinya tiap panggil ulang akan memalsukan statistik "
+             "lama tunggu.",
+    )
     wait_seconds = fields.Integer("Menunggu (detik)", compute="_compute_durations", store=True)
     service_seconds = fields.Integer("Dilayani (detik)", compute="_compute_durations", store=True)
     estimated_at = fields.Datetime("Estimasi Dipanggil")
@@ -223,6 +230,7 @@ class HmsQmsTicket(models.Model):
                 "called_at": fields.Datetime.now(),
                 "called_by_id": self.env.uid,
                 "call_count": ticket.call_count + 1,
+                "last_call_at": fields.Datetime.now(),
             })
             counter.write({"current_ticket_id": ticket.id})
             ticket._log(previous, "called")
@@ -230,14 +238,47 @@ class HmsQmsTicket(models.Model):
         return True
 
     def action_recall(self):
+        """Call the patient again, and only sometimes count it.
+
+        `max_call_count` is one number for a rule that has two dimensions:
+        how many calls, and over what span. Without the second dimension an
+        impatient clerk, a sticky button or a double tap on a touch screen
+        marks a patient who is standing at the desk as absent — and for a BPJS
+        patient that reaches Antrol.
+
+        Two shapes were possible. REFUSING the too-early recall was rejected:
+        a deaf or elderly patient genuinely needs calling several times, and a
+        clerk who is told "not yet" by the system will stop trusting it or
+        work around it. So the recall always happens — it is logged and
+        announced on the display exactly as before — and only the COUNTER
+        stands still. Nothing a clerk can do by pressing faster takes a turn
+        away from a patient; the no-show still arrives, it just needs real
+        time to pass.
+
+        `recall_min_interval_seconds` defaults to 0, which is the behaviour
+        this method had before the parameter existed.
+        """
         settings = self.env["hms.settings"].get_settings()
+        min_gap = settings.recall_min_interval_seconds or 0
+        now = fields.Datetime.now()
         for ticket in self:
             if ticket.state not in ("called", "serving"):
                 raise UserError(_("Tiket %s tidak sedang dipanggil.") % ticket.name)
-            ticket.write({"call_count": ticket.call_count + 1})
-            ticket._log(ticket.state, ticket.state, reason=_("Panggil ulang"))
+            # Tickets called before this field existed fall back to called_at,
+            # so an upgrade does not hand anyone a free extra call.
+            last = ticket.last_call_at or ticket.called_at
+            counts = True
+            if min_gap > 0 and last:
+                counts = (now - last).total_seconds() >= min_gap
+            if counts:
+                ticket.write({"call_count": ticket.call_count + 1, "last_call_at": now})
+                reason = _("Panggil ulang")
+            else:
+                reason = _("Panggil ulang (tidak dihitung: jeda < %s detik)") % min_gap
+            ticket._log(ticket.state, ticket.state, reason=reason)
             ticket._emit("qms.ticket.recalled")
-            if ticket.call_count >= (settings.max_call_count or 3) and ticket.state == "called":
+            if (counts and ticket.call_count >= (settings.max_call_count or 3)
+                    and ticket.state == "called"):
                 ticket.action_no_show()
         return True
 
@@ -289,7 +330,7 @@ class HmsQmsTicket(models.Model):
                     _("Tiket %(n)s sudah lewat %(m)s menit; pasien harus mengambil nomor baru.")
                     % {"n": ticket.name, "m": int(elapsed)}
                 )
-            ticket.write({"state": "waiting", "call_count": 0})
+            ticket.write({"state": "waiting", "call_count": 0, "last_call_at": False})
             ticket._log("no_show", "waiting", reason=_("Dipulihkan"))
             ticket._emit("qms.ticket.created")
         return True
