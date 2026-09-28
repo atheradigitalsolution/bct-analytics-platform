@@ -87,7 +87,22 @@ class LgxTripAdvance(models.Model):
 
     @api.constrains("driver_id", "state")
     def _check_single_open_advance(self):
-        """Satu pengemudi, satu uang jalan terbuka. Dapat dimatikan lewat parameter."""
+        """Satu pengemudi, satu uang jalan terbuka. Dimatikan dengan mengisi 0.
+
+        MENGOSONGKAN parameter ini TIDAK mematikannya. `get_param` berbunyi
+        `return self._get_param(key) or default` (base/models/ir_config_parameter.py;
+        nomor barisnya sengaja tidak dikutip, ia berubah antar versi Odoo), dan
+        `or default` berada DI LUAR ormcache — ormcache-nya menempel di
+        `_get_param` yang privat, bukan di `get_param` yang publik. Akibatnya
+        nilai kosong dan record yang tidak ada mengembalikan hal yang sama. Di
+        sini defaultnya "1", sehingga isian yang dikosongkan terbaca sebagai
+        penjaga MENYALA.
+
+        Arahnya aman: tidak ada yang lolos yang seharusnya ditahan. Yang tidak
+        aman adalah keyakinan operatornya — ia mengira sudah mematikan aturan
+        ini dan tidak. Karena itu pesan galat di bawah menyebut angkanya, bukan
+        sekadar nama parameternya.
+        """
         enabled = self.env["ir.config_parameter"].sudo().get_param(
             "lgx.driver_single_open_advance", "1") == "1"
         if not enabled:
@@ -103,9 +118,10 @@ class LgxTripAdvance(models.Model):
             if others:
                 raise ValidationError(_(
                     "Pengemudi %s masih punya uang jalan terbuka: %s. Satu pengemudi "
-                    "hanya boleh memegang satu uang jalan terbuka; aturan ini dapat "
-                    "dimatikan lewat parameter 'lgx.driver_single_open_advance' bila "
-                    "memang dikehendaki.",
+                    "hanya boleh memegang satu uang jalan terbuka. Bila memang "
+                    "dikehendaki, matikan dengan MENGISI 0 pada parameter "
+                    "'lgx.driver_single_open_advance' — mengosongkan isiannya tidak "
+                    "mematikan aturan ini.",
                     advance.driver_id.name, ", ".join(others.mapped("name")),
                 ))
 
