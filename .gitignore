@@ -137,6 +137,17 @@ desktop.ini
 observability/prometheus/scrape.d/*.json
 
 # ---------------------------------------------------------------------------
+# Script probe manual ad-hoc di root repo. `probe_mkuser.py` (2026-09-20-an)
+# membuat/mengubah user `zz-live@simrs-demo.invalid` dengan password
+# HARDCODED untuk uji lintas-proses manual terhadap custom_hms_base -- bukan
+# bagian addon, tidak dipanggil manifest mana pun, dan membawa kredensial
+# literal. Diabaikan, bukan dihapus, karena masih dipakai sebagai probe lokal;
+# jangan pernah ter-commit lewat `git add -A`.
+# Berjangkar: hanya file ini di root, bukan setiap `probe_*.py` di manapun.
+# ---------------------------------------------------------------------------
+/probe_mkuser.py
+
+# ---------------------------------------------------------------------------
 # Deliverable operator: dokumen klien, tangkapan layar, dan arsip yang dibangun
 # untuk sebuah pekerjaan. Bukan bagian dari produk.
 #
