@@ -26,6 +26,12 @@ def bill_payload(bill, detail=False):
         "amount_paid": bill.amount_paid,
         "amount_due": bill.amount_due,
         "unpriced_lines": bill.unpriced_line_count,
+        # Kunci TAMBAHAN. Dihitung di Odoo supaya layar hanya menampilkan:
+        # tiga salinan rumus "deposit menipis" tidak akan pernah tetap setuju.
+        "deposit_total": bill.deposit_total,
+        "deposit_balance": bill.deposit_balance,
+        "deposit_used_percent": bill.deposit_used_percent,
+        "deposit_warning": bill.deposit_warning,
     }
     if detail:
         sections = {}

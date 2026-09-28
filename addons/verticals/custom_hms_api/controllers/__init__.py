@@ -11,6 +11,7 @@ from . import diagnostics
 from . import inpatient
 from . import billing
 from . import nursing
+from . import scheduling
 from . import reports
 from . import casemix
 from . import medrec

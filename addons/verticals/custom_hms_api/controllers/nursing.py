@@ -133,12 +133,23 @@ class HmsNursingController(http.Controller):
     @hms_route(f"{API_ROOT}/nursing/requests", methods=("POST",))
     def unit_request(self, body=None, **kw):
         body = body or {}
-        record = request.env["hms.unit.request"].create({
+        values = {
             "station_id": int(body["station_id"]),
             "admission_id": int(body["admission_id"]) if body.get("admission_id") else False,
             "to_unit": body["to_unit"],
             "type": body.get("type"),
             "detail": body["detail"],
             "priority": body.get("priority", "normal"),
-        })
+        }
+        # Tambahan opsional, bukan perubahan kontrak: permintaan gizi yang
+        # TIDAK mengubah diet (tambah porsi, geser jam makan) tetap sah tanpa
+        # kedua kunci ini, dan bentuk responsnya tidak bergeser. Tanpa jalur
+        # ini dapur menerima teks bebas lagi, dan rekap porsi per jenis diet
+        # — satu-satunya alasan master diet dibuat — tidak pernah bisa
+        # dihitung.
+        if body.get("diet_type_id"):
+            values["diet_type_id"] = int(body["diet_type_id"])
+        if body.get("order_line_id"):
+            values["order_line_id"] = int(body["order_line_id"])
+        record = request.env["hms.unit.request"].create(values)
         return {"request": {"id": record.id, "state": record.state}}
