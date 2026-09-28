@@ -277,6 +277,18 @@ hook; project-specific rules for the Odoo master password, mask salt, DSNs and a
 repository ever gains a remote and a secret has already been pushed, rotation is the only
 remedy — scrubbing history does not un-fetch it.
 
+**Realized instance (2026-09-29).** `custom_hms_demo/models/hms_demo_builder.py` shipped
+`os.environ.get("SIMRS_DEMO_PASSWORD", "simrsdemo2026")` — a hardcoded fallback never declared
+in `compose/odoo.yml`, so it was the value in practice on any host that didn't set the
+variable. It was already in `fork/feat/analytics-platform` history (remote
+`atheradigitalsolution/bct-analytics-platform`) before this was noticed. Commit `76433ec`
+removes the default and makes startup fail without `SIMRS_DEMO_PASSWORD`, guarded by
+`test_no_default_password_survives_in_the_source` (a hashed comparison, so the fix itself does
+not reintroduce the literal) — that closes the code path, **not** the history. Scrubbing is not
+an option, per the paragraph above: the repo already has a remote. **Action required, not yet
+done:** rotate the demo login's password on every environment that ran with the default,
+especially the internet-facing `simrs_demo` database.
+
 ---
 
 ## 4. Explicitly out of scope for Phase 1
