@@ -8,6 +8,7 @@ import time
 import requests
 
 from odoo import _, api, fields, models
+from odoo.addons.custom_hms_base.tools.config_param import config_float
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ class HmsSatusehatClient(models.AbstractModel):
         """Return a cached access token, refreshing only when it is nearly due."""
         Param = self.env["ir.config_parameter"].sudo()
         cached = Param.get_param("hms.satusehat.token")
-        expires = float(Param.get_param("hms.satusehat.token_expires") or 0)
+        expires = config_float(self.env, "hms.satusehat.token_expires", 0.0)
         if cached and expires - TOKEN_SKEW > time.time():
             return cached
         settings = self._settings()
