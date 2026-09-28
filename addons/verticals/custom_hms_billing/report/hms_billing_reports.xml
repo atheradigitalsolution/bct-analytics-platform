@@ -106,6 +106,10 @@
                 <t t-set="settings" t-value="pay.env['hms.settings'].get_settings()"/>
                 <t t-call="web.external_layout">
                     <div class="page" style="font-size: 10pt;">
+                        <div t-if="settings.hospital_logo" style="text-align: center;">
+                            <img t-att-src="image_data_uri(settings.hospital_logo)"
+                                 style="max-height: 16mm; max-width: 60mm;"/>
+                        </div>
                         <h4 style="text-align: center; letter-spacing: 1mm;">KWITANSI</h4>
                         <p style="text-align: center; margin-top: -2mm;">
                             No. <strong><span t-field="pay.name"/></strong>

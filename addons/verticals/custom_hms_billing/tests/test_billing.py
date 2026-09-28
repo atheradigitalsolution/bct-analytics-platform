@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Charging, payer split, deposits, payments and the accounting handoff."""
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -400,3 +400,154 @@ class TestUnpricedService(BillingCase):
         self.assertEqual(bill.unpriced_line_count, 0)
         bill.action_open()
         self.assertEqual(bill.state, "open")
+
+
+@tagged("post_install", "-at_install", "hms")
+class TestBillLineBounds(BillingCase):
+    """Batas keras pada dua persentase yang mengalikan uang di baris tagihan.
+
+    Penjaga di hms.payer.plan menjaga data master; yang benar-benar menghitung
+    uang adalah hms.bill.line. Wizard dan ambang otorisasi bisa dilewati lewat
+    API, impor dan data demo, jadi batasnya harus ada di model.
+    """
+
+    def _line(self):
+        encounter = self._encounter()
+        self._order_done(encounter)
+        bill = self.env["hms.bill"].search([("encounter_id", "=", encounter.id)])
+        return bill.line_ids
+
+    # --- lubang yang ditutup ------------------------------------------------
+    def test_discount_percent_above_hundred_is_refused(self):
+        with self.assertRaises(ValidationError):
+            self._line().write({"discount_percent": 500.0})
+
+    def test_discount_percent_below_zero_is_refused(self):
+        """Diskon negatif adalah surcharge terselubung."""
+        with self.assertRaises(ValidationError):
+            self._line().write({"discount_percent": -1.0})
+
+    def test_coverage_percent_above_hundred_is_refused(self):
+        with self.assertRaises(ValidationError):
+            self._line().write({"coverage_percent": 500.0})
+
+    def test_coverage_percent_below_zero_is_refused(self):
+        with self.assertRaises(ValidationError):
+            self._line().write({"coverage_percent": -1.0})
+
+    def test_refusal_names_the_field_and_the_valid_range(self):
+        with self.assertRaises(ValidationError) as caught:
+            self._line().write({"discount_percent": 500.0})
+        message = str(caught.exception)
+        self.assertIn("Diskon", message)
+        self.assertIn("0", message)
+        self.assertIn("100", message)
+
+    def test_approved_authorisation_cannot_smuggle_five_hundred_percent(self):
+        """Ambang otorisasi adalah ambang PERSETUJUAN, bukan plafon: tanpa
+        batas di model, supervisor yang menyetujui 500% membuat RS membayar
+        pasien."""
+        encounter = self._encounter()
+        self._order_done(encounter)
+        bill = self.env["hms.bill"].search([("encounter_id", "=", encounter.id)])
+        request = bill.request_discount_authorization(500.0, "Uji batas")
+        supervisor = self.env["res.users"].create({
+            "name": "Supervisor Batas", "login": "sup.batas.test",
+            "group_ids": [(4, self.env.ref(
+                "custom_hms_base.group_hms_billing_supervisor").id)],
+        })
+        request.with_user(supervisor).action_approve()
+        with self.assertRaises(ValidationError):
+            bill.apply_discount(500.0, "Uji batas")
+
+    # --- kontrol positif: batasnya sendiri wajib lolos ----------------------
+    def test_discount_of_zero_is_accepted(self):
+        line = self._line()
+        line.write({"discount_percent": 0.0})
+        self.assertAlmostEqual(line.discount_amount, 0.0)
+
+    def test_discount_of_one_hundred_is_accepted(self):
+        """Gratis/dibebaskan adalah keadaan nyata yang justru harus tercatat."""
+        line = self._line()
+        line.write({"discount_percent": 100.0})
+        self.assertAlmostEqual(line.discount_amount, line.price_subtotal)
+        self.assertAlmostEqual(line.amount_patient, 0.0)
+
+    def test_coverage_of_zero_and_one_hundred_are_accepted(self):
+        line = self._line()
+        line.write({"coverage_percent": 0.0})
+        self.assertAlmostEqual(line.amount_payer, 0.0)
+        line.write({"coverage_percent": 100.0})
+        self.assertAlmostEqual(line.amount_payer, line.price_subtotal)
+        self.assertAlmostEqual(line.amount_patient, 0.0)
+
+    def test_ordinary_values_are_accepted(self):
+        line = self._line()
+        line.write({"discount_percent": 15.0, "coverage_percent": 80.0})
+        self.assertAlmostEqual(line.discount_amount, line.price_subtotal * 0.15)
+        self.assertAlmostEqual(
+            line.amount_payer, (line.price_subtotal - line.discount_amount) * 0.8)
+
+
+@tagged("post_install", "-at_install", "hms")
+class TestDepositWarning(BillingCase):
+    """`deposit_warning_percent` dulu bisa diisi tetapi tidak pernah dibaca kode."""
+
+    def setUp(self):
+        super().setUp()
+        self.settings = self.env["hms.settings"].get_settings()
+
+    def _bill_with_deposit(self, amount):
+        encounter = self._encounter()
+        self._order_done(encounter)          # tarif 200.000, pasien umum
+        bill = self.env["hms.bill"].search([("encounter_id", "=", encounter.id)])
+        if amount:
+            self.env["hms.deposit"].create({
+                "patient_id": bill.patient_id.id, "amount": amount, "method": "cash",
+            })
+        bill.invalidate_recordset()
+        return bill
+
+    def test_charges_past_the_threshold_raise_the_warning(self):
+        self.settings.write({"deposit_warning_percent": 80.0})
+        bill = self._bill_with_deposit(250000)   # 200.000 / 250.000 = 80%
+        self.assertAlmostEqual(bill.deposit_total, 250000)
+        self.assertAlmostEqual(bill.deposit_used_percent, 80.0, places=2)
+        self.assertTrue(bill.deposit_warning)
+
+    def test_a_higher_threshold_stays_quiet(self):
+        self.settings.write({"deposit_warning_percent": 95.0})
+        bill = self._bill_with_deposit(250000)
+        self.assertFalse(bill.deposit_warning)
+
+    def test_a_comfortable_deposit_stays_quiet(self):
+        self.settings.write({"deposit_warning_percent": 80.0})
+        bill = self._bill_with_deposit(2000000)  # 10%
+        self.assertFalse(bill.deposit_warning)
+
+    def test_zero_threshold_switches_the_warning_off(self):
+        self.settings.write({"deposit_warning_percent": 0.0})
+        bill = self._bill_with_deposit(100000)   # tagihan 2x deposit
+        self.assertAlmostEqual(bill.deposit_used_percent, 200.0, places=2)
+        self.assertFalse(
+            bill.deposit_warning,
+            "Ambang 0 berarti peringatan dimatikan, bukan selalu menyala.",
+        )
+
+    def test_a_patient_without_a_deposit_is_not_warned(self):
+        self.settings.write({"deposit_warning_percent": 80.0})
+        bill = self._bill_with_deposit(0)
+        self.assertAlmostEqual(bill.deposit_total, 0.0)
+        self.assertFalse(bill.deposit_warning)
+
+    def test_the_flag_travels_in_the_bill_payload(self):
+        from odoo.addons.custom_hms_api.controllers.billing import bill_payload
+        self.settings.write({"deposit_warning_percent": 80.0})
+        bill = self._bill_with_deposit(250000)
+        payload = bill_payload(bill)
+        # Kunci lama tidak boleh berubah bentuknya.
+        for key in ("amount_deposit", "amount_due", "amount_patient"):
+            self.assertIn(key, payload)
+        self.assertTrue(payload["deposit_warning"])
+        self.assertAlmostEqual(payload["deposit_total"], 250000)
+        self.assertAlmostEqual(payload["deposit_balance"], 250000)

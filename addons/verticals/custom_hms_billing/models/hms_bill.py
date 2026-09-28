@@ -41,6 +41,31 @@ class HmsBill(models.Model):
     unpriced_line_count = fields.Integer(
         "Baris Tanpa Tarif", compute="_compute_unpriced", store=True,
     )
+
+    # `deposit_warning_percent` di hms.settings dulu bisa diisi RS tanpa satu
+    # baris kode pun membacanya. Perhitungannya ditaruh di sini, bukan di
+    # layar: kasir Odoo, layar web dan cetakan harus setuju tentang kapan
+    # deposit dianggap menipis, dan tiga salinan rumus tidak akan pernah tetap
+    # setuju. Tidak disimpan (store=False) karena nilainya bergantung pada
+    # deposit pasien yang belum tentu terkait tagihan ini, sehingga tidak ada
+    # depends yang jujur bisa ditulis untuknya.
+    deposit_total = fields.Monetary(
+        "Deposit Diterima", compute="_compute_deposit_warning",
+        help="Jumlah deposit pasien yang masih bisa dipakai untuk tagihan ini.",
+    )
+    deposit_balance = fields.Monetary(
+        "Sisa Deposit", compute="_compute_deposit_warning",
+    )
+    deposit_used_percent = fields.Float(
+        "Tagihan thd Deposit (%)", compute="_compute_deposit_warning",
+        help="Porsi pasien pada tagihan berjalan dibagi deposit yang diterima.",
+    )
+    deposit_warning = fields.Boolean(
+        "Deposit Menipis", compute="_compute_deposit_warning",
+        help="Menyala bila tagihan berjalan sudah melewati ambang "
+             "hms.settings.deposit_warning_percent terhadap deposit yang "
+             "diterima. Ambang 0 berarti peringatan dimatikan.",
+    )
     state = fields.Selection(
         [("draft", "Berjalan"), ("open", "Siap Bayar"), ("paid", "Lunas"),
          ("closed", "Ditutup"), ("cancelled", "Batal")],
@@ -75,6 +100,41 @@ class HmsBill(models.Model):
                 bill.payment_ids.filtered(lambda p: p.state == "done").mapped("amount")
             )
             bill.amount_due = bill.amount_patient - bill.amount_deposit - bill.amount_paid
+
+    def _compute_deposit_warning(self):
+        """Flag bills whose running charges are eating the patient's deposit.
+
+        The deposits that count are the ones still available to this bill:
+        those already applied to it, plus the patient's open deposits that no
+        other bill has claimed. A deposit taken at admission carries no
+        bill_id until it is consumed, so restricting this to `deposit_ids`
+        would report zero for exactly the inpatient case the warning exists
+        for.
+
+        A threshold of 0 means OFF, not "always on": the parameter's own
+        default is 80, and a hospital that clears the field is switching the
+        warning off, not asking to be warned about every bill.
+        """
+        threshold = self.env["hms.settings"].get_settings().deposit_warning_percent or 0.0
+        Deposit = self.env["hms.deposit"]
+        for bill in self:
+            deposits = Deposit.search([
+                ("patient_id", "=", bill.patient_id.id),
+                ("state", "in", ("open", "used")),
+                "|", ("bill_id", "=", bill.id), ("bill_id", "=", False),
+            ]) if bill.patient_id else Deposit.browse()
+            bill.deposit_total = sum(deposits.mapped("amount"))
+            bill.deposit_balance = sum(deposits.mapped("balance"))
+            if float_is_zero(bill.deposit_total, precision_digits=2):
+                bill.deposit_used_percent = 0.0
+                bill.deposit_warning = False
+                continue
+            bill.deposit_used_percent = bill.amount_patient / bill.deposit_total * 100.0
+            bill.deposit_warning = (
+                threshold > 0.0
+                and float_compare(bill.deposit_used_percent, threshold,
+                                  precision_digits=2) >= 0
+            )
 
     @api.depends("line_ids.price_missing", "line_ids.state")
     def _compute_unpriced(self):

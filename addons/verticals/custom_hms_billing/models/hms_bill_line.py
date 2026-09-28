@@ -68,6 +68,38 @@ class HmsBillLine(models.Model):
             line.amount_payer = net * (line.coverage_percent or 0.0) / 100.0
             line.amount_patient = net - line.amount_payer
 
+    @api.constrains("discount_percent", "coverage_percent")
+    def _check_percentages(self):
+        """Kedua persentase yang mengalikan uang di baris ini: 0..100 inklusif.
+
+        Penjaga yang sudah ada berada di hms.payer.plan (data master),
+        sedangkan baris inilah yang benar-benar menghitung
+        `amount_payer = net * coverage_percent / 100`. Nilai plan hanya
+        DISALIN ke sini saat charge(); siapa pun yang boleh menulis
+        hms.bill.line dapat menyetelnya langsung lewat API, impor, atau data
+        demo tanpa melewati wizard atau alur otorisasi diskon. Ambang
+        `discount_auth_percent` adalah ambang PERSETUJUAN, bukan plafon:
+        diskon 500% yang disetujui supervisor tetap akan tertulis tanpa
+        penjaga di sini, dan baris tagihan menjadi negatif (RS membayar
+        pasien).
+
+        Batasnya inklusif karena 0 dan 100 keduanya keadaan nyata yang justru
+        harus tercatat: tanpa diskon / gratis, tidak ditanggung / ditanggung
+        penuh. Dipasang sebagai @api.constrains, bukan CHECK SQL: seluruh 62
+        baris yang ada punya discount_percent NULL, dan CHECK SQL lolos begitu
+        saja pada NULL sementara ORM membaca NULL sebagai 0.0.
+        """
+        for line in self:
+            for label, value in (("Diskon", line.discount_percent),
+                                 ("Ditanggung Penjamin", line.coverage_percent)):
+                if not 0.0 <= (value or 0.0) <= 100.0:
+                    raise ValidationError(
+                        _("%(label)s pada baris \"%(name)s\" bernilai %(value).2f%%. "
+                          "Persentase harus antara 0 dan 100 "
+                          "(0 = tidak ada, 100 = penuh).")
+                        % {"label": label, "name": line.name or "", "value": value}
+                    )
+
     @api.model
     def charge(self, bill, tariff, qty=1.0, source=None, unit=None, practitioner=None,
                service_date=None, name=None, cito=False, class_override=None, note=None):
