@@ -36,6 +36,19 @@ class HmsSettings(models.Model):
     vitals_interval_hours = fields.Integer("Interval TTV default (jam)", default=8)
     no_show_recover_minutes = fields.Integer("Pemulihan no-show (menit)", default=30)
     max_call_count = fields.Integer("Panggilan sebelum no-show", default=3)
+    recall_min_interval_seconds = fields.Integer(
+        "Jeda minimum antar panggilan (detik)", default=0,
+        help="Jeda minimum antara dua panggilan yang DIHITUNG menuju no-show. "
+             "Panggilan ulang yang datang lebih cepat dari ini tetap dilakukan "
+             "dan tetap diumumkan \u2014 hanya pencacahnya yang tidak melaju, "
+             "sehingga tiga ketukan dalam lima detik tidak lagi menandai pasien "
+             "yang berdiri di depan loket sebagai tidak hadir. "
+             "KOSONG ATAU 0 BERARTI TANPA JEDA MINIMUM, dan itulah defaultnya: "
+             "tidak ada norma nasional maupun SPO yang bisa dikutip untuk angka "
+             "ini, dan angka yang ditebak akan menolak perilaku yang sah tanpa "
+             "memberi petunjuk sebabnya. Isi sesuai SPO loket RS ini \u2014 "
+             "misalnya 20 berarti panggilan kedua dalam 20 detik tidak dihitung.",
+    )
     booking_checkin_before_minutes = fields.Integer("Batas check-in booking (menit)", default=30)
     name_masking = fields.Boolean("Samarkan nama di display antrian", default=True)
     priority_interleave = fields.Integer(
@@ -45,6 +58,16 @@ class HmsSettings(models.Model):
 
     # Billing / cashier thresholds.
     discount_auth_percent = fields.Float("Diskon butuh otorisasi (%)", default=10.0)
+    tariff_multiplier_max = fields.Float(
+        "Plafon pengali tarif", default=0.0,
+        help="Batas ATAS pengali CITO dan pengali akhir pekan pada hms.tariff.price. "
+             "KOSONG ATAU 0 BERARTI TANPA PLAFON, dan itulah defaultnya: sistem "
+             "tidak menebak angka maksimum, karena plafon yang ditebak menolak "
+             "tarif yang sah tanpa memberi petunjuk sebabnya. Isi hanya bila RS "
+             "punya kebijakan tertulis \u2014 misalnya 3 berarti pengali di atas 3x "
+             "ditolak. Batas bawah (pengali harus lebih besar dari nol) selalu "
+             "berlaku dan tidak bisa dimatikan dari sini.",
+    )
     deposit_warning_percent = fields.Float(
         "Ambang peringatan deposit (%)", default=80.0,
         help="Bila tagihan berjalan melewati persentase ini dari deposit, kasir diberi tugas top-up.",

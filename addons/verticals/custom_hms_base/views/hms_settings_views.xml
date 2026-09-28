@@ -19,6 +19,7 @@
                         </group>
                         <group string="Antrian">
                             <field name="max_call_count"/>
+                            <field name="recall_min_interval_seconds"/>
                             <field name="no_show_recover_minutes"/>
                             <field name="booking_checkin_before_minutes"/>
                             <field name="priority_interleave"/>
@@ -32,6 +33,7 @@
                         <group string="Kasir">
                             <field name="discount_auth_percent"/>
                             <field name="deposit_warning_percent"/>
+                            <field name="tariff_multiplier_max"/>
                         </group>
                     </group>
                     <notebook>

@@ -208,6 +208,48 @@ class HmsTariffPrice(models.Model):
                     % {"code": rec.tariff_id.code, "parts": parts, "total": rec.price_total}
                 )
 
+    @api.constrains("cito_multiplier", "weekend_multiplier")
+    def _check_multipliers(self):
+        """Pengali tarif harus lebih besar dari nol.
+
+        Sengaja hanya batas BAWAH, dan sengaja ketat. Nol bukan "tanpa
+        pengali": effective_amounts memakai `self.cito_multiplier or 1.0`,
+        jadi nol diam-diam berperilaku seperti 1.0 sementara nilai negatif
+        benar-benar diterapkan dan membalik tanda tagihan. Keduanya tidak
+        punya arti sebagai pengali tarif.
+
+        Batas ATAS tidak ditebak di sini. Plafon karangan menolak tarif yang
+        sah dan gejalanya ("tarif ditolak") tidak menunjuk sebabnya. Bila RS
+        punya kebijakan pengali maksimum, ia mengisinya sendiri di
+        hms.settings.tariff_multiplier_max; kosong/0 berarti tanpa plafon,
+        yang merupakan default dan perilaku sistem sebelum perubahan ini.
+        """
+        # search (bukan get_settings) supaya validasi tidak pernah MEMBUAT
+        # baris pengaturan sebagai efek samping; tanpa baris berarti tanpa plafon.
+        cap = self.env["hms.settings"].search(
+            [("company_id", "=", self.env.company.id)], limit=1
+        ).tariff_multiplier_max or 0.0
+        for rec in self:
+            for label, value in (("CITO", rec.cito_multiplier),
+                                 ("Akhir Pekan", rec.weekend_multiplier)):
+                if value <= 0.0:
+                    raise ValidationError(
+                        _("Pengali %(label)s pada tarif %(code)s bernilai %(value).4g. "
+                          "Pengali tarif harus lebih besar dari nol "
+                          "(1 = tanpa pengali, 1,5 = 150%% dari tarif dasar).")
+                        % {"label": label, "code": rec.tariff_id.code or rec.tariff_id.name,
+                           "value": value}
+                    )
+                if cap and value > cap:
+                    raise ValidationError(
+                        _("Pengali %(label)s pada tarif %(code)s bernilai %(value).4g, "
+                          "melebihi plafon %(cap).4g yang disetel rumah sakit pada "
+                          "Pengaturan SIMRS \u2192 Plafon pengali tarif. "
+                          "Rentang yang sah: lebih besar dari 0 sampai %(cap).4g.")
+                        % {"label": label, "code": rec.tariff_id.code or rec.tariff_id.name,
+                           "value": value, "cap": cap}
+                    )
+
     def effective_amounts(self, qty=1.0):
         """Return the amounts actually charged, multipliers applied."""
         self.ensure_one()

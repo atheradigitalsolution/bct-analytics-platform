@@ -188,3 +188,90 @@ class TestBedStateMachine(TransactionCase):
         self.ward.invalidate_recordset()
         self.assertEqual(self.ward.occupied_count, 1)
         self.assertAlmostEqual(self.ward.occupancy_rate, 100.0)
+
+
+@tagged("post_install", "-at_install", "hms")
+class TestTariffMultiplierBounds(TransactionCase):
+    """Pengali tarif mengalikan uang, jadi nilainya harus punya arti tarif.
+
+    Nol diam-diam diperlakukan sebagai 1.0 oleh fallback `or 1.0` di
+    effective_amounts (jadi tidak terlihat), sementara nilai negatif
+    benar-benar diterapkan dan membalik tanda tagihan. Keduanya ditolak di
+    model, bukan di layar: impor dan API melewati layar.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.tariff = cls.env["hms.tariff"].create({
+            "code": "ZT-TND-MUL", "name": "Tindakan Uji Pengali",
+            "category_id": cls.env.ref("custom_hms_base.tariff_cat_procedure").id,
+        })
+        cls.price = cls.env["hms.tariff.price"].create({
+            "tariff_id": cls.tariff.id, "price_total": 100000,
+        })
+
+    # --- lubang yang ditutup ------------------------------------------------
+    def test_cito_multiplier_zero_is_refused(self):
+        with self.assertRaises(ValidationError):
+            self.price.write({"cito_multiplier": 0.0})
+
+    def test_cito_multiplier_negative_is_refused(self):
+        with self.assertRaises(ValidationError):
+            self.price.write({"cito_multiplier": -5.0})
+
+    def test_weekend_multiplier_zero_is_refused(self):
+        with self.assertRaises(ValidationError):
+            self.price.write({"weekend_multiplier": 0.0})
+
+    def test_weekend_multiplier_negative_is_refused(self):
+        with self.assertRaises(ValidationError):
+            self.price.write({"weekend_multiplier": -5.0})
+
+    def test_multiplier_bound_is_enforced_on_create_too(self):
+        with self.assertRaises(ValidationError):
+            self.env["hms.tariff.price"].create({
+                "tariff_id": self.tariff.id, "price_total": 50000,
+                "valid_from": "2030-01-01", "cito_multiplier": 0.0,
+            })
+
+    def test_refusal_names_the_field_and_the_valid_range(self):
+        with self.assertRaises(ValidationError) as caught:
+            self.price.write({"cito_multiplier": -5.0})
+        message = str(caught.exception)
+        self.assertIn("CITO", message)
+        self.assertIn("lebih besar dari nol", message)
+
+    # --- kontrol positif: batasnya sendiri wajib lolos ----------------------
+    def test_multiplier_of_one_is_accepted(self):
+        """1.0 adalah nilai SELURUH data tarif yang ada; menolaknya mematahkan semuanya."""
+        self.price.write({"cito_multiplier": 1.0, "weekend_multiplier": 1.0})
+        self.assertAlmostEqual(self.price.cito_multiplier, 1.0)
+        self.assertAlmostEqual(self.price.weekend_multiplier, 1.0)
+
+    def test_ordinary_multipliers_are_accepted(self):
+        self.price.write({"cito_multiplier": 1.5, "weekend_multiplier": 1.25})
+        self.assertAlmostEqual(self.price.cito_multiplier, 1.5)
+        self.assertAlmostEqual(self.price.weekend_multiplier, 1.25)
+
+    def test_multiplier_below_one_is_accepted(self):
+        """Pengali < 1 sah (tarif paket/diskon kontrak); hanya <= 0 yang tidak."""
+        self.price.write({"cito_multiplier": 0.5})
+        self.assertAlmostEqual(self.price.cito_multiplier, 0.5)
+
+    # --- plafon: tidak dikarang, hanya berlaku bila RS mengisinya -----------
+    def test_no_ceiling_is_invented_by_default(self):
+        """Tanpa kebijakan RS, angka besar tetap diterima: plafon karangan
+        menolak data sah dan lebih sulit didiagnosis daripada tidak ada plafon."""
+        self.price.write({"cito_multiplier": 100.0})
+        self.assertAlmostEqual(self.price.cito_multiplier, 100.0)
+
+    def test_configured_ceiling_refuses_above_it(self):
+        self.env["hms.settings"].get_settings().tariff_multiplier_max = 5.0
+        with self.assertRaises(ValidationError):
+            self.price.write({"cito_multiplier": 100.0})
+
+    def test_configured_ceiling_accepts_its_own_limit(self):
+        self.env["hms.settings"].get_settings().tariff_multiplier_max = 5.0
+        self.price.write({"cito_multiplier": 5.0, "weekend_multiplier": 1.0})
+        self.assertAlmostEqual(self.price.cito_multiplier, 5.0)
