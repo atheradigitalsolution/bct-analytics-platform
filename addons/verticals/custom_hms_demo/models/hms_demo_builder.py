@@ -170,7 +170,16 @@ class HmsDemoBuilder(models.AbstractModel):
         self._nursing(wards)
         self._cashier()
         self._nursing_masters()
+        # Pembersihan mendahului pembuatan. Tiga pasien sisa uji coba adalah
+        # pasien UMUM dengan id terendah, dan _patient_pools() mengurutkan per
+        # id — merekalah yang dipegang episode nilai kritis dan KLPCM. Lihat
+        # PROBE_PATIENTS untuk alasan identitasnya dipulihkan, bukan dihapus.
+        self._restore_probe_patients()
+        self._cancel_stale_registrations()
+        self._archive_probe_qms_services()
         self._patients()
+        self._deduplicate_patient_names()
+        self._assign_niks()
         self._users(practitioners)
         _logger.info("SIMRS: data demo selesai dibuat")
         return True
@@ -561,7 +570,16 @@ class HmsDemoBuilder(models.AbstractModel):
             ("PERIKSA-UM", "Ruang Periksa Umum", ["POLI-UMUM"], "Lantai 1", True),
             ("PERIKSA-PD", "Ruang Periksa Penyakit Dalam", ["POLI-PD"], "Lantai 1", True),
             ("PERIKSA-ANAK", "Ruang Periksa Anak", ["POLI-ANAK"], "Lantai 1", True),
+            ("PERIKSA-OBG", "Ruang Periksa Kebidanan", ["POLI-OBG"], "Lantai 1", True),
+            ("PERIKSA-BEDAH", "Ruang Periksa Bedah", ["POLI-BEDAH"], "Lantai 1", True),
+            ("PERIKSA-GIGI", "Ruang Periksa Gigi", ["POLI-GIGI"], "Lantai 1", True),
+            # Penunjang tanpa loket tidak dapat memanggil siapa pun:
+            # hms.qms.ticket.action_call() menolak tiket tanpa loket, sehingga
+            # antrian LAB dan RAD hanya bisa bertambah, tidak pernah terlayani.
+            ("LAB-1", "Loket Laboratorium", ["LAB"], "Lantai 1", False),
+            ("RAD-1", "Loket Radiologi", ["RAD"], "Lantai 1", False),
             ("APOTEK-1", "Meja Apotek 1", ["FAR"], "Lantai 1", False),
+            ("APOTEK-2", "Meja Apotek 2", ["FAR"], "Lantai 1", False),
             ("KASIR-1", "Kasir 1", ["KAS"], "Lobi Utama", False),
             ("KASIR-2", "Kasir 2", ["KAS"], "Lobi Utama", False),
         ]
@@ -736,9 +754,34 @@ class HmsDemoBuilder(models.AbstractModel):
                           "custom_hms_medrec.group_hms_medrec"]),
         ("kp", None, ["custom_hms_safety.group_hms_patient_safety"]),
     ]
-    # Overridable so a demo on a shared host does not use a password that is
-    # written down in the source tree.
-    DEMO_PASSWORD = os.environ.get("SIMRS_DEMO_PASSWORD", "simrsdemo2026")
+    @api.model
+    def _demo_password(self):
+        """The demo account password, required from the environment.
+
+        There is no default. A password written into the source tree is a
+        known credential from the moment it is committed, and this seeder runs
+        on every `-u`: one missing compose entry is enough to reissue it on a
+        stack that may face the internet, silently and with no error.
+
+        Blank is refused too, not just absent. Compose forwards
+        `${SIMRS_DEMO_PASSWORD:-}`, so an .env without the value leaves the
+        variable PRESENT but empty -- and `os.environ.get(key, default)` never
+        reaches its default in that case. The accounts would be created with
+        no usable password instead, which fails in a quieter and more
+        confusing way than not being created at all.
+
+        It deliberately does not invent a random one: a password nobody
+        recorded means nobody can log in, which is its own confusing failure.
+        """
+        password = (os.environ.get("SIMRS_DEMO_PASSWORD") or "").strip()
+        if not password:
+            raise UserError(_(
+                "SIMRS_DEMO_PASSWORD belum disetel, sehingga akun peran demo "
+                "tidak dibuat. Penyemai menolak memakai sandi bawaan yang "
+                "tertulis di kode sumber. Setel variabel itu (diteruskan dari "
+                ".env lewat compose/odoo.yml) lalu jalankan ulang."
+            ))
+        return password
 
     @api.model
     def _group_ref(self, name):
@@ -748,14 +791,20 @@ class HmsDemoBuilder(models.AbstractModel):
     def _users(self, practitioners):
         Users = self.env["res.users"].sudo()
         created = {}
+        # Resolved on first actual need, not up front: build_all() re-runs on
+        # every `-u`, and a stack whose accounts already exist must not start
+        # failing its upgrades just because the variable is absent.
+        password = None
         for slug, practitioner_name, groups in self.DEMO_USERS:
             login = f"{slug}@simrs-demo.invalid"
             user = Users.search([("login", "=", login)], limit=1)
             if not user:
+                if password is None:
+                    password = self._demo_password()
                 user = Users.create({
                     "name": practitioner_name or slug.capitalize(),
                     "login": login,
-                    "password": self.DEMO_PASSWORD,
+                    "password": password,
                     "group_ids": [(4, self._group_ref(g).id) for g in groups],
                 })
             practitioner = practitioners.get(practitioner_name) if practitioner_name else None
@@ -771,7 +820,41 @@ class HmsDemoBuilder(models.AbstractModel):
         )
 
     # --- patients ---------------------------------------------------------
-    def _patients(self, count=50):
+    def _unused_patient_name(self, gender, taken):
+        """Nama yang belum dipakai pasien lain.
+
+        Memilih acak lalu MEMERIKSA, bukan memilih acak lalu berharap.
+        ``random.seed()`` dipasang di awal ``build_all()``, sehingga
+        penyemaian yang menambah pasien ke register yang sudah ada memulai
+        deret acaknya dari posisi yang hampir sama dan menghasilkan nama
+        yang sama persis dengan pasien lama — bukan kebetulan, melainkan
+        sistematis. Dua "Oka Puspita" pada papan bed berisi dua puluh baris
+        adalah hal yang langsung ditunjuk orang.
+        """
+        firsts = FIRST_NAMES_M if gender == "male" else FIRST_NAMES_F
+        for _attempt in range(200):
+            name = f"{random.choice(firsts)} {random.choice(LAST_NAMES)}"
+            if name not in taken:
+                return name
+        # Deret acak kehabisan keberuntungan: telusuri seluruh kombinasi.
+        # Tanpa cabang ini, loop di atas bisa mengembalikan nama kembar
+        # secara diam-diam begitu registernya cukup besar.
+        for first in firsts:
+            for last in LAST_NAMES:
+                if f"{first} {last}" not in taken:
+                    return f"{first} {last}"
+        raise UserError(_(
+            "Kombinasi nama pasien demo habis (%s nama terpakai). Tambah "
+            "entri di FIRST_NAMES/LAST_NAMES sebelum memperbesar register."
+        ) % len(taken))
+
+
+    # Register pasien harus lebih besar daripada jumlah slot papan hari ini.
+    # Dengan 50 pasien, 24 kunjungan hari ini dan 19 admisi menghabiskan
+    # seluruh pasien dewasa sebelum bangsal kelas III terisi, dan penyemaian
+    # berhenti di tengah upgrade. Delapan puluh juga lebih masuk akal untuk
+    # rumah sakit yang sudah berjalan daripada lima puluh.
+    def _patients(self, count=80):
         Patient = self.env["hms.patient"]
         existing = Patient.search_count([])
         if existing >= count:
@@ -780,10 +863,11 @@ class HmsDemoBuilder(models.AbstractModel):
         allergens = self.env["hms.ingredient"].search([], limit=6)
         created = Patient
         base_nik = 3273010101000000
+        taken = set(Patient.search([]).mapped("name"))
         for index in range(count - existing):
             gender = "male" if index % 2 == 0 else "female"
-            first = random.choice(FIRST_NAMES_M if gender == "male" else FIRST_NAMES_F)
-            name = f"{first} {random.choice(LAST_NAMES)}"
+            name = self._unused_patient_name(gender, taken)
+            taken.add(name)
             age = random.choice([2, 5, 9, 17, 24, 31, 38, 45, 52, 60, 67, 74])
             birth = fields.Date.subtract(
                 fields.Date.context_today(self), days=age * 365 + random.randint(0, 364)
@@ -920,8 +1004,12 @@ class HmsDemoScenario(models.AbstractModel):
             "line_ids": [(0, 0, {"tariff_id": lab_tariff.id})],
         })
         lab_order.action_submit()
-        lab_order.line_ids.action_start()
         analyst = self.env["hms.demo.builder"].demo_user("analis")
+        # Gerbang pra-analitik, bukan action_start() langsung: pemeriksaan
+        # yang selesai atas spesimen yang tidak pernah diterima adalah baris
+        # yang langsung terbaca salah oleh petugas laboratorium.
+        lab_line = lab_order.line_ids
+        (lab_line.with_user(analyst) if analyst else lab_line).action_receive_specimen()
         for result in lab_order.line_ids.lab_result_ids:
             value = {"HB": 13.5, "WBC": 13.2, "PLT": 180.0, "HCT": 41.0}.get(
                 result.parameter_id.code, 10.0

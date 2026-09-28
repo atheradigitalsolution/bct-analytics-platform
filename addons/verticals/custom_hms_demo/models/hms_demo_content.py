@@ -58,15 +58,23 @@ ICD10 = [
     ("J18.9", "Pneumonia, organisme tidak spesifik", "Pneumonia, unspecified organism"),
     ("J44.1", "PPOK dengan eksaserbasi akut",
      "Chronic obstructive pulmonary disease with acute exacerbation"),
+    ("J06.9", "Infeksi saluran napas atas akut, tidak spesifik",
+     "Acute upper respiratory infection, unspecified"),
+    ("K04.0", "Pulpitis", "Pulpitis"),
     ("K29.7", "Gastritis, tidak spesifik", "Gastritis, unspecified"),
     ("K35.80", "Apendisitis akut, tidak spesifik", "Acute appendicitis, unspecified"),
+    ("K40.90", "Hernia inguinalis unilateral tanpa obstruksi atau gangren",
+     "Unilateral inguinal hernia, without obstruction or gangrene"),
     ("K80.2", "Batu kandung empedu tanpa kolesistitis",
      "Calculus of gallbladder without cholecystitis"),
+    ("M17.1", "Osteoartritis lutut primer lainnya", "Other primary gonarthrosis"),
     ("N18.5", "Penyakit ginjal kronik stadium 5", "Chronic kidney disease, stage 5"),
     ("N39.0", "Infeksi saluran kemih, lokasi tidak spesifik",
      "Urinary tract infection, site not specified"),
     ("R50.9", "Demam, tidak spesifik", "Fever, unspecified"),
     ("S06.0", "Komosio serebri", "Concussion"),
+    ("Z34.0", "Supervisi kehamilan normal pertama",
+     "Supervision of normal first pregnancy"),
     ("W19", "Jatuh tidak spesifik", "Unspecified fall"),
 ]
 
@@ -341,6 +349,14 @@ class HmsDemoContent(models.AbstractModel):
         self.env["hms.demo.builder"]._assert_demo_database()
         self._masters()
         self._episodes()
+        self._correct_seeded_diagnoses()
+        self._today_board()
+        # Sesudah papan hari ini: order penunjang yang masih berjalan
+        # menggantung pada kunjungan dan admisi yang baru dibuat di sana.
+        self._support_worklists()
+        # Sesudah keduanya: loket kasir membayar tagihan yang lahir dari
+        # episode DAN dari papan hari ini.
+        self._cashier_day()
         self._realign_klpcm()
         self._batches()
         self._medrec()
@@ -369,7 +385,11 @@ class HmsDemoContent(models.AbstractModel):
         ``_assert_demo_database()``.
         """
         stale = self.env["hms.job"].sudo().search([
-            ("state", "in", ("pending", "failed")),
+            # "dead" ikut dibatalkan. Ia lahir dari sebab yang sama persis —
+            # bridging yang tidak tersambung — dan dasbor menampilkannya
+            # sebagai angka merah "pekerjaan mati" di samping angka-angka
+            # yang justru ingin diperagakan.
+            ("state", "in", ("pending", "failed", "dead")),
             "|", ("name", "=like", "bpjs.%"), ("name", "=like", "satusehat.%"),
         ])
         if not stale:
@@ -381,6 +401,48 @@ class HmsDemoContent(models.AbstractModel):
         stale.action_cancel()
         _logger.info("SIMRS demo: %s job bridging dibatalkan", len(stale))
         return len(stale)
+
+    # (kunci jangkar episode, kode yang terlanjur tersemai, kode yang benar)
+    #
+    # Perbaikan data, bukan perbaikan spesifikasi: sumbernya sudah menyebut
+    # kode yang benar, tetapi ``_episode()`` berhenti di jangkar dan tidak
+    # pernah menengok lagi diagnosis kunjungan yang sudah ada. Database yang
+    # sempat disemai versi lama karena itu memegang kode lama selamanya,
+    # tanpa satu pun angka yang terlihat salah.
+    MIS_SEEDED_DIAGNOSES = [
+        # Poli Gigi & Mulut, "Pulpitis ireversibel gigi 46" pada catatan
+        # dokternya, tetapi terkode K29.7 (Gastritis). Diagnosis kerja, jadi
+        # mengubahnya adalah koreksi dokter yang biasa — bukan pembongkaran
+        # diagnosis akhir yang sudah menjadi dasar klaim.
+        ("ep_klpcm_fresh", "K29.7", "K04.0"),
+    ]
+
+    def _correct_seeded_diagnoses(self):
+        """Luruskan kode diagnosis yang terlanjur tersemai keliru.
+
+        Hanya menyentuh kunjungan berjangkar demo, dan hanya bila kode yang
+        keliru memang masih terpasang — sehingga menjalankannya berulang kali
+        tidak mengubah apa pun, dan diagnosis yang sudah dikoreksi tangan
+        manusia tidak ditimpa balik.
+        """
+        self.env["hms.demo.builder"]._assert_demo_database()
+        fixed = 0
+        for key, wrong, right in self.MIS_SEEDED_DIAGNOSES:
+            encounter = self._anchor(key)
+            icd = self._icd10(right)
+            if not encounter or not icd:
+                continue
+            stale = self.env["hms.diagnosis"].search([
+                ("encounter_id", "=", encounter.id),
+                ("icd10_id.code", "=", wrong),
+            ])
+            if not stale:
+                continue
+            stale.write({"icd10_id": icd.id})
+            fixed += len(stale)
+            _logger.info("SIMRS demo: diagnosis %s pada %s dikoreksi menjadi %s",
+                         wrong, encounter.name, right)
+        return fixed
 
     def _realign_klpcm(self):
         """Kembalikan tenggat KLPCM ke jam kunjungan demo ditutup.
@@ -548,7 +610,7 @@ class HmsDemoContent(models.AbstractModel):
                 or payer.plan_ids[:1])
 
     def _open_encounter(self, patient, unit, doctor, payer, arrival, enc_type,
-                        complaint, triage=None, arrival_mode="walk_in"):
+                        complaint, triage=None, arrival_mode="walk_in", start=True):
         plan = self._plan_for(payer, patient)
         vals = {
             "patient_id": patient.id,
@@ -575,7 +637,10 @@ class HmsDemoContent(models.AbstractModel):
                 "sep_no": "0001R001%s%04d" % (arrival.strftime("%m%y"), encounter.id % 10000),
                 "sep_state": "issued",
             })
-        encounter.action_start_service()
+        if start:
+            # Papan hari ini butuh kunjungan yang MASIH berstatus Terdaftar —
+            # pasien yang sudah ambil nomor tetapi belum masuk ruang periksa.
+            encounter.action_start_service()
         return encounter
 
     def _observation(self, encounter, at, **vitals):
@@ -675,7 +740,14 @@ class HmsDemoContent(models.AbstractModel):
         })
         order.action_submit()
         line = order.line_ids
-        line.action_start()
+        # Penerimaan spesimen, bukan action_start() langsung: di laboratorium
+        # yang memulai pemeriksaan adalah spesimen yang sampai di meja, dan
+        # aksi inilah yang mencatatnya lalu memulai barisnya. Memanggil
+        # action_start() sendiri menghasilkan pemeriksaan selesai atas
+        # spesimen yang tidak pernah diterima — tiga belas baris seperti itu
+        # sudah pernah tersemai dan harus dibereskan belakangan.
+        self._as(line, "analis").action_receive_specimen()
+        line.write({"specimen_received_at": ordered_at})
         analyst = self._user("analis")
         values = values or {}
         for result in line.lab_result_ids:
@@ -1313,6 +1385,28 @@ class HmsDemoContent(models.AbstractModel):
         )
         self._claim_for(enc, 0.94)
 
+        # --- 11. Klaim yang tenggatnya tinggal hitungan hari --------------
+        # Dua klaim di pita merah, bukan satu. Dengan satu baris saja, papan
+        # kedaluwarsa terbaca sebagai kasus tunggal yang kebetulan; penanda
+        # yang gunanya memperingatkan perlu terlihat sedang memperingatkan.
+        # Tenggatnya TIDAK ditulis langsung — ia turunan dari tanggal pulang,
+        # jadi yang digeser tanggal kunjungannya.
+        enc = self._episode(
+            "ep_deadline_urgent",
+            patient=bpjs[10], unit_code="POLI-UMUM", specialty="SPU",
+            payer_code="BPJS", enc_type="outpatient", days_ago=180, hours=3,
+            complaint="Nyeri sendi lutut kanan saat berjalan",
+            notes=[("soap",
+                    "Nyeri lutut kanan saat berjalan jauh dan naik tangga, 2 bulan.",
+                    "Krepitasi lutut kanan, tidak ada efusi, gerakan terbatas ringan.",
+                    "Osteoartritis lutut kanan.",
+                    "Analgetik, latihan penguatan otot paha, turunkan berat badan.")],
+            diagnoses=[("M17.1", "primary", "final")],
+            want_summary=True,
+            bill_tariffs=("ADM-RJ", "KONS-UM"),
+        )
+        self._claim_for(enc, 0.91)
+
         # --- Episode penunjang: nilai kritis yang belum diakui ------------
         self._episode(
             "ep_igd_critical",
@@ -1367,7 +1461,7 @@ class HmsDemoContent(models.AbstractModel):
                     "Karies profunda gigi 46, perkusi positif, tidak ada abses.",
                     "Pulpitis ireversibel gigi 46.",
                     "Perawatan saluran akar bertahap, analgetik.")],
-            diagnoses=[("K29.7", "primary", "working")],
+            diagnoses=[("K04.0", "primary", "working")],
             want_summary=False,
             bill_tariffs=("ADM-RJ", "KONS-SP"),
         )
